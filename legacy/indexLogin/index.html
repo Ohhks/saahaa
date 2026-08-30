@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAHA Portal</title>
+    <link rel="stylesheet" href="indexStyle.css">
+</head>
+<body>
+
+<div class="container">
+
+    <!-- Left Side -->
+    <div class="left-panel">
+
+        <div class="logo">
+            <img src="images/saha-logo.png" alt="SAHA Logo">
+            <h1>SAHA</h1>
+            <p>Together, We Elevate Life</p>
+        </div>
+
+        <div class="welcome">
+            <h2>Welcome to SAHA</h2>
+            <p>
+                Book trusted home services, shop from nearby stores,
+                become a partner and earn more with India's
+                Hyperlocal Service Platform.
+            </p>
+        </div>
+
+    </div>
+
+    <!-- Right Side -->
+    <div class="right-panel">
+
+        <!-- Login Form -->
+        <div class="form-box active" id="loginForm">
+
+            <h2>Login</h2>
+
+            <form>
+
+                <div class="input-box">
+                    <label>Email / Mobile</label>
+                    <input type="text" placeholder="Enter Email or Mobile">
+                </div>
+
+                <div class="input-box">
+                    <label>Password</label>
+                    <input type="password" placeholder="Enter Password">
+                </div>
+
+                <div class="options">
+
+                    <label>
+                        <input type="checkbox">
+                        Remember Me
+                    </label>
+
+                    <a href="#">Forgot Password?</a>
+
+                </div>
+
+               <button type="button" onclick="loginUser()">
+                    Login
+                </button>
+
+            </form>
+
+            <p>
+                Don't have an account?
+                <a href="#" onclick="showRegister()">Register</a>
+            </p>
+
+        </div>
+
+        <!-- Register Form -->
+        <div class="form-box" id="registerForm">
+
+            <h2>Create Account</h2>
+
+            <form>
+
+                <div class="input-box">
+                    <label>Full Name</label>
+                    <input type="text" placeholder="Enter Full Name">
+                </div>
+
+                <div class="input-box">
+                    <label>Email</label>
+                    <input type="email" placeholder="Enter Email">
+                </div>
+
+                <div class="input-box">
+                    <label>Mobile Number</label>
+                    <input type="text" placeholder="Enter Mobile Number">
+                </div>
+
+                <div class="input-box">
+                    <label>Select Role</label>
+
+                    <select>
+
+                        <option>Customer</option>
+
+                        <option>Service Provider</option>
+
+                        <option>Shop Owner</option>
+
+                        <option>Ironing Partner</option>
+
+                        <option>Delivery Partner</option>
+
+                    </select>
+
+                </div>
+
+                <div class="input-box">
+                    <label>Password</label>
+                    <input type="password" placeholder="Create Password">
+                </div>
+
+                <div class="input-box">
+                    <label>Confirm Password</label>
+                    <input type="password" placeholder="Confirm Password">
+                </div>
+
+                <button type="submit">
+                    Register
+                </button>
+
+            </form>
+
+            <p>
+                Already have an account?
+                <a href="#" onclick="showLogin()">Login</a>
+            </p>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+function showRegister(){
+
+    document.getElementById("loginForm").classList.remove("active");
+    document.getElementById("registerForm").classList.add("active");
+
+}
+
+function showLogin(){
+
+    document.getElementById("registerForm").classList.remove("active");
+    document.getElementById("loginForm").classList.add("active");
+
+}
+function loginUser(){
+
+    // Later we'll validate username/password
+
+    window.location.href="home.html";
+
+}
+
+</script>
+
+</body>
+</html>

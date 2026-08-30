@@ -1,0 +1,608 @@
+/*==================================
+        GOOGLE FONT
+===================================*/
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Poppins',sans-serif;
+}
+
+body{
+    background:#f5f7fb;
+    color:#333;
+    padding-bottom:100px;
+}
+
+/*==================================
+        HEADER
+===================================*/
+
+.top-header{
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    padding:18px 20px;
+
+    background:#009966;
+
+    color:white;
+
+    position:sticky;
+
+    top:0;
+
+    z-index:1000;
+
+}
+
+.back{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:15px;
+
+}
+
+.back a{
+
+    color:white;
+
+    text-decoration:none;
+
+}
+
+.back i{
+
+    font-size:22px;
+
+}
+
+.header-icons i{
+
+    font-size:22px;
+
+    cursor:pointer;
+
+}
+
+/*==================================
+        SUCCESS CARD
+===================================*/
+
+.success{
+
+    margin:20px;
+
+    background:white;
+
+    border-radius:20px;
+
+    padding:30px;
+
+    text-align:center;
+
+    box-shadow:0 5px 15px rgba(0,0,0,.08);
+
+}
+
+.success-icon{
+
+    width:90px;
+
+    height:90px;
+
+    margin:auto;
+
+    border-radius:50%;
+
+    background:#e8fff2;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    margin-bottom:20px;
+
+}
+
+.success-icon i{
+
+    font-size:55px;
+
+    color:#00b56f;
+
+}
+
+.success h2{
+
+    color:#009966;
+
+    margin-bottom:10px;
+
+}
+
+.success h3{
+
+    margin-top:15px;
+
+    color:#ff6b00;
+
+}
+
+/*==================================
+        SECTION
+===================================*/
+
+section{
+
+    margin:20px;
+
+}
+
+section h2{
+
+    color:#009966;
+
+    margin-bottom:18px;
+
+}
+
+/*==================================
+        TIMELINE
+===================================*/
+
+.timeline{
+
+    background:white;
+
+    border-radius:20px;
+
+    padding:25px;
+
+    box-shadow:0 5px 15px rgba(0,0,0,.08);
+
+}
+
+.step{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:15px;
+
+}
+
+.circle{
+
+    width:45px;
+
+    height:45px;
+
+    border-radius:50%;
+
+    background:#d9d9d9;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    color:white;
+
+}
+
+.step.active .circle{
+
+    background:#00b56f;
+
+}
+
+.line{
+
+    width:3px;
+
+    height:45px;
+
+    background:#ddd;
+
+    margin-left:20px;
+
+    margin-top:5px;
+
+    margin-bottom:5px;
+
+}
+
+/*==================================
+        DETAILS CARD
+===================================*/
+
+.details-card{
+
+    background:white;
+
+    padding:22px;
+
+    border-radius:18px;
+
+    box-shadow:0 5px 15px rgba(0,0,0,.08);
+
+}
+
+.details-card p{
+
+    margin:12px 0;
+
+    font-size:15px;
+
+}
+
+.details-card hr{
+
+    margin:15px 0;
+
+}
+
+.details-card h3{
+
+    color:#009966;
+
+}
+/*==================================
+        RATING SECTION
+===================================*/
+
+.rating-card{
+
+    background:white;
+
+    padding:25px;
+
+    border-radius:20px;
+
+    box-shadow:0 5px 15px rgba(0,0,0,.08);
+
+    text-align:center;
+
+}
+
+.stars{
+
+    margin:20px 0;
+
+}
+
+.stars i{
+
+    font-size:35px;
+
+    color:#ccc;
+
+    cursor:pointer;
+
+    margin:0 5px;
+
+    transition:.3s;
+
+}
+
+.stars i:hover{
+
+    color:#FFD700;
+
+    transform:scale(1.2);
+
+}
+
+.rating-card textarea{
+
+    width:100%;
+
+    height:120px;
+
+    padding:15px;
+
+    border:1px solid #ddd;
+
+    border-radius:12px;
+
+    resize:none;
+
+    outline:none;
+
+    margin-bottom:20px;
+
+}
+
+.submit-review{
+
+    width:100%;
+
+    padding:15px;
+
+    background:#009966;
+
+    color:white;
+
+    border:none;
+
+    border-radius:12px;
+
+    cursor:pointer;
+
+    font-size:17px;
+
+    transition:.3s;
+
+}
+
+.submit-review:hover{
+
+    background:#007d57;
+
+}
+
+/*==================================
+        SUPPORT
+===================================*/
+
+.support-card{
+
+    display:grid;
+
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+
+    gap:20px;
+
+}
+
+.support-card div{
+
+    background:white;
+
+    padding:25px;
+
+    border-radius:18px;
+
+    text-align:center;
+
+    box-shadow:0 5px 15px rgba(0,0,0,.08);
+
+    transition:.3s;
+
+}
+
+.support-card div:hover{
+
+    transform:translateY(-6px);
+
+}
+
+.support-card i{
+
+    font-size:38px;
+
+    color:#009966;
+
+    margin-bottom:15px;
+
+}
+
+/*==================================
+        ACTION BUTTONS
+===================================*/
+
+.action-buttons{
+
+    display:grid;
+
+    grid-template-columns:1fr 1fr;
+
+    gap:20px;
+
+}
+
+.action-buttons button{
+
+    padding:16px;
+
+    border:none;
+
+    border-radius:12px;
+
+    background:#009966;
+
+    color:white;
+
+    font-size:16px;
+
+    cursor:pointer;
+
+    transition:.3s;
+
+}
+
+.action-buttons button:hover{
+
+    background:#007a52;
+
+    transform:translateY(-3px);
+
+}
+
+.action-buttons i{
+
+    margin-right:8px;
+
+}
+
+/*==================================
+        BOTTOM NAVIGATION
+===================================*/
+
+.bottom-nav{
+
+    position:fixed;
+
+    bottom:0;
+
+    left:0;
+
+    width:100%;
+
+    background:white;
+
+    display:flex;
+
+    justify-content:space-around;
+
+    padding:14px 0;
+
+    box-shadow:0 -5px 15px rgba(0,0,0,.12);
+
+}
+
+.bottom-nav a{
+
+    text-decoration:none;
+
+    color:#666;
+
+    display:flex;
+
+    flex-direction:column;
+
+    align-items:center;
+
+    font-size:13px;
+
+    transition:.3s;
+
+}
+
+.bottom-nav a i{
+
+    font-size:22px;
+
+    margin-bottom:5px;
+
+}
+
+.bottom-nav a.active,
+.bottom-nav a:hover{
+
+    color:#009966;
+
+}
+
+/*==================================
+        RESPONSIVE
+===================================*/
+
+@media(max-width:768px){
+
+.action-buttons{
+
+    grid-template-columns:1fr;
+
+}
+
+.support-card{
+
+    grid-template-columns:1fr;
+
+}
+
+.success{
+
+    padding:20px;
+
+}
+
+.timeline{
+
+    padding:20px;
+
+}
+
+}
+
+@media(max-width:500px){
+
+.top-header{
+
+    padding:15px;
+
+}
+
+.success{
+
+    margin:15px;
+
+}
+
+section{
+
+    margin:15px;
+
+}
+
+.success-icon{
+
+    width:70px;
+
+    height:70px;
+
+}
+
+.success-icon i{
+
+    font-size:40px;
+
+}
+
+.circle{
+
+    width:38px;
+
+    height:38px;
+
+}
+
+.line{
+
+    margin-left:18px;
+
+}
+
+.stars i{
+
+    font-size:28px;
+
+}
+
+.bottom-nav span{
+
+    font-size:11px;
+
+}
+
+.bottom-nav i{
+
+    font-size:18px;
+
+}
+
+}

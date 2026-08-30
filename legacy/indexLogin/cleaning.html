@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<title>SAHA Cleaning</title>
+
+<link rel="stylesheet" href="cleaning.css">
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+</head>
+
+<body>
+
+<header class="top-header">
+
+<div class="back">
+
+<a href="home.html">
+
+<i class="fa-solid fa-arrow-left"></i>
+
+</a>
+
+<h2>Cleaning Services</h2>
+
+</div>
+
+<div class="icons">
+
+<i class="fa-solid fa-bell"></i>
+
+<i class="fa-solid fa-cart-shopping"></i>
+
+</div>
+
+</header>
+
+<!--================ HERO =================-->
+
+<section class="hero">
+
+<div>
+
+<h1>Professional Home Cleaning</h1>
+
+<p>
+
+Trusted experts for a sparkling clean home.
+
+</p>
+
+<button>Book Now</button>
+
+</div>
+
+<i class="fa-solid fa-broom hero-icon"></i>
+
+</section>
+
+<!--================ SERVICES =================-->
+
+<section>
+
+<h2>Cleaning Services</h2>
+
+<div class="service-grid">
+
+<div class="service-card">
+
+<i class="fa-solid fa-house"></i>
+
+<h3>Home Cleaning</h3>
+
+<p>₹999</p>
+
+<button onclick="addToCart('Light Installation',199)">
+Select
+</button>
+
+</div>
+
+<div class="service-card">
+
+<i class="fa-solid fa-couch"></i>
+
+<h3>Sofa Cleaning</h3>
+
+<p>₹699</p>
+
+<button onclick="addToCart('Light Installation',199)">
+Select
+</button>
+
+</div>
+
+<div class="service-card">
+
+<i class="fa-solid fa-kitchen-set"></i>
+
+<h3>Kitchen Cleaning</h3>
+
+<p>₹899</p>
+
+<button onclick="addToCart('Light Installation',199)">
+Select
+</button>
+
+</div>
+
+<div class="service-card">
+
+<i class="fa-solid fa-bath"></i>
+
+<h3>Bathroom Cleaning</h3>
+
+<p>₹599</p>
+<button onclick="addToCart('Light Installation',199)">
+Select
+</button>
+
+</div>
+
+<div class="service-card">
+
+<i class="fa-solid fa-spray-can-sparkles"></i>
+
+<h3>Deep Cleaning</h3>
+
+<p>₹1999</p>
+
+<button onclick="addToCart('Light Installation',199)">
+Select
+</button>
+
+</div>
+
+<div class="service-card">
+
+<i class="fa-solid fa-window-maximize"></i>
+
+<h3>Window Cleaning</h3>
+
+<p>₹499</p>
+<button onclick="addToCart('Light Installation',199)">
+Select
+</button>
+
+</div>
+
+</div>
+
+</section>
+
+<!--================ BOOKING =================-->
+
+<section>
+
+<h2>Book Cleaning Service</h2>
+
+<form class="booking-form">
+
+<input
+type="text"
+placeholder="Full Name"
+required>
+
+<input
+type="text"
+placeholder="Mobile Number"
+required>
+
+<textarea
+placeholder="Service Address"
+required></textarea>
+
+<label>Select Date</label>
+
+<input
+type="date"
+required>
+
+<label>Select Time</label>
+
+<input
+type="time"
+required>
+<!--================ PAYMENT =================-->
+
+<label>Select Payment Method</label>
+
+<div class="payment-method">
+
+<label>
+<input type="radio" name="payment" checked>
+Cash on Delivery
+</label>
+
+<label>
+<input type="radio" name="payment">
+UPI
+</label>
+
+<label>
+<input type="radio" name="payment">
+Credit / Debit Card
+</label>
+
+</div>
+
+<button class="book-btn">
+
+Confirm Booking
+
+</button>
+
+</form>
+
+</section>
+
+<!--================ PACKAGES =================-->
+
+<section>
+
+<h2>Cleaning Packages</h2>
+
+<div class="package-grid">
+
+<div class="package-card">
+
+<h3>Basic Cleaning</h3>
+
+<p>✔ Living Room</p>
+
+<p>✔ Bedroom</p>
+
+<p>✔ Dusting</p>
+
+<h2>₹999</h2>
+
+<button>Choose</button>
+
+</div>
+
+<div class="package-card">
+
+<h3>Premium Cleaning</h3>
+
+<p>✔ Home Deep Cleaning</p>
+
+<p>✔ Kitchen</p>
+
+<p>✔ Bathroom</p>
+
+<p>✔ Balcony</p>
+
+<h2>₹1999</h2>
+
+<button>Choose</button>
+
+</div>
+
+<div class="package-card">
+
+<h3>Luxury Cleaning</h3>
+
+<p>✔ Full Home Sanitization</p>
+
+<p>✔ Sofa Cleaning</p>
+
+<p>✔ Window Cleaning</p>
+
+<p>✔ Premium Chemicals</p>
+
+<h2>₹2999</h2>
+
+<button>Choose</button>
+
+</div>
+
+</div>
+
+</section>
+
+<!--================ WHY SAHA =================-->
+
+<section>
+
+<h2>Why Choose SAHA?</h2>
+
+<div class="features">
+
+<div class="feature">
+
+<i class="fa-solid fa-user-shield"></i>
+
+<h3>Verified Professionals</h3>
+
+</div>
+
+<div class="feature">
+
+<i class="fa-solid fa-clock"></i>
+
+<h3>On Time Service</h3>
+
+</div>
+
+<div class="feature">
+
+<i class="fa-solid fa-star"></i>
+
+<h3>Top Rated</h3>
+
+</div>
+
+<div class="feature">
+
+<i class="fa-solid fa-hand-holding-dollar"></i>
+
+<h3>Affordable Pricing</h3>
+
+</div>
+
+</div>
+
+</section>
+
+<!--================ REVIEWS =================-->
+
+<section>
+
+<h2>Customer Reviews</h2>
+
+<div class="review-grid">
+
+<div class="review-card">
+
+<h3>Anjali</h3>
+
+<p>⭐⭐⭐⭐⭐</p>
+
+<p>
+
+Excellent home cleaning service.
+Very professional staff.
+
+</p>
+
+</div>
+
+<div class="review-card">
+
+<h3>Ramesh</h3>
+
+<p>⭐⭐⭐⭐⭐</p>
+
+<p>
+
+Kitchen cleaning was amazing.
+Highly recommended.
+
+</p>
+
+</div>
+
+<div class="review-card">
+
+<h3>Keerthi</h3>
+
+<p>⭐⭐⭐⭐⭐</p>
+
+<p>
+
+Affordable pricing and quality
+service.
+
+</p>
+
+</div>
+
+</div>
+
+</section>
+
+<!--================ BOTTOM NAVIGATION =================-->
+
+<nav class="bottom-nav">
+
+<a href="home.html">
+
+<i class="fa-solid fa-house"></i>
+
+<span>Home</span>
+
+</a>
+
+<a href="grocery.html">
+
+<i class="fa-solid fa-store"></i>
+
+<span>Shop</span>
+
+</a>
+
+<a href="booking.html">
+
+<i class="fa-solid fa-calendar-check"></i>
+
+<span>Bookings</span>
+
+</a>
+
+<a href="cleaning.html" class="active">
+
+<i class="fa-solid fa-broom"></i>
+
+<span>Cleaning</span>
+
+</a>
+
+<a href="profile.html">
+
+<i class="fa-solid fa-user"></i>
+
+<span>Profile</span>
+
+</a>
+
+</nav>
+
+<script src="cleaning.js"></script>
+
+</body>
+
+</html>

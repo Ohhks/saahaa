@@ -1,0 +1,14 @@
+{
+  "name": "SAAHAA Exchange",
+  "short_name": "SAAHAA",
+  "description": "Fully automated P2P bid & ask marketplace — +12% projection, 8% profit.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EDF1F6",
+  "theme_color": "#059669",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,247 @@
+/* Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Poppins',sans-serif;
+}
+
+body{
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:linear-gradient(135deg,#009966,#00c47a);
+    padding:20px;
+}
+
+.container{
+    width:100%;
+    max-width:1100px;
+    min-height:650px;
+    display:flex;
+    background:#fff;
+    border-radius:20px;
+    overflow:hidden;
+    box-shadow:0 15px 40px rgba(0,0,0,.2);
+}
+
+/* LEFT PANEL */
+
+.left-panel{
+    width:45%;
+    background:linear-gradient(135deg,#008c5a,#00b56f);
+    color:white;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    padding:50px;
+    text-align:center;
+}
+
+.logo img{
+    width:90px;
+    margin-bottom:15px;
+}
+
+.logo h1{
+    font-size:42px;
+    font-weight:800;
+    letter-spacing:2px;
+}
+
+.logo p{
+    margin-top:8px;
+    font-size:15px;
+    opacity:.9;
+}
+
+.welcome{
+    margin-top:60px;
+}
+
+.welcome h2{
+    font-size:32px;
+    margin-bottom:20px;
+}
+
+.welcome p{
+    line-height:1.8;
+    font-size:16px;
+}
+
+/* RIGHT PANEL */
+
+.right-panel{
+    width:55%;
+    padding:50px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    position:relative;
+}
+
+.form-box{
+    width:100%;
+    display:none;
+    animation:fade .4s ease;
+}
+
+.form-box.active{
+    display:block;
+}
+
+@keyframes fade{
+
+    from{
+        opacity:0;
+        transform:translateY(20px);
+    }
+
+    to{
+        opacity:1;
+        transform:translateY(0);
+    }
+
+}
+
+.form-box h2{
+    font-size:32px;
+    color:#009966;
+    margin-bottom:30px;
+}
+
+.input-box{
+    margin-bottom:18px;
+}
+
+.input-box label{
+    display:block;
+    margin-bottom:8px;
+    font-size:14px;
+    font-weight:600;
+    color:#444;
+}
+
+.input-box input,
+.input-box select{
+    width:100%;
+    padding:14px;
+    border:1px solid #ccc;
+    border-radius:10px;
+    outline:none;
+    font-size:15px;
+    transition:.3s;
+}
+
+.input-box input:focus,
+.input-box select:focus{
+    border-color:#00a86b;
+    box-shadow:0 0 10px rgba(0,168,107,.2);
+}
+
+.options{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+    font-size:14px;
+}
+
+.options a{
+    text-decoration:none;
+    color:#009966;
+    font-weight:600;
+}
+
+button{
+    width:100%;
+    padding:15px;
+    border:none;
+    border-radius:10px;
+    background:#009966;
+    color:white;
+    font-size:16px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.3s;
+}
+
+button:hover{
+    background:#007d52;
+    transform:translateY(-2px);
+}
+
+.form-box p{
+    margin-top:25px;
+    text-align:center;
+    font-size:15px;
+}
+
+.form-box p a{
+    text-decoration:none;
+    color:#009966;
+    font-weight:700;
+}
+
+/* Responsive */
+
+@media(max-width:900px){
+
+.container{
+    flex-direction:column;
+    max-width:450px;
+}
+
+.left-panel{
+    width:100%;
+    padding:40px 25px;
+}
+
+.right-panel{
+    width:100%;
+    padding:35px 25px;
+}
+
+.logo h1{
+    font-size:34px;
+}
+
+.welcome h2{
+    font-size:26px;
+}
+
+}
+
+@media(max-width:480px){
+
+.form-box h2{
+    font-size:26px;
+}
+
+.options{
+    flex-direction:column;
+    gap:10px;
+    align-items:flex-start;
+}
+
+.logo img{
+    width:70px;
+}
+
+.logo h1{
+    font-size:28px;
+}
+
+.welcome h2{
+    font-size:22px;
+}
+
+.welcome p{
+    font-size:14px;
+}
+
+}

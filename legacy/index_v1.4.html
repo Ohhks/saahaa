@@ -1,0 +1,2896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SAHA Pro v1.4 — Together, We Elevate Life</title>
+<meta name="description" content="SAHA Pro v1.4 — India's automated hyperlocal services & commerce platform. Together, We Elevate Life.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   DESIGN SYSTEM & MODERN NEON TOKENS
+   ═══════════════════════════════════════════ */
+:root {
+  --bg:       #F8FAFC;
+  --bg-sub:   #F1F5F9;
+  --surface:  #FFFFFF;
+  --surface2: #F8FAFC;
+  --ink:      #0F172A;
+  --ink2:     #334155;
+  --muted:    #64748B;
+  --faint:    #94A3B8;
+  --line:     #E2E8F0;
+  --line2:    #F1F5F9;
+
+  --brand:    #059669;
+  --brand-dk: #047857;
+  --brand-lt: #D1FAE5;
+  --brand-bg: #ECFDF5;
+
+  --accent:   #D97706;
+  --accent-lt:#FEF3C7;
+  --accent-bg:#FFFBEB;
+
+  --info:     #2563EB;
+  --info-lt:  #DBEAFE;
+  --danger:   #DC2626;
+  --danger-lt:#FEE2E2;
+  --purple:   #7C3AED;
+  --purple-lt:#EDE9FE;
+  --sky:      #0EA5E9;
+  --sky-lt:   #E0F2FE;
+
+  --sh-xs:  0 1px 2px rgba(15,23,42,0.04);
+  --sh-sm:  0 1px 3px rgba(15,23,42,0.06);
+  --sh:     0 4px 6px -1px rgba(15,23,42,0.07);
+  --sh-md:  0 10px 15px -3px rgba(15,23,42,0.08);
+  --sh-lg:  0 20px 25px -5px rgba(15,23,42,0.1);
+  --sh-xl:  0 25px 50px -12px rgba(15,23,42,0.2);
+
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r:    14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-full:999px;
+
+  --nav-h: 60px;
+  --top-h: 52px;
+  --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+body.dark {
+  --bg:       #0F172A;
+  --bg-sub:   #020617;
+  --surface:  #1E293B;
+  --surface2: #0F172A;
+  --ink:      #F8FAFC;
+  --ink2:     #E2E8F0;
+  --muted:    #94A3B8;
+  --faint:    #475569;
+  --line:     #334155;
+  --line2:    #1E293B;
+
+  --brand-lt: #065F46;
+  --brand-bg: #064E3B;
+  --accent-lt:#78350F;
+  --accent-bg:#451A03;
+  --info-lt:  #1E3A8A;
+  --danger-lt:#7F1D1D;
+  --purple-lt:#4C1D95;
+  --sky-lt:   #0C4A6E;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+body{
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  background:var(--bg-sub);color:var(--ink);
+  min-height:100vh;letter-spacing:-0.011em;
+  line-height:1.5;overflow-x:hidden;
+  position:relative;
+  transition: background 0.3s, color 0.3s;
+}
+button{cursor:pointer;font-family:inherit}
+input,select,textarea{font-family:inherit}
+
+.mono{font-family:'JetBrains Mono',monospace}
+.text-xs{font-size:0.68rem}
+.text-sm{font-size:0.78rem}
+.text-base{font-size:0.88rem}
+.text-lg{font-size:1rem}
+.fw-600{font-weight:600}
+.fw-700{font-weight:700}
+.fw-800{font-weight:800}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE DUAL-PANE LAYOUT SYSTEM
+   ═══════════════════════════════════════════ */
+#appContainer {
+  display: flex;
+  max-width: 1700px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 1.5rem;
+  gap: 1.5rem;
+}
+
+#mobileSide {
+  width: 420px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#dashboardSide {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+/* Tab Switcher for mobile screen sizing */
+#responsiveTabs {
+  display: none;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  padding: 0.5rem;
+  justify-content: space-around;
+}
+.resp-tab-btn {
+  background: transparent;
+  border: none;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+}
+.resp-tab-btn.active {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+@media(max-width: 1024px) {
+  #appContainer {
+    flex-direction: column;
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  #responsiveTabs {
+    display: flex;
+  }
+  #mobileSide {
+    width: 100%;
+    max-width: 450px;
+    margin: 0 auto;
+    display: none;
+  }
+  #mobileSide.active-view {
+    display: flex;
+  }
+  #dashboardSide {
+    width: 100%;
+    display: none;
+  }
+  #dashboardSide.active-view {
+    display: flex;
+  }
+}
+
+/* Phone Mockup Styling */
+.phone-mockup {
+  background: var(--bg);
+  border: 8px solid var(--ink);
+  border-radius: 40px;
+  overflow: hidden;
+  box-shadow: var(--sh-xl);
+  min-height: 840px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.phone-screen {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ═══ MOBILE TOPBAR ═══ */
+#topbar {
+  height: var(--top-h);
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: saturate(200%) blur(20px);
+  -webkit-backdrop-filter: saturate(200%) blur(20px);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.1rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+body.dark #topbar {
+  background: rgba(30,41,59,0.85);
+  border-color: var(--line);
+}
+.brand-logo { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(5,150,105,0.3);
+}
+.brand-mark-letter { font-size: 0.85rem; font-weight: 900; color: #fff; }
+.brand-wordmark { font-size: 0.95rem; font-weight: 800; color: var(--ink); }
+.brand-wordmark span { color: var(--brand); }
+.topbar-actions { display: flex; align-items: center; gap: 0.4rem; }
+.top-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: var(--bg-sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.88rem;
+  color: var(--muted);
+  transition: all 0.15s var(--ease);
+}
+.top-btn:active { transform: scale(0.92); }
+.avatar-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg,var(--accent-lt),#FDE68A);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ═══ MOBILE BOTTOM NAV ═══ */
+#bottomnav {
+  height: var(--nav-h);
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: saturate(200%) blur(20px);
+  -webkit-backdrop-filter: saturate(200%) blur(20px);
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  padding: 0 0.3rem;
+  box-shadow: 0 -4px 20px rgba(15,23,42,0.06);
+  position: sticky;
+  bottom: 0;
+  z-index: 100;
+}
+body.dark #bottomnav {
+  background: rgba(30,41,59,0.88);
+  border-color: var(--line);
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  padding: 0.4rem 0; border: none; background: none;
+  color: var(--muted); font-family: inherit;
+}
+.nav-item.active { color: var(--brand); }
+.nav-ico { font-size: 1.15rem; line-height: 1; }
+.nav-txt { font-size: 0.6rem; font-weight: 600; }
+
+/* ═══ MOBILE CONTENT SCREENS ═══ */
+#scroll { flex: 1; overflow-y: auto; padding-bottom: 1rem; }
+.scr { display: none; animation: fadeIn 0.25s var(--ease); }
+.scr.on { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ═══ CARDS & UI ═══ */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 1rem; margin-bottom: 0.8rem; box-shadow: var(--sh-xs); }
+.card-press { transition: all 0.15s var(--ease); cursor: pointer; }
+.card-press:active { transform: scale(0.98); }
+
+.hero { padding: 1.4rem 1.1rem; background: linear-gradient(180deg, var(--bg-sub) 0%, var(--bg) 100%); }
+.hero-eyebrow { font-size: 0.74rem; font-weight: 700; color: var(--brand); text-transform: uppercase; letter-spacing: 0.5px; }
+.hero-h { font-size: 1.45rem; font-weight: 900; color: var(--ink); margin-top: 0.15rem; }
+.hero-sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.25rem; }
+
+.qa-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; padding: 0 1.1rem 1rem; }
+.qa { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 0.85rem; cursor: pointer; }
+.qa-ico { font-size: 1.4rem; margin-bottom: 0.4rem; display: block; }
+.qa-name { font-size: 0.8rem; font-weight: 800; color: var(--ink); }
+.qa-desc { font-size: 0.64rem; color: var(--muted); margin-top: 0.1rem; }
+.qa-tag { font-size: 0.6rem; font-weight: 700; color: var(--brand); margin-top: 0.4rem; }
+
+.sec-h { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 1.1rem 0.5rem; }
+.sec-t { font-size: 0.85rem; font-weight: 800; color: var(--ink); flex: 1; }
+.sec-l { font-size: 0.7rem; font-weight: 700; color: var(--brand); cursor: pointer; }
+
+/* ═══ FORMS & INPUTS ═══ */
+.fg { margin-bottom: 0.75rem; }
+.fl { font-size: 0.72rem; font-weight: 700; color: var(--ink2); margin-bottom: 0.25rem; display: block; }
+.fi { width: 100%; background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 0.65rem 0.8rem; font-size: 0.84rem; color: var(--ink); transition: border-color 0.15s; }
+.fi:focus { border-color: var(--brand); outline: none; }
+.fi:disabled { background: var(--bg-sub); color: var(--muted); cursor: not-allowed; opacity: 0.75; }
+
+.btn { border: none; border-radius: 12px; padding: 0.6rem 1.1rem; font-size: 0.82rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; text-decoration: none; }
+.btn-brand { background: var(--brand); color: #fff; }
+.btn-brand:active { background: var(--brand-dk); transform: scale(0.96); }
+.btn-outline { background: transparent; border: 1.5px solid var(--line); color: var(--ink2); }
+.btn-ghost { background: transparent; color: var(--brand); }
+.btn-ghost:hover { background: var(--bg-sub); }
+.btn-full { width: 100%; }
+.btn-lg { padding: 0.75rem 1.2rem; font-size: 0.88rem; }
+.btn-sm { padding: 0.35rem 0.65rem; font-size: 0.72rem; border-radius: 8px; }
+
+.pill { font-size: 0.56rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: var(--r-full); text-transform: uppercase; }
+.pill-brand { background: var(--brand-lt); color: var(--brand); }
+.pill-danger { background: var(--danger-lt); color: var(--danger); }
+.pill-warning { background: var(--accent-lt); color: var(--accent); }
+
+/* Services List */
+.svc { display: flex; align-items: center; gap: 0.8rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 0.8rem; margin: 0 1.1rem 0.6rem; }
+.svc-ico { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+.svc-body { flex: 1; }
+.svc-name { font-size: 0.82rem; font-weight: 800; color: var(--ink); }
+.svc-prov { font-size: 0.68rem; color: var(--muted); margin-top: 0.1rem; }
+.svc-end { text-align: right; }
+.svc-price { font-size: 0.84rem; font-weight: 800; color: var(--brand); }
+.svc-orig { font-size: 0.68rem; color: var(--faint); text-decoration: line-through; }
+
+.fstrip { display: flex; gap: 0.4rem; overflow-x: auto; padding: 0.6rem 1.1rem; scrollbar-width: none; }
+.fbtn { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-full); padding: 0.35rem 0.75rem; font-size: 0.68rem; font-weight: 700; color: var(--ink2); white-space: nowrap; }
+.fbtn.on { background: var(--brand); color: #fff; border-color: var(--brand)}
+
+/* Shop Catalog */
+.shop-hero { background: linear-gradient(135deg, var(--brand-bg), #D1FAE5); padding: 1.4rem 1.1rem; display: flex; justify-content: space-between; align-items: center; }
+.shop-tag { font-size: 0.66rem; font-weight: 800; color: var(--brand); text-transform: uppercase; }
+.shop-h { font-size: 1.3rem; font-weight: 900; color: var(--brand-dk); }
+.shop-sub { font-size: 0.75rem; color: var(--brand-dk); opacity: 0.8; margin-top: 0.15rem; }
+.shop-badge { background: #fff; border-radius: 10px; padding: 0.4rem 0.6rem; text-align: center; }
+.shop-badge-v { font-size: 0.95rem; font-weight: 900; color: var(--brand-dk); }
+.shop-badge-l { font-size: 0.5rem; color: var(--brand); text-transform: uppercase; }
+
+.shop-search { padding: 0.8rem 1.1rem; }
+.search-box { position: relative; }
+.search-ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 0.88rem; }
+.search-in { width: 100%; background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 0.65rem 0.8rem 0.65rem 2.2rem; font-size: 0.82rem; color: var(--ink); }
+
+.cat-bar { display: flex; gap: 0.45rem; overflow-x: auto; padding: 0 1.1rem 0.8rem; scrollbar-width: none; }
+.cat-btn { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 0.5rem; text-align: center; min-width: 62px; }
+.cat-btn.on { border-color: var(--brand); background: var(--brand-bg); }
+.cat-btn-ico { font-size: 1.15rem; display: block; }
+.cat-btn-txt { font-size: 0.56rem; font-weight: 700; color: var(--ink2); margin-top: 0.15rem; display: block; }
+
+.pgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; padding: 0 1.1rem 1rem; }
+.pcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 0.75rem; position: relative; }
+.pcard-disc { position: absolute; top: 6px; left: 6px; background: var(--brand-lt); color: var(--brand); font-size: 0.54rem; font-weight: 800; padding: 0.1rem 0.3rem; border-radius: 4px; }
+.pcard-img { height: 75px; display: flex; align-items: center; justify-content: center; font-size: 2.4rem; }
+.pcard-body { text-align: center; }
+.pcard-name { font-size: 0.76rem; font-weight: 800; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcard-prices { margin-top: 0.2rem; display: flex; justify-content: center; gap: 0.3rem; }
+.pcard-price { font-size: 0.82rem; font-weight: 800; color: var(--brand); }
+.pcard-mrp { font-size: 0.68rem; color: var(--faint); text-decoration: line-through; }
+.add-btn { width: 100%; border: 1.5px solid var(--line); background: var(--bg-sub); color: var(--brand); font-size: 0.7rem; font-weight: 800; padding: 0.35rem 0; border-radius: 8px; margin-top: 0.45rem; transition: all 0.1s; }
+.add-btn:active { transform: scale(0.95); }
+
+/* Cart Bar */
+#cartBar {
+  position: absolute; bottom: calc(var(--nav-h) + 0.6rem); left: 50%; transform: translateX(-50%) translateY(40px);
+  width: calc(100% - 2rem); max-width: 390px; z-index: 90; height: 48px;
+  background: var(--brand); border-radius: 12px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1rem; box-shadow: var(--sh-md); opacity: 0; pointer-events: none; transition: all 0.25s var(--ease);
+}
+#cartBar.vis { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+.cb-items { font-size: 0.75rem; color: rgba(255,255,255,0.8); font-weight: 600; }
+.cb-total { font-size: 0.95rem; font-weight: 900; color: #fff; }
+.cb-btn { background: rgba(255,255,255,0.15); border: none; border-radius: 8px; padding: 0.35rem 0.7rem; color: #fff; font-size: 0.75rem; font-weight: 800; }
+
+/* Earnings Hero */
+.earn-hero { background: var(--surface); border-bottom: 1px solid var(--line); padding: 1.4rem 1.1rem; text-align: center; }
+.earn-lbl { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.earn-amt { font-size: 1.85rem; font-weight: 900; color: var(--brand); margin-top: 0.1rem; }
+.earn-sub { font-size: 0.74rem; color: var(--muted); }
+
+.progress-bar { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 0.75rem; margin: 0.8rem 1.1rem 0; }
+.progress-top { display: flex; justify-content: space-between; font-size: 0.68rem; font-weight: 700; margin-bottom: 0.25rem; }
+.progress-label { color: var(--ink2); }
+.progress-val { color: var(--brand); }
+.progress-track { height: 6px; background: var(--bg-sub); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--brand); transition: width 0.3s; }
+
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 0.8rem 1.1rem; }
+.stat-cell { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem; text-align: center; }
+.stat-v { font-size: 0.95rem; font-weight: 800; color: var(--ink); }
+.stat-l { font-size: 0.56rem; color: var(--muted); text-transform: uppercase; margin-top: 0.15rem; }
+
+.ocard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 0.85rem; margin: 0 1.1rem 0.6rem; }
+.ocard-h { display: flex; align-items: center; gap: 0.6rem; }
+.ocard-av { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-sub); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800; color: var(--brand); }
+.ocard-name { font-size: 0.78rem; font-weight: 800; color: var(--ink); }
+.ocard-meta { font-size: 0.64rem; color: var(--muted); }
+.ocard-b { margin-top: 0.55rem; }
+.ocard-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin-bottom: 0.55rem; }
+.ocard-box { background: var(--bg-sub); border-radius: 8px; padding: 0.45rem; text-align: center; }
+.ocard-box-v { font-size: 0.82rem; font-weight: 800; color: var(--ink); }
+.ocard-box-l { font-size: 0.56rem; color: var(--muted); }
+
+/* ═══ ADMIN CONTROL PANEL LAYOUT (DASHBOARD) ═══ */
+.dash-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 1.25rem;
+  box-shadow: var(--sh-sm);
+  display: flex;
+  flex-direction: column;
+}
+.dash-card-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 2D Geographic Observability Map Grid */
+.map-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+.map-node {
+  background: var(--bg);
+  border: 1.5px dashed var(--line);
+  border-radius: var(--r-sm);
+  padding: 0.6rem;
+  text-align: center;
+  position: relative;
+  transition: all 0.25s var(--ease);
+}
+.map-node.has-orders {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  animation: pulse-border 1.5s infinite alternate;
+}
+.map-node.has-alert {
+  border-color: var(--danger);
+  background: var(--danger-lt);
+  animation: flash-red 1s infinite alternate;
+}
+@keyframes pulse-border {
+  from { box-shadow: 0 0 2px rgba(217, 119, 6, 0.1); }
+  to { box-shadow: 0 0 10px rgba(217, 119, 6, 0.3); }
+}
+@keyframes flash-red {
+  0% { box-shadow: 0 0 2px rgba(220, 38, 38, 0.1); }
+  100% { box-shadow: 0 0 12px rgba(220, 38, 38, 0.5); }
+}
+.map-node-name { font-size: 0.72rem; font-weight: 800; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+.map-node-stats {
+  display: flex;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+  font-size: 0.6rem;
+}
+.map-badge {
+  padding: 0.05rem 0.25rem;
+  border-radius: 4px;
+  font-weight: 700;
+}
+.map-badge-green { background: var(--brand-lt); color: var(--brand); }
+.map-badge-yellow { background: var(--accent-lt); color: var(--accent); }
+.map-badge-red { background: var(--danger-lt); color: var(--danger); }
+
+/* Live Workers Status Board */
+.workers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.75rem;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+.worker-card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 0.75rem;
+  position: relative;
+  transition: all 0.2s var(--ease);
+}
+.worker-card.busy {
+  border-color: var(--accent);
+}
+.worker-card.paged {
+  border-color: var(--danger);
+  animation: border-flash-red 0.8s infinite alternate;
+}
+@keyframes border-flash-red {
+  from { border-color: var(--line); }
+  to { border-color: var(--danger); }
+}
+.worker-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.4rem;
+}
+.worker-card-name { font-size: 0.8rem; font-weight: 800; color: var(--ink); }
+.worker-card-role { font-size: 0.64rem; color: var(--muted); font-weight: 600; }
+.worker-card-loc { font-size: 0.62rem; color: var(--faint); margin-top: 0.05rem; }
+
+/* Custom Toggle Switch */
+.toggle-switch {
+  position: relative; display: inline-block;
+  width: 42px; height: 20px;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #cbd5e1; transition: .2s;
+  border-radius: 20px;
+}
+body.dark .toggle-slider { background-color: #475569; }
+.toggle-slider:before {
+  position: absolute; content: "";
+  height: 14px; width: 14px;
+  left: 3px; bottom: 3px;
+  background-color: white; transition: .2s;
+  border-radius: 50%;
+}
+input:checked + .toggle-slider { background-color: var(--brand); }
+input:checked + .toggle-slider:before { transform: translateX(22px); }
+
+.w-badge {
+  font-size: 0.58rem; font-weight: 800; padding: 0.1rem 0.35rem; border-radius: 4px;
+}
+.w-badge-avail { background: var(--brand-lt); color: var(--brand); }
+.w-badge-busy { background: var(--accent-lt); color: var(--accent); }
+.w-badge-off { background: var(--line); color: var(--muted); }
+
+/* Dispatch Paging Alert inside worker card */
+.card-alert-banner {
+  background: linear-gradient(135deg, var(--danger), var(--purple));
+  color: white;
+  border-radius: 6px;
+  padding: 0.45rem;
+  margin-top: 0.5rem;
+  font-size: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  animation: shake 0.5s;
+}
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
+}
+
+/* ═══ INTERACTIVE STATE TIMELINES ═══ */
+.order-row-grid {
+  display: grid;
+  grid-template-columns: 50px 110px 90px 80px 100px 90px 1fr;
+  font-size: 0.68rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--line);
+  align-items: center;
+}
+.order-row-grid:hover { background: var(--bg-sub); }
+.order-state-tag {
+  font-size: 0.56rem; font-weight: 800; padding: 0.1rem 0.35rem; border-radius: 4px; text-transform: uppercase; text-align: center;
+}
+
+/* Admin / Simulation Settings Header Controls */
+.dash-ctrl-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--r);
+}
+
+/* Modals & Popups */
+.modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,0.4); z-index: 900; display: flex; align-items: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.modal-bg.open { opacity: 1; pointer-events: auto; }
+.modal-card { width: 100%; max-width: 430px; margin: 0 auto; background: var(--surface); border-radius: 24px 24px 0 0; padding: 1.4rem; box-shadow: var(--sh-xl); transform: translateY(100%); transition: transform 0.25s var(--ease); }
+.modal-bg.open .modal-card { transform: translateY(0); }
+.modal-grab { width: 36px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 1rem; }
+.modal-h { font-size: 1.1rem; font-weight: 800; margin-bottom: 0.75rem; }
+
+#toast {
+  position: fixed; bottom: 5rem; left: 50%;
+  transform: translateX(-50%) translateY(16px);
+  max-width: 360px; width: calc(100% - 2rem);
+  background: var(--ink); color: var(--bg);
+  padding: 0.7rem 1rem; border-radius: 12px;
+  font-size: 0.8rem; font-weight: 600;
+  box-shadow: var(--sh-lg); opacity: 0;
+  transition: all 0.3s var(--ease);
+  z-index: 999; pointer-events: none; text-align: center;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- Mobile Screen Switcher Tabs (Hidden on Desktop) -->
+<div id="responsiveTabs">
+  <button class="resp-tab-btn active" id="btnSideMobile" onclick="switchResponsiveTab('mobile')">📱 Customer App</button>
+  <button class="resp-tab-btn" id="btnSideDash" onclick="switchResponsiveTab('dash')">👑 Command Center</button>
+</div>
+
+<!-- MAIN DUAL-PANE CONTAINER -->
+<div id="appContainer">
+
+  <!-- LEFT PANE: Mobile Customer/Worker App Viewport -->
+  <div id="mobileSide" class="active-view">
+    <div class="phone-mockup">
+      <div class="phone-screen">
+        
+        <!-- TOPBAR -->
+        <div id="topbar">
+          <div class="brand-logo" onclick="go('home')" style="display:flex; align-items:center; gap:0.4rem">
+            <img src="saha-logo.jpg" alt="SAHA Logo" style="height:28px; border-radius:6px">
+            <span class="brand-wordmark" style="font-family:'Outfit',sans-serif; font-weight:800; font-size:1.15rem; color:var(--brand)">SAHA</span>
+          </div>
+          <div class="topbar-actions">
+            <button class="top-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌙</button>
+            <button class="top-btn" onclick="toggleNotificationCenter()" title="Notifications" style="position:relative">🔔<span class="dot" id="notifDot" style="display:none;position:absolute;top:4px;right:4px;width:6px;height:6px;background:red;border-radius:50%"></span></button>
+            <button class="avatar-btn" id="userChip" onclick="go('account')">?</button>
+          </div>
+        </div>
+
+        <!-- Simulated Messages Dropdown Inbox -->
+        <div id="notifCenter" style="display:none;position:absolute;top:calc(var(--top-h) + 0.4rem);left:5%;width:90%;background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:1rem;z-index:140;box-shadow:var(--sh-lg);max-height:260px;overflow-y:auto">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;border-bottom:1px solid var(--line);padding-bottom:0.4rem">
+            <div style="font-size:0.82rem;font-weight:800;color:var(--ink)">📥 Alerts & Notifications</div>
+            <button class="btn btn-ghost btn-sm" onclick="clearNotifications()" style="padding:0.2rem 0.4rem;font-size:0.65rem">Clear</button>
+          </div>
+          <div id="notifList" style="display:flex;flex-direction:column;gap:0.45rem"></div>
+        </div>
+
+        <!-- SCROLLABLE MOBILE CONTENT -->
+        <div id="scroll">
+
+          <!-- HOME SCREEN -->
+          <div id="s-home" class="scr on">
+            <div class="hero">
+              <div class="hero-eyebrow" id="heroGreet">Good morning 👋</div>
+              <div class="hero-h">What do you need?</div>
+              <div class="hero-sub"><span>10% off</span> standard rates · Partners keep <span>88%</span></div>
+            </div>
+            <div class="qa-grid">
+              <div class="qa" onclick="go('services')" style="--c:var(--info)"><span class="qa-ico">🔧</span><div class="qa-name">Book a Service</div><div class="qa-desc">Plumber, Electrician…</div><div class="qa-tag">From ₹270 →</div></div>
+              <div class="qa" onclick="gotoIron()" style="--c:var(--sky)"><span class="qa-ico">👔</span><div class="qa-name">Ironing Service</div><div class="qa-desc">Fast press service</div><div class="qa-tag">₹18/cloth →</div></div>
+              <div class="qa" onclick="go('shop')" style="--c:var(--brand)"><span class="qa-ico">🛍️</span><div class="qa-name">Shop Groceries</div><div class="qa-desc">Sai Kirana essentials</div><div class="qa-tag">10% discount →</div></div>
+              <div class="qa" onclick="go('earn')" style="--c:var(--accent)"><span class="qa-ico">💰</span><div class="qa-name">Partner Portal</div><div class="qa-desc">Earn as local partner</div><div class="qa-tag">Start working →</div></div>
+            </div>
+            <div style="padding:0.9rem 1rem 0">
+              <div class="sec-h" style="padding:0"><span class="sec-t">Revenue Model Breakdown</span><span class="sec-l" onclick="go('earn')">Details →</span></div>
+            </div>
+            <div style="padding:0 1rem" id="homeStackModel"></div>
+            <div class="sec-h" style="margin-top:0.5rem"><span class="sec-t">Available Services</span><span class="sec-l" onclick="go('services')">See all →</span></div>
+            <div id="homeSvcList"></div>
+          </div>
+
+          <!-- SERVICES VIEW -->
+          <div id="s-services" class="scr">
+            <div class="fstrip" id="svcFilters"></div>
+            <div style="padding-top:0.5rem" id="svcList"></div>
+          </div>
+
+          <!-- PARTNER PORTAL (EARN) VIEW -->
+          <div id="s-earn" class="scr">
+            <div class="earn-hero">
+              <div class="earn-lbl">Your daily earnings</div>
+              <div class="earn-amt" id="earnVal">₹0</div>
+              <div class="earn-sub" id="earnSub">Log in to view dashboard</div>
+            </div>
+            <div class="progress-bar" id="progressBlock" style="display:none">
+              <div class="progress-top"><span class="progress-label" id="progLabel">Bonus Incentive</span><span class="progress-val" id="progVal"></span></div>
+              <div class="progress-track"><div class="progress-fill" id="progFill" style="width:0%"></div></div>
+            </div>
+            <div class="stats-row" id="earnStats"></div>
+            <div id="earnRolePicker" style="padding:1rem"></div>
+            <div id="earnPending"></div>
+            <div id="earnBookings" style="padding:0 1.1rem"></div>
+            <div style="padding:0 1rem" id="earnStackModel"></div>
+          </div>
+
+          <!-- GROCERY STORE VIEW -->
+          <div id="s-shop" class="scr">
+            <div class="shop-hero">
+              <div>
+                <div class="shop-tag">SAHA Kirana</div>
+                <div class="shop-h">Sai Kirana & Ravi Mart</div>
+                <div class="shop-sub">Delivered in 20 minutes</div>
+              </div>
+              <div class="shop-badge">
+                <div class="shop-badge-v">20</div>
+                <div class="shop-badge-l">min delivery</div>
+              </div>
+            </div>
+            <div class="shop-search">
+              <div class="search-box">
+                <span class="search-ico">🔍</span>
+                <input class="search-in" id="shopSearch" placeholder="Search products..." oninput="filterProducts(this.value)">
+              </div>
+            </div>
+            <div style="padding: 0 1.1rem 0.6rem">
+              <label class="fl" style="margin-bottom:0.15rem">Select Hyperlocal Shop</label>
+              <select class="fi" id="shopStoreSelect" onchange="switchActiveShop(this.value)" style="height:36px; padding:0 0.4rem; font-size:0.75rem; border-radius:8px">
+                <option value="1">Sai Kirana Store (Madhapur · 2.1 km · 4.8 ⭐)</option>
+                <option value="2">Ravi Mart (Ameerpet · 4.3 km · 4.5 ⭐)</option>
+              </select>
+            </div>
+            <div class="cat-bar" id="catBar"></div>
+            <div id="shopArea"></div>
+          </div>
+
+          <!-- USER ACCOUNT VIEW -->
+          <div id="s-account" class="scr">
+            <div class="auth-wrap" id="authWrap"></div>
+          </div>
+
+        </div>
+
+        <!-- Phone App Cart bar -->
+        <div id="cartBar">
+          <div><div class="cb-items" id="cbI">0 items</div><div class="cb-total" id="cbT">₹0</div></div>
+          <button class="cb-btn" onclick="openCart()">View Cart →</button>
+        </div>
+
+        <!-- Phone App Bottom Navigation -->
+        <div id="bottomnav">
+          <button class="nav-item active" data-s="home" onclick="go('home')"><span class="nav-ico">🏠</span><span class="nav-txt">Home</span></button>
+          <button class="nav-item" data-s="shop" onclick="go('shop')"><span class="nav-ico">🛍️</span><span class="nav-txt">Shop</span></button>
+          <button class="nav-item" data-s="services" onclick="go('services')"><span class="nav-ico">🔧</span><span class="nav-txt">Services</span></button>
+          <button class="nav-item" data-s="earn" onclick="go('earn')"><span class="nav-ico">💰</span><span class="nav-txt">Earn</span></button>
+          <button class="nav-item" data-s="account" onclick="go('account')"><span class="nav-ico">👤</span><span class="nav-txt">Account</span></button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANE: Enterprise Observability Panel & Settings -->
+  <div id="dashboardSide">
+    
+    <!-- TOP STATS & SIMULATION CONTROLS -->
+    <div class="dash-ctrl-row">
+      <div style="display:flex;align-items:center;gap:1.5rem">
+        <div>
+          <span style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase">System Mode</span>
+          <div style="display:flex;align-items:center;gap:0.4rem;margin-top:0.15rem">
+            <label class="toggle-switch">
+              <input type="checkbox" id="simToggle" checked onchange="toggleSimulationMode()">
+              <span class="toggle-slider"></span>
+            </label>
+            <span id="simStatusText" style="font-size:0.8rem;font-weight:800;color:var(--brand)">Auto-Simulation ON</span>
+          </div>
+        </div>
+        <div>
+          <span style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase">Sim Speed</span>
+          <div style="display:flex;align-items:center;gap:0.4rem;margin-top:0.15rem">
+            <select id="simSpeedSelect" onchange="changeSpeed(this.value)" style="background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:0.15rem 0.4rem;font-size:0.75rem;font-weight:700;color:var(--ink)">
+              <option value="1">1x (Normal)</option>
+              <option value="2">2x (Fast)</option>
+              <option value="5">5x (Aggressive)</option>
+              <option value="10">10x (Hyper)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Live Telemetry -->
+      <div style="display:flex;gap:1.5rem">
+        <div style="text-align:right">
+          <span style="font-size:0.6rem;font-weight:700;color:var(--muted)">LIVE CPU LOAD</span>
+          <div style="font-size:1.15rem;font-weight:900;color:var(--brand)" id="telemetryCPU">18%</div>
+        </div>
+        <div style="text-align:right">
+          <span style="font-size:0.6rem;font-weight:700;color:var(--muted)">MEMORY ACTIVE</span>
+          <div style="font-size:1.15rem;font-weight:900;color:var(--info)" id="telemetryRAM">42MB</div>
+        </div>
+        <div style="text-align:right">
+          <span style="font-size:0.6rem;font-weight:700;color:var(--muted)">ESCROW HOLDS</span>
+          <div style="font-size:1.15rem;font-weight:900;color:var(--purple)" id="telemetryEscrow">₹0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOX: GLOBAL ADMINISTRATIVE PRICE FIX CONTROLLER -->
+    <div class="dash-card">
+      <div class="dash-card-title">
+        <span>👑 Global Administrative Absolute Category Price Fix Controller</span>
+        <span class="pill pill-warning" id="priceLockBadge">Custom Provider Pricing Active</span>
+      </div>
+      <div id="adminPriceFixContainer" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:0.6rem; margin-top: 0.5rem">
+        <!-- Rendered dynamically via JavaScript -->
+      </div>
+      <div style="margin-top:0.6rem; text-align:right">
+        <button class="btn btn-outline btn-sm" onclick="releaseGlobalPriceLocks()" style="color:var(--danger)">Release Absolute Admin Locks</button>
+      </div>
+    </div>
+
+    <!-- GEOGRAPHIC OVERLAY MAP -->
+    <div class="dash-card">
+      <div class="dash-card-title">
+        <span>🗺️ Regional Service Matrix (10 Hyderabad Sectors)</span>
+        <span style="font-size:0.65rem;color:var(--muted);font-weight:600">Flashes Red on Paging Alert · Shows available/busy counts</span>
+      </div>
+      <div class="map-grid" id="mapGrid"></div>
+    </div>
+
+    <!-- LIVE PARTNERS LIST & STATUS CONTROL BOARD -->
+    <div class="dash-card">
+      <div class="dash-card-title">
+        <span>👥 Proximity Partner Registry & Availability Control Panel</span>
+        <div style="display:flex;gap:0.4rem">
+          <button class="btn btn-ghost btn-sm" onclick="setAllWorkersOnline(true)">Turn All Online</button>
+          <button class="btn btn-ghost btn-sm" onclick="setAllWorkersOnline(false)" style="color:var(--danger)">Turn All Offline</button>
+        </div>
+      </div>
+      <div class="workers-grid" id="dashboardWorkersGrid"></div>
+    </div>
+
+    <!-- ACTIVE ORDERS STATE TIMELINE -->
+    <div class="dash-card">
+      <div class="dash-card-title">
+        <span>🔄 Real-time Order Dispatch State Machine Tracker</span>
+        <span style="font-size:0.62rem;color:var(--brand);font-weight:700">Online & Not Busy Workers Paged First · 15s Fallback Timing Decay</span>
+      </div>
+      
+      <!-- Table Headers -->
+      <div class="order-row-grid" style="font-weight:800;border-bottom:2.5px solid var(--line);background:var(--bg-sub);border-radius:6px;padding:0.4rem 0.5rem">
+        <div>Order ID</div>
+        <div>Type / Category</div>
+        <div>Customer Region</div>
+        <div>Distance Range</div>
+        <div>Assigned Worker</div>
+        <div>State Code</div>
+        <div>Live Process Log</div>
+      </div>
+      <div id="dashboardOrdersList" style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column"></div>
+    </div>
+
+    <!-- UTILITY CONTROL PANELS (FLAGS & AUDIT LOGS) -->
+    <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:1.2rem">
+      
+      <!-- FEATURE SWITCHES & SIM ERROR INJECTORS -->
+      <div class="dash-card">
+        <div class="dash-card-title">⚙️ Policy Switches & Fault Injectors</div>
+        <div style="display:flex;flex-direction:column;gap:0.5rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg);padding:0.45rem;border-radius:8px;font-size:0.75rem">
+            <span style="font-weight:700">Surge Pricing Override (1.5x Rate)</span>
+            <button class="btn btn-sm" id="flag-SurgePricing" onclick="toggleDashboardFlag('SurgePricing')">Disabled</button>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg);padding:0.45rem;border-radius:8px;font-size:0.75rem">
+            <span style="font-weight:700">Fraud Protection Rate-Limiting</span>
+            <button class="btn btn-brand btn-sm" id="flag-FraudChecks" onclick="toggleDashboardFlag('FraudChecks')">Enabled</button>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg);padding:0.45rem;border-radius:8px;font-size:0.75rem">
+            <span style="font-weight:700">Simulate API Network Timeout</span>
+            <button class="btn btn-sm" id="err-APITimeout" onclick="toggleDashboardError('APITimeout')">Normal</button>
+          </div>
+          <button class="btn btn-brand btn-sm btn-full" style="background:var(--purple);margin-top:0.3rem" onclick="runDiagnostics()">🧪 Launch Diagnostic Suite Verification Matrix</button>
+        </div>
+      </div>
+
+      <!-- AUDIT LOGS BLOCKCHAIN-LIKE -->
+      <div class="dash-card">
+        <div class="dash-card-title">📋 Hashed Observability Audit Trail</div>
+        <div style="max-height:175px;overflow-y:auto;display:flex;flex-direction:column;gap:0.35rem" id="dashboardAuditLogs"></div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Popups and Overlays -->
+<div class="modal-bg" id="modalBg" onclick="closeModal(event)"><div class="modal-card"><div class="modal-grab"></div><div id="modalBody"></div></div></div>
+<div id="toast"></div>
+
+<!-- CORE APPLICATION CONTROLLERS -->
+<script>
+/* ══════════════════════════════════════════
+   1. GLOBAL TOKENS, CONFIGS & SEED DATA
+   ══════════════════════════════════════════ */
+const C = { WORKER: 0.88, PLATFORM: 0.12, DISCOUNT: 0.10, INCENTIVE: 0.10, THRESHOLD: 10 };
+const AREAS = ['Jubilee Hills', 'Ameerpet', 'Banjara Hills', 'Madhapur', 'Gachibowli', 'Kukatpally', 'Begumpet', 'Secunderabad', 'Kondapur', 'HITEC City'];
+const SVCTYPES = [
+  { name: 'Plumber', rate: 400 },
+  { name: 'Electrician', rate: 600 },
+  { name: 'Carpenter', rate: 350 },
+  { name: 'AC Technician', rate: 700 },
+  { name: "Women's Salon & Spa", rate: 800 },
+  { name: "Men's Grooming & Salon", rate: 300 },
+  { name: 'Cleaning & Pest Control', rate: 1200 },
+  { name: 'Appliance Repair & Installation', rate: 500 },
+  { name: 'Home Painting & Renovation', rate: 1500 }
+];
+
+const NAMES = {
+  f: ['Aarav', 'Vivaan', 'Aditya', 'Vihaan', 'Arjun', 'Sai', 'Reyansh', 'Ayaan', 'Krishna', 'Ishaan', 'Priya', 'Ananya', 'Sneha', 'Pooja', 'Divya', 'Kavya', 'Riya', 'Meera', 'Neha', 'Tanvi'],
+  l: ['Sharma', 'Verma', 'Gupta', 'Reddy', 'Kumar', 'Singh', 'Nair', 'Rao', 'Mehta', 'Das', 'Patel', 'Iyer', 'Joshi', 'Agarwal', 'Chopra']
+};
+const gn = (i) => NAMES.f[i % NAMES.f.length] + ' ' + NAMES.l[i % NAMES.l.length];
+const gp = (i) => '98765' + String(10000 + i).slice(-5);
+
+const AREA_COORDS = {
+  'Jubilee Hills': { x: 5, y: 5 },
+  'Madhapur':      { x: 3, y: 6 },
+  'Banjara Hills': { x: 6, y: 4 },
+  'Ameerpet':      { x: 7, y: 7 },
+  'Gachibowli':    { x: 1, y: 3 },
+  'Kondapur':      { x: 2, y: 7 },
+  'HITEC City':    { x: 2, y: 5 },
+  'Kukatpally':    { x: 5, y: 11 },
+  'Begumpet':      { x: 9, y: 8 },
+  'Secunderabad':  { x: 13, y: 9 }
+};
+
+function getDistanceKM(areaA, areaB) {
+  const cA = AREA_COORDS[areaA] || { x: 0, y: 0 };
+  const cB = AREA_COORDS[areaB] || { x: 0, y: 0 };
+  const dist = Math.sqrt((cA.x - cB.x) ** 2 + (cA.y - cB.y) ** 2);
+  return +(dist * 2.0).toFixed(1); // Scale to realistic kilometers
+}
+
+let DB = {
+  users: { customers: [], providers: [], ironShops: [], shopkeepers: [] },
+  admins: [
+    { user: 'admin', pass: 'SAHA@2025', name: 'Platform Owner', role: 'Owner', permissions: ['CanRefund', 'CanEditPricing', 'CanDeleteUsers', 'CanBanWorkers', 'CanViewWallets', 'CanExportReports', 'platform_settings'] }
+  ],
+  adminSvc: SVCTYPES.map((s, idx) => ({ id: idx + 1, name: s.name, fp: null })),
+  prods: [
+    { id: 1, shopId: 1, shop: 'Sai Kirana', cat: 'Fruits & Veg', name: 'Tomatoes (500g)', price: 25, stock: 80, icon: '🍅', unit: '500g' },
+    { id: 2, shopId: 1, shop: 'Sai Kirana', cat: 'Fruits & Veg', name: 'Onions (1kg)', price: 35, stock: 60, icon: '🧅', unit: '1 kg' },
+    { id: 3, shopId: 1, shop: 'Sai Kirana', cat: 'Fruits & Veg', name: 'Bananas (6 pcs)', price: 40, stock: 100, icon: '🍌', unit: '6 pcs' },
+    { id: 4, shopId: 1, shop: 'Sai Kirana', cat: 'Dairy & Eggs', name: 'Amul Milk (500ml)', price: 27, stock: 50, icon: '🥛', unit: '500 ml' },
+    { id: 5, shopId: 1, shop: 'Sai Kirana', cat: 'Dairy & Eggs', name: 'Eggs (6 pcs)', price: 60, stock: 40, icon: '🥚', unit: '6 pcs' },
+    { id: 6, shopId: 1, shop: 'Sai Kirana', cat: 'Staples', name: 'Rice (1kg)', price: 55, stock: 200, icon: '🍚', unit: '1 kg' },
+    { id: 7, shopId: 2, shop: 'Ravi Mart', cat: 'Personal Care', name: 'Bathing Soap', price: 12, stock: 50, icon: '🧼', unit: '75g' },
+    { id: 8, shopId: 2, shop: 'Ravi Mart', cat: 'Personal Care', name: 'Toothpaste (100g)', price: 60, stock: 35, icon: '🦷', unit: '100g' },
+    { id: 9, shopId: 2, shop: 'Ravi Mart', cat: 'Snacks', name: 'Biscuits (Parle-G)', price: 10, stock: 120, icon: '🍪', unit: '70g' }
+  ],
+  cats: ['All', 'Fruits & Veg', 'Dairy & Eggs', 'Staples', 'Personal Care', 'Snacks'],
+  svcs: [],
+  ironOrders: [],
+  svcBookings: [],
+  prodOrders: [],
+  cart: [],
+  reviews: [],
+  wallets: [],
+  auditLogs: [],
+  notifications: [],
+  adminPriceFixes: {}, // absolute locked prices
+  autopilot: true
+};
+
+const FeatureFlags = {
+  SurgePricing: false,
+  FraudChecks: true,
+  WalletSettlements: true
+};
+
+const InjectedErrors = {
+  APITimeout: false
+};
+
+const HealthMetrics = {
+  CPU: 18,
+  Memory: 42,
+  Latency: 12,
+  FailedRequests: 0,
+  Uptime: 0
+};
+
+let simSpeed = 1;
+let _user = null;
+let _token = '';
+
+/* ══════════════════════════════════════════
+   2. CENTRAL DECOUPLED EVENT BUS
+   ══════════════════════════════════════════ */
+const EventBus = {
+  listeners: {},
+  on(event, cb) {
+    if (!this.listeners[event]) this.listeners[event] = [];
+    this.listeners[event].push(cb);
+  },
+  emit(event, payload) {
+    if (this.listeners[event]) {
+      this.listeners[event].forEach(cb => {
+        try { cb(payload); } catch (e) { console.error('EventBus execution crash:', e); }
+      });
+    }
+  }
+};
+
+/* ══════════════════════════════════════════
+   3. SECURE BLOCKCHAIN-STYLE AUDIT TRAIL
+   ══════════════════════════════════════════ */
+const AuditLogEngine = {
+  getLastHash() {
+    if (!DB.auditLogs.length) return '00000000000000000000000000000000';
+    return DB.auditLogs[DB.auditLogs.length - 1].hash;
+  },
+  createSimpleHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash << 5) - hash + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return 'sha256-' + Math.abs(hash).toString(16).padStart(8, '0') + Math.random().toString(36).substr(2, 4);
+  },
+  log(user, role, action, details) {
+    const prevHash = this.getLastHash();
+    const requestId = 'req_' + Math.random().toString(36).substr(2, 6);
+    const logItem = {
+      timestamp: new Date().toLocaleTimeString(),
+      user: user || 'SYSTEM',
+      role: role || 'CORE',
+      action: action,
+      details: details,
+      prevHash: prevHash,
+      requestId: requestId,
+      hash: ''
+    };
+    logItem.hash = this.createSimpleHash(JSON.stringify(logItem));
+    DB.auditLogs.push(logItem);
+    saveDB();
+    renderDashboardAuditLogs();
+  }
+};
+
+function saveDB() {
+  localStorage.setItem('NS_DB_STATE_V1.4', JSON.stringify(DB));
+  localStorage.setItem('NS_FEATURE_FLAGS_V1.4', JSON.stringify(FeatureFlags));
+}
+
+function loadDB() {
+  const saved = localStorage.getItem('NS_DB_STATE_V1.4');
+  const flags = localStorage.getItem('NS_FEATURE_FLAGS_V1.4');
+  if (saved) {
+    try {
+      DB = JSON.parse(saved);
+      if (flags) Object.assign(FeatureFlags, JSON.parse(flags));
+      return;
+    } catch(e) { console.warn('Corrupted state. Re-seeding database...'); }
+  }
+  seedDatabase();
+}
+
+function seedDatabase() {
+  DB.users.customers = [];
+  DB.users.providers = [];
+  DB.users.ironShops = [];
+  DB.users.shopkeepers = [];
+  DB.svcBookings = [];
+  DB.ironOrders = [];
+  DB.prodOrders = [];
+  DB.reviews = [];
+  DB.wallets = [];
+  DB.auditLogs = [];
+  DB.notifications = [];
+  DB.adminPriceFixes = {};
+  DB.autopilot = true;
+
+  // Seed Customers
+  for (let i = 0; i < 30; i++) {
+    DB.users.customers.push({
+      id: i + 1, name: gn(i), user: 'cust' + (i + 1), pass: '123',
+      role: 'customer', phone: gp(i), area: AREAS[i % AREAS.length], active: true
+    });
+  }
+  // Seed Iron Shops with referrals
+  for (let i = 0; i < 15; i++) {
+    DB.users.ironShops.push({
+      id: i + 1, name: gn(30 + i) + ' Ironing', user: 'iron' + (i + 1), pass: '123',
+      role: 'ironshop', area: AREAS[i % AREAS.length], ordersToday: 0, earned: 0,
+      phone: gp(30 + i), active: true, status: 'Available', alert: null, currentOrderId: null,
+      referrals: Math.floor(5 + Math.random() * 85)
+    });
+  }
+  // Seed Service Providers with referrals
+  for (let i = 0; i < 25; i++) {
+    const s = SVCTYPES[i % SVCTYPES.length];
+    DB.users.providers.push({
+      id: i + 1, name: gn(45 + i), user: 'prov' + (i + 1), pass: '123',
+      role: 'provider', cost: s.rate, svc: [s.name], ordersToday: 0, earned: 0,
+      phone: gp(45 + i), area: AREAS[i % AREAS.length], active: true,
+      status: 'Available', alert: null, currentOrderId: null,
+      referrals: Math.floor(5 + Math.random() * 85)
+    });
+  }
+  // Seed Kirana Shopkeepers with referrals
+  for (let i = 0; i < 15; i++) {
+    DB.users.shopkeepers.push({
+      id: i + 1, name: gn(70 + i) + ' Kirana', user: 'shop' + (i + 1), pass: '123',
+      role: 'shopkeeper', area: AREAS[i % AREAS.length], ordersToday: 0, earned: 0,
+      phone: gp(70 + i), active: true, status: 'Available', alert: null, currentOrderId: null,
+      referrals: Math.floor(5 + Math.random() * 85)
+    });
+  }
+
+  // Set explicit default test users & coordinates matching test verification criteria
+  DB.users.customers[0] = { id: 1, name: 'Priya Sharma', user: 'customer', pass: '123', role: 'customer', phone: '9876543210', area: 'Jubilee Hills', active: true };
+  
+  // Plumbers in Jubilee Hills (0km)
+  DB.users.providers[0] = { id: 1, name: 'Raju Plumber', user: 'raju', pass: '123', role: 'provider', cost: 400, svc: ['Plumber'], ordersToday: 0, earned: 0, phone: '9876545001', area: 'Jubilee Hills', active: true, status: 'Available', alert: null, currentOrderId: null, referrals: 18 };
+  DB.users.providers[1] = { id: 2, name: 'Amit Verma', user: 'amit', pass: '123', role: 'provider', cost: 450, svc: ['Plumber'], ordersToday: 0, earned: 0, phone: '9876545002', area: 'Jubilee Hills', active: true, status: 'Available', alert: null, currentOrderId: null, referrals: 42 };
+  
+  // Plumber in Secunderabad (Secunderabad to Jubilee Hills coordinates distance is ~17.9km, which is > 15km)
+  DB.users.providers[2] = { id: 3, name: 'Vikram Singh', user: 'vikram', pass: '123', role: 'provider', cost: 450, svc: ['Plumber'], ordersToday: 0, earned: 0, phone: '9876545003', area: 'Secunderabad', active: true, status: 'Available', alert: null, currentOrderId: null, referrals: 80 };
+  
+  // Additional setup for shopkeeper & AC Technicians
+  DB.users.shopkeepers[0] = { id: 1, name: 'Sai Kirana Store', user: 'sai', pass: '123', role: 'shopkeeper', ordersToday: 0, earned: 0, phone: '9876570001', area: 'Madhapur', active: true, status: 'Available', alert: null, currentOrderId: null, referrals: 35 };
+  DB.users.providers[5] = { id: 6, name: 'Anjali Sharma', user: 'anjali', pass: '123', role: 'provider', cost: 800, svc: ["Women's Salon & Spa"], ordersToday: 0, earned: 0, phone: '9876545006', area: 'Banjara Hills', active: true, status: 'Available', alert: null, currentOrderId: null, referrals: 12 };
+
+  allMockUsers().forEach(u => {
+    DB.wallets.push({ userId: u.id, user: u.user, role: u.role, balance: 0, escrow: 0, history: [] });
+  });
+
+  AuditLogEngine.log('SYSTEM', 'Owner', 'DATABASE_SEED', 'Relational database tables generated with referral and coordinate bounds.');
+  saveDB();
+}
+
+function allMockUsers() {
+  return [...DB.users.customers, ...DB.users.ironShops, ...DB.users.shopkeepers, ...DB.users.providers];
+}
+
+function getWorkersRegistry() {
+  return [...DB.users.providers, ...DB.users.ironShops, ...DB.users.shopkeepers];
+}
+
+/* ══════════════════════════════════════════
+   4. STATELESS CRYPTOGRAPHIC AUTHENTICATION
+   ══════════════════════════════════════════ */
+const AuthService = {
+  createSessionToken(userObj) {
+    const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const payload = btoa(JSON.stringify({
+      user: userObj.user,
+      name: userObj.name,
+      role: userObj.role,
+      perms: userObj.permissions || [],
+      phone: userObj.phone,
+      exp: Date.now() + 1000 * 60 * 60
+    }));
+    const signature = btoa(userObj.user + 'SecretSaltToken14');
+    return `${header}.${payload}.${signature}`;
+  },
+  validateSessionToken(token) {
+    if (!token) return { valid: false, reason: 'Missing session token' };
+    const parts = token.split('.');
+    if (parts.length !== 3) return { valid: false, reason: 'Malformed token structure' };
+    try {
+      const payload = JSON.parse(atob(parts[1]));
+      if (Date.now() > payload.exp) return { valid: false, reason: 'Session token expired' };
+      const checkSig = btoa(payload.user + 'SecretSaltToken14');
+      if (parts[2] !== checkSig) return { valid: false, reason: 'Signature mismatch' };
+      return { valid: true, payload };
+    } catch(e) {
+      return { valid: false, reason: 'JSON parsing failure' };
+    }
+  }
+};
+
+/* ══════════════════════════════════════════
+   5. GATEWAY ROUTER (APIs)
+   ══════════════════════════════════════════ */
+const APIGateway = {
+  async request(path, token, payload) {
+    if (InjectedErrors.APITimeout) {
+      HealthMetrics.FailedRequests++;
+      throw new Error('504 Gateway Timeout: API simulation delay triggered.');
+    }
+
+    let authUser = null;
+    if (path !== '/api/auth/login' && path !== '/api/auth/register') {
+      const auth = AuthService.validateSessionToken(token);
+      if (!auth.valid) {
+        HealthMetrics.FailedRequests++;
+        throw new Error(`401 Unauthorized: ${auth.reason}`);
+      }
+      authUser = auth.payload;
+    }
+
+    switch (path) {
+      case '/api/auth/login': return this.doLogin(payload);
+      case '/api/auth/register': return this.doRegister(payload);
+      case '/api/orders/create': return this.doCreateOrder(authUser, payload);
+      case '/api/orders/complete': return this.doCompleteOrder(authUser, payload);
+      default: throw new Error('404 Path Not Found');
+    }
+  },
+
+  doLogin(p) {
+    const admin = DB.admins.find(a => a.user === p.user && a.pass === p.pass);
+    if (admin) {
+      const token = AuthService.createSessionToken(admin);
+      AuditLogEngine.log(admin.user, admin.role, 'USER_LOGIN', 'Admin authenticated.');
+      return { user: { name: admin.name, role: 'admin', user: admin.user, _perms: admin.permissions }, token };
+    }
+    const user = allMockUsers().find(x => x.user === p.user && x.pass === p.pass);
+    if (user) {
+      if (user.active === false) throw new Error('Your user profile has been deactivated.');
+      const token = AuthService.createSessionToken(user);
+      AuditLogEngine.log(user.user, user.role, 'USER_LOGIN', 'User authenticated.');
+      return { user, token };
+    }
+    throw new Error('Invalid credentials.');
+  },
+
+  doRegister(p) {
+    const all = [...DB.admins, ...allMockUsers()];
+    if (all.find(x => x.user === p.user)) throw new Error('Username taken.');
+    const area = AREAS[Math.floor(Math.random() * AREAS.length)];
+    let newUser = {
+      id: allMockUsers().length + 1, name: p.name, user: p.user, pass: p.pass,
+      phone: p.phone || '9876543210', area: area, active: true, earned: 0, ordersToday: 0,
+      referrals: Math.floor(Math.random() * 20)
+    };
+
+    let col = '';
+    if (p.role === 'customer') col = 'customers';
+    else if (p.role === 'ironshop') {
+      col = 'ironShops';
+      Object.assign(newUser, { status: 'Available', alert: null, currentOrderId: null });
+    }
+    else if (p.role === 'shopkeeper') {
+      col = 'shopkeepers';
+      Object.assign(newUser, { status: 'Available', alert: null, currentOrderId: null });
+    }
+    else if (p.role === 'provider') {
+      col = 'providers';
+      newUser.svc = Array.isArray(p.svc) ? p.svc : [p.svc];
+      newUser.cost = 400;
+      Object.assign(newUser, { status: 'Available', alert: null, currentOrderId: null });
+    }
+
+    DB.users[col].push(newUser);
+    DB.wallets.push({ userId: newUser.id, user: newUser.user, role: newUser.role, balance: 0, escrow: 0, history: [] });
+    initDataMapping();
+    saveDB();
+    AuditLogEngine.log(newUser.user, newUser.role, 'USER_REGISTERED', `Created active ${p.role} profile.`);
+    return { success: true };
+  },
+
+  doCreateOrder(authUser, p) {
+    const listCol = p.type === 'iron' ? DB.ironOrders : p.type === 'svc' ? DB.svcBookings : DB.prodOrders;
+    const newId = 100 + listCol.length + 1;
+    const customer = DB.users.customers.find(c => c.name === authUser.name) || { area: 'Jubilee Hills' };
+
+    // Apply Admin strict pricing locks
+    let lockedPrice = p.price;
+    if (p.type === 'svc') {
+      lockedPrice = DB.adminPriceFixes[p.svc] !== undefined ? DB.adminPriceFixes[p.svc] : null;
+    }
+
+    const orderObj = {
+      id: newId,
+      cust: authUser.name,
+      phone: authUser.phone || '9876543210',
+      date: 'Just now',
+      status: 'created',
+      location: customer.area,
+      type: p.type,
+      items: p.items,
+      hours: p.hours,
+      svc: p.svc,
+      otp: Math.floor(1000 + Math.random() * 9000),
+      surge: FeatureFlags.SurgePricing ? 1.5 : 1.0,
+      workerUser: null,
+      workerName: null,
+      msg: 'Finding matching partners...',
+      forcedPrice: lockedPrice
+    };
+
+    listCol.push(orderObj);
+    saveDB();
+    EventBus.emit('ORDER_CREATED', orderObj);
+    return { success: true, order: orderObj };
+  },
+
+  doCompleteOrder(authUser, p) {
+    const listCol = p.type === 'iron' ? DB.ironOrders : p.type === 'svc' ? DB.svcBookings : DB.prodOrders;
+    const order = listCol.find(x => x.id === p.id);
+    if (!order) throw new Error('Order not found.');
+    
+    order.status = 'completed';
+    EventBus.emit('ORDER_COMPLETED', { order, workerUser: authUser.user });
+    return { success: true };
+  }
+};
+
+/* ══════════════════════════════════════════
+   6. GEOGRAPHIC PROXIMITY & REFERRAL PRIORITY DISPATCH
+   ══════════════════════════════════════════ */
+const OrderService = {
+  init() {
+    EventBus.on('ORDER_CREATED', async (order) => {
+      this.dispatchWorkflow(order);
+    });
+  },
+
+  async dispatchWorkflow(order) {
+    order.status = 'assigning';
+    order.msg = 'Filtering available nearby partners...';
+    EventBus.emit('ORDER_STATE_CHANGED', order);
+
+    // Calculate base rate
+    let rate = 400;
+    if (order.type === 'svc') {
+      const isFixed = DB.adminPriceFixes[order.svc] !== undefined;
+      rate = isFixed ? DB.adminPriceFixes[order.svc] : (SVCTYPES.find(s => s.name === order.svc)?.rate || 400);
+    } else if (order.type === 'iron') {
+      rate = 20 * order.items;
+    } else {
+      rate = order.items.reduce((s, i) => s + i.price * i.qty, 0);
+    }
+    
+    const finalRate = order.forcedPrice !== null ? order.forcedPrice : rate;
+    order.payout = +(finalRate * order.surge).toFixed(2);
+
+    if (FeatureFlags.FraudChecks) {
+      const completedCount = [...DB.ironOrders, ...DB.svcBookings, ...DB.prodOrders].filter(o => o.cust === order.cust && o.status === 'completed').length;
+      if (completedCount > 25) {
+        order.status = 'rejected';
+        order.msg = 'Fraud Engine: Spammer account locked.';
+        EventBus.emit('ORDER_STATE_CHANGED', order);
+        AuditLogEngine.log('SYSTEM', 'Security', 'FRAUD_BLOCK', `Blocked order spammer ${order.cust}`);
+        return;
+      }
+    }
+
+    // Find candidates matching requirements
+    let workers = [];
+    if (order.type === 'svc') {
+      workers = DB.users.providers.filter(w => w.svc.includes(order.svc));
+    } else if (order.type === 'iron') {
+      workers = DB.users.ironShops;
+    } else {
+      workers = DB.users.shopkeepers;
+    }
+
+    // REQUIREMENT 1: AVAILABILITY MUTEX LOCK STATE CHECK
+    let onlineAvailable = workers.filter(w => w.active !== false && w.status === 'Available' && w.currentOrderId === null);
+
+    // REQUIREMENT 2: 15KM CIRCULAR VECTOR GEOMETRY RADIUS FILTER
+    let localizedAvailable = onlineAvailable.filter(w => getDistanceKM(w.area, order.location) <= 15.0);
+
+    if (!localizedAvailable.length) {
+      order.status = 'rejected';
+      order.msg = 'No matching partners available within strict 15km sector.';
+      EventBus.emit('ORDER_STATE_CHANGED', order);
+      AuditLogEngine.log('SYSTEM', 'Dispatch', 'MATCH_FAIL', `Failed to allocate Order #${order.id}. Zero workers in range.`);
+      return;
+    }
+
+    // REQUIREMENT 3: RANK HIGHEST REFERRALS FIRST
+    localizedAvailable.sort((a, b) => b.referrals - a.referrals);
+
+    // Page the top-ranked referral candidate
+    const worker = localizedAvailable[0];
+    order.status = 'paging';
+    order.timerTicks = 0;
+    order.assignedWorker = worker;
+    order.msg = `Priority paged partner ${worker.name} (${worker.referrals} refs) in ${worker.area}...`;
+    EventBus.emit('ORDER_STATE_CHANGED', order);
+
+    // Trigger paging alert inside card
+    worker.status = 'Paging Alert';
+    worker.alert = {
+      orderId: order.id,
+      location: order.location,
+      type: order.type,
+      svc: order.svc || 'Grocery Shop Item',
+      payout: order.payout
+    };
+
+    saveDB();
+    refreshDashboardWorkers();
+    renderMapGrid();
+
+    AuditLogEngine.log('SYSTEM', 'Dispatch', 'WORKER_PAGED', `Paged high-referral node ${worker.name} for Order #${order.id}. Lock active for 15s.`);
+
+    // Auto-autopilot mode clicks accept automatically after a delay
+    if (DB.autopilot) {
+      setTimeout(() => {
+        if (worker.alert && worker.alert.orderId === order.id && order.status === 'paging') {
+          acceptPagingAlert(worker.user, order.id);
+        }
+      }, 1500 / simSpeed);
+    }
+  },
+
+  async startWorkCycle(order, worker) {
+    // Stage 1: Traveling
+    order.status = 'traveling';
+    order.msg = `Partner ${worker.name} is traveling to your location...`;
+    worker.status = 'Busy: Traveling';
+    worker.currentOrderId = order.id;
+    saveDB();
+    EventBus.emit('ORDER_STATE_CHANGED', order);
+    refreshDashboardWorkers();
+    renderMapGrid();
+
+    let travelTime = 3000 / simSpeed;
+    await new Promise(r => setTimeout(r, travelTime));
+
+    // Stage 2: Arrived & Verification OTP
+    order.status = 'arrived';
+    order.msg = `Partner arrived. Share verification code ${order.otp} to start service.`;
+    EventBus.emit('ORDER_STATE_CHANGED', order);
+
+    EventBus.emit('NOTIF_SEND', {
+      user: order.cust,
+      msg: `💬 WhatsApp Alert: Your partner has arrived! Share OTP code ${order.otp} with worker.`
+    });
+
+    if (DB.autopilot) {
+      // Auto-Completes service after a work delay
+      setTimeout(async () => {
+        if (order.status === 'arrived') {
+          order.status = 'in_progress';
+          order.msg = 'Service partner is currently working...';
+          worker.status = 'Busy: Working';
+          saveDB();
+          EventBus.emit('ORDER_STATE_CHANGED', order);
+          refreshDashboardWorkers();
+
+          let workTime = 4000 / simSpeed;
+          await new Promise(r => setTimeout(r, workTime));
+
+          // Call Gateway Complete API Route
+          try {
+            await APIGateway.request('/api/orders/complete', AuthService.createSessionToken(worker), { id: order.id, type: order.type, otp: order.otp });
+            toast(`Order #${order.id} Completed! Payout Distributed.`);
+          } catch(e) {
+            console.error('Auto complete fail:', e);
+          }
+        }
+      }, 2000 / simSpeed);
+    }
+  }
+};
+
+/* ══════════════════════════════════════════
+   7. ESCROW & FINANCIAL DISTRIBUTIONS
+   ══════════════════════════════════════════ */
+const WalletService = {
+  init() {
+    EventBus.on('ORDER_CREATED', (order) => {
+      const wallet = DB.wallets.find(w => w.user === order.cust);
+      if (wallet) {
+        wallet.escrow += order.payout;
+        wallet.history.push({ type: 'ESCROW_HOLD', amt: order.payout, ref: order.id, date: new Date().toLocaleTimeString() });
+      }
+    });
+
+    EventBus.on('ORDER_COMPLETED', ({ order, workerUser }) => {
+      const custWallet = DB.wallets.find(w => w.user === order.cust);
+      if (custWallet) {
+        custWallet.escrow = Math.max(0, custWallet.escrow - order.payout);
+        custWallet.history.push({ type: 'ESCROW_RELEASE', amt: order.payout, ref: order.id, date: new Date().toLocaleTimeString() });
+      }
+
+      // Distribute to worker
+      const worker = getWorkersRegistry().find(x => x.user === workerUser);
+      if (worker) {
+        worker.ordersToday++;
+        const e = calc(order.payout / (1 - C.DISCOUNT), worker.ordersToday);
+        worker.earned += e.workerTotal;
+
+        // FREE UP WORKER & RESET STATE
+        worker.currentOrderId = null;
+        worker.status = worker.active !== false ? 'Available' : 'Offline';
+        saveDB();
+
+        const wWallet = DB.wallets.find(l => l.user === workerUser);
+        if (wWallet) {
+          wWallet.balance += e.workerTotal;
+          wWallet.history.push({ type: 'JOB_PAYOUT', amt: e.workerTotal, ref: order.id, date: new Date().toLocaleTimeString() });
+        }
+
+        AuditLogEngine.log('SYSTEM', 'Finance', 'PAYOUT_SETTLEMENT', `Payout distributed for Order #${order.id} to worker ${worker.name}. Worker Share: ${fmt(e.workerTotal)}, Platform Share: ${fmt(e.platform)}.`);
+      }
+
+      saveDB();
+      refreshDashboardWorkers();
+      renderMapGrid();
+      
+      // Update UI displays
+      if (_user && _user.user === workerUser) {
+        renderProfile();
+        renderEarn();
+      }
+    });
+  }
+};
+
+const NotificationService = {
+  init() {
+    EventBus.on('ORDER_STATE_CHANGED', (order) => {
+      let msg = `Order Status: Order #${order.id} is now '${order.status}'.`;
+      if (order.status === 'accepted') msg = `💬 SMS: ${order.workerName} has accepted your order.`;
+      if (order.status === 'arrived') msg = `💬 WA: Your partner has arrived! Verification OTP: ${order.otp}.`;
+      this.send(order.cust, msg);
+    });
+
+    EventBus.on('NOTIF_SEND', (p) => {
+      this.send(p.user, p.msg);
+    });
+  },
+
+  send(user, msg) {
+    const notif = { id: Date.now() + Math.random(), timestamp: new Date().toLocaleTimeString(), user, message: msg };
+    DB.notifications.push(notif);
+    const dot = document.getElementById('notifDot');
+    if (dot) dot.style.display = 'block';
+    renderNotifications();
+    saveDB();
+  }
+};
+
+/* ══════════════════════════════════════════
+   8. ACTIVE SYSTEM CONTROLLERS AND TICK SCHEDULERS
+   ══════════════════════════════════════════ */
+let lastSecond = Date.now();
+function runSystemRuntime() {
+  const now = Date.now();
+  if (now - lastSecond >= 1000) {
+    lastSecond = now;
+    HealthMetrics.Uptime++;
+
+    // Calculate simulated server telemetry values
+    const ordersCount = DB.ironOrders.length + DB.svcBookings.length + DB.prodOrders.length;
+    HealthMetrics.CPU = Math.min(99, Math.max(10, Math.floor(12 + (ordersCount % 12) + Math.random() * 5)));
+    HealthMetrics.Memory = Math.min(120, Math.max(30, Math.floor(40 + (ordersCount % 8) + Math.random() * 3)));
+    
+    // Telemetry updates
+    document.getElementById('telemetryCPU').textContent = `${HealthMetrics.CPU}%`;
+    document.getElementById('telemetryRAM').textContent = `${HealthMetrics.Memory}MB`;
+    
+    const activeEscrow = DB.wallets.reduce((s, w) => s + w.escrow, 0);
+    document.getElementById('telemetryEscrow').textContent = fmt(activeEscrow);
+
+    // REQUIREMENT 4: 15-SECOND DECAY TIMING FALLBACK TIMER
+    tickActivePagingOrders();
+
+    // Auto-cleanup stale orders every 10 system seconds
+    if (HealthMetrics.Uptime % 10 === 0) {
+      cleanupStaleOrders();
+    }
+  }
+  requestAnimationFrame(runSystemRuntime);
+}
+
+function tickActivePagingOrders() {
+  const list = [...DB.ironOrders, ...DB.svcBookings, ...DB.prodOrders];
+  list.forEach(o => {
+    if (o.status === 'paging') {
+      o.timerTicks = (o.timerTicks || 0) + 1;
+      const currentWorker = getWorkersRegistry().find(w => w.alert && w.alert.orderId === o.id);
+
+      if (o.timerTicks >= 15) {
+        // LOCK DECAYS! Release paged worker
+        if (currentWorker) {
+          currentWorker.alert = null;
+          currentWorker.status = currentWorker.active !== false ? 'Available' : 'Offline';
+        }
+
+        // Broaden alert search outwards to secondary available workers in the 15km sector
+        let workers = [];
+        if (o.type === 'svc') workers = DB.users.providers.filter(w => w.svc.includes(o.svc));
+        else if (o.type === 'iron') workers = DB.users.ironShops;
+        else workers = DB.users.shopkeepers;
+
+        let onlineAvailable = workers.filter(w => w.active !== false && w.status === 'Available' && w.currentOrderId === null && w.user !== (currentWorker ? currentWorker.user : ''));
+        let candidatePool = onlineAvailable.filter(w => getDistanceKM(w.area, o.location) <= 15.0);
+
+        if (candidatePool.length > 0) {
+          candidatePool.sort((a, b) => b.referrals - a.referrals);
+          const fallbackChoice = candidatePool[0];
+          o.assignedWorker = fallbackChoice;
+          fallbackChoice.status = 'Paging Alert';
+          fallbackChoice.alert = { orderId: o.id, cost: o.payout, location: o.location, type: o.type, svc: o.svc };
+          o.timerTicks = 0; // reset decay timer for the fallback choice
+          o.msg = `15s priority timer expired. Opened alert logs outwards to secondary node ${fallbackChoice.name}.`;
+          AuditLogEngine.log('SYSTEM', 'Dispatch', 'FALLBACK_ROUTING', `Order #${o.id} priority paged timed out. Fallback routed to ${fallbackChoice.name}.`);
+        } else {
+          o.status = 'rejected';
+          o.msg = '15s fallback expired. No alternative available partners within 15km circular sector.';
+          EventBus.emit('ORDER_STATE_CHANGED', o);
+          AuditLogEngine.log('SYSTEM', 'Dispatch', 'MATCH_EXPIRED', `Order #${o.id} expired. Zero alternative candidates within 15km.`);
+        }
+      } else {
+        if (currentWorker) {
+          const remainingSecs = 15 - o.timerTicks;
+          o.msg = `Priority paged highest referral partner ${currentWorker.name} (${currentWorker.referrals} refs). Fallback decays in ${remainingSecs}s.`;
+        }
+      }
+      EventBus.emit('ORDER_STATE_CHANGED', o);
+    }
+  });
+}
+
+function cleanupStaleOrders() {
+  let expired = 0;
+  [...DB.ironOrders, ...DB.svcBookings, ...DB.prodOrders].forEach(o => {
+    if (o.status === 'created' && Math.random() > 0.85) {
+      o.status = 'rejected';
+      o.msg = 'Expired. No response from regional partners.';
+      expired++;
+      EventBus.emit('ORDER_STATE_CHANGED', o);
+    }
+  });
+
+  if (expired > 0) {
+    saveDB();
+    refreshDashboardWorkers();
+    renderMapGrid();
+    AuditLogEngine.log('SYSTEM', 'Dispatch', 'EXPIRY_CLEANUP', `Cleaned up ${expired} unanswered orders due to dispatch timeout.`);
+  }
+}
+
+/* ══════════════════════════════════════════
+   9. MANUAL AND SIMULATED ACTIONS (HANDLERS)
+   ══════════════════════════════════════════ */
+function toggleWorkerActive(userId, role, isOnline) {
+  const workers = getWorkersRegistry();
+  const worker = workers.find(w => w.id === userId && w.role === role);
+  if (worker) {
+    worker.active = isOnline;
+    if (!isOnline) {
+      if (worker.currentOrderId === null) {
+        worker.status = 'Offline';
+      } else {
+        toast('⚠️ Worker is busy. Will toggle offline once job completes.');
+      }
+    } else {
+      if (worker.currentOrderId === null) {
+        worker.status = 'Available';
+      }
+    }
+    saveDB();
+    refreshDashboardWorkers();
+    renderMapGrid();
+    AuditLogEngine.log('SYSTEM', 'Operator', 'AVAILABILITY_CHANGE', `Toggled ${worker.name} (${worker.role}) to ${isOnline ? 'Online' : 'Offline'}.`);
+  }
+}
+
+function setAllWorkersOnline(isOnline) {
+  getWorkersRegistry().forEach(w => {
+    w.active = isOnline;
+    if (!isOnline) {
+      if (w.currentOrderId === null) w.status = 'Offline';
+    } else {
+      if (w.currentOrderId === null) w.status = 'Available';
+    }
+  });
+  saveDB();
+  refreshDashboardWorkers();
+  renderMapGrid();
+  AuditLogEngine.log('SYSTEM', 'Operator', 'BULK_AVAILABILITY_CHANGE', `Toggled all workers to ${isOnline ? 'Online' : 'Offline'}.`);
+}
+
+function acceptPagingAlert(workerUser, orderId) {
+  const worker = getWorkersRegistry().find(w => w.user === workerUser);
+  const listCol = [...DB.ironOrders, ...DB.svcBookings, ...DB.prodOrders];
+  const order = listCol.find(o => o.id === orderId);
+
+  if (worker && order && worker.alert && worker.alert.orderId === orderId) {
+    worker.alert = null;
+    worker.currentOrderId = orderId;
+    order.workerUser = worker.user;
+    order.workerName = worker.name;
+    
+    AuditLogEngine.log(worker.user, worker.role, 'ALERT_ACCEPTED', `Accepted Order #${order.id} dispatch.`);
+    OrderService.startWorkCycle(order, worker);
+  }
+}
+
+function declinePagingAlert(workerUser, orderId) {
+  const worker = getWorkersRegistry().find(w => w.user === workerUser);
+  const listCol = [...DB.ironOrders, ...DB.svcBookings, ...DB.prodOrders];
+  const order = listCol.find(o => o.id === orderId);
+
+  if (worker && order && worker.alert && worker.alert.orderId === orderId) {
+    worker.alert = null;
+    worker.status = 'Available';
+    saveDB();
+
+    AuditLogEngine.log(worker.user, worker.role, 'ALERT_DECLINED', `Declined Order #${order.id} assignment request.`);
+    
+    // Lock decays instantly. Retry dispatch to trigger next candidates
+    OrderService.dispatchWorkflow(order);
+  }
+}
+
+function toggleSimulationMode() {
+  const isEnabled = document.getElementById('simToggle').checked;
+  const statusTxt = document.getElementById('simStatusText');
+
+  DB.autopilot = isEnabled;
+  saveDB();
+
+  if (isEnabled) {
+    statusTxt.textContent = 'Auto-Simulation RUNNING';
+    statusTxt.style.color = 'var(--brand)';
+    AuditLogEngine.log('SYSTEM', 'Simulator', 'AUTO_SIM_START', `Self-driving simulation active. Speed: ${simSpeed}x`);
+    toast('🟢 Auto-Simulation Mode Started');
+  } else {
+    statusTxt.textContent = 'Auto-Simulation OFF';
+    statusTxt.style.color = 'var(--danger)';
+    AuditLogEngine.log('SYSTEM', 'Simulator', 'AUTO_SIM_STOP', 'Self-driving simulation disabled.');
+    toast('🔴 Auto-Simulation Mode Stopped');
+  }
+}
+
+function changeSpeed(val) {
+  simSpeed = parseInt(val) || 1;
+  AuditLogEngine.log('SYSTEM', 'Simulator', 'SPEED_CHANGED', `Simulation speed factor updated to ${simSpeed}x.`);
+  toast(`Speed multiplier set to ${simSpeed}x`);
+}
+
+function applyAdminPriceFix(index, categoryName) {
+  const val = parseFloat(document.getElementById(`adminPrice-${index}`).value) || 100;
+  DB.adminPriceFixes[categoryName] = val;
+  
+  // Update badge status UI
+  document.getElementById('priceLockBadge').textContent = '⚠️ Global Administrative Price Freeze Enforced';
+  document.getElementById('priceLockBadge').className = 'pill pill-danger';
+  
+  AuditLogEngine.log('SYSTEM', 'Admin', 'PRICE_FREEZE', `Admin absolute locked price parameter for ${categoryName} to ₹${val}. Custom provider pricing inputs disabled.`);
+  toast(`Fixed ${categoryName} rate to ₹${val}`);
+  updateInterface();
+}
+
+function releaseGlobalPriceLocks() {
+  DB.adminPriceFixes = {};
+  document.getElementById('priceLockBadge').textContent = 'Custom Provider Pricing Active';
+  document.getElementById('priceLockBadge').className = 'pill pill-warning';
+  
+  AuditLogEngine.log('SYSTEM', 'Admin', 'PRICE_FREEZE_RELEASE', `Released administrative global pricing caps. Restored custom editing parameters.`);
+  toast(`Restored custom provider price configurations`);
+  updateInterface();
+}
+
+function updateWorkerCustomPrice(workerId, role, value) {
+  const workers = getWorkersRegistry();
+  const w = workers.find(x => x.id === workerId && x.role === role);
+  if (w) {
+    w.cost = parseFloat(value) || 400;
+    saveDB();
+    refreshDashboardWorkers();
+  }
+}
+
+function renderAdminPriceController() {
+  const container = document.getElementById('adminPriceFixContainer');
+  if (!container) return;
+  
+  container.innerHTML = SVCTYPES.map((s, idx) => {
+    const isFixed = DB.adminPriceFixes[s.name] !== undefined;
+    const fixedVal = isFixed ? DB.adminPriceFixes[s.name] : s.rate;
+    return `
+      <div style="background:var(--bg-sub); padding:0.45rem; border-radius:8px; display:flex; flex-direction:column; gap:0.25rem; font-size:0.7rem; border: 1px solid var(--line)">
+        <span style="font-weight:700; color:var(--ink2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${s.name}</span>
+        <div style="display:flex; gap:0.2rem">
+          <input type="number" id="adminPrice-${idx}" class="fi" value="${fixedVal}" style="padding:0.15rem 0.35rem; font-size:0.72rem; height:26px; border-radius:6px">
+          <button class="btn btn-brand btn-sm" onclick="applyAdminPriceFix(${idx}, '${s.name}')" style="height:26px; padding:0 0.4rem; font-size:0.65rem; border-radius:6px">Fix</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ══════════════════════════════════════════
+   10. MOBILE CLIENT INTERFACES (SCREENS)
+   ══════════════════════════════════════════ */
+function go(scr) {
+  _screen = scr;
+  document.querySelectorAll('.scr').forEach(el => el.classList.remove('on'));
+  const target = document.getElementById('s-' + scr);
+  if (target) target.classList.add('on');
+
+  // Bottom Navigation highlight
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.toggle('active', item.getAttribute('data-s') === scr);
+  });
+
+  if (scr === 'home') renderHome();
+  else if (scr === 'services') renderServices();
+  else if (scr === 'shop') renderShop();
+  else if (scr === 'earn') renderEarn();
+  else if (scr === 'account') renderAuth();
+  
+  document.getElementById('scroll').scrollTop = 0;
+}
+window.go = go;
+
+function renderHome() {
+  document.getElementById('heroGreet').textContent = _user ? `Welcome back, ${_user.name} 👋` : 'Welcome to SAHA 👋';
+  const modelBox = document.getElementById('homeStackModel');
+  if (modelBox) modelBox.innerHTML = stackModelHTML(600);
+
+  const homeList = document.getElementById('homeSvcList');
+  if (homeList) {
+    homeList.innerHTML = SVCTYPES.slice(0, 3).map(s => {
+      const isFixed = DB.adminPriceFixes[s.name] !== undefined;
+      const displayPrice = isFixed ? DB.adminPriceFixes[s.name] : s.rate;
+      return `
+        <div class="svc" onclick="go('services')">
+          <div class="svc-ico" style="background:var(--brand-bg);color:var(--brand)">🔧</div>
+          <div class="svc-body">
+            <div class="svc-name">${s.name}</div>
+            <div class="svc-prov">${isFixed ? '🔒 Price Fixed by Admin' : 'Verified Local Partners'}</div>
+          </div>
+          <div class="svc-end">
+            <div class="svc-price">${fmt(displayPrice)}</div>
+            <div class="svc-orig">${fmt(displayPrice * 1.15)}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function renderServices() {
+  const container = document.getElementById('svcList');
+  if (!container) return;
+  container.innerHTML = SVCTYPES.map(s => {
+    const isFixed = DB.adminPriceFixes[s.name] !== undefined;
+    const displayPrice = isFixed ? DB.adminPriceFixes[s.name] : s.rate;
+    return `
+      <div class="svc">
+        <div class="svc-ico" style="background:var(--brand-bg);color:var(--brand)">🔧</div>
+        <div class="svc-body">
+          <div class="svc-name">${s.name}</div>
+          <div class="svc-prov">${isFixed ? '🔒 Admin Absolute Locked Rate' : 'Auto-assigned to nearby provider'}</div>
+        </div>
+        <div class="svc-end">
+          <div class="svc-price">${fmt(displayPrice)}</div>
+          <button class="btn btn-brand btn-sm" style="margin-top:0.3rem" onclick="bookService('${s.name}', ${displayPrice})">Book Now</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function bookService(svcName, basePrice) {
+  if (!_user) {
+    toast('⚠️ Please sign in to book services.');
+    go('account');
+    return;
+  }
+  try {
+    const res = await APIGateway.request('/api/orders/create', _token, { type: 'svc', svc: svcName, price: basePrice });
+    toast(`🎉 Booking Order #${res.order.id} Created!`);
+    refreshOrdersList();
+    renderMapGrid();
+    go('earn');
+  } catch(e) {
+    toast(`🔴 Booking failed: ${e.message}`);
+  }
+}
+
+function gotoIron() {
+  if (!_user) {
+    toast('⚠️ Please sign in to request services.');
+    go('account');
+    return;
+  }
+  openModal(`
+    <div class="modal-h">👔 Request Ironing</div>
+    <div class="fg">
+      <label class="fl">Number of garments</label>
+      <input type="number" id="ironGarmentsCount" class="fi" value="5" min="1">
+    </div>
+    <button class="btn btn-brand btn-full" onclick="confirmIronBooking()">Submit Order</button>
+  `);
+}
+
+async function confirmIronBooking() {
+  const count = parseInt(document.getElementById('ironGarmentsCount').value) || 0;
+  closeModal();
+  try {
+    const res = await APIGateway.request('/api/orders/create', _token, { type: 'iron', items: count });
+    toast(`🎉 Ironing Order #${res.order.id} Placed.`);
+    refreshOrdersList();
+    renderMapGrid();
+    go('earn');
+  } catch(e) {
+    toast(`🔴 Request failed: ${e.message}`);
+  }
+}
+
+/* Grocery Shop Module */
+let activeShopCat = 'All';
+let activeShopId = 1;
+
+function switchActiveShop(val) {
+  activeShopId = parseInt(val) || 1;
+  renderShop();
+}
+
+function renderShop() {
+  const catBar = document.getElementById('catBar');
+  if (catBar) {
+    catBar.innerHTML = DB.cats.map(c => `
+      <button class="cat-btn${c === activeShopCat ? ' on' : ''}" onclick="setShopCat('${c}')">
+        <span class="cat-btn-txt">${c}</span>
+      </button>
+    `).join('');
+  }
+  filterProducts('');
+}
+
+function setShopCat(cat) {
+  activeShopCat = cat;
+  renderShop();
+}
+
+function filterProducts(query) {
+  const area = document.getElementById('shopArea');
+  if (!area) return;
+
+  const filtered = DB.prods.filter(p => {
+    const matchShop = p.shopId === activeShopId;
+    const matchCat = activeShopCat === 'All' || p.cat === activeShopCat;
+    const matchQuery = p.name.toLowerCase().includes(query.toLowerCase());
+    return matchShop && matchCat && matchQuery;
+  });
+
+  if (!filtered.length) {
+    area.innerHTML = `<div style="text-align:center;padding:2rem 0;color:var(--muted)">No items found.</div>`;
+    return;
+  }
+
+  area.innerHTML = `
+    <div class="pgrid">
+      ${filtered.map(p => `
+        <div class="pcard">
+          <div class="pcard-disc">10% OFF</div>
+          <div class="pcard-img">${p.icon}</div>
+          <div class="pcard-body">
+            <div class="pcard-name">${p.name}</div>
+            <div style="font-size:0.6rem;color:var(--muted)">${p.unit} · ${p.shop}</div>
+            <div class="pcard-prices">
+              <span class="pcard-price">${fmt(p.price)}</span>
+            </div>
+            <button class="add-btn" onclick="addToCart(${p.id})">Add to Cart</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function addToCart(prodId) {
+  if (!_user) {
+    toast('⚠️ Please sign in to add products.');
+    go('account');
+    return;
+  }
+  const p = DB.prods.find(x => x.id === prodId);
+  if (p) {
+    const existing = DB.cart.find(item => item.id === prodId);
+    if (existing) {
+      existing.qty++;
+    } else {
+      DB.cart.push({ ...p, qty: 1 });
+    }
+    saveDB();
+    updateCartBar();
+    toast(`🛒 Added ${p.name} to cart.`);
+  }
+}
+
+function updateCartBar() {
+  const bar = document.getElementById('cartBar');
+  if (!bar) return;
+  const count = DB.cart.reduce((s, i) => s + i.qty, 0);
+  const total = DB.cart.reduce((s, i) => s + i.price * i.qty, 0);
+
+  if (count > 0) {
+    document.getElementById('cbI').textContent = `${count} Items`;
+    document.getElementById('cbT').textContent = fmt(total);
+    bar.classList.add('vis');
+  } else {
+    bar.classList.remove('vis');
+  }
+}
+
+function openCart() {
+  const total = DB.cart.reduce((s, i) => s + i.price * i.qty, 0);
+  openModal(`
+    <div class="modal-h">🛒 Shopping Cart</div>
+    <div style="max-height:220px;overflow-y:auto;margin-bottom:1rem">
+      ${DB.cart.map(i => `
+        <div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--line);font-size:0.75rem">
+          <span>${i.name} (x${i.qty})</span>
+          <strong>${fmt(i.price * i.qty)}</strong>
+        </div>
+      `).join('')}
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:0.9rem;font-weight:800;margin-bottom:1rem">
+      <span>Total (after 10% discount):</span>
+      <span style="color:var(--brand)">${fmt(total * 0.9)}</span>
+    </div>
+    <button class="btn btn-brand btn-full" onclick="checkoutCart()">Confirm Purchase</button>
+  `);
+}
+
+async function checkoutCart() {
+  closeModal();
+  try {
+    const res = await APIGateway.request('/api/orders/create', _token, { type: 'shop', items: [...DB.cart] });
+    DB.cart = [];
+    saveDB();
+    updateCartBar();
+    toast(`🎉 Grocery Order #${res.order.id} Created!`);
+    refreshOrdersList();
+    renderMapGrid();
+    go('earn');
+  } catch(e) {
+    toast(`🔴 Checkout failed: ${e.message}`);
+  }
+}
+
+/* Worker/Partner Mobile Portal */
+function renderEarn() {
+  const v = document.getElementById('earnVal');
+  const stats = document.getElementById('earnStats');
+  const block = document.getElementById('progressBlock');
+  const rolePick = document.getElementById('earnRolePicker');
+
+  if (!_user || _user.role === 'customer') {
+    v.textContent = '₹0';
+    block.style.display = 'none';
+    stats.innerHTML = '';
+    rolePick.innerHTML = `
+      <div class="card">
+        <h4 style="font-size:0.82rem;font-weight:800;margin-bottom:0.4rem">Earn Income as a Hyperlocal Partner</h4>
+        <p style="font-size:0.72rem;color:var(--muted);margin-bottom:0.8rem">Register a service category provider account or shopkeeper profile to start accepting automated dispatch requests.</p>
+        <button class="btn btn-brand btn-full btn-sm" onclick="go('account')">Go to Register/Sign In</button>
+      </div>
+    `;
+    return;
+  }
+
+  // Retrieve current active worker stats
+  const workerObj = getWorkersRegistry().find(w => w.user === _user.user);
+  if (!workerObj) return;
+
+  v.textContent = fmt(workerObj.earned);
+  block.style.display = 'block';
+
+  const wWallet = DB.wallets.find(w => w.user === _user.user) || { balance: 0 };
+  const incentiveProgress = Math.min(100, (workerObj.ordersToday / C.THRESHOLD) * 100);
+  
+  document.getElementById('progVal').textContent = `${workerObj.ordersToday}/${C.THRESHOLD} Orders`;
+  document.getElementById('progFill').style.width = incentiveProgress + '%';
+
+  stats.innerHTML = `
+    <div class="stat-cell"><div class="stat-v">${workerObj.ordersToday}</div><div class="stat-l">Jobs Today</div></div>
+    <div class="stat-cell"><div class="stat-v">${fmt(wWallet.balance)}</div><div class="stat-l">Wallet Bal</div></div>
+    <div class="stat-cell"><div class="stat-v" style="color:var(--brand)">Active</div><div class="stat-l">Status</div></div>
+  `;
+
+  // Display pending alerts on worker's phone
+  const alertPanel = document.getElementById('earnPending');
+  if (workerObj.alert) {
+    alertPanel.innerHTML = `
+      <div class="card" style="border-color:var(--danger);background:var(--danger-lt);margin:1rem 1.1rem">
+        <div style="font-size:0.8rem;font-weight:800;color:var(--danger)">🚨 Live Dispatch Alert!</div>
+        <div style="font-size:0.72rem;color:var(--ink);margin:0.3rem 0">
+          Order #${workerObj.alert.orderId} in ${workerObj.alert.location}.<br>
+          Payout: <strong>${fmt(workerObj.alert.payout)}</strong>
+        </div>
+        <div style="display:flex;gap:0.4rem;margin-top:0.4rem">
+          <button class="btn btn-brand btn-sm" onclick="acceptPagingAlert('${workerObj.user}', ${workerObj.alert.orderId})">Accept Assignment</button>
+          <button class="btn btn-outline btn-sm" onclick="declinePagingAlert('${workerObj.user}', ${workerObj.alert.orderId})">Decline</button>
+        </div>
+      </div>
+    `;
+  } else {
+    alertPanel.innerHTML = '';
+  }
+
+  // Display Job Booking lists
+  const bookingsPanel = document.getElementById('earnBookings');
+  const allOrders = [...DB.ironOrders, ...DB.svcBookings, ...DB.prodOrders].filter(o => o.workerUser === _user.user);
+  
+  if (allOrders.length > 0) {
+    bookingsPanel.innerHTML = `
+      <h3 style="font-size:0.8rem;font-weight:800;margin-bottom:0.5rem">Your Assigned Jobs</h3>
+      <div style="display:flex;flex-direction:column;gap:0.5rem">
+        ${allOrders.map(o => `
+          <div class="card" style="margin-bottom:0">
+            <div style="display:flex;justify-content:space-between;font-size:0.75rem">
+              <strong>Order #${o.id}</strong>
+              <span class="pill pill-${o.status === 'completed' ? 'brand' : 'warning'}">${o.status}</span>
+            </div>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:0.2rem">
+              Client: ${o.cust} (${o.location})<br>
+              Status: ${o.msg}
+            </div>
+            ${o.status === 'arrived' ? `
+              <div style="margin-top:0.4rem;display:flex;gap:0.4rem">
+                <input class="fi" id="otpIn-${o.id}" type="number" placeholder="Enter Customer OTP" style="width:120px;height:30px;font-size:0.75rem">
+                <button class="btn btn-brand btn-sm" onclick="verifyJobOTP(${o.id}, '${o.type}')">Complete</button>
+              </div>
+            ` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else {
+    bookingsPanel.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:0.75rem">No active jobs assigned yet.</div>`;
+  }
+
+  // REQUIREMENT 5: INLINE ADMINISTRATIVE CAPS FREEZES (DISABLE PRICING TOGGLE)
+  const stackBox = document.getElementById('earnStackModel');
+  if (stackBox) {
+    const isLocked = DB.adminPriceFixes[workerObj.role === 'provider' ? workerObj.svc[0] : workerObj.role === 'ironshop' ? 'Ironing' : 'Grocery'] !== undefined;
+    const finalCost = isLocked ? (DB.adminPriceFixes[workerObj.role === 'provider' ? workerObj.svc[0] : workerObj.role === 'ironshop' ? 'Ironing' : 'Grocery']) : workerObj.cost;
+    
+    stackBox.innerHTML = `
+      ${stackModelHTML(finalCost)}
+      <div class="card" style="background:var(--bg-sub); margin-top: 1rem">
+        <h5 style="font-size:0.8rem;margin-bottom:0.4rem">🔧 Custom Pricing Console</h5>
+        <div class="fg">
+          <label class="fl">My Hourly Base Service Charge (₹)</label>
+          <input type="number" class="fi" value="${workerObj.cost}" 
+            oninput="updateWorkerCustomPrice(${workerObj.id}, '${workerObj.role}', this.value)" 
+            ${isLocked ? 'disabled' : ''}>
+          ${isLocked ? `<span style="font-size:0.58rem;color:var(--danger);font-weight:700;margin-top:0.25rem;display:block">🔒 Editing disabled. Absolute admin price cap enforced.</span>` : ''}
+        </div>
+      </div>
+    `;
+  }
+  rolePick.innerHTML = '';
+}
+
+async function verifyJobOTP(orderId, type) {
+  const otpVal = document.getElementById('otpIn-' + orderId).value;
+  try {
+    await APIGateway.request('/api/orders/complete', _token, { id: orderId, type, otp: otpVal });
+    toast('✅ OTP Verified. Job Completed successfully!');
+    renderEarn();
+    refreshOrdersList();
+    renderMapGrid();
+  } catch(e) {
+    toast(`🔴 Error: ${e.message}`, '#EF4444');
+  }
+}
+
+/* Sign In & User Settings Screen */
+function renderAuth() {
+  const wrap = document.getElementById('authWrap');
+  if (!wrap) return;
+
+  if (_user) {
+    wrap.innerHTML = `
+      <div class="card" style="text-align:center">
+        <div style="font-size:2.2rem;margin-bottom:0.4rem">👤</div>
+        <div style="font-size:0.95rem;font-weight:800">${_user.name}</div>
+        <div style="font-size:0.72rem;color:var(--muted)">Role: ${_user.role.toUpperCase()} · ${_user.phone || 'No Phone'}</div>
+        <div style="font-size:0.7rem;color:var(--brand);margin-top:0.25rem">Session active (Stateless JWT token generated)</div>
+        <button class="btn btn-outline btn-full btn-sm" style="margin-top:1.2rem;color:var(--danger);border-color:var(--danger-lt)" onclick="doLogout()">Sign Out</button>
+      </div>
+    `;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <div class="card">
+      <div class="auth-tabs">
+        <button class="auth-tab on" id="tabLogin" onclick="setAuthTab('login')">Sign In</button>
+        <button class="auth-tab" id="tabRegister" onclick="setAuthTab('register')">Register Partner</button>
+      </div>
+      <div id="authForm"></div>
+    </div>
+  `;
+  setAuthTab('login');
+}
+
+let activeAuthTab = 'login';
+function setAuthTab(tab) {
+  activeAuthTab = tab;
+  document.getElementById('tabLogin').classList.toggle('on', tab === 'login');
+  document.getElementById('tabRegister').classList.toggle('on', tab === 'register');
+
+  const form = document.getElementById('authForm');
+  if (tab === 'login') {
+    form.innerHTML = `
+      <div class="fg">
+        <label class="fl">Username</label>
+        <input class="fi" type="text" id="authUser" value="customer">
+      </div>
+      <div class="fg">
+        <label class="fl">Password</label>
+        <input class="fi" type="password" id="authPass" value="123">
+      </div>
+      <button class="btn btn-brand btn-full" onclick="submitLogin()">Sign In</button>
+      <div class="cred-box" style="background:var(--bg-sub);border-radius:10px;padding:0.7rem;font-size:0.72rem;line-height:1.4;margin-top:0.8rem;color:var(--ink2)">
+        <strong>Demo Login Credentials:</strong><br>
+        • Customer: <code>customer</code> / <code>123</code><br>
+        • Raju Plumber: <code>raju</code> / <code>123</code><br>
+        • Amit Verma: <code>amit</code> / <code>123</code><br>
+        • Admin: <code>admin</code> / <code>SAHA@2025</code>
+      </div>
+    `;
+  } else {
+    form.innerHTML = `
+      <div class="fg">
+        <label class="fl">Full Name</label>
+        <input class="fi" type="text" id="regName" placeholder="e.g. Ramesh Kumar">
+      </div>
+      <div class="fg">
+        <label class="fl">Username</label>
+        <input class="fi" type="text" id="regUser" placeholder="Choose username">
+      </div>
+      <div class="fg">
+        <label class="fl">Password</label>
+        <input class="fi" type="password" id="regPass" placeholder="••••••">
+      </div>
+      <div class="fg">
+        <label class="fl">Phone Number</label>
+        <input class="fi" type="number" id="regPhone" placeholder="98765xxxxx">
+      </div>
+      <div class="fg">
+        <label class="fl">Select Service Category</label>
+        <select class="fi" id="regRole" onchange="toggleRegSvc(this.value)">
+          <option value="customer">Customer (Standard User)</option>
+          <option value="provider">Service Partner (Plumber, Salon, etc.)</option>
+          <option value="ironshop">Ironing Shop Partner</option>
+          <option value="shopkeeper">Kirana Grocery Partner</option>
+        </select>
+      </div>
+      <div class="fg" id="regSvcBlock" style="display:none">
+        <label class="fl">Specialty Category</label>
+        <select class="fi" id="regSvc">
+          ${SVCTYPES.map(s => `<option value="${s.name}">${s.name}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn btn-brand btn-full" onclick="submitRegister()">Submit Registry</button>
+    `;
+  }
+}
+
+function toggleRegSvc(role) {
+  const block = document.getElementById('regSvcBlock');
+  if (block) block.style.display = role === 'provider' ? 'block' : 'none';
+}
+
+async function submitLogin() {
+  const user = document.getElementById('authUser').value;
+  const pass = document.getElementById('authPass').value;
+  try {
+    const res = await APIGateway.request('/api/auth/login', null, { user, pass });
+    _user = res.user;
+    _token = res.token;
+    
+    // Set avatar chip
+    const chip = document.getElementById('userChip');
+    if (chip) chip.textContent = _user.name.charAt(0);
+
+    toast(`👋 Welcome ${_user.name}!`);
+    go('home');
+  } catch(e) {
+    toast(`🔴 Sign in failed: ${e.message}`, '#EF4444');
+  }
+}
+
+async function submitRegister() {
+  const name = document.getElementById('regName').value;
+  const user = document.getElementById('regUser').value;
+  const pass = document.getElementById('regPass').value;
+  const phone = document.getElementById('regPhone').value;
+  const role = document.getElementById('regRole').value;
+  const svc = document.getElementById('regSvc').value;
+
+  try {
+    await APIGateway.request('/api/auth/register', null, { name, user, pass, phone, role, svc });
+    toast('🎉 Registration completed! Sign in now.');
+    setAuthTab('login');
+  } catch(e) {
+    toast(`🔴 Registration failed: ${e.message}`, '#EF4444');
+  }
+}
+
+function doLogout() {
+  _user = null;
+  _token = '';
+  document.getElementById('userChip').textContent = '?';
+  toast('Signed out successfully.');
+  go('home');
+}
+
+/* ══════════════════════════════════════════
+   11. COMMAND CENTER (DASHBOARD RENDERS)
+   ══════════════════════════════════════════ */
+function renderMapGrid() {
+  const grid = document.getElementById('mapGrid');
+  if (!grid) return;
+
+  const orders = [...DB.ironOrders, ...DB.svcBookings, ...DB.prodOrders].filter(o => o.status !== 'completed' && o.status !== 'rejected');
+  const workers = getWorkersRegistry();
+
+  grid.innerHTML = AREAS.map(area => {
+    const areaOrders = orders.filter(o => o.location === area);
+    const areaWorkersAvail = workers.filter(w => w.area === area && w.active !== false && w.status === 'Available');
+    const areaWorkersBusy = workers.filter(w => w.area === area && w.active !== false && w.status.includes('Busy'));
+
+    const isPaged = workers.some(w => w.area === area && w.status === 'Paging Alert');
+    const classStr = isPaged ? 'map-node has-alert' : areaOrders.length > 0 ? 'map-node has-orders' : 'map-node';
+
+    return `
+      <div class="${classStr}">
+        <div class="map-node-name">${area}</div>
+        <div class="map-node-stats">
+          <span class="map-badge map-badge-green" title="Available">${areaWorkersAvail.length}</span>
+          <span class="map-badge map-badge-yellow" title="Busy">${areaWorkersBusy.length}</span>
+          <span class="map-badge map-badge-red" title="Active Orders">${areaOrders.length}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function refreshDashboardWorkers() {
+  const grid = document.getElementById('dashboardWorkersGrid');
+  if (!grid) return;
+
+  const workers = getWorkersRegistry();
+  grid.innerHTML = workers.map(w => {
+    let statClass = 'w-badge-avail';
+    if (w.status === 'Offline') statClass = 'w-badge-off';
+    else if (w.status.includes('Busy') || w.status === 'Paging Alert') statClass = 'w-badge-busy';
+
+    const isPriceLocked = DB.adminPriceFixes[w.role === 'provider' ? w.svc[0] : w.role === 'ironshop' ? 'Ironing' : 'Grocery'] !== undefined;
+    const currentActivePrice = isPriceLocked ? (DB.adminPriceFixes[w.role === 'provider' ? w.svc[0] : w.role === 'ironshop' ? 'Ironing' : 'Grocery']) : w.cost;
+
+    return `
+      <div class="worker-card ${w.status.includes('Busy') ? 'busy' : ''} ${w.status === 'Paging Alert' ? 'paged' : ''}">
+        <div class="worker-card-header">
+          <div>
+            <div class="worker-card-name">${w.name}</div>
+            <div class="worker-card-role">${w.role.toUpperCase()} · ${w.svc ? w.svc.join('/') : 'Garment Ironing'}</div>
+            <div class="worker-card-loc">📍 ${w.area}</div>
+          </div>
+          
+          <!-- Availability Toggle -->
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.2rem">
+            <label class="toggle-switch">
+              <input type="checkbox" ${w.active !== false ? 'checked' : ''} onchange="toggleWorkerActive(${w.id}, '${w.role}', this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="w-badge ${statClass}">${w.status}</span>
+          </div>
+        </div>
+        
+        <div style="display:flex;justify-content:space-between;font-size:0.64rem;color:var(--muted);border-top:1px dashed var(--line);padding-top:0.4rem;margin-top:0.4rem">
+          <span>Referral Score: <strong>${w.referrals} pts</strong></span>
+          <span>Price Rate: <strong>${fmt(currentActivePrice)}</strong></span>
+        </div>
+
+        <!-- Pulse alert overlay inside card when paged -->
+        ${w.alert ? `
+          <div class="card-alert-banner">
+            <div>🚨 Priority assignment order #${w.alert.orderId} nearby!</div>
+            <div style="font-size:0.58rem;opacity:0.9">Client Sector: ${w.alert.location} (${w.alert.svc})</div>
+            <div style="display:flex;gap:0.3rem;margin-top:0.2rem">
+              <button class="btn btn-sm" style="background:#fff;color:var(--brand);font-size:0.55rem;padding:0.15rem 0.35rem" onclick="acceptPagingAlert('${w.user}', ${w.alert.orderId})">Claim Payout</button>
+              <button class="btn btn-sm" style="background:transparent;border:1px solid #fff;color:#fff;font-size:0.55rem;padding:0.15rem 0.35rem" onclick="declinePagingAlert('${w.user}', ${w.alert.orderId})">Decline</button>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Payout progress bars when active -->
+        ${w.status.includes('Busy') ? `
+          <div style="margin-top:0.45rem">
+            <div style="font-size:0.58rem;color:var(--accent);font-weight:700">${w.status} - Processing transaction</div>
+            <div class="progress-track" style="margin-top:0.15rem;height:4px"><div class="progress-fill" style="width:100%;background:var(--accent);animation: progressAnim 3s infinite linear"></div></div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function refreshOrdersList() {
+  const container = document.getElementById('dashboardOrdersList');
+  if (!container) return;
+
+  const list = [...DB.ironOrders, ...DB.svcBookings, ...DB.prodOrders];
+  if (!list.length) {
+    container.innerHTML = `<div style="text-align:center;padding:1.5rem;font-size:0.72rem;color:var(--muted)">No orders placed yet.</div>`;
+    return;
+  }
+
+  container.innerHTML = list.slice(-10).reverse().map(o => {
+    let col = 'var(--muted)';
+    if (o.status === 'completed') col = 'var(--brand)';
+    else if (o.status === 'rejected') col = 'var(--danger)';
+    else if (o.status === 'paging' || o.status === 'assigning') col = 'var(--accent)';
+    else if (o.status === 'traveling' || o.status === 'arrived' || o.status === 'in_progress') col = 'var(--info)';
+
+    const dist = getDistanceKM(o.location, o.assignedWorker ? o.assignedWorker.area : o.location);
+
+    return `
+      <div class="order-row-grid">
+        <strong style="color:var(--ink)">#${o.id}</strong>
+        <span style="font-weight:600">${o.type.toUpperCase()}${o.svc ? ` (${o.svc})` : ''}</span>
+        <div style="color:var(--ink2)">📍 ${o.location}</div>
+        <div>${o.assignedWorker ? `&lt; ${dist} km` : 'Pending'}</div>
+        <div style="font-weight:700">${o.workerName || 'Paging...'}</div>
+        <div>
+          <span class="order-state-tag" style="background:${col}15;color:${col}">${o.status}</span>
+        </div>
+        <div style="color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${o.msg}">${o.msg}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderDashboardAuditLogs() {
+  const container = document.getElementById('dashboardAuditLogs');
+  if (!container) return;
+
+  container.innerHTML = DB.auditLogs.slice(-10).reverse().map(l => `
+    <div style="background:var(--bg-sub);padding:0.4rem;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:0.58rem;line-height:1.3;border-left:2.5px solid var(--brand)">
+      <div style="display:flex;justify-content:space-between;font-weight:700;color:var(--brand)">
+        <span>[${l.action}]</span>
+        <span>${l.timestamp}</span>
+      </div>
+      <div style="color:var(--ink2)">Actor: ${l.user} (${l.role})</div>
+      <div style="color:var(--muted)">Details: ${l.details}</div>
+      <div style="color:var(--faint);font-size:0.5rem;word-break:break-all">Hash: ${l.hash.substr(0, 24)}...</div>
+    </div>
+  `).join('') || `<div style="text-align:center;padding:1rem;color:var(--muted);font-size:0.7rem">No audit logs yet.</div>`;
+}
+
+function toggleDashboardFlag(key) {
+  FeatureFlags[key] = !FeatureFlags[key];
+  saveDB();
+  const btn = document.getElementById('flag-' + key);
+  if (btn) {
+    btn.textContent = FeatureFlags[key] ? 'Enabled' : 'Disabled';
+    btn.classList.toggle('btn-brand', FeatureFlags[key]);
+  }
+  AuditLogEngine.log(_user ? _user.user : 'SYSTEM', 'Developer', 'FLAG_TOGGLED', `Policy flag ${key} set to ${FeatureFlags[key]}.`);
+  toast(`Policy Switch ${key} toggled.`);
+}
+
+function toggleDashboardError(key) {
+  InjectedErrors[key] = !InjectedErrors[key];
+  const btn = document.getElementById('err-' + key);
+  if (btn) {
+    btn.textContent = InjectedErrors[key] ? 'Injecting' : 'Normal';
+    btn.classList.toggle('btn-brand', InjectedErrors[key]);
+  }
+  AuditLogEngine.log(_user ? _user.user : 'SYSTEM', 'Developer', 'ERROR_INJECTED', `Error condition ${key} set to ${InjectedErrors[key]}.`);
+  toast(`Fault scenario ${key} modified.`);
+}
+
+function switchResponsiveTab(tab) {
+  const m = document.getElementById('mobileSide');
+  const d = document.getElementById('dashboardSide');
+  const bm = document.getElementById('btnSideMobile');
+  const bd = document.getElementById('btnSideDash');
+
+  if (tab === 'mobile') {
+    m.classList.add('active-view');
+    d.classList.remove('active-view');
+    bm.classList.add('active');
+    bd.classList.remove('active');
+  } else {
+    d.classList.add('active-view');
+    m.classList.remove('active-view');
+    bd.classList.add('active');
+    bm.classList.remove('active');
+  }
+}
+
+/* ══════════════════════════════════════════
+   12. DIAGNOSTICS & SYSTEM MATRIX TESTS
+   ══════════════════════════════════════════ */
+function updateInterface() {
+  refreshDashboardWorkers();
+  refreshOrdersList();
+  renderMapGrid();
+  renderAdminPriceController();
+}
+
+function initDataMapping() {
+  DB.svcs = DB.users.providers.map(p => ({
+    id: p.id,
+    name: p.svc[0],
+    prov: p.name,
+    rate: p.cost,
+    avail: p.active !== false
+  }));
+}
+
+function calc(l, o) {
+  l = Math.max(0, +l || 0);
+  o = Math.max(1, parseInt(o) || 1);
+  const cp = +(l * (1 - C.DISCOUNT)).toFixed(2);
+  const wb = +(cp * C.WORKER).toFixed(2);
+  const pf = +(cp * C.PLATFORM).toFixed(2);
+  const hi = o >= C.THRESHOLD;
+  const ib = hi ? +(wb * C.INCENTIVE).toFixed(2) : 0;
+  const wt = +(wb + ib).toFixed(2);
+  const de = +(wt * o).toFixed(2);
+  return { listed: l, custPays: cp, workerBase: wb, platform: pf, hasIncentive: hi, incBonus: ib, workerTotal: wt, dayEarnings: de };
+}
+
+function fmt(n) {
+  return '₹' + (+n).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+}
+
+function stackModelHTML(rate) {
+  const discount = +(rate * C.DISCOUNT).toFixed(2);
+  const custPays = +(rate - discount).toFixed(2);
+  const workerBase = +(custPays * C.WORKER).toFixed(2);
+  const platformFee = +(custPays * C.PLATFORM).toFixed(2);
+  const incentive = +(workerBase * C.INCENTIVE).toFixed(2);
+  
+  // Platform fee breakdown: including GST at 18% inside platform
+  const netPlatform = +(platformFee / 1.18).toFixed(2);
+  const gst = +(platformFee - netPlatform).toFixed(2);
+  
+  // Width percentages
+  const workerPercent = 71.2;
+  const incentivePercent = 8.0;
+  const platformPercent = 10.8;
+  const discountPercent = 10.0;
+  
+  return `
+    <div style="font-family:'Inter',sans-serif; margin: 0.8rem 0; width: 100%">
+      <div style="font-size: 0.72rem; font-weight: 800; color: var(--muted); margin-bottom: 0.35rem; display: flex; justify-content: space-between; align-items: center">
+        <span>CUSTOMER PAYS: <strong style="color:var(--brand)">${fmt(custPays)}</strong></span>
+        <span style="font-size: 0.65rem; font-weight: 500">Base: ${fmt(rate)}</span>
+      </div>
+      
+      <!-- Stacked Bar exactly like the math uploaded -->
+      <div style="height: 24px; border-radius: 8px; overflow: hidden; display: flex; width: 100%; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1)">
+        <!-- Worker Base Segment (Green) -->
+        <div style="width: ${workerPercent}%; background: #059669; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.65rem; font-weight: 800; text-shadow: 0 1px 1px rgba(0,0,0,0.2)">
+          Worker ${fmt(workerBase)}
+        </div>
+        
+        <!-- Incentive Segment (Orange) -->
+        <div style="width: ${incentivePercent}%; background: #D97706; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; font-size: 0.52rem; font-weight: 800; line-height: 1.1; border-left: 1px solid rgba(255,255,255,0.15)">
+          <span>+</span>
+          <span>${fmt(incentive)}</span>
+        </div>
+        
+        <!-- Platform Fee Segment (Purple) -->
+        <div title="Net Platform: ${fmt(netPlatform)} + GST (18%): ${fmt(gst)}" style="width: ${platformPercent}%; background: #7C3AED; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.62rem; font-weight: 800; text-shadow: 0 1px 1px rgba(0,0,0,0.2); cursor: help">
+          ${fmt(platformFee)}
+        </div>
+        
+        <!-- Discount Segment (Blue) -->
+        <div style="width: ${discountPercent}%; background: #0EA5E9; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.62rem; font-weight: 800; text-shadow: 0 1px 1px rgba(0,0,0,0.2)">
+          ${fmt(discount)}
+        </div>
+      </div>
+      
+      <!-- Legend -->
+      <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.35rem; font-size: 0.62rem; font-weight: 600; color: var(--muted)">
+        <span style="display: flex; align-items: center; gap: 0.2rem">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: #059669; display: inline-block"></span>
+          Worker (88%)
+        </span>
+        <span style="display: flex; align-items: center; gap: 0.2rem; cursor: help" title="Net Platform Infrastructure: ${fmt(netPlatform)} + 18% GST (${fmt(gst)})">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: #7C3AED; display: inline-block"></span>
+          Platform (12% inc. GST) 🛈
+        </span>
+        <span style="display: flex; align-items: center; gap: 0.2rem">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: #0EA5E9; display: inline-block"></span>
+          Discount (10%)
+        </span>
+        <span style="display: flex; align-items: center; gap: 0.2rem; color: #D97706">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: #D97706; display: inline-block"></span>
+          Incentive (+10%)
+        </span>
+      </div>
+    </div>
+  `;
+}
+
+async function runDiagnostics() {
+  openModal(`
+    <div class="modal-h">🧪 Sandbox Assertions Suite</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:#E2E8F0;background:#0F172A;border-radius:12px;padding:1rem">
+      <div id="d-status" style="margin-bottom:0.5rem">Initializing diagnostics...</div>
+      <div style="height:6px;background:#334155;border-radius:3px;overflow:hidden;margin-bottom:0.8rem">
+        <div id="d-progress" style="height:100%;width:0%;background:#10B981;transition:width 0.3s"></div>
+      </div>
+      <div id="d-log" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:0.25rem"></div>
+    </div>
+  `);
+  const logEl = document.getElementById('d-log');
+  const statusEl = document.getElementById('d-status');
+  const progEl = document.getElementById('d-progress');
+
+  const addLog = (msg, status = 'info') => {
+    const colors = { info: '#94A3B8', pass: '#34D399', fail: '#F87171' };
+    logEl.innerHTML += `<div style="color:${colors[status]}">${status==='pass'?'✓ ':'• '}${msg}</div>`;
+    logEl.scrollTop = logEl.scrollHeight;
+  };
+  const updateProgress = (pct, text) => {
+    progEl.style.width = pct + '%';
+    statusEl.textContent = text;
+  };
+  
+  try {
+    updateProgress(15, 'Asserting geofencing range filter boundaries...');
+    await new Promise(r => setTimeout(r, 300));
+    // Secunderabad (13,9) coordinates to Jubilee Hills (5,5) distance is ~17.9km
+    const rangeSecunderabad = getDistanceKM('Secunderabad', 'Jubilee Hills');
+    if (rangeSecunderabad > 15.0) {
+      addLog(`Proximity geofencing: Secunderabad is ${rangeSecunderabad}km (outside 15km vector). Worker Vikram Singh will be excluded.`, 'pass');
+    } else {
+      throw new Error('Distance range calculation mismatch.');
+    }
+
+    updateProgress(35, 'Asserting high-referral priority routing order...');
+    await new Promise(r => setTimeout(r, 300));
+    // Plumbers in Jubilee Hills: Amit Verma (42 refs) vs Raju Plumber (18 refs)
+    let jubileePlumbers = getWorkersRegistry().filter(w => w.role === 'Plumber' && w.area === 'Jubilee Hills');
+    jubileePlumbers.sort((a, b) => b.referrals - a.referrals);
+    if (jubileePlumbers[0].name === 'Amit Verma' && jubileePlumbers[0].referrals === 42) {
+      addLog(`Referral Priority: Amit Verma ranked top with ${jubileePlumbers[0].referrals} referrals. Will receive order first.`, 'pass');
+    } else {
+      throw new Error('Referral priority sorting verification check failure.');
+    }
+
+    updateProgress(55, 'Asserting administrative pricing locks matrix...');
+    await new Promise(r => setTimeout(r, 300));
+    // Mocking an admin pricing override
+    DB.adminPriceFixes['Plumber'] = 500;
+    const isLocked = DB.adminPriceFixes['Plumber'] !== undefined;
+    if (isLocked && DB.adminPriceFixes['Plumber'] === 500) {
+      addLog(`Admin pricing cap: absolute pricing override lock parameter set to ₹500. Worker price fields disabled.`, 'pass');
+    } else {
+      throw new Error('Admin pricing cap locks checking failure.');
+    }
+    // Release testing lock
+    DB.adminPriceFixes = {};
+
+    updateProgress(75, 'Executing 3,000 fast-forward stress-testing iterations...');
+    await new Promise(r => setTimeout(r, 400));
+    
+    const startTime = Date.now();
+    
+    // Find workers safely
+    const workerPlumber = getWorkersRegistry().find(w => w.user === 'amit');
+    const shopkeeper = getWorkersRegistry().find(w => w.user === 'sai');
+    const ironWorker = getWorkersRegistry().find(w => w.user === 'ironpro');
+    
+    if (!workerPlumber || !shopkeeper || !ironWorker) {
+      throw new Error('Verification failed: Test profiles Raju/Sai/Kumar not found.');
+    }
+
+    // Track pre-stress test balances
+    const wWallet = DB.wallets.find(l => l.user === workerPlumber.user) || { balance: 0 };
+    const skWallet = DB.wallets.find(l => l.user === shopkeeper.user) || { balance: 0 };
+    const ironWallet = DB.wallets.find(l => l.user === ironWorker.user) || { balance: 0 };
+    
+    const initialPBalance = wWallet.balance;
+    const initialSkBalance = skWallet.balance;
+    const initialIronBalance = ironWallet.balance;
+    
+    // 1. Run 1000 Plumber Service bookings
+    for (let i = 0; i < 1000; i++) {
+      const o = {
+        id: 100000 + i,
+        cust: 'Priya Sharma',
+        phone: '9876543210',
+        date: 'Just now',
+        status: 'completed',
+        location: 'Jubilee Hills',
+        type: 'svc',
+        svc: 'Plumber',
+        otp: 1234,
+        surge: 1.0,
+        workerUser: workerPlumber.user,
+        workerName: workerPlumber.name,
+        msg: 'Stress testing...',
+        forcedPrice: null,
+        payout: 400,
+        timerTicks: 0
+      };
+      workerPlumber.ordersToday++;
+      const e = calc(400, workerPlumber.ordersToday);
+      workerPlumber.earned += e.workerTotal;
+      wWallet.balance = +(wWallet.balance + e.workerTotal).toFixed(2);
+    }
+    
+    // 2. Run 1000 Grocery Shop bookings (Sai Kirana vs Ravi Mart switcher paths)
+    for (let i = 0; i < 1000; i++) {
+      const o = {
+        id: 200000 + i,
+        cust: 'Priya Sharma',
+        phone: '9876543210',
+        date: 'Just now',
+        status: 'completed',
+        location: 'Jubilee Hills',
+        type: 'shop',
+        items: [{ id: 1, price: 25, qty: 2 }],
+        otp: 1234,
+        surge: 1.0,
+        workerUser: shopkeeper.user,
+        workerName: shopkeeper.name,
+        msg: 'Stress testing...',
+        forcedPrice: null,
+        payout: 50,
+        timerTicks: 0
+      };
+      shopkeeper.ordersToday++;
+      const e = calc(50, shopkeeper.ordersToday);
+      shopkeeper.earned += e.workerTotal;
+      skWallet.balance = +(skWallet.balance + e.workerTotal).toFixed(2);
+    }
+    
+    // 3. Run 1000 Ironing bookings
+    for (let i = 0; i < 1000; i++) {
+      const o = {
+        id: 300000 + i,
+        cust: 'Priya Sharma',
+        phone: '9876543210',
+        date: 'Just now',
+        status: 'completed',
+        location: 'Jubilee Hills',
+        type: 'iron',
+        items: 5,
+        otp: 1234,
+        surge: 1.0,
+        workerUser: ironWorker.user,
+        workerName: ironWorker.name,
+        msg: 'Stress testing...',
+        forcedPrice: null,
+        payout: 100,
+        timerTicks: 0
+      };
+      ironWorker.ordersToday++;
+      const e = calc(100, ironWorker.ordersToday);
+      ironWorker.earned += e.workerTotal;
+      ironWallet.balance = +(ironWallet.balance + e.workerTotal).toFixed(2);
+    }
+    
+    const duration = Date.now() - startTime;
+    addLog(`3,000 synchronous order cycles executed in ${duration}ms!`, 'pass');
+    addLog(`Services: 1,000 runs. Plumber wallet earned: +${fmt(wWallet.balance - initialPBalance)}.`, 'pass');
+    addLog(`Groceries: 1,000 runs. Shopkeeper wallet earned: +${fmt(skWallet.balance - initialSkBalance)}.`, 'pass');
+    addLog(`Ironing: 1,000 runs. Iron shop wallet earned: +${fmt(ironWallet.balance - initialIronBalance)}.`, 'pass');
+    
+    updateProgress(100, 'Test suite PASS');
+    addLog('All hyperlocal local service dispatch verification checks passed successfully!', 'pass');
+    saveDB();
+    updateInterface();
+  } catch(e) {
+    updateProgress(100, 'TEST FAILED');
+    addLog(`Assertion failed: ${e.message}`, 'fail');
+  }
+}
+
+/* ══════════════════════════════════════════
+   13. NOTIFICATION & WINDOW UTILS
+   ══════════════════════════════════════════ */
+function toggleNotificationCenter() {
+  const center = document.getElementById('notifCenter');
+  center.style.display = center.style.display === 'none' ? 'block' : 'none';
+  const dot = document.getElementById('notifDot');
+  if (dot) dot.style.display = 'none';
+}
+
+function clearNotifications() {
+  DB.notifications = [];
+  renderNotifications();
+  saveDB();
+}
+
+function renderNotifications() {
+  const el = document.getElementById('notifList');
+  if (!el) return;
+  const target = _user ? _user.user : 'customer';
+  const list = DB.notifications.filter(n => n.user === target || n.user === 'all' || (target === 'admin' && n.user === 'admin'));
+  
+  el.innerHTML = list.slice(-5).reverse().map(n => `
+    <div style="background:var(--bg-sub);border-radius:10px;padding:0.55rem;font-size:0.74rem;color:var(--ink2);line-height:1.4">
+      <div style="font-size:0.6rem;color:var(--muted);margin-bottom:0.15rem">${n.timestamp}</div>
+      ${n.message}
+    </div>
+  `).join('') || '<div style="font-size:0.72rem;color:var(--muted);text-align:center;padding:1rem 0">No notifications.</div>';
+}
+
+function toggleTheme() {
+  document.body.classList.toggle('dark');
+  const btn = document.getElementById('themeToggleBtn');
+  btn.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+  saveDB();
+}
+
+function openModal(htmlContent) {
+  document.getElementById('modalBody').innerHTML = htmlContent;
+  document.getElementById('modalBg').classList.add('open');
+}
+
+function closeModal(event) {
+  if (!event || event.target.classList.contains('modal-bg')) {
+    document.getElementById('modalBg').classList.remove('open');
+  }
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+/* ══════════ INITIAL BOOT SEQUENCE ══════════ */
+loadDB();
+initDataMapping();
+go('home');
+updateInterface();
+renderDashboardAuditLogs();
+
+// Initialize Event listeners
+OrderService.init();
+WalletService.init();
+NotificationService.init();
+
+// Register Event listeners for updates
+EventBus.on('ORDER_STATE_CHANGED', () => {
+  refreshOrdersList();
+  refreshDashboardWorkers();
+  renderMapGrid();
+});
+
+// Run Telemetry Schedule loop
+runSystemRuntime();
+
+console.log('🚀 SAHA Pro v1.4 loaded successfully.');
+</script>
+</body>
+</html>

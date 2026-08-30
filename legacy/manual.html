@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAHA Pro v1.4 — Integrated Operations Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   PREMIUM DESIGN SYSTEM & CURATED HSL PALETTE
+   ═══════════════════════════════════════════ */
+:root {
+  --bg:          #0B0F19;
+  --bg-sub:      #05070C;
+  --surface:     #121826;
+  --surface-lt:  #1B2338;
+  --border:      #26314D;
+  --border-glow: #3E4E7A;
+  
+  --ink:         #F8FAFC;
+  --ink-muted:   #94A3B8;
+  --ink-faint:   #475569;
+
+  --brand:       #10B981; /* Green */
+  --brand-glow:  rgba(16,185,129,0.15);
+  --purple:      #8B5CF6; /* Purple */
+  --blue:        #0EA5E9; /* Blue */
+  --orange:      #F59E0B; /* Orange */
+  --danger:      #EF4444; /* Red */
+
+  --sh:          0 10px 30px rgba(0,0,0,0.5);
+  --sh-sm:       0 4px 12px rgba(0,0,0,0.3);
+  --r:           16px;
+  --r-sm:        10px;
+  --ease:        cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-sub);
+  color: var(--ink);
+  min-height: 100vh;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+header {
+  background: linear-gradient(135deg, var(--surface) 0%, var(--bg) 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+header::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.header-h {
+  font-family: 'Outfit', sans-serif;
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, #10B981, #8B5CF6, #0EA5E9);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.header-sub {
+  font-size: 0.95rem;
+  color: var(--ink-muted);
+  margin-top: 0.5rem;
+}
+
+/* MAIN LAYOUT STRUCTURE */
+#mainLayout {
+  display: flex;
+  max-width: 1400px;
+  margin: 2rem auto;
+  padding: 0 1.5rem;
+  gap: 2rem;
+}
+
+#sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  position: sticky;
+  top: 2rem;
+  height: fit-content;
+}
+
+.nav-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 0.9rem 1.2rem;
+  text-align: left;
+  color: var(--ink-muted);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s var(--ease);
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.nav-btn:hover {
+  border-color: var(--border-glow);
+  color: var(--ink);
+  transform: translateX(4px);
+}
+.nav-btn.active {
+  background: var(--surface-lt);
+  border-color: var(--brand);
+  color: var(--brand);
+  box-shadow: 0 0 15px var(--brand-glow);
+}
+
+#contentArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 2.2rem;
+  box-shadow: var(--sh);
+  display: none;
+  animation: fadeIn 0.4s var(--ease);
+}
+.panel.active { display: block; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 1.2rem;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.6rem;
+  color: var(--brand);
+}
+
+p {
+  color: var(--ink-muted);
+  font-size: 0.92rem;
+  margin-bottom: 1rem;
+}
+
+ul {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+li { margin-bottom: 0.45rem; }
+
+code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-lt);
+  color: var(--brand);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+}
+
+.badge {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.64rem;
+  font-weight: 800;
+  padding: 0.15rem 0.45rem;
+  border-radius: 99px;
+  text-transform: uppercase;
+}
+.badge-client { background: rgba(14,165,233,0.15); color: var(--blue); }
+.badge-worker { background: rgba(245,158,11,0.15); color: var(--orange); }
+.badge-admin { background: rgba(139,92,246,0.15); color: var(--purple); }
+
+/* STACKED SPLITS VISUALIZER CONTAINER */
+.calc-card {
+  background: var(--surface-lt);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+}
+.calc-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+  color: var(--ink);
+}
+
+.calc-input-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+.calc-input-label {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+.calc-input {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+  width: 130px;
+  outline: none;
+  font-family: 'JetBrains Mono', monospace;
+}
+.calc-input:focus { border-color: var(--brand); }
+
+/* Stacked bar logic representation */
+.stacked-bar-container {
+  margin-top: 1.2rem;
+  width: 100%;
+}
+.stacked-bar-header {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--ink-muted);
+  margin-bottom: 0.35rem;
+  display: flex;
+  justify-content: space-between;
+  text-transform: uppercase;
+}
+.stacked-bar-track {
+  height: 26px;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  width: 100%;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+}
+.bar-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+  transition: width 0.3s var(--ease);
+}
+.bar-seg-worker { background-color: #059669; }
+.bar-seg-incentive { background-color: #D97706; border-left: 1px solid rgba(255,255,255,0.15); }
+.bar-seg-platform { background-color: #7C3AED; }
+.bar-seg-discount { background-color: #0EA5E9; }
+
+.legends-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.legend-item { display: flex; align-items: center; gap: 0.3rem; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+.tooltip-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.8rem;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-family: 'JetBrains Mono', monospace;
+  margin-top: 0.8rem;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+@media(max-width: 900px) {
+  #mainLayout { flex-direction: column; }
+  #sidebar { width: 100%; position: static; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-h">SAHA Pro v1.4 Operations Guide</div>
+  <div class="header-sub">Structured User, Partner, & Control Terminal Manual</div>
+</header>
+
+<div id="mainLayout">
+
+  <!-- NAVIGATION SIDEBAR -->
+  <div id="sidebar">
+    <button class="nav-btn active" onclick="showPanel('client')"><span>📱</span> Client Manual</button>
+    <button class="nav-btn" onclick="showPanel('worker')"><span>🔧</span> Partner Manual</button>
+    <button class="nav-btn" onclick="showPanel('admin')"><span>👑</span> Admin Manual</button>
+    <button class="nav-btn" onclick="showPanel('calculator')"><span>📊</span> Splits Visualizer</button>
+  </div>
+
+  <!-- CONTENT BLOCKS -->
+  <div id="contentArea">
+
+    <!-- PANEL: CLIENT -->
+    <div class="panel active" id="p-client">
+      <h2><span>📱</span> Customer (User) Mobile Guide <span class="badge badge-client">Customer</span></h2>
+      <p>Follow these steps to sign in, purchase Kirana goods from different shops, book service technicians, and authenticate fulfillment using secure OTP codes.</p>
+      
+      <h3>1. User Account Registration & Session</h3>
+      <ul>
+        <li>Navigate to the **Account** tab in the footer of the Mobile Simulator (left pane).</li>
+        <li>To use the seeded customer profile, enter username <code>customer</code> and password <code>123</code>, then click **Sign In**.</li>
+        <li>This issues a stateless JWT token signature in the header configuration to authorize booking API requests securely.</li>
+      </ul>
+
+      <h3>2. Hyperlocal Service Dispatch bookings</h3>
+      <ul>
+        <li>Select **Book Services** from the mobile home dashboard view.</li>
+        <li>Choose a specialty tier (e.g. *Plumber, AC Technician, Electrician*).</li>
+        <li>Click **Book Now**. The system automatically computes a strict 15km geofence map checking, filters out unavailable workers, ranks local candidates by referrals, and pages the top partner.</li>
+      </ul>
+
+      <h3>3. Shop Kirana Essentials</h3>
+      <ul>
+        <li>Click the **Shop** navigation button in the footer.</li>
+        <li>Toggle the dropdown labeled **Select Hyperlocal Shop** to view different catalog items:
+          <ul>
+            <li>*Sai Kirana Store* (located in Madhapur sector, 2.1km range)</li>
+            <li>*Ravi Mart* (located in Ameerpet sector, 4.3km range)</li>
+          </ul>
+        </li>
+        <li>Select item category filters or type queries in the search box.</li>
+        <li>Click **Add to Cart**. A slide-up bottom cart menu will display the items count and discounted total.</li>
+        <li>Click **View Cart →** and choose **Confirm Purchase** to execute order checkout.</li>
+      </ul>
+
+      <h3>4. Fulfillment Tracking & Verification</h3>
+      <ul>
+        <li>Go to the **Status** page in the footer tabs to track orders.</li>
+        <li>Once the assigned worker arrives, share the 4-digit **Secure OTP** displayed inside the order status card. Sharing this code is required for the worker to complete the job and receive payouts.</li>
+      </ul>
+    </div>
+
+    <!-- PANEL: WORKER -->
+    <div class="panel" id="p-worker">
+      <h2><span>🔧</span> Local Partner Operational Guide <span class="badge badge-worker">Worker</span></h2>
+      <p>Follow these instructions to toggle availability presence, adjust custom price bounds, and claim contract paging alerts.</p>
+
+      <h3>1. Worker Account Profiles</h3>
+      <ul>
+        <li>Authenticate by choosing a seeded user profile in the **Account** tab:
+          <ul>
+            <li>**Amit Verma (Plumber):** <code>amit</code> / <code>123</code> (Jubilee Hills)</li>
+            <li>**Raju Plumber:** <code>raju</code> / <code>123</code> (Jubilee Hills)</li>
+            <li>**Kumar Iron Works:** <code>ironpro</code> / <code>123</code> (Jubilee Hills)</li>
+            <li>**Sai Kirana Store:** <code>sai</code> / <code>123</code> (Madhapur)</li>
+          </ul>
+        </li>
+      </ul>
+
+      <h3>2. Presence Toggling</h3>
+      <ul>
+        <li>Use the active slider switch in your mobile dashboard or inside the Command Center registry to go **Online** or **Offline**.</li>
+        <li>If marked offline or busy, the geofenced dispatcher blocks incoming notifications automatically, avoiding parallel contract alerts.</li>
+      </ul>
+
+      <h3>3. Custom Pricing Console</h3>
+      <ul>
+        <li>Workers can edit their custom hourly rate under the **Earn** page.</li>
+        <li>**Pricing Freezes:** When the platform administrator fixes pricing for a service category, the pricing input console changes to disabled: `🔒 Editing disabled. Absolute admin price cap enforced.` Transactions use the fixed admin rate.</li>
+      </ul>
+
+      <h3>4. Alert Pages & Payout Completion</h3>
+      <ul>
+        <li>When paged for a nearby order, a red blinking **Live Dispatch Alert** banner appears.</li>
+        <li>Click **Accept Assignment** to claim the job within the 15-second lockout delay window.</li>
+        <li>Once arrived at the customer, request the customer's 4-digit OTP, enter it in the text box, and select **Complete** to release escrow payouts.</li>
+      </ul>
+    </div>
+
+    <!-- PANEL: ADMIN -->
+    <div class="panel" id="p-admin">
+      <h2><span>👑</span> Control Terminal Administrator Guide <span class="badge badge-admin">Admin</span></h2>
+      <p>Instructions for configuring policy variables, price locks overrides, running diagnostics checks, and monitoring transaction logs.</p>
+
+      <h3>1. Autopilot & Speed Controls</h3>
+      <ul>
+        <li>Toggle **Auto-Simulation Mode** to drive traffic generators, auto-claim alerts, and complete state transitions automatically.</li>
+        <li>Set **Sim Speed** multiplier parameters to fast-forward order cycles (`1x` normal up to `10x` hyper).</li>
+      </ul>
+
+      <h3>2. Absolute Price override Controls</h3>
+      <ul>
+        <li>Locate the **Global Administrative Price Fix Controller** on the dashboard.</li>
+        <li>Type the absolute fixed value for any category and click **Fix**. This locks the rate globally and disables provider rate edits.</li>
+        <li>Click **Release Absolute Admin Locks** to restore custom worker pricing.</li>
+      </ul>
+
+      <h3>3. Proximity Map Grid Monitor</h3>
+      <ul>
+        <li>The **Regional Service Matrix Map** displays available providers (green), busy providers (yellow), and active orders (red) in Hyderabad sectors.</li>
+        <li>Sectors with pending paged orders flash red.</li>
+      </ul>
+
+      <h3>4. Diagnostics suite & 3,000 Runs stress-Test</h3>
+      <ul>
+        <li>Click **Launch Diagnostic Suite Verification Matrix** to verify proximity ranges, referral ranking priorities, and price override parameters.</li>
+        <li>**3,000 Synchronous Order Stress Test:** Automatically creates and settles 1,000 services, 1,000 grocery, and 1,000 ironing orders in a synchronous loop. Confirms that final wallet payouts, platform net shares, and tax payouts sum up correctly, validating database stability under heavy load.</li>
+      </ul>
+    </div>
+
+    <!-- PANEL: CALCULATOR -->
+    <div class="panel" id="p-calculator">
+      <h2><span>📊</span> Stacked Revenue Splits Calculator</h2>
+      <p>Use this interactive tool to simulate splits math matching the design layout criteria. It calculates customer payments, discounts, worker shares, and platform fees including 18% GST.</p>
+      
+      <div class="calc-card">
+        <div class="calc-title">Interactive Revenue Simulator</div>
+        <div class="calc-input-row">
+          <span class="calc-input-label">Enter Service Base Fee (₹):</span>
+          <input type="number" id="baseRateInput" class="calc-input" value="600" oninput="calculateSplits(this.value)">
+        </div>
+
+        <!-- Rendered Stacked Bar exactly like the user's reference image -->
+        <div class="stacked-bar-container">
+          <div class="stacked-bar-header">
+            <span>Customer Pays: <strong id="lblCustPays" style="color:var(--brand)">₹540.00</strong></span>
+            <span>Base rate: <strong id="lblBaseRate">₹600.00</strong></span>
+          </div>
+          <div class="stacked-bar-track">
+            <div id="barWorker" class="bar-seg bar-seg-worker" style="width: 71.2%">Worker ₹475.20</div>
+            <div id="barIncentive" class="bar-seg bar-seg-incentive" style="width: 8%">+ ₹47.52</div>
+            <div id="barPlatform" class="bar-seg bar-seg-platform" style="width: 10.8%" title="Platform fee includes GST">₹64.80</div>
+            <div id="barDiscount" class="bar-seg bar-seg-discount" style="width: 10%">₹60.00</div>
+          </div>
+          <div class="legends-row">
+            <div class="legend-item"><span class="legend-dot" style="background-color: #059669"></span> Worker Share (88%)</div>
+            <div class="legend-item"><span class="legend-dot" style="background-color: #7C3AED"></span> Platform Net + 18% GST (12%)</div>
+            <div class="legend-item"><span class="legend-dot" style="background-color: #0EA5E9"></span> Discount (10%)</div>
+            <div class="legend-item"><span class="legend-dot" style="background-color: #D97706"></span> Worker Incentive (+10%)</div>
+          </div>
+
+          <div class="tooltip-box" id="taxBreakdownText">
+            Platform Fee Share (12%): ₹64.80<br>
+            • Net Infrastructure Base: ₹54.92<br>
+            • GST (18% on platform): ₹9.88
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+  
+  document.getElementById('p-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+function calculateSplits(val) {
+  const rate = parseFloat(val) || 0;
+  const discount = +(rate * 0.10).toFixed(2);
+  const custPays = +(rate - discount).toFixed(2);
+  const workerBase = +(custPays * 0.88).toFixed(2);
+  const platformFee = +(custPays * 0.12).toFixed(2);
+  const incentive = +(workerBase * 0.10).toFixed(2);
+
+  // platform tax GST breakdown
+  const netPlatform = +(platformFee / 1.18).toFixed(2);
+  const gst = +(platformFee - netPlatform).toFixed(2);
+
+  // Update UI text labels
+  document.getElementById('lblCustPays').textContent = '₹' + custPays.toFixed(2);
+  document.getElementById('lblBaseRate').textContent = '₹' + rate.toFixed(2);
+
+  document.getElementById('barWorker').textContent = 'Worker ₹' + workerBase.toFixed(2);
+  document.getElementById('barIncentive').textContent = '+ ₹' + incentive.toFixed(2);
+  document.getElementById('barPlatform').textContent = '₹' + platformFee.toFixed(2);
+  document.getElementById('barDiscount').textContent = '₹' + discount.toFixed(2);
+
+  document.getElementById('barPlatform').title = `Net Platform: ₹${netPlatform.toFixed(2)} + GST (18%): ₹${gst.toFixed(2)}`;
+
+  document.getElementById('taxBreakdownText').innerHTML = `
+    Platform Fee Share (12%): ₹${platformFee.toFixed(2)}<br>
+    • Net Infrastructure Base: ₹${netPlatform.toFixed(2)}<br>
+    • GST (18% on platform): ₹${gst.toFixed(2)}
+  `;
+}
+</script>
+</body>
+</html>

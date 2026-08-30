@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>SAHA AC Repair</title>
+
+<link rel="stylesheet" href="acrepair.css">
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+</head>
+
+
+<body>
+
+
+<header class="top-header">
+
+<div class="back">
+
+<a href="home.html">
+<i class="fa-solid fa-arrow-left"></i>
+</a>
+
+<h2>AC Repair Services</h2>
+
+</div>
+
+
+<div class="icons">
+
+<i class="fa-solid fa-bell"></i>
+<i class="fa-solid fa-phone"></i>
+
+</div>
+
+</header>
+
+
+
+
+
+<section class="hero">
+
+<div>
+
+<h1>Expert AC Technicians</h1>
+
+<p>Fast Cooling Solutions & Professional AC Services.</p>
+
+<button>
+Book Now
+</button>
+
+</div>
+
+
+<i class="fa-solid fa-snowflake hero-icon"></i>
+
+
+</section>
+
+<section>
+
+<h2>Our Services</h2>
+
+
+<div class="service-grid">
+
+
+<div class="service-card">
+
+<i class="fa-solid fa-snowflake"></i>
+
+<h3>AC Service</h3>
+
+<p>Starting ₹499</p>
+
+<button onclick="addToCart('Light Installation',199)">
+Select
+</button>
+
+</div>
+
+
+
+<div class="service-card">
+
+<i class="fa-solid fa-wind"></i>
+
+<h3>AC Repair</h3>
+
+<p>Starting ₹399</p>
+
+<button onclick="addToCart('Light Installation',199)">
+Select
+</button>
+
+</div>
+
+
+
+<div class="service-card">
+
+<i class="fa-solid fa-temperature-arrow-down"></i>
+
+<h3>Gas Refilling</h3>
+
+<p>Starting ₹999</p>
+
+<button onclick="addToCart('Light Installation',199)">
+Select
+</button>
+
+</div>
+
+
+
+<div class="service-card">
+
+<i class="fa-solid fa-screwdriver-wrench"></i>
+
+<h3>AC Installation</h3>
+
+<p>Starting ₹1499</p>
+
+<button onclick="addToCart('Light Installation',199)">
+Select
+</button>
+
+</div>
+
+
+
+<div class="service-card">
+
+<i class="fa-solid fa-filter"></i>
+
+<h3>Filter Cleaning</h3>
+
+<p>Starting ₹299</p>
+
+<button onclick="addToCart('Light Installation',199)">
+Select
+</button>
+
+</div>
+
+
+
+<div class="service-card">
+
+<i class="fa-solid fa-fan"></i>
+
+<h3>AC Maintenance</h3>
+
+<p>Starting ₹699</p>
+
+<button onclick="addToCart('Light Installation',199)">
+Select
+</button>
+
+</div>
+
+
+</div>
+
+</section>
+
+
+<section>
+
+
+<h2>Book AC Service</h2>
+
+
+<form class="booking-form">
+
+
+<input type="text" placeholder="Full Name" required>
+
+
+<input type="text" placeholder="Mobile Number" required>
+
+
+<textarea placeholder="Service Address" required></textarea>
+
+
+
+<label>Select Date</label>
+
+<input type="date" required>
+
+
+
+<label>Select Time</label>
+
+<input type="time" required>
+
+
+
+
+<label>Select Payment Method</label>
+
+
+<div class="payment-method">
+
+
+<label>
+
+<input type="radio" name="payment" checked>
+
+Cash on Delivery
+
+</label>
+
+
+<label>
+
+<input type="radio" name="payment">
+
+UPI
+
+</label>
+
+
+<label>
+
+<input type="radio" name="payment">
+
+Card Payment
+
+</label>
+
+
+</div>
+
+
+
+
+<button class="book-btn">
+
+Confirm Booking
+
+</button>
+
+
+
+</form>
+
+
+</section>
+
+
+
+<section>
+
+
+<h2>Service Packages</h2>
+
+
+<div class="package-grid">
+
+
+<div class="package-card">
+
+<h3>Basic AC Service</h3>
+
+<p>✔ Cleaning</p>
+
+<p>✔ Inspection</p>
+
+<p>✔ Performance Check</p>
+
+<h2>₹499</h2>
+
+<button>Choose</button>
+
+</div>
+
+
+
+
+<div class="package-card">
+
+<h3>Premium Package</h3>
+
+<p>✔ Deep Cleaning</p>
+
+<p>✔ Gas Check</p>
+
+<p>✔ Complete Service</p>
+
+<h2>₹1499</h2>
+
+<button>Choose</button>
+
+</div>
+
+
+
+
+<div class="package-card">
+
+<h3>Annual Maintenance</h3>
+
+<p>✔ 3 Services</p>
+
+<p>✔ Priority Support</p>
+
+<p>✔ Technician Visit</p>
+
+<h2>₹2999</h2>
+
+<button>Choose</button>
+
+</div>
+
+
+</div>
+
+
+</section>
+
+
+
+<section>
+
+
+<h2>Why Choose SAHA?</h2>
+
+
+<div class="features">
+
+
+<div class="feature">
+
+<i class="fa-solid fa-user-check"></i>
+
+<h3>Certified Technicians</h3>
+
+</div>
+
+
+
+<div class="feature">
+
+<i class="fa-solid fa-clock"></i>
+
+<h3>Fast Response</h3>
+
+</div>
+
+
+
+<div class="feature">
+
+<i class="fa-solid fa-shield"></i>
+
+<h3>Trusted Service</h3>
+
+</div>
+
+
+
+<div class="feature">
+
+<i class="fa-solid fa-medal"></i>
+
+<h3>Quality Guarantee</h3>
+
+</div>
+
+
+
+</div>
+
+</section>
+
+<section>
+
+
+<h2>Customer Reviews</h2>
+
+
+<div class="review-grid">
+
+
+<div class="review-card">
+
+<h3>Rahul</h3>
+
+<p>⭐⭐⭐⭐⭐</p>
+
+<p>
+AC cooling problem solved quickly.
+</p>
+
+</div>
+
+
+
+
+<div class="review-card">
+
+<h3>Priya</h3>
+
+<p>⭐⭐⭐⭐⭐</p>
+
+<p>
+Good technician and affordable service.
+</p>
+
+</div>
+
+<div class="review-card">
+
+<h3>Kiran</h3>
+
+<p>⭐⭐⭐⭐⭐</p>
+
+<p>
+Very professional AC repair.
+</p>
+
+</div>
+
+
+
+</div>
+
+
+</section>
+
+
+<section>
+
+
+<h2>Emergency Support</h2>
+
+
+<div class="support-card">
+
+
+<i class="fa-solid fa-phone"></i>
+
+
+<h3>24 × 7 AC Support</h3>
+
+
+<p>Call: +91 9876543210</p>
+
+
+<button>
+Call Now
+</button>
+
+
+</div>
+
+
+</section>
+
+
+
+
+
+
+
+
+<nav class="bottom-nav">
+
+
+<a href="home.html">
+
+<i class="fa-solid fa-house"></i>
+
+<span>Home</span>
+
+</a>
+
+
+<a href="booking.html">
+
+<i class="fa-solid fa-calendar-check"></i>
+
+<span>Bookings</span>
+
+</a>
+
+
+
+<a href="acrepair.html" class="active">
+
+<i class="fa-solid fa-snowflake"></i>
+
+<span>AC Repair</span>
+
+</a>
+
+
+
+<a href="profile.html">
+
+<i class="fa-solid fa-user"></i>
+
+<span>Profile</span>
+
+</a>
+
+
+</nav>
+
+
+
+
+
+<script src="acrepair.js"></script>
+
+
+</body>
+
+</html>

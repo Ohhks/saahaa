@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#059669">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SAAHAA">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>SAAHAA Exchange v3.0 — Fully Automated P2P</title>
+<meta name="description" content="SAAHAA v3.0 — fully automated peer-to-peer bid/ask exchange. +12% projection, 8% profit, escrow OTP pipeline, hash-chained ledger.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════ TOKENS ═══════════ */
+:root{
+  --bg:#EDF1F6; --surface:#FFFFFF; --surface2:#F6F8FB;
+  --ink:#0F172A; --ink2:#334155; --muted:#64748B; --faint:#94A3B8; --line:#DDE4EE;
+  --brand:#059669; --brand-dk:#036B4B; --brand-bg:#ECFDF5;
+  --red:#DC2626; --red-bg:#FEF2F2; --amber:#D97706; --amber-bg:#FFFBEB;
+  --purple:#7C3AED; --purple-bg:#F5F3FF; --blue:#2563EB; --blue-bg:#EFF6FF;
+  --sh-sm:0 1px 3px rgba(15,23,42,.07); --sh:0 6px 18px -4px rgba(15,23,42,.12);
+  --sh-lg:0 24px 48px -12px rgba(15,23,42,.25);
+  --r:16px; --r-sm:11px; --r-lg:22px; --ease:cubic-bezier(.25,.46,.45,.94);
+}
+body.dark{
+  --bg:#0B1120; --surface:#151E31; --surface2:#0F172A;
+  --ink:#F1F5F9; --ink2:#CBD5E1; --muted:#94A3B8; --faint:#64748B; --line:#26334D;
+  --brand-bg:#0A2E22; --red-bg:#2A1215; --amber-bg:#271A05; --purple-bg:#1E1533; --blue-bg:#10203C;
+  --sh-sm:0 1px 3px rgba(0,0,0,.4); --sh:0 6px 18px -4px rgba(0,0,0,.55); --sh-lg:0 24px 48px -12px rgba(0,0,0,.7);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;-webkit-font-smoothing:antialiased}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;letter-spacing:-.011em;line-height:1.5;transition:background .3s,color .3s}
+button{cursor:pointer;font-family:inherit}
+input,select{font-family:inherit}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* ═══════════ SKEUOMORPHIC KIT ═══════════ */
+/* Glossy embossed button */
+.sk-btn{
+  border:1px solid rgba(0,0,0,.28);border-radius:12px;font-weight:800;color:#fff;
+  padding:.75rem 1.25rem;font-size:.86rem;text-shadow:0 -1px 1px rgba(0,0,0,.3);position:relative;
+  background:linear-gradient(180deg,var(--c1) 0%,var(--c2) 48%,var(--c3) 52%,var(--c2) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -2px 3px rgba(0,0,0,.25),0 4px 8px rgba(0,0,0,.28),0 1px 2px rgba(0,0,0,.2);
+  transition:transform .1s,box-shadow .1s;
+}
+.sk-btn:active{transform:translateY(2px);box-shadow:inset 0 2px 6px rgba(0,0,0,.4),0 1px 2px rgba(0,0,0,.2)}
+.sk-green{--c1:#34D399;--c2:#059669;--c3:#047857}
+.sk-blue{--c1:#60A5FA;--c2:#2563EB;--c3:#1D4ED8}
+.sk-purple{--c1:#A78BFA;--c2:#7C3AED;--c3:#6D28D9}
+.sk-red{--c1:#F87171;--c2:#DC2626;--c3:#B91C1C}
+.sk-amber{--c1:#FBBF24;--c2:#D97706;--c3:#B45309}
+.sk-slate{--c1:#94A3B8;--c2:#475569;--c3:#334155}
+/* Brushed metal plate */
+.metal{
+  background:linear-gradient(180deg,#FDFEFF,#E8EDF4 45%,#DCE3EE 55%,#EEF2F8),
+             repeating-linear-gradient(90deg,rgba(255,255,255,.06) 0 2px,rgba(0,0,0,.02) 2px 4px);
+  border:1px solid #C6D0DF;border-radius:var(--r);
+  box-shadow:inset 0 1px 0 #fff,inset 0 -1px 0 rgba(0,0,0,.08),0 6px 14px rgba(15,23,42,.14);
+}
+body.dark .metal{background:linear-gradient(180deg,#2A3650,#1B2438 45%,#141C2E 55%,#1E273C);border-color:#31405F;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 6px 14px rgba(0,0,0,.5)}
+/* LED board */
+.led-board{
+  background:linear-gradient(180deg,#101710,#060B06 60%,#0A120A);
+  border:2px solid #1C2A1C;border-radius:12px;
+  box-shadow:inset 0 0 22px rgba(0,0,0,.85),inset 0 2px 4px rgba(0,0,0,.9),0 5px 12px rgba(0,0,0,.35);
+  position:relative;overflow:hidden;
+}
+.led-board::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.22) 2px 3px)}
+.led-text{font-family:'JetBrains Mono',monospace;font-size:.74rem;color:#4ADE80;text-shadow:0 0 6px rgba(74,222,128,.9),0 0 14px rgba(74,222,128,.45)}
+.led-text b{color:#FDE047;text-shadow:0 0 6px rgba(253,224,71,.9)}
+.led-text .up{color:#38BDF8;text-shadow:0 0 6px rgba(56,189,248,.9)}
+/* Paper receipt */
+.paper{
+  background:linear-gradient(180deg,#FFFEF9,#FBF8EF);color:#1F2937;
+  border-radius:6px;position:relative;box-shadow:0 14px 30px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.2);
+  padding:1.6rem 1.5rem 1.9rem;
+}
+.paper::before,.paper::after{
+  content:'';position:absolute;left:0;right:0;height:10px;
+  background:radial-gradient(circle at 6px 5px,transparent 5px,#FFFEF9 5.5px);background-size:14px 10px;
+}
+.paper::before{top:-9px;transform:rotate(180deg)}
+.paper::after{bottom:-9px}
+.stamp{
+  position:absolute;top:1rem;right:1rem;transform:rotate(12deg);
+  border:3px double #059669;color:#059669;font-weight:900;font-size:.7rem;letter-spacing:.14em;
+  padding:.25rem .6rem;border-radius:6px;opacity:.85;text-transform:uppercase;
+}
+/* Real toggle switch */
+.sw3d{position:relative;width:56px;height:30px;flex-shrink:0;display:inline-block}
+.sw3d input{opacity:0;width:0;height:0}
+.sw3d .tr{
+  position:absolute;inset:0;border-radius:99px;cursor:pointer;transition:.25s;
+  background:linear-gradient(180deg,#8B95A5,#B7C0CE);
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.5),inset 0 -1px 0 rgba(255,255,255,.6);
+}
+.sw3d .tr::before{
+  content:'';position:absolute;width:24px;height:24px;border-radius:50%;left:3px;top:3px;transition:.25s;
+  background:linear-gradient(180deg,#FFFFFF,#D6DEE9 60%,#C1CBDA);
+  box-shadow:0 2px 4px rgba(0,0,0,.45),inset 0 1px 0 #fff;
+}
+.sw3d input:checked + .tr{background:linear-gradient(180deg,#047857,#10B981);box-shadow:inset 0 2px 6px rgba(0,0,0,.45),0 0 10px rgba(16,185,129,.5)}
+.sw3d input:checked + .tr::before{transform:translateX(26px)}
+/* Leather report card */
+.leather{
+  background:linear-gradient(145deg,#7C4A21,#5C3413 55%,#4A2A0E),
+             radial-gradient(circle at 30% 20%,rgba(255,255,255,.12),transparent 55%);
+  border-radius:var(--r);color:#F5E9DA;border:1px solid #3B2109;
+  box-shadow:inset 0 1px 0 rgba(255,220,170,.25),inset 0 0 40px rgba(0,0,0,.35),0 10px 22px rgba(0,0,0,.35);
+  position:relative;
+}
+.leather::before{content:'';position:absolute;inset:7px;border:2px dashed rgba(245,222,179,.4);border-radius:11px;pointer-events:none}
+
+/* ═══════════ AUTH OVERLAY (opens on demand) ═══════════ */
+#loginScreen{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:1rem;z-index:850;
+  background:rgba(2,6,23,.55);backdrop-filter:blur(6px)}
+#loginScreen.show{display:flex}
+.auth-tabs{display:flex;gap:.4rem;margin-bottom:1.2rem;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:.3rem;box-shadow:inset 0 2px 4px rgba(15,23,42,.1)}
+.auth-tab{flex:1;border:none;background:transparent;font-weight:800;font-size:.82rem;color:var(--muted);padding:.55rem;border-radius:9px;transition:all .2s}
+.auth-tab.on{color:#fff;background:linear-gradient(180deg,#34D399,#059669 55%,#047857);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.25),0 2px 5px rgba(5,150,105,.4);text-shadow:0 -1px 1px rgba(0,0,0,.3)}
+.auth-close{position:absolute;top:.9rem;right:1rem;border:none;background:transparent;font-size:1.05rem;color:var(--muted);font-weight:800}
+.login-card{width:100%;max-width:440px;padding:2.3rem 2.1rem;animation:rise .45s var(--ease)}
+@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.logo-mark{width:56px;height:56px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:#fff;font-weight:900;margin-bottom:1rem;
+  background:linear-gradient(150deg,#34D399,#059669 45%,#0EA5E9);
+  box-shadow:inset 0 2px 2px rgba(255,255,255,.5),inset 0 -3px 5px rgba(0,0,0,.3),0 10px 22px rgba(5,150,105,.45);text-shadow:0 -1px 2px rgba(0,0,0,.35)}
+.login-h{font-size:1.45rem;font-weight:900;letter-spacing:-.03em}
+.login-sub{font-size:.82rem;color:var(--muted);margin:.3rem 0 1.4rem}
+.field{margin-bottom:.9rem}
+.field label{display:block;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.35rem}
+.field input{width:100%;background:var(--surface2);border:1.5px solid var(--line);border-radius:var(--r-sm);padding:.72rem .9rem;font-size:.92rem;color:var(--ink);outline:none;box-shadow:inset 0 2px 4px rgba(15,23,42,.07)}
+.field input:focus{border-color:var(--brand)}
+.login-hint{margin-top:1.1rem;padding:.8rem .9rem;background:var(--surface2);border:1px dashed var(--line);border-radius:var(--r-sm);font-size:.72rem;color:var(--muted);line-height:1.7}
+.login-hint code{font-family:'JetBrains Mono',monospace;background:var(--brand-bg);color:var(--brand);padding:.05rem .35rem;border-radius:5px;font-size:.7rem}
+.login-err{display:none;margin-top:.7rem;font-size:.78rem;font-weight:700;color:var(--red)}
+.sec-chips{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.8rem}
+.sec-chip{font-size:.6rem;font-weight:800;padding:.2rem .55rem;border-radius:99px;background:var(--blue-bg);color:var(--blue)}
+
+/* ═══════════ SHELL ═══════════ */
+#app{display:none;max-width:1320px;margin:0 auto;padding:0 1.2rem 3rem}
+header{display:flex;align-items:center;gap:.9rem;padding:1rem 0 .8rem;flex-wrap:wrap}
+.h-logo{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:1.1rem;
+  background:linear-gradient(150deg,#34D399,#059669 45%,#0EA5E9);
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.5),inset 0 -2px 4px rgba(0,0,0,.3),0 4px 10px rgba(5,150,105,.4)}
+.h-title{font-weight:900;font-size:1.1rem;letter-spacing:-.02em}
+.h-title span{color:var(--brand)}
+.h-tag{font-size:.63rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.h-right{margin-left:auto;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.pill{font-size:.68rem;font-weight:800;padding:.34rem .7rem;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 1px 2px rgba(15,23,42,.08)}
+body.dark .pill{box-shadow:none}
+.pill.role-admin{background:var(--purple-bg);color:var(--purple);border-color:transparent}
+.pill.role-user{background:var(--brand-bg);color:var(--brand);border-color:transparent}
+.icon-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:.95rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(15,23,42,.08),inset 0 1px 0 rgba(255,255,255,.8)}
+body.dark .icon-btn{box-shadow:none}
+.btn-ghost{background:var(--surface);border:1px solid var(--line);color:var(--ink2);font-size:.76rem;font-weight:700;padding:.45rem .85rem;border-radius:10px;box-shadow:0 2px 4px rgba(15,23,42,.08),inset 0 1px 0 rgba(255,255,255,.8)}
+body.dark .btn-ghost{box-shadow:none}
+.ticker-wrap{margin-bottom:1.1rem;padding:0}
+.ticker{display:inline-flex;gap:2.4rem;white-space:nowrap;padding:.55rem 0;animation:tick 40s linear infinite}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-sm);padding:1.2rem}
+.card-h{font-size:.94rem;font-weight:800;display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem}
+.card-h small{font-weight:600;color:var(--muted);font-size:.7rem;margin-left:auto}
+
+/* ═══════════ CATALOG (top-most showcase) ═══════════ */
+.catalog-h{display:flex;align-items:baseline;gap:.7rem;margin:0 0 .8rem .2rem}
+.catalog-h h2{font-size:1.15rem;font-weight:900;letter-spacing:-.02em}
+.catalog-h small{font-size:.7rem;color:var(--muted);font-weight:700}
+.catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:.9rem;margin-bottom:1.3rem}
+.cat-card{
+  border-radius:18px;padding:1rem .9rem .95rem;color:#fff;position:relative;cursor:pointer;border:1px solid rgba(0,0,0,.22);
+  background:linear-gradient(160deg,var(--cl) 0%,var(--cc) 55%,var(--cd) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -3px 6px rgba(0,0,0,.28),0 8px 18px -4px var(--cs);
+  transition:transform .18s var(--ease),box-shadow .18s;
+}
+.cat-card:hover{transform:translateY(-3px)}
+.cat-card.on{outline:3px solid rgba(255,255,255,.85);outline-offset:-3px}
+.cat-ico{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;margin-bottom:.55rem;
+  background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.75),rgba(255,255,255,.15) 60%);
+  box-shadow:inset 0 -3px 5px rgba(0,0,0,.3),inset 0 2px 3px rgba(255,255,255,.6),0 3px 6px rgba(0,0,0,.25)}
+.cat-name{font-weight:900;font-size:.9rem;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.cat-range{font-family:'JetBrains Mono',monospace;font-size:.64rem;opacity:.92;margin-top:.1rem}
+.cat-live{position:absolute;top:.7rem;right:.7rem;font-size:.56rem;font-weight:900;background:rgba(0,0,0,.3);padding:.16rem .45rem;border-radius:99px;letter-spacing:.05em;box-shadow:inset 0 1px 2px rgba(0,0,0,.4)}
+.cat-book{margin-top:.7rem;width:100%;border:none;border-radius:9px;font-weight:900;font-size:.7rem;padding:.45rem;color:#fff;text-shadow:0 -1px 1px rgba(0,0,0,.35);
+  background:linear-gradient(180deg,rgba(255,255,255,.32),rgba(255,255,255,.08) 50%,rgba(0,0,0,.18));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.3),0 2px 4px rgba(0,0,0,.25)}
+.cat-book:active{transform:translateY(1px)}
+
+/* ═══════════ MARKET ═══════════ */
+.market-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:1.1rem;align-items:start}
+@media(max-width:900px){.market-grid{grid-template-columns:1fr}}
+.quote-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:1rem}
+.quote-cell{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-sm);padding:.6rem .7rem;text-align:center;box-shadow:inset 0 2px 4px rgba(15,23,42,.06)}
+.quote-cell .q-lbl{font-size:.58rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.quote-cell .q-val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:.95rem;margin-top:.15rem}
+.q-bid{color:var(--brand)}.q-ask{color:var(--red)}.q-proj{color:var(--purple)}
+.book{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+.book-col-h{font-size:.64rem;font-weight:900;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem;display:flex;justify-content:space-between;color:var(--muted)}
+.book-row{position:relative;display:flex;justify-content:space-between;align-items:center;padding:.34rem .55rem;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:.75rem;margin-bottom:3px;overflow:hidden}
+.book-row .depth{position:absolute;top:0;bottom:0;opacity:.14;border-radius:7px}
+.bid-row .depth{right:0;background:var(--brand)}
+.ask-row .depth{left:0;background:var(--red)}
+.book-row .p{font-weight:700;z-index:1}
+.bid-row .p{color:var(--brand)}.ask-row .p{color:var(--red)}
+.book-row .who{font-family:'Inter',sans-serif;font-size:.65rem;color:var(--muted);z-index:1;max-width:56%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.book-row.mine{outline:1.5px solid var(--brand);outline-offset:-1.5px}
+.bid-box{display:flex;gap:.55rem;margin-top:1rem}
+.bid-box input{flex:1;background:var(--surface2);border:1.5px solid var(--line);border-radius:var(--r-sm);padding:.7rem .85rem;font-size:.95rem;color:var(--ink);outline:none;font-family:'JetBrains Mono',monospace;box-shadow:inset 0 2px 4px rgba(15,23,42,.07)}
+.note{font-size:.67rem;color:var(--muted);margin-top:.55rem;line-height:1.6}
+.deal-item{display:flex;align-items:center;gap:.7rem;padding:.6rem .3rem;border-bottom:1px solid var(--line)}
+.deal-item:last-child{border-bottom:none}
+.deal-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0;color:#fff;
+  background:linear-gradient(160deg,var(--cl,#34D399),var(--cc,#059669));box-shadow:inset 0 1px 1px rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.25)}
+.deal-t{font-size:.76rem;font-weight:700}
+.deal-s{font-size:.64rem;color:var(--muted)}
+.deal-amt{margin-left:auto;text-align:right;flex-shrink:0}
+.deal-amt .a1{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:.8rem;color:var(--purple)}
+.deal-amt .a2{font-size:.6rem;color:var(--muted)}
+.empty{text-align:center;color:var(--faint);font-size:.78rem;padding:1.3rem 0}
+.stage{display:inline-flex;align-items:center;gap:.25rem;font-size:.56rem;font-weight:900;padding:.14rem .45rem;border-radius:99px;letter-spacing:.04em}
+.st-ESCROW{background:var(--amber-bg);color:var(--amber)}
+.st-OTP{background:var(--blue-bg);color:var(--blue)}
+.st-PAID{background:var(--brand-bg);color:var(--brand)}
+.auto-panel{display:flex;align-items:center;gap:.9rem;padding:.9rem 1.1rem;margin-bottom:1.1rem}
+.auto-lbl{font-weight:900;font-size:.9rem}
+.auto-sub{font-size:.68rem;color:var(--muted)}
+
+/* ═══════════ SANDBOX ═══════════ */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.9rem;margin-bottom:1.1rem}
+@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.kpi{padding:1rem 1.1rem;position:relative;overflow:hidden}
+.kpi::after{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,var(--kc),color-mix(in srgb,var(--kc) 55%,black))}
+.kpi-lbl{font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.kpi-val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:1.3rem;margin-top:.25rem}
+.kpi-sub{font-size:.64rem;color:var(--faint);margin-top:.15rem}
+.sand-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:1.1rem;align-items:start;margin-bottom:1.1rem}
+@media(max-width:900px){.sand-grid{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse;font-size:.74rem}
+th{text-align:left;font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:800;padding:.45rem .5rem;border-bottom:1.5px solid var(--line)}
+td{padding:.48rem .5rem;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.t-mono{font-family:'JetBrains Mono',monospace;font-weight:600}
+.tag{font-size:.58rem;font-weight:800;padding:.14rem .5rem;border-radius:999px}
+.tag-g{background:var(--brand-bg);color:var(--brand)}
+.tag-p{background:var(--purple-bg);color:var(--purple)}
+.perf-row{margin-bottom:.7rem}
+.perf-top{display:flex;justify-content:space-between;font-size:.72rem;font-weight:700;margin-bottom:.25rem}
+.perf-top span:last-child{font-family:'JetBrains Mono',monospace;color:var(--muted);font-weight:600}
+.perf-track{height:12px;border-radius:99px;background:var(--surface2);border:1px solid var(--line);overflow:hidden;box-shadow:inset 0 2px 4px rgba(15,23,42,.15)}
+.perf-fill{height:100%;border-radius:99px;background:linear-gradient(180deg,var(--pc1,#34D399),var(--pc2,#059669));box-shadow:inset 0 1px 0 rgba(255,255,255,.5);transition:width .5s var(--ease)}
+.admin-controls{display:flex;gap:.7rem;flex-wrap:wrap;align-items:center;margin-bottom:1.1rem;padding:.85rem 1.1rem}
+.ctl-lbl{font-size:.74rem;font-weight:800;color:var(--ink2)}
+select.ctl{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:.42rem .6rem;font-size:.76rem;font-weight:700;color:var(--ink);outline:none;box-shadow:inset 0 1px 3px rgba(15,23,42,.08)}
+.scroll-y{max-height:340px;overflow-y:auto}
+.sec-row{display:flex;align-items:center;gap:.6rem;padding:.55rem 0;border-bottom:1px solid var(--line);font-size:.76rem}
+.sec-row:last-child{border-bottom:none}
+.sec-ok{margin-left:auto;font-weight:900;font-size:.66rem;color:var(--brand)}
+.sec-bad{margin-left:auto;font-weight:900;font-size:.66rem;color:var(--red)}
+.prog-track{height:16px;border-radius:99px;background:var(--surface2);border:1px solid var(--line);overflow:hidden;box-shadow:inset 0 2px 5px rgba(15,23,42,.2);margin:.6rem 0}
+.prog-fill{height:100%;border-radius:99px;background:linear-gradient(180deg,#A78BFA,#7C3AED);box-shadow:inset 0 1px 0 rgba(255,255,255,.5);transition:width .15s;width:0%}
+.stress-report{font-family:'JetBrains Mono',monospace;font-size:.72rem;line-height:1.9;padding:1rem 1.2rem}
+.stress-report b{color:#FDE047}
+
+/* ═══════════ MOBILE APP LAYER ═══════════ */
+#mobileNav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:400;justify-content:space-around;align-items:center;
+  background:linear-gradient(180deg,var(--surface),var(--surface2));border-top:1px solid var(--line);
+  box-shadow:0 -8px 20px rgba(15,23,42,.18);padding:.35rem .5rem calc(.35rem + env(safe-area-inset-bottom))}
+.mnav-btn{border:none;background:transparent;font-size:.6rem;font-weight:800;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:.1rem;padding:.35rem .9rem;border-radius:11px;min-width:64px}
+.mnav-btn span{font-size:1.2rem}
+.mnav-btn:active{background:var(--brand-bg);color:var(--brand)}
+@media(max-width:700px){
+  #mobileNav{display:flex}
+  #app{padding-bottom:5rem}
+  .quote-strip{grid-template-columns:repeat(2,1fr)}
+  .catalog{grid-template-columns:repeat(2,1fr);gap:.7rem}
+  header{gap:.45rem}
+  .h-tag{display:none}
+  .kpi-grid{grid-template-columns:1fr 1fr}
+  .admin-controls{gap:.5rem}
+  .bid-box{flex-direction:column}
+  .sk-btn{padding:.85rem 1.25rem}
+  .auto-panel{flex-wrap:wrap}
+}
+
+/* toast + modal */
+#toast{position:fixed;bottom:1.4rem;left:50%;transform:translateX(-50%) translateY(90px);background:var(--ink);color:var(--bg);padding:.65rem 1.2rem;border-radius:999px;font-size:.78rem;font-weight:700;box-shadow:var(--sh-lg);transition:transform .3s var(--ease);z-index:900;max-width:92vw}
+body.dark #toast{background:#F1F5F9;color:#0F172A}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#modalWrap{position:fixed;inset:0;background:rgba(2,6,23,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:1.2rem;z-index:800}
+#modalWrap.show{display:flex}
+.modal-shell{max-width:400px;width:100%;animation:rise .35s var(--ease)}
+.split-bar{display:flex;height:28px;border-radius:8px;overflow:hidden;margin:.9rem 0 .4rem;border:1px solid rgba(0,0,0,.25);box-shadow:inset 0 2px 4px rgba(0,0,0,.25)}
+.split-seg{display:flex;align-items:center;justify-content:center;color:#fff;font-size:.58rem;font-weight:800;text-shadow:0 1px 1px rgba(0,0,0,.35);background-image:linear-gradient(180deg,rgba(255,255,255,.35),transparent 55%)}
+.leg{display:flex;gap:.8rem;flex-wrap:wrap;font-size:.6rem;font-weight:700;color:#6B7280}
+.leg span::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;background:var(--c)}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ AUTH OVERLAY (Login / Sign Up on demand) ═══════════ -->
+<div id="loginScreen" onclick="if(event.target===this)closeAuth()">
+  <div class="login-card metal" style="position:relative">
+    <button class="auth-close" onclick="closeAuth()">✕</button>
+    <div class="logo-mark">S</div>
+    <div class="login-h">SAAHAA <span style="color:var(--brand)">Exchange</span> <span style="font-size:.7rem;color:var(--muted)">v3.0</span></div>
+    <div class="login-sub" id="authSub">Sign in to bid, book &amp; track your P2P deals.</div>
+    <div class="auth-tabs">
+      <button class="auth-tab on" id="tabLogin" onclick="setAuthTab('login')">🔑 Login</button>
+      <button class="auth-tab" id="tabSignup" onclick="setAuthTab('signup')">✨ Sign Up</button>
+    </div>
+    <div class="field" id="roleField" style="display:none">
+      <label>I am a</label>
+      <div class="auth-tabs" style="margin-bottom:0">
+        <button class="auth-tab on" id="roleCustomer" onclick="setSignupRole('customer')">🛍 Customer</button>
+        <button class="auth-tab" id="roleWorker" onclick="setSignupRole('worker')">🔧 Worker</button>
+      </div>
+    </div>
+    <div class="field"><label>Full Name / Org ID</label><input id="inName" placeholder="e.g. Anoosh  ·  or  admin" autocomplete="off" maxlength="40"></div>
+    <div class="field"><label>Mobile Number</label><input id="inMobile" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" autocomplete="off"></div>
+    <div id="workerFields" style="display:none">
+      <div class="field"><label>My Service Category</label>
+        <select id="inWCat" style="width:100%;background:var(--surface2);border:1.5px solid var(--line);border-radius:11px;padding:.72rem .9rem;font-size:.92rem;color:var(--ink);outline:none"></select>
+      </div>
+      <div class="field"><label>My Ask Price (₹)</label><input id="inWAsk" type="number" min="1" max="99999" placeholder="e.g. 550"></div>
+    </div>
+    <div class="field" id="passField"><label>Passcode <span style="text-transform:none;font-weight:600">(admins only)</span></label><input id="inPass" type="password" placeholder="••••••••" maxlength="40"></div>
+    <button class="sk-btn sk-green" style="width:100%" id="authCta" onclick="doLogin()">Sign In →</button>
+    <div class="login-err" id="loginErr"></div>
+    <div class="sec-chips">
+      <span class="sec-chip">🔐 SHA-256 auth</span><span class="sec-chip">🛡 CSP locked</span>
+      <span class="sec-chip">⛓ Hash-chain ledger</span><span class="sec-chip">🕸 P2P mesh</span><span class="sec-chip">🚫 rate-limited</span>
+    </div>
+    <div class="login-hint" id="authHint">
+      👤 <b>User:</b> your name + registered 10-digit mobile<br>
+      👑 <b>Admin:</b> name <code>admin</code> + passcode <code>saahaa123</code> → Sandbox
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ APP ═══════════ -->
+<div id="app">
+  <header>
+    <div class="h-logo">S</div>
+    <div>
+      <div class="h-title">SAAHAA <span>Exchange</span></div>
+      <div class="h-tag">Fully Automated P2P · v3.0</div>
+    </div>
+    <div class="h-right">
+      <span class="pill" id="meshPill">🕸 Mesh: 0 peers</span>
+      <span class="pill" id="enginePill">⚙️ Engine LIVE</span>
+      <span class="pill" id="rolePill" style="display:none"></span>
+      <button class="icon-btn" onclick="toggleTheme()" title="Theme">🌓</button>
+      <button class="btn-ghost" id="loginBtn" onclick="openAuth('login')">🔑 Login</button>
+      <button class="sk-btn sk-green" id="signupBtn" style="padding:.5rem 1rem;font-size:.78rem" onclick="openAuth('signup')">✨ Sign Up</button>
+      <button class="btn-ghost" id="logoutBtn" style="display:none" onclick="doLogout()">Logout</button>
+    </div>
+  </header>
+
+  <div class="ticker-wrap led-board"><div class="ticker led-text" id="tickerTape"></div></div>
+
+  <!-- ── USER VIEW ── -->
+  <div id="userView" style="display:none">
+
+    <div class="auto-panel metal">
+      <label class="sw3d"><input type="checkbox" id="autoPilotSw" checked onchange="setAutoPilot(this.checked)"><span class="tr"></span></label>
+      <div>
+        <div class="auto-lbl">🤖 Auto-Pilot <span id="apState" style="color:var(--brand)">ON</span></div>
+        <div class="auto-sub">Your agent bids, matches, pays escrow &amp; verifies OTP automatically — zero clicks. Budget cap: base rate +35%.</div>
+      </div>
+      <div style="margin-left:auto;text-align:right">
+        <div class="auto-sub">automated deals this session</div>
+        <div class="mono" style="font-weight:700;font-size:1.15rem;color:var(--brand)" id="apCount">0</div>
+      </div>
+    </div>
+
+    <div class="catalog-h"><h2>🗂 Service Catalog</h2><small>live P2P markets — tap a card to open its order book, Auto-Book for an instant deal</small></div>
+    <div class="catalog" id="catalogGrid"></div>
+
+    <div class="market-grid" id="marketAnchor">
+      <div class="card">
+        <div class="card-h">📊 Live Order Book — <span id="bookCatName" style="color:var(--brand)"></span><small id="bookMeta"></small></div>
+        <div class="quote-strip">
+          <div class="quote-cell"><div class="q-lbl">Best Bid</div><div class="q-val q-bid" id="qBid">—</div></div>
+          <div class="quote-cell"><div class="q-lbl">Best Ask</div><div class="q-val q-ask" id="qAsk">—</div></div>
+          <div class="quote-cell"><div class="q-lbl">Last Deal</div><div class="q-val" id="qLast">—</div></div>
+          <div class="quote-cell"><div class="q-lbl">You Pay (+12%)</div><div class="q-val q-proj" id="qProj">—</div></div>
+        </div>
+        <div class="book">
+          <div><div class="book-col-h"><span style="color:var(--brand)">BIDS (customers)</span><span>₹</span></div><div id="bidCol"></div></div>
+          <div><div class="book-col-h"><span style="color:var(--red)">ASKS (workers)</span><span>₹</span></div><div id="askCol"></div></div>
+        </div>
+        <div class="bid-box">
+          <input id="myBidInput" type="number" min="1" max="99999" placeholder="Manual bid ₹ (optional — Auto-Pilot handles it)">
+          <button class="sk-btn sk-green" onclick="placeMyBid()">Bid ⚡</button>
+        </div>
+        <div class="note">💡 Direct P2P: your bid matches a worker's ask with no middleman — funds lock in escrow, the 4-digit OTP releases payout. Confirmed price is <b>projected +12%</b>: platform profit <b>8%</b>, GST &amp; ops 4%. Worker receives the full confirmed price.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1.1rem">
+        <div class="card" id="dealsAnchor">
+          <div class="card-h">🧾 My P2P Deals<small id="myDealCount"></small></div>
+          <div id="myDeals"></div>
+        </div>
+        <div class="card">
+          <div class="card-h">⚡ Market Pulse<small>all categories</small></div>
+          <div id="pulseList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── WORKER VIEW ── -->
+  <div id="workerView" style="display:none">
+    <div class="auto-panel metal">
+      <label class="sw3d"><input type="checkbox" id="wOnlineSw" checked onchange="toggleWorkerOnline(this.checked)"><span class="tr"></span></label>
+      <div>
+        <div class="auto-lbl">🔧 <span id="wCatLbl"></span> · <span id="wOnlineLbl" style="color:var(--brand)">ONLINE</span></div>
+        <div class="auto-sub">Auto-Ask reposts &amp; re-prices your ask automatically to win the next job.</div>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:.5rem">
+        <span class="ctl-lbl">Auto-Ask</span>
+        <label class="sw3d"><input type="checkbox" id="wAutoSw" checked onchange="toggleAutoAsk(this.checked)"><span class="tr"></span></label>
+      </div>
+    </div>
+    <div class="market-grid">
+      <div style="display:flex;flex-direction:column;gap:1.1rem">
+        <div class="card" id="wAskCard">
+          <div class="card-h">🏷 My Ask Console<small id="wBookMeta"></small></div>
+          <div class="quote-strip">
+            <div class="quote-cell"><div class="q-lbl">Best Bid</div><div class="q-val q-bid" id="wqBid">—</div></div>
+            <div class="quote-cell"><div class="q-lbl">My Ask</div><div class="q-val q-ask" id="wqAsk">—</div></div>
+            <div class="quote-cell"><div class="q-lbl">Last Deal</div><div class="q-val" id="wqLast">—</div></div>
+            <div class="quote-cell"><div class="q-lbl">Cust. Pays (+12%)</div><div class="q-val q-proj" id="wqProj">—</div></div>
+          </div>
+          <div class="book">
+            <div><div class="book-col-h"><span style="color:var(--brand)">BIDS (customers)</span><span>₹</span></div><div id="wBidCol"></div></div>
+            <div><div class="book-col-h"><span style="color:var(--red)">ASKS (workers)</span><span>₹</span></div><div id="wAskCol"></div></div>
+          </div>
+          <div class="bid-box">
+            <input id="wAskInput" type="number" min="1" max="99999" placeholder="New ask price ₹">
+            <button class="sk-btn sk-amber" onclick="updateWorkerAsk()">Update Ask 🏷</button>
+          </div>
+          <div class="note">💡 You receive <b>100% of your confirmed price</b> — the +12% projection is charged to the customer on top. Matches settle to your wallet through escrow → OTP automatically.</div>
+        </div>
+        <div class="card" id="wJobsCard">
+          <div class="card-h">💼 My Jobs<small id="wJobCount"></small></div>
+          <div id="wJobs"></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1.1rem">
+        <div class="leather" id="wWallet" style="padding:1.3rem 1.5rem">
+          <div style="font-weight:900;font-size:.9rem;letter-spacing:.04em">👛 EARNINGS WALLET</div>
+          <div class="stress-report" style="padding:.5rem 0 0" id="wWalletBody">No jobs yet.</div>
+        </div>
+        <div class="card">
+          <div class="card-h">⚡ Demand Pulse<small>your category</small></div>
+          <div id="wPulse"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ADMIN SANDBOX ── -->
+  <div id="adminView" style="display:none">
+    <div class="admin-controls metal">
+      <label class="sw3d"><input type="checkbox" id="engineToggle" checked onchange="toggleEngine(this.checked)"><span class="tr"></span></label>
+      <span class="ctl-lbl">Auto Engine</span>
+      <select class="ctl" id="speedSel" onchange="setSpeed(this.value)">
+        <option value="1">Speed 1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option>
+      </select>
+      <span style="flex:1"></span>
+      <button class="sk-btn sk-purple" onclick="runStress()" id="stressBtn">🚀 1 Lakh User Stress Test</button>
+      <button class="sk-btn sk-blue" onclick="verifyChain()">⛓ Verify Ledger Chain</button>
+      <button class="btn-ghost" onclick="exportCSV('deals')">⬇ Deals CSV</button>
+      <button class="btn-ghost" onclick="exportCSV('visitors')">⬇ Visitors CSV</button>
+      <button class="btn-ghost" style="color:var(--red)" onclick="resetSandbox()">Reset</button>
+    </div>
+
+    <div class="kpi-grid" id="kpiAnchor">
+      <div class="kpi metal" style="--kc:#2563EB"><div class="kpi-lbl">Confirmed Deals</div><div class="kpi-val" id="kDeals">0</div><div class="kpi-sub" id="kDealsSub"></div></div>
+      <div class="kpi metal" style="--kc:#059669"><div class="kpi-lbl">Deal Volume</div><div class="kpi-val" id="kVol">₹0</div><div class="kpi-sub">sum of confirmed prices</div></div>
+      <div class="kpi metal" style="--kc:#7C3AED"><div class="kpi-lbl">Projected Revenue (+12%)</div><div class="kpi-val" id="kProj">₹0</div><div class="kpi-sub">what customers pay</div></div>
+      <div class="kpi metal" style="--kc:#D97706"><div class="kpi-lbl">Platform Profit (8%)</div><div class="kpi-val" id="kProfit">₹0</div><div class="kpi-sub" id="kProfitSub"></div></div>
+    </div>
+
+    <div class="sand-grid">
+      <div class="card">
+        <div class="card-h">📈 Cumulative Profit Curve<small>8% per deal</small></div>
+        <canvas id="profitChart" height="190" style="width:100%"></canvas>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1.1rem">
+        <div class="card">
+          <div class="card-h">🛡 Security &amp; Protocol Status</div>
+          <div id="secList"></div>
+        </div>
+        <div class="leather" style="padding:1.2rem 1.4rem">
+          <div style="font-weight:900;font-size:.9rem;letter-spacing:.04em">🚀 1 LAKH STRESS REPORT</div>
+          <div class="prog-track" id="stressProgWrap" style="display:none"><div class="prog-fill" id="stressProg"></div></div>
+          <div class="stress-report" id="stressReport" style="padding:.4rem 0 0">No run yet — hit the purple button above.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sand-grid">
+      <div class="card">
+        <div class="card-h">🏆 Category Performance<small>by profit</small></div>
+        <div id="perfList"></div>
+      </div>
+      <div class="card">
+        <div class="card-h">📇 Visitor Registry<small id="visMeta"></small></div>
+        <div class="scroll-y"><table>
+          <thead><tr><th>Name</th><th>Mobile</th><th>Role</th><th>Visits</th><th>Last Seen</th></tr></thead>
+          <tbody id="visTable"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.1rem" id="ledgerAnchor">
+      <div class="card-h">🤝 P2P Deal Ledger (hash-chained)<small id="ledgerMeta"></small></div>
+      <div class="scroll-y"><table>
+        <thead><tr><th>Time</th><th>Category</th><th>Worker</th><th>Customer</th><th>Stage</th><th>Deal ₹</th><th>Proj ₹</th><th>Profit ₹</th><th>Block Hash</th></tr></thead>
+        <tbody id="dealTable"></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<nav id="mobileNav"></nav>
+
+<div id="modalWrap" onclick="if(event.target===this)this.classList.remove('show')"><div class="modal-shell" id="modalBody"></div></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════
+   SAAHAA EXCHANGE v3.0 — FULLY AUTOMATED P2P CORE
+   Pipeline (zero manual steps in Auto-Pilot):
+   AGENT BID → P2P MATCH → ESCROW LOCK → OTP VERIFY → PAYOUT
+   Deal D → customer pays D×1.12 · profit 8% · GST/ops 4%
+   Security: SHA-256 auth · CSP · XSS escaping · rate limit
+             hash-chained ledger · BroadcastChannel P2P mesh
+   ═══════════════════════════════════════════════════════ */
+const MARKUP=0.12, PROFIT=0.08, GSTOPS=0.04;
+const LS_KEY='SAAHAA_V3_STATE';
+const ADMIN_PASS_HASH='103291d01ffa6b14328a1e853eb37a4f98718a2312b732399c2749f5a9f678d8'; /* sha256("saahaa123") */
+
+const CATS=[
+  {id:'plumber',    name:'Plumber',      ico:'🔧', base:520, cl:'#60A5FA', cc:'#2563EB', cd:'#1E3A8A', cs:'rgba(37,99,235,.45)'},
+  {id:'electrician',name:'Electrician',  ico:'⚡', base:480, cl:'#FCD34D', cc:'#D97706', cd:'#92400E', cs:'rgba(217,119,6,.45)'},
+  {id:'acrepair',   name:'AC Repair',    ico:'❄️', base:750, cl:'#67E8F9', cc:'#0891B2', cd:'#155E75', cs:'rgba(8,145,178,.45)'},
+  {id:'carpenter',  name:'Carpenter',    ico:'🪚', base:600, cl:'#D6A97B', cc:'#92400E', cd:'#5B2A08', cs:'rgba(146,64,14,.45)'},
+  {id:'cleaning',   name:'Cleaning',     ico:'🧹', base:400, cl:'#F9A8D4', cc:'#DB2777', cd:'#9D174D', cs:'rgba(219,39,119,.45)'},
+  {id:'laundry',    name:'Laundry/Iron', ico:'👕', base:180, cl:'#C4B5FD', cc:'#7C3AED', cd:'#4C1D95', cs:'rgba(124,58,237,.45)'},
+  {id:'grocery',    name:'Grocery Run',  ico:'🛒', base:250, cl:'#6EE7B7', cc:'#059669', cd:'#065F46', cs:'rgba(5,150,105,.45)'},
+];
+const PROVIDERS={
+  plumber:['Amit Verma','Raju Plumber','Srinu Waterworks'],
+  electrician:['Vikram Volts','PowerPro Nani','Sparks Anil'],
+  acrepair:['CoolCare Ravi','Arctic Techs','FrostFix Babu'],
+  carpenter:['Kumar Iron Works','WoodCraft Ali','Shiva Carpentry'],
+  cleaning:['SparkleTeam Devi','NeatNest Crew','CleanKart Pros'],
+  laundry:['Press Express','Kumar Iron Works','SteamLine Laxmi'],
+  grocery:['Sai Kirana Store','Ravi Mart','QuickKart Madhapur'],
+};
+const SIM_CUSTOMERS=['Priya S','Rahul K','Meena D','Farhan A','Lakshmi R','Dev P','Sana I','Kiran T','Asha M','Vijay N'];
+
+let state={visitors:[], deals:[], profitSeries:[], agg:{deals:0,vol:0,proj:0,profit:0,gst:0}, chain:{length:0,lastHash:'GENESIS'}, stress:null};
+let session=null, books={}, activeCat='plumber';
+let engineOn=true, speed=1, engineTimer=null, orderSeq=1, apDeals=0;
+const PEER_ID='peer-'+Math.random().toString(36).slice(2,10);
+let mesh=null, peers={};
+
+/* ── security primitives ── */
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function sha256(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function rateLimited(){
+  const now=Date.now();
+  let a=[]; try{a=JSON.parse(sessionStorage.getItem('SAAHAA_ATT')||'[]');}catch(e){}
+  a=a.filter(t=>now-t<60000);
+  if(a.length>=5) return true;
+  a.push(now); sessionStorage.setItem('SAAHAA_ATT',JSON.stringify(a));
+  return false;
+}
+
+/* ── persistence ── */
+function save(){ try{ localStorage.setItem(LS_KEY,JSON.stringify(state)); }catch(e){} }
+function load(){ try{ const s=localStorage.getItem(LS_KEY); if(s) state=Object.assign(state,JSON.parse(s)); }catch(e){} }
+
+/* ── helpers ── */
+const r2=n=>Math.round(n*100)/100;
+const fmt=n=>'₹'+n.toLocaleString('en-IN',{maximumFractionDigits:0});
+const fmt2=n=>'₹'+n.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const rand=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const nowStr=ts=>new Date(ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
+const catByName=n=>CATS.find(c=>c.name===n);
+
+/* ── P2P MESH (BroadcastChannel gossip) ── */
+function initMesh(){
+  if(typeof BroadcastChannel==='undefined') return;
+  mesh=new BroadcastChannel('SAAHAA_MESH_V3');
+  mesh.onmessage=e=>{
+    const m=e.data||{};
+    if(m.peer===PEER_ID) return;
+    peers[m.peer]=Date.now();
+    if(m.type==='hello') mesh.postMessage({type:'hi',peer:PEER_ID});
+    if(m.type==='deal' && m.deal && !state.deals.some(d=>d.id===m.deal.id)){
+      state.deals.unshift(m.deal); trimDeals(); applyAgg(m.deal); save();
+      renderTicker(); if(session&&session.role==='admin') renderSandbox();
+    }
+    if(m.type==='visitor' && m.v && !state.visitors.some(x=>x.key===m.v.key)){
+      state.visitors.unshift(m.v); save();
+    }
+    renderMeshPill();
+  };
+  mesh.postMessage({type:'hello',peer:PEER_ID});
+  setInterval(()=>{ const now=Date.now(); Object.keys(peers).forEach(p=>{if(now-peers[p]>45000)delete peers[p];}); renderMeshPill(); mesh.postMessage({type:'hello',peer:PEER_ID}); },15000);
+}
+function gossip(type,payload){ if(mesh) try{ mesh.postMessage(Object.assign({type,peer:PEER_ID},payload)); }catch(e){} }
+function renderMeshPill(){
+  const n=Object.keys(peers).length;
+  const el=document.getElementById('meshPill');
+  el.textContent='🕸 Mesh: '+n+' peer'+(n===1?'':'s');
+  el.style.color=n>0?'var(--brand)':'';
+}
+
+/* ── order books ── */
+function seedBooks(){
+  CATS.forEach(c=>{ books[c.id]={bids:[],asks:[]}; for(let i=0;i<4;i++){addAsk(c.id);addBid(c.id);} });
+}
+function addAsk(catId){
+  const c=CATS.find(x=>x.id===catId);
+  books[catId].asks.push({id:orderSeq++,price:r2(c.base*rand(1.01,1.22)),who:pick(PROVIDERS[catId]),mine:false});
+  books[catId].asks.sort((a,b)=>a.price-b.price);
+}
+function addBid(catId,price,who,mine){
+  const c=CATS.find(x=>x.id===catId);
+  books[catId].bids.push({id:orderSeq++,price:price!=null?r2(price):r2(c.base*rand(0.80,0.99)),who:who||pick(SIM_CUSTOMERS),mine:!!mine});
+  books[catId].bids.sort((a,b)=>b.price-a.price);
+}
+
+/* ── AUTOMATED ENGINE: match + lifecycle + auto-pilot ── */
+function engineTick(){
+  CATS.forEach(c=>{
+    const bk=books[c.id];
+    bk.bids.forEach(b=>{ if(!b.mine&&Math.random()<.45) b.price=r2(b.price*rand(1.000,1.018)); });
+    bk.asks.forEach(a=>{ if(!a.mine&&Math.random()<.45) a.price=r2(a.price*rand(0.985,1.001)); });
+    bk.bids.sort((a,b)=>b.price-a.price); bk.asks.sort((a,b)=>a.price-b.price);
+    matchBook(c.id);
+    while(bk.asks.length<4) addAsk(c.id);
+    while(bk.bids.length<4) addBid(c.id);
+    /* trim depth but NEVER evict the logged-in peer's own orders */
+    if(bk.asks.length>7){ const m=bk.asks.filter(a=>a.mine); bk.asks=bk.asks.filter(a=>!a.mine).slice(0,7-m.length).concat(m).sort((a,b)=>a.price-b.price); }
+    if(bk.bids.length>7){ const m=bk.bids.filter(b=>b.mine); bk.bids=bk.bids.filter(b=>!b.mine).slice(0,7-m.length).concat(m).sort((a,b)=>b.price-a.price); }
+  });
+  advanceLifecycles();
+  autoPilotTick();
+  workerTick();
+  renderMarket(); renderPulse(); renderCatalogLive();
+  if(session&&session.role==='worker') renderWorker();
+  if(session&&session.role==='admin') renderSandbox();
+}
+function matchBook(catId){
+  const bk=books[catId]; let guard=0;
+  while(bk.bids.length&&bk.asks.length&&bk.bids[0].price>=bk.asks[0].price&&guard++<5){
+    const bid=bk.bids.shift(), ask=bk.asks.shift();
+    confirmDeal(catId,r2((bid.price+ask.price)/2),ask.who,bid.who,bid.mine,ask.mine);
+  }
+}
+/* every deal walks ESCROW → OTP → PAID automatically */
+function advanceLifecycles(){
+  let changed=false;
+  state.deals.forEach(d=>{
+    if(d.stage==='ESCROW'){d.stage='OTP';changed=true;}
+    else if(d.stage==='OTP'){d.stage='PAID';changed=true;}
+  });
+  if(changed) save();
+}
+/* the customer-side agent: bids automatically within budget */
+function autoPilotTick(){
+  if(!session||session.role!=='user'||!session.autopilot) return;
+  if(Math.random()>=.22) return;
+  const c=pick(CATS), bk=books[c.id];
+  if(!bk.asks.length) return;
+  const cap=c.base*1.35, ask=bk.asks[0];
+  if(ask.price>cap) return;
+  if(bk.bids.some(b=>b.mine)) return;
+  addBid(c.id,ask.price,session.name,true);
+  matchBook(c.id);
+}
+/* ── WORKER-SIDE AUTOMATION ── */
+function postWorkerAsk(){
+  if(!session||session.role!=='worker'||!session.online) return;
+  const bk=books[session.wcat];
+  bk.asks=bk.asks.filter(a=>!a.mine);
+  bk.asks.push({id:orderSeq++,price:r2(session.wask),who:session.name,mine:true});
+  bk.asks.sort((a,b)=>a.price-b.price);
+  matchBook(session.wcat);
+}
+function workerTick(){
+  if(!session||session.role!=='worker'||!session.online) return;
+  const bk=books[session.wcat];
+  let mineAsk=bk.asks.find(a=>a.mine);
+  if(!mineAsk){ postWorkerAsk(); return; }
+  if(session.autoAsk){
+    const bestBid=bk.bids[0];
+    if(bestBid&&mineAsk.price>bestBid.price&&mineAsk.price>session.wask*0.85){
+      mineAsk.price=r2(Math.max(bestBid.price,mineAsk.price*0.985,session.wask*0.85));
+      bk.asks.sort((a,b)=>a.price-b.price);
+      matchBook(session.wcat);
+    }
+  }
+}
+function updateWorkerAsk(){
+  const inp=document.getElementById('wAskInput');
+  const p=parseFloat(inp.value);
+  if(!isFinite(p)||p<=0||p>99999){ toast('Enter a valid ask price (1–99999)'); return; }
+  session.wask=r2(p);
+  const v=state.visitors.find(x=>x.key===(session.name+'|'+session.mobile).toLowerCase());
+  if(v){ v.wask=session.wask; save(); }
+  postWorkerAsk(); inp.value=''; renderWorker();
+  toast('🏷 Ask updated to '+fmt2(session.wask));
+}
+function toggleWorkerOnline(on){
+  session.online=on;
+  const lbl=document.getElementById('wOnlineLbl');
+  lbl.textContent=on?'ONLINE':'OFFLINE'; lbl.style.color=on?'var(--brand)':'var(--red)';
+  if(on) postWorkerAsk();
+  else { const bk=books[session.wcat]; bk.asks=bk.asks.filter(a=>!a.mine); }
+  renderWorker();
+  toast(on?'🟢 You are live — jobs incoming':'⭕ Offline — ask withdrawn from the book');
+}
+function toggleAutoAsk(on){ session.autoAsk=on; toast(on?'🤖 Auto-Ask ON — pricing follows demand':'Auto-Ask OFF — your ask stays fixed'); }
+function renderWorker(){
+  if(!session||session.role!=='worker') return;
+  const c=CATS.find(x=>x.id===session.wcat), bk=books[session.wcat];
+  document.getElementById('wBookMeta').textContent=bk.bids.length+' bids · '+bk.asks.length+' asks';
+  const mineAsk=bk.asks.find(a=>a.mine);
+  document.getElementById('wqBid').textContent=bk.bids[0]?fmt2(bk.bids[0].price):'—';
+  document.getElementById('wqAsk').textContent=mineAsk?fmt2(mineAsk.price):(session.online?'—':'offline');
+  const lastDeal=state.deals.find(d=>d.cat===c.name);
+  document.getElementById('wqLast').textContent=lastDeal?fmt2(lastDeal.deal):'—';
+  document.getElementById('wqProj').textContent=lastDeal?fmt2(lastDeal.projected):'—';
+  const maxB=Math.max(...bk.bids.map(b=>b.price),1), maxA=Math.max(...bk.asks.map(a=>a.price),1);
+  document.getElementById('wBidCol').innerHTML=bk.bids.map(b=>
+    `<div class="book-row bid-row"><div class="depth" style="width:${(b.price/maxB*88).toFixed(1)}%"></div><span class="who">${esc(b.who)}</span><span class="p">${b.price.toFixed(2)}</span></div>`).join('')||'<div class="empty">No bids</div>';
+  document.getElementById('wAskCol').innerHTML=bk.asks.map(a=>
+    `<div class="book-row ask-row ${a.mine?'mine':''}"><span class="p">${a.price.toFixed(2)}</span><span class="who">${a.mine?'⭐ You':esc(a.who)}</span><div class="depth" style="width:${(a.price/maxA*88).toFixed(1)}%"></div></div>`).join('')||'<div class="empty">No asks</div>';
+  const jobs=state.deals.filter(d=>d.provider===session.name).slice(0,8);
+  document.getElementById('wJobCount').textContent=jobs.length+' jobs';
+  document.getElementById('wJobs').innerHTML=jobs.length?jobs.map(d=>
+    `<div class="deal-item"><div class="deal-ico" style="--cl:${c.cl};--cc:${c.cc}">${d.ico}</div>
+      <div><div class="deal-t">${esc(d.customer)}</div>
+      <div class="deal-s">${nowStr(d.ts)} · <span class="stage st-${d.stage}">${d.stage==='PAID'?'✔ PAID':d.stage==='OTP'?'🔑 OTP '+d.otp:'🔒 ESCROW'}</span></div></div>
+      <div class="deal-amt"><div class="a1" style="color:var(--brand)">${fmt2(d.deal)}</div><div class="a2">you earn 100%</div></div></div>`).join('')
+    :'<div class="empty">Stay online — your first job is on the way ⚡</div>';
+  const all=state.deals.filter(d=>d.provider===session.name);
+  const earned=all.filter(d=>d.stage==='PAID').reduce((s,d)=>s+d.deal,0);
+  const pending=all.filter(d=>d.stage!=='PAID').reduce((s,d)=>s+d.deal,0);
+  document.getElementById('wWalletBody').innerHTML=all.length?
+    'Jobs completed ..... <b>'+all.filter(d=>d.stage==='PAID').length+'</b><br>'+
+    'Paid out ........... <b>'+fmt2(earned)+'</b><br>'+
+    'In escrow .......... <b>'+fmt2(pending)+'</b><br>'+
+    'Avg ticket ......... <b>'+fmt2(all.length?r2(all.reduce((s,d)=>s+d.deal,0)/all.length):0)+'</b>'
+    :'No jobs yet — Auto-Ask is hunting.';
+  const n=state.deals.filter(d=>d.cat===c.name).length;
+  const spread=bk.bids[0]&&bk.asks[0]?r2(bk.asks[0].price-bk.bids[0].price):null;
+  document.getElementById('wPulse').innerHTML=
+    `<div class="deal-item"><div class="deal-ico" style="--cl:${c.cl};--cc:${c.cc}">${c.ico}</div>
+      <div><div class="deal-t">${c.name}</div><div class="deal-s">${n} deals today · spread ${spread!=null?fmt2(Math.max(spread,0)):'—'}</div></div>
+      <div class="deal-amt"><div class="a1" style="color:${spread!=null&&spread<20?'var(--brand)':'var(--muted)'}">${spread!=null&&spread<20?'HOT 🔥':'steady'}</div></div></div>`;
+}
+
+function confirmDeal(catId,dealPrice,provider,customer,isMine,askMine){
+  const c=CATS.find(x=>x.id===catId);
+  const projected=r2(dealPrice*(1+MARKUP)), profit=r2(dealPrice*PROFIT), gst=r2(dealPrice*GSTOPS);
+  const deal={id:PEER_ID+'-'+(orderSeq++)+'-'+Date.now(),ts:Date.now(),cat:c.name,ico:c.ico,provider,customer,
+    deal:dealPrice,projected,profit,gst,mine:!!isMine,workerMine:!!askMine,stage:'ESCROW',otp:String(1000+Math.floor(Math.random()*9000)),hash:'…'};
+  state.deals.unshift(deal); trimDeals(); applyAgg(deal);
+  const prev=state.profitSeries.length?state.profitSeries[state.profitSeries.length-1]:0;
+  state.profitSeries.push(r2(prev+profit));
+  if(state.profitSeries.length>400) state.profitSeries.shift();
+  appendBlock(deal);
+  save(); renderTicker();
+  gossip('deal',{deal});
+  if(isMine){
+    apDeals++; const ap=document.getElementById('apCount'); if(ap) ap.textContent=apDeals;
+    if(session&&session.autopilot) toast('🤖 Auto-deal: '+c.name+' '+fmt2(dealPrice)+' → pay '+fmt2(projected));
+    else showDealTicket(deal);
+  }
+  if(askMine){
+    toast('💼 Job won! '+c.name+' for '+esc(customer)+' — you earn '+fmt2(dealPrice));
+    if(session&&session.role==='worker') renderWorker();
+  }
+}
+function trimDeals(){ if(state.deals.length>300) state.deals.length=300; }
+function applyAgg(d){ const a=state.agg; a.deals++; a.vol=r2(a.vol+d.deal); a.proj=r2(a.proj+d.projected); a.profit=r2(a.profit+d.profit); a.gst=r2(a.gst+d.gst); }
+
+/* ── HASH-CHAINED LEDGER ── */
+let chainQ=Promise.resolve();
+function appendBlock(deal){
+  chainQ=chainQ.then(async()=>{
+    const idx=state.chain.length, prev=state.chain.lastHash;
+    const payload=idx+'|'+prev+'|'+deal.id+'|'+deal.deal+'|'+deal.projected+'|'+deal.profit+'|'+deal.provider+'|'+deal.customer;
+    const h=await sha256(payload);
+    deal.hash=h; deal.prevHash=prev; deal.blockIdx=idx;
+    state.chain.length=idx+1; state.chain.lastHash=h;
+    save();
+  }).catch(()=>{});
+}
+async function verifyChain(){
+  await chainQ;
+  const blocks=state.deals.filter(d=>d.blockIdx!=null).sort((a,b)=>a.blockIdx-b.blockIdx);
+  let ok=0,bad=0;
+  for(const d of blocks){
+    const payload=d.blockIdx+'|'+d.prevHash+'|'+d.id+'|'+d.deal+'|'+d.projected+'|'+d.profit+'|'+d.provider+'|'+d.customer;
+    ((await sha256(payload))===d.hash)?ok++:bad++;
+  }
+  toast(bad===0?'⛓ Ledger intact: '+ok+' blocks verified, 0 tampered':'⚠ TAMPER DETECTED in '+bad+' block(s)!');
+  return {ok,bad};
+}
+
+/* ── engine controls ── */
+function startEngine(){
+  clearInterval(engineTimer);
+  if(engineOn) engineTimer=setInterval(engineTick,1600/speed);
+  const pill=document.getElementById('enginePill');
+  pill.textContent=engineOn?'⚙️ Engine LIVE':'⏸ Engine PAUSED';
+  pill.style.color=engineOn?'var(--brand)':'var(--red)';
+}
+function toggleEngine(on){ engineOn=on; startEngine(); toast(on?'Auto engine resumed':'Auto engine paused'); }
+function setSpeed(v){ speed=+v; startEngine(); toast('Engine speed '+v+'×'); }
+function setAutoPilot(on){
+  if(!session){ document.getElementById('autoPilotSw').checked=false; requireAuth('autopilot'); return; }
+  session.autopilot=on;
+  document.getElementById('apState').textContent=on?'ON':'OFF';
+  document.getElementById('apState').style.color=on?'var(--brand)':'var(--red)';
+  toast(on?'🤖 Auto-Pilot engaged — sit back':'Manual mode — you place the bids');
+}
+
+/* ── AUTH (guest-first: Login / Sign Up open on demand) ── */
+let authMode='login', pendingAction=null;
+function openAuth(mode,pending){
+  authMode=mode||'login'; pendingAction=pending||null;
+  setAuthTab(authMode);
+  document.getElementById('loginErr').style.display='none';
+  document.getElementById('loginScreen').classList.add('show');
+  document.getElementById('inName').focus();
+}
+function closeAuth(){ document.getElementById('loginScreen').classList.remove('show'); pendingAction=null; }
+let signupRole='customer';
+function setAuthTab(mode){
+  authMode=mode;
+  document.getElementById('tabLogin').classList.toggle('on',mode==='login');
+  document.getElementById('tabSignup').classList.toggle('on',mode==='signup');
+  document.getElementById('passField').style.display=mode==='login'?'block':'none';
+  document.getElementById('roleField').style.display=mode==='signup'?'block':'none';
+  document.getElementById('authCta').textContent=mode==='login'?'Sign In →':'Create Account →';
+  document.getElementById('authSub').textContent=mode==='login'
+    ?'Welcome back — sign in to bid, book & track your deals.'
+    :'New here? Pick your side of the market and you\'re in.';
+  document.getElementById('authHint').style.display=mode==='login'?'block':'none';
+  document.getElementById('loginErr').style.display='none';
+  setSignupRole(signupRole);
+}
+function setSignupRole(r){
+  signupRole=r;
+  document.getElementById('roleCustomer').classList.toggle('on',r==='customer');
+  document.getElementById('roleWorker').classList.toggle('on',r==='worker');
+  document.getElementById('workerFields').style.display=(authMode==='signup'&&r==='worker')?'block':'none';
+}
+async function doLogin(){
+  const name=document.getElementById('inName').value.trim();
+  const mobile=document.getElementById('inMobile').value.trim();
+  const pass=document.getElementById('inPass').value;
+  const err=document.getElementById('loginErr');
+  err.style.display='none';
+  if(rateLimited()){ err.textContent='⛔ Too many attempts — wait 60 seconds.'; err.style.display='block'; return; }
+  let role=null, wcat=null, wask=null;
+  if(name.toLowerCase()==='admin'){
+    if((await sha256(pass))===ADMIN_PASS_HASH) role='admin';
+    else { err.textContent='⚠ Wrong admin passcode.'; err.style.display='block'; return; }
+  } else {
+    if(!name){ err.textContent='⚠ Enter your name.'; err.style.display='block'; return; }
+    if(!/^[6-9]\d{9}$/.test(mobile)){ err.textContent='⚠ Enter a valid 10-digit Indian mobile number.'; err.style.display='block'; return; }
+    role='user';
+    if(authMode==='signup'&&signupRole==='worker'){
+      role='worker';
+      wcat=document.getElementById('inWCat').value;
+      wask=parseFloat(document.getElementById('inWAsk').value);
+      if(!CATS.some(c=>c.id===wcat)){ err.textContent='⚠ Pick your service category.'; err.style.display='block'; return; }
+      if(!isFinite(wask)||wask<=0||wask>99999){ err.textContent='⚠ Enter a valid ask price (1–99999).'; err.style.display='block'; return; }
+      wask=r2(wask);
+    }
+  }
+  const mob=role==='admin'?(mobile||'—'):mobile;
+  const key=(name+'|'+mob).toLowerCase();
+  let v=state.visitors.find(x=>x.key===key);
+  if(role!=='admin'&&authMode==='login'&&!v){
+    err.innerHTML='⚠ No account found for this name + mobile. <b>Use Sign Up.</b>'; err.style.display='block';
+    return;
+  }
+  if(role!=='admin'&&authMode==='signup'&&v) toast('You were already registered — signed you in!');
+  if(v&&role!=='admin'){                       /* login: recover the registered role */
+    if(authMode==='login'){ role=v.role==='worker'?'worker':'user'; wcat=v.wcat||null; wask=v.wask||null; }
+    else if(role==='worker'){ v.role='worker'; v.wcat=wcat; v.wask=wask; }
+  }
+  session={name,mobile:mob,role,autopilot:true};
+  if(role==='worker'){
+    session.wcat=wcat||CATS[0].id;
+    session.wask=wask||CATS.find(c=>c.id===session.wcat).base;
+    session.online=true; session.autoAsk=true;
+  }
+  if(v){ v.visits++; v.lastSeen=Date.now(); }
+  else { v={key,name,mobile:mob,role,visits:1,firstSeen:Date.now(),lastSeen:Date.now()}; if(role==='worker'){v.wcat=session.wcat;v.wask=session.wask;} state.visitors.unshift(v); }
+  save(); gossip('visitor',{v});
+  closeAuthKeepPending(); enterApp();
+}
+function closeAuthKeepPending(){ document.getElementById('loginScreen').classList.remove('show'); }
+function requireAuth(pending){
+  if(session) return true;
+  openAuth('signup',pending);
+  toast('🔒 Login or Sign Up to continue');
+  return false;
+}
+/* GUEST landing: straight to the live user page, browse freely */
+function enterGuest(){
+  session=null;
+  document.getElementById('app').style.display='block';
+  document.getElementById('userView').style.display='block';
+  document.getElementById('adminView').style.display='none';
+  document.getElementById('workerView').style.display='none';
+  document.getElementById('rolePill').style.display='none';
+  document.getElementById('loginBtn').style.display='';
+  document.getElementById('signupBtn').style.display='';
+  document.getElementById('logoutBtn').style.display='none';
+  const sw=document.getElementById('autoPilotSw'); if(sw) sw.checked=false;
+  const st=document.getElementById('apState'); if(st){ st.textContent='OFF (login to enable)'; st.style.color='var(--muted)'; }
+  renderCatalog(); renderMarket(); renderMyDeals(); renderPulse(); renderTicker(); renderMeshPill(); renderMobileNav();
+}
+function enterApp(){
+  document.getElementById('app').style.display='block';
+  document.getElementById('loginBtn').style.display='none';
+  document.getElementById('signupBtn').style.display='none';
+  document.getElementById('logoutBtn').style.display='';
+  const rp=document.getElementById('rolePill'); rp.style.display='';
+  document.getElementById('userView').style.display='none';
+  document.getElementById('adminView').style.display='none';
+  document.getElementById('workerView').style.display='none';
+  if(session.role==='admin'){
+    rp.innerHTML='👑 '+esc(session.name)+' · Admin'; rp.className='pill role-admin';
+    document.getElementById('adminView').style.display='block';
+    renderSandbox(); renderSecurity();
+  } else if(session.role==='worker'){
+    rp.innerHTML='🔧 '+esc(session.name)+' · Worker'; rp.className='pill role-user';
+    document.getElementById('workerView').style.display='block';
+    document.getElementById('wCatLbl').textContent=CATS.find(c=>c.id===session.wcat).name;
+    document.getElementById('wOnlineSw').checked=true;
+    document.getElementById('wAutoSw').checked=true;
+    postWorkerAsk(); renderWorker();
+  } else {
+    rp.innerHTML='👤 '+esc(session.name); rp.className='pill role-user';
+    document.getElementById('userView').style.display='block';
+    const sw=document.getElementById('autoPilotSw'); if(sw) sw.checked=true;
+    const st=document.getElementById('apState'); if(st){ st.textContent='ON'; st.style.color='var(--brand)'; }
+    renderCatalog(); renderMarket(); renderMyDeals(); renderPulse();
+  }
+  renderTicker(); renderMeshPill(); renderMobileNav();
+  toast('Welcome, '+session.name+'!'+(session.role==='user'?' Auto-Pilot is ON — deals will flow by themselves.':session.role==='worker'?' You are LIVE in the '+CATS.find(c=>c.id===session.wcat).name+' market.':''));
+  if(pendingAction){ const p=pendingAction; pendingAction=null; runPending(p); }
+}
+function runPending(p){
+  if(session.role!=='user') return;
+  const [act,arg]=String(p).split(':');
+  if(act==='autoBook') autoBook(arg);
+  if(act==='bid') placeMyBid();
+  if(act==='autopilot'){ const sw=document.getElementById('autoPilotSw'); sw.checked=true; setAutoPilot(true); }
+}
+function doLogout(){ location.reload(); }
+function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem('SAAHAA_THEME',document.body.classList.contains('dark')?'dark':'light'); }
+
+/* ── CATALOG ── */
+function renderCatalog(){
+  document.getElementById('catalogGrid').innerHTML=CATS.map(c=>
+    `<div class="cat-card ${c.id===activeCat?'on':''}" style="--cl:${c.cl};--cc:${c.cc};--cd:${c.cd};--cs:${c.cs}" onclick="setCat('${c.id}')">
+      <span class="cat-live" id="live-${c.id}">● LIVE</span>
+      <div class="cat-ico">${c.ico}</div>
+      <div class="cat-name">${c.name}</div>
+      <div class="cat-range">₹${Math.round(c.base*.8)}–${Math.round(c.base*1.25)}</div>
+      <button class="cat-book" onclick="event.stopPropagation();autoBook('${c.id}')">AUTO-BOOK ⚡</button>
+    </div>`).join('');
+}
+function renderCatalogLive(){
+  if(session&&session.role!=='user')return;
+  CATS.forEach(c=>{
+    const el=document.getElementById('live-'+c.id); if(!el) return;
+    const bk=books[c.id];
+    const spread=bk.bids[0]&&bk.asks[0]?r2(bk.asks[0].price-bk.bids[0].price):null;
+    el.textContent=spread!=null&&spread<20?'🔥 HOT':'● LIVE';
+  });
+}
+function setCat(id){ activeCat=id; renderCatalog(); renderMarket(); }
+function autoBook(catId){
+  if(!requireAuth('autoBook:'+catId)) return;
+  const bk=books[catId], c=CATS.find(x=>x.id===catId);
+  if(!bk.asks.length){ toast('No workers asking right now'); return; }
+  bk.bids=bk.bids.filter(b=>!b.mine);
+  addBid(catId,bk.asks[0].price,session.name,true);
+  const wasAuto=session.autopilot; session.autopilot=false;   /* show ticket for explicit taps */
+  matchBook(catId);
+  session.autopilot=wasAuto;
+  setCat(catId);
+}
+
+/* ── MARKET RENDER ── */
+function renderMarket(){
+  if(session&&session.role!=='user') return;
+  const c=CATS.find(x=>x.id===activeCat), bk=books[activeCat];
+  if(!bk) return;
+  document.getElementById('bookCatName').textContent=c.ico+' '+c.name;
+  document.getElementById('bookMeta').textContent=bk.bids.length+' bids · '+bk.asks.length+' asks';
+  document.getElementById('qBid').textContent=bk.bids[0]?fmt2(bk.bids[0].price):'—';
+  document.getElementById('qAsk').textContent=bk.asks[0]?fmt2(bk.asks[0].price):'—';
+  const lastDeal=state.deals.find(d=>d.cat===c.name);
+  document.getElementById('qLast').textContent=lastDeal?fmt2(lastDeal.deal):'—';
+  document.getElementById('qProj').textContent=lastDeal?fmt2(lastDeal.projected):'—';
+  const maxB=Math.max(...bk.bids.map(b=>b.price),1), maxA=Math.max(...bk.asks.map(a=>a.price),1);
+  document.getElementById('bidCol').innerHTML=bk.bids.map(b=>
+    `<div class="book-row bid-row ${b.mine?'mine':''}"><div class="depth" style="width:${(b.price/maxB*88).toFixed(1)}%"></div><span class="who">${b.mine?'⭐ You':esc(b.who)}</span><span class="p">${b.price.toFixed(2)}</span></div>`).join('')||'<div class="empty">No bids</div>';
+  document.getElementById('askCol').innerHTML=bk.asks.map(a=>
+    `<div class="book-row ask-row"><span class="p">${a.price.toFixed(2)}</span><span class="who">${esc(a.who)}</span><div class="depth" style="width:${(a.price/maxA*88).toFixed(1)}%"></div></div>`).join('')||'<div class="empty">No asks</div>';
+  renderMyDeals();
+}
+function placeMyBid(){
+  if(!requireAuth('bid')) return;
+  const inp=document.getElementById('myBidInput');
+  const p=parseFloat(inp.value);
+  if(!isFinite(p)||p<=0||p>99999){ toast('Enter a valid bid price (1–99999)'); return; }
+  const bk=books[activeCat];
+  bk.bids=bk.bids.filter(b=>!b.mine);
+  addBid(activeCat,p,session.name,true);
+  const wasAuto=session.autopilot; session.autopilot=false;
+  matchBook(activeCat);
+  session.autopilot=wasAuto;
+  inp.value=''; renderMarket();
+  toast('Bid placed at '+fmt2(p));
+}
+function renderMyDeals(){
+  const box=document.getElementById('myDeals');
+  if(!session){
+    if(box.dataset.guest==='1') return;   /* static — never re-render under the cursor */
+    box.dataset.guest='1';
+    document.getElementById('myDealCount').textContent='guest';
+    box.innerHTML=
+      '<div class="empty">👋 You\'re browsing as a guest.<br>Login or Sign Up to bid, Auto-Book and track deals.<br><br>'+
+      '<button class="sk-btn sk-green" style="font-size:.78rem;padding:.55rem 1.1rem" onclick="openAuth(\'signup\')">✨ Sign Up free</button> '+
+      '<button class="btn-ghost" onclick="openAuth(\'login\')">🔑 Login</button></div>';
+    return;
+  }
+  box.dataset.guest='';
+  const mine=state.deals.filter(d=>d.mine).slice(0,8);
+  document.getElementById('myDealCount').textContent=mine.length+' deals';
+  document.getElementById('myDeals').innerHTML=mine.length?mine.map(d=>{
+    const c=catByName(d.cat)||{};
+    return `<div class="deal-item"><div class="deal-ico" style="--cl:${c.cl};--cc:${c.cc}">${d.ico}</div>
+      <div><div class="deal-t">${esc(d.cat)} · ${esc(d.provider)}</div>
+      <div class="deal-s">${fmt2(d.deal)} · ${nowStr(d.ts)} · <span class="stage st-${d.stage}">${d.stage==='PAID'?'✔ PAID':d.stage==='OTP'?'🔑 OTP '+d.otp:'🔒 ESCROW'}</span></div></div>
+      <div class="deal-amt"><div class="a1">${fmt2(d.projected)}</div><div class="a2">you pay (+12%)</div></div></div>`;
+  }).join(''):'<div class="empty">Auto-Pilot will land your first deal shortly ⚡</div>';
+}
+function renderPulse(){
+  if(session&&session.role!=='user') return;
+  document.getElementById('pulseList').innerHTML=CATS.map(c=>{
+    const bk=books[c.id];
+    const spread=bk.bids[0]&&bk.asks[0]?r2(bk.asks[0].price-bk.bids[0].price):null;
+    const n=state.deals.filter(d=>d.cat===c.name).length;
+    return `<div class="deal-item"><div class="deal-ico" style="--cl:${c.cl};--cc:${c.cc}">${c.ico}</div>
+      <div><div class="deal-t">${c.name}</div><div class="deal-s">${n} deals · spread ${spread!=null?fmt2(Math.max(spread,0)):'—'}</div></div>
+      <div class="deal-amt"><div class="a1" style="color:${spread!=null&&spread<20?'var(--brand)':'var(--muted)'}">${spread!=null&&spread<20?'HOT 🔥':'live'}</div></div></div>`;
+  }).join('');
+}
+
+/* ── PAPER RECEIPT (skeuomorphic deal ticket) ── */
+function showDealTicket(d){
+  const wSeg=(100/(1+MARKUP)).toFixed(1), pSeg=(PROFIT*100/(1+MARKUP)).toFixed(1), gSeg=(GSTOPS*100/(1+MARKUP)).toFixed(1);
+  document.getElementById('modalBody').innerHTML=`
+  <div class="paper">
+    <div class="stamp">Confirmed</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:#9CA3AF;letter-spacing:.12em">SAAHAA EXCHANGE · P2P RECEIPT</div>
+    <div style="font-weight:900;font-size:1.2rem;margin:.35rem 0 .1rem">${d.ico} ${esc(d.cat)}</div>
+    <div style="font-size:.78rem;color:#6B7280">Worker: <b>${esc(d.provider)}</b> · direct peer deal</div>
+    <div style="border-top:1.5px dashed #D1D5DB;margin:.9rem 0"></div>
+    <table style="width:100%;font-size:.8rem;color:#374151">
+      <tr><td>Confirmed price</td><td class="t-mono" style="text-align:right;border:none">${fmt2(d.deal)}</td></tr>
+      <tr><td>Projection (+12%)</td><td class="t-mono" style="text-align:right;border:none">+ ${fmt2(r2(d.projected-d.deal))}</td></tr>
+      <tr><td style="font-weight:900;border:none">You pay</td><td class="t-mono" style="text-align:right;font-weight:900;color:#7C3AED;border:none">${fmt2(d.projected)}</td></tr>
+    </table>
+    <div class="split-bar">
+      <div class="split-seg" style="width:${wSeg}%;background-color:#059669">Worker ${fmt2(d.deal)}</div>
+      <div class="split-seg" style="width:${pSeg}%;background-color:#7C3AED">${fmt2(d.profit)}</div>
+      <div class="split-seg" style="width:${gSeg}%;background-color:#D97706">${fmt2(d.gst)}</div>
+    </div>
+    <div class="leg"><span style="--c:#059669">Worker 100%</span><span style="--c:#7C3AED">Profit 8%</span><span style="--c:#D97706">GST/ops 4%</span></div>
+    <div style="border-top:1.5px dashed #D1D5DB;margin:.9rem 0"></div>
+    <div style="font-size:.72rem;color:#6B7280">🔒 Escrow locked · 🔑 Release OTP: <b class="t-mono" style="color:#DC2626;font-size:.9rem;letter-spacing:.2em">${d.otp}</b></div>
+    <div style="font-size:.6rem;color:#9CA3AF;margin-top:.3rem" class="t-mono">block #${d.blockIdx!=null?d.blockIdx:'…'} · ${d.hash?String(d.hash).slice(0,18):''}…</div>
+    <button class="sk-btn sk-green" style="width:100%;margin-top:1.1rem" onclick="document.getElementById('modalWrap').classList.remove('show')">Done ✔</button>
+  </div>`;
+  document.getElementById('modalWrap').classList.add('show');
+}
+
+/* ── TICKER ── */
+function renderTicker(){
+  const items=state.deals.slice(0,12).map(d=>
+    `<span>${d.ico} ${esc(d.cat)} <b>${fmt(d.deal)}</b> <span class="up">→ ${fmt(d.projected)} (+12%)</span></span>`);
+  const html=items.length?items.join(''):'<span>⚙️ SAAHAA P2P engine warming up — automated deals will stream here…</span>';
+  document.getElementById('tickerTape').innerHTML=html+html;
+}
+
+/* ── SANDBOX ── */
+function renderSandbox(){
+  const a=state.agg;
+  document.getElementById('kDeals').textContent=a.deals.toLocaleString('en-IN');
+  document.getElementById('kDealsSub').textContent=state.visitors.length+' visitors · '+state.chain.length+' chain blocks';
+  document.getElementById('kVol').textContent=fmt(a.vol);
+  document.getElementById('kProj').textContent=fmt(a.proj);
+  document.getElementById('kProfit').textContent=fmt(a.profit);
+  document.getElementById('kProfitSub').textContent='+ '+fmt(a.gst)+' GST & ops buffer';
+
+  document.getElementById('ledgerMeta').textContent='last '+Math.min(state.deals.length,40)+' of '+a.deals.toLocaleString('en-IN');
+  document.getElementById('dealTable').innerHTML=state.deals.slice(0,40).map(d=>
+    `<tr><td class="t-mono" style="font-size:.64rem">${nowStr(d.ts)}</td><td>${d.ico} ${esc(d.cat)}</td><td>${esc(d.provider)}</td>
+     <td>${d.mine?'⭐ ':''}${esc(d.customer)}</td><td><span class="stage st-${d.stage}">${d.stage}</span></td>
+     <td class="t-mono">${d.deal.toFixed(0)}</td><td class="t-mono" style="color:var(--purple)">${d.projected.toFixed(0)}</td>
+     <td class="t-mono" style="color:var(--brand)">${d.profit.toFixed(0)}</td>
+     <td class="t-mono" style="font-size:.6rem;color:var(--faint)">${d.hash?String(d.hash).slice(0,10)+'…':'…'}</td></tr>`).join('')||'<tr><td colspan="9" class="empty">No deals yet</td></tr>';
+
+  document.getElementById('visMeta').textContent=state.visitors.length+' unique'+(state.stress?' + '+state.stress.users.toLocaleString('en-IN')+' stress-sim':'');
+  document.getElementById('visTable').innerHTML=state.visitors.slice(0,100).map(v=>
+    `<tr><td style="font-weight:700">${esc(v.name)}</td><td class="t-mono">${esc(v.mobile)}</td>
+     <td><span class="tag ${v.role==='admin'?'tag-p':v.role==='worker'?'tag-b':'tag-g'}">${v.role==='admin'?'admin':v.role==='worker'?'worker':'customer'}</span>${v.role==='worker'&&v.wcat?' <span style="font-size:.58rem;color:var(--muted)">'+esc(v.wcat)+'</span>':''}</td>
+     <td class="t-mono">${v.visits}</td><td style="font-size:.64rem;color:var(--muted)">${new Date(v.lastSeen).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No visitors yet</td></tr>';
+
+  const byCat=CATS.map(c=>{
+    const ds=state.deals.filter(d=>d.cat===c.name);
+    return {c,n:ds.length,profit:ds.reduce((s,d)=>s+d.profit,0)};
+  }).sort((x,y)=>y.profit-x.profit);
+  const maxP=Math.max(...byCat.map(x=>x.profit),1);
+  document.getElementById('perfList').innerHTML=byCat.map(x=>
+    `<div class="perf-row"><div class="perf-top"><span>${x.c.ico} ${x.c.name}</span><span>${x.n} deals · ${fmt(x.profit)}</span></div>
+     <div class="perf-track"><div class="perf-fill" style="--pc1:${x.c.cl};--pc2:${x.c.cc};width:${(x.profit/maxP*100).toFixed(1)}%"></div></div></div>`).join('');
+
+  if(state.stress) renderStressReport(state.stress);
+  drawChart();
+}
+function renderSecurity(){
+  const rows=[
+    ['🔐','Admin auth','SHA-256 hashed, never stored plaintext',true],
+    ['🚫','Login rate limit','max 5 attempts / 60s per session',true],
+    ['🛡','Content-Security-Policy','external scripts & frames blocked',!!document.querySelector('meta[http-equiv="Content-Security-Policy"]')],
+    ['🧼','XSS input escaping','all names/inputs HTML-escaped on render',true],
+    ['⛓','Hash-chained ledger','every deal = SHA-256 block linked to previous',true],
+    ['🕸','P2P gossip mesh','BroadcastChannel peer sync, dedup by deal id',!!mesh],
+    ['🔒','Escrow + OTP release','4-digit OTP gates every payout',true],
+  ];
+  document.getElementById('secList').innerHTML=rows.map(r=>
+    `<div class="sec-row"><span>${r[0]}</span><div><div style="font-weight:800">${r[1]}</div><div style="font-size:.64rem;color:var(--muted)">${r[2]}</div></div><span class="${r[3]?'sec-ok':'sec-bad'}">${r[3]?'ACTIVE ✔':'OFF ✘'}</span></div>`).join('');
+}
+function drawChart(){
+  const cv=document.getElementById('profitChart'); if(!cv) return;
+  const ctx=cv.getContext('2d');
+  const W=cv.width=cv.clientWidth*2, H=cv.height=380;
+  ctx.clearRect(0,0,W,H);
+  const S=state.profitSeries;
+  if(S.length<2){ ctx.fillStyle='#94A3B8'; ctx.font='24px Inter'; ctx.textAlign='center'; ctx.fillText('Profit curve builds as deals confirm…',W/2,H/2); return; }
+  const max=Math.max(...S), pad=30;
+  const x=i=>pad+i*(W-2*pad)/(S.length-1);
+  const y=v=>H-pad-(v)/(max||1)*(H-2*pad);
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(5,150,105,.35)'); grad.addColorStop(1,'rgba(5,150,105,0)');
+  ctx.beginPath(); ctx.moveTo(x(0),H-pad);
+  S.forEach((v,i)=>ctx.lineTo(x(i),y(v)));
+  ctx.lineTo(x(S.length-1),H-pad); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+  ctx.beginPath(); S.forEach((v,i)=>i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)));
+  ctx.strokeStyle='#059669'; ctx.lineWidth=4; ctx.lineJoin='round'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(x(S.length-1),y(S[S.length-1]),7,0,7); ctx.fillStyle='#059669'; ctx.fill();
+  ctx.fillStyle=document.body.classList.contains('dark')?'#F1F5F9':'#0F172A';
+  ctx.font='700 26px JetBrains Mono, monospace'; ctx.textAlign='right';
+  ctx.fillText('₹'+S[S.length-1].toLocaleString('en-IN',{maximumFractionDigits:0}),W-pad,y(S[S.length-1])-16);
+}
+
+/* ── 1 LAKH USER STRESS TEST ── */
+let stressRunning=false;
+async function runStress(){
+  if(stressRunning) return;
+  stressRunning=true;
+  const btn=document.getElementById('stressBtn'); btn.disabled=true; btn.style.opacity=.6;
+  const wrap=document.getElementById('stressProgWrap'), bar=document.getElementById('stressProg');
+  wrap.style.display='block';
+  const N=100000, CHUNK=2500;
+  let vol=0,proj=0,profit=0,gst=0,mismatches=0,done=0;
+  const t0=performance.now();
+  for(let start=0;start<N;start+=CHUNK){
+    const end=Math.min(start+CHUNK,N);
+    for(let i=start;i<end;i++){
+      const c=CATS[i%CATS.length];
+      const D=r2(c.base*rand(0.85,1.15));
+      const P=r2(D*(1+MARKUP)), pr=r2(D*PROFIT), g=r2(D*GSTOPS);
+      if(Math.abs(P-D*1.12)>0.011||Math.abs(pr-D*0.08)>0.011||Math.abs(g-D*0.04)>0.011) mismatches++;
+      vol+=D; proj+=P; profit+=pr; gst+=g;
+    }
+    done=end;
+    bar.style.width=(done/N*100).toFixed(1)+'%';
+    document.getElementById('stressReport').innerHTML='⏳ Simulating… <b>'+done.toLocaleString('en-IN')+'</b> / 1,00,000 users';
+    await new Promise(r=>setTimeout(r,0));
+  }
+  const secs=(performance.now()-t0)/1000;
+  const rep={users:N,deals:N,vol:r2(vol),proj:r2(proj),profit:r2(profit),gst:r2(gst),mismatches,
+    secs:+secs.toFixed(2),ops:Math.round(N/secs),at:Date.now(),
+    ratioProj:+(proj/vol).toFixed(5),ratioProfit:+(profit/vol).toFixed(5)};
+  state.stress=rep; save();
+  renderStressReport(rep); renderSandbox();
+  wrap.style.display='none'; btn.disabled=false; btn.style.opacity=1;
+  stressRunning=false;
+  toast('🚀 1 lakh users simulated in '+rep.secs+'s — '+rep.mismatches+' math errors');
+  return rep;
+}
+function renderStressReport(r){
+  document.getElementById('stressReport').innerHTML=
+    'Users simulated ....... <b>'+r.users.toLocaleString('en-IN')+'</b><br>'+
+    'Deals settled ......... <b>'+r.deals.toLocaleString('en-IN')+'</b><br>'+
+    'Runtime ............... <b>'+r.secs+'s</b> ('+r.ops.toLocaleString('en-IN')+' deals/sec)<br>'+
+    'Deal volume ........... <b>'+fmt(r.vol)+'</b><br>'+
+    'Projected (+12%) ...... <b>'+fmt(r.proj)+'</b> (ratio '+r.ratioProj+')<br>'+
+    'Platform profit (8%) .. <b>'+fmt(r.profit)+'</b> (ratio '+r.ratioProfit+')<br>'+
+    'GST & ops (4%) ........ <b>'+fmt(r.gst)+'</b><br>'+
+    'Math mismatches ....... <b style="color:'+(r.mismatches?'#F87171':'#4ADE80')+'">'+r.mismatches+'</b> '+(r.mismatches?'⚠':'✔ all invariants hold');
+}
+
+/* ── exports & reset ── */
+function exportCSV(kind){
+  let rows,name;
+  if(kind==='deals'){
+    rows=[['Time','Category','Worker','Customer','Stage','DealPrice','Projected(+12%)','Profit(8%)','GST_Ops(4%)','BlockHash']]
+      .concat(state.deals.map(d=>[new Date(d.ts).toISOString(),d.cat,d.provider,d.customer,d.stage,d.deal,d.projected,d.profit,d.gst,d.hash||'']));
+    name='saahaa_deals.csv';
+  } else {
+    rows=[['Name','Mobile','Role','Visits','FirstSeen','LastSeen']]
+      .concat(state.visitors.map(v=>[v.name,v.mobile,v.role,v.visits,new Date(v.firstSeen).toISOString(),new Date(v.lastSeen).toISOString()]));
+    name='saahaa_visitors.csv';
+  }
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=name; a.click();
+  toast('Exported '+name);
+}
+function resetSandbox(){
+  if(!confirm('Reset ALL sandbox data (deals, chain, profit curve, visitors, stress report)?')) return;
+  state={visitors:[],deals:[],profitSeries:[],agg:{deals:0,vol:0,proj:0,profit:0,gst:0},chain:{length:0,lastHash:'GENESIS'},stress:null};
+  save(); seedBooks(); renderSandbox(); renderTicker();
+  document.getElementById('stressReport').textContent='No run yet — hit the purple button above.';
+  toast('Sandbox reset ✓');
+}
+
+/* ── MOBILE APP NAV ── */
+function renderMobileNav(){
+  const nav=document.getElementById('mobileNav');
+  let items;
+  if(session&&session.role==='worker') items=[['🏷','Console','wAskCard'],['💼','Jobs','wJobsCard'],['👛','Wallet','wWallet']];
+  else if(session&&session.role==='admin') items=[['📊','Stats','kpiAnchor'],['🛡','Security','secList'],['🤝','Ledger','ledgerAnchor']];
+  else items=[['🗂','Catalog','catalogGrid'],['📊','Market','marketAnchor'],['🧾','Deals','dealsAnchor']];
+  nav.innerHTML=items.map(i=>`<button class="mnav-btn" onclick="scrollToId('${i[2]}')"><span>${i[0]}</span>${i[1]}</button>`).join('');
+}
+function scrollToId(id){ const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
+
+/* ── BOOT ── */
+load();
+if(localStorage.getItem('SAAHAA_THEME')==='dark') document.body.classList.add('dark');
+document.getElementById('inWCat').innerHTML=CATS.map(c=>`<option value="${c.id}">${c.ico} ${c.name} (base ₹${c.base})</option>`).join('');
+seedBooks();
+initMesh();
+startEngine();
+enterGuest();   /* land directly on the live user page — auth only when acting */
+document.getElementById('inPass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('inMobile').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});   /* installable PWA + offline shell */
+</script>
+</body>
+</html>

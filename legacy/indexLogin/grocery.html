@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<title>SAHA Grocery</title>
+
+<link rel="stylesheet" href="grocery.css">
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+</head>
+
+<body>
+
+<!--================ HEADER =================-->
+
+<header class="top-header">
+
+<div class="back">
+
+<a href="home.html">
+
+<i class="fa-solid fa-arrow-left"></i>
+
+</a>
+
+<h2>SAHA Grocery</h2>
+
+</div>
+
+<div class="cart">
+
+<i class="fa-solid fa-cart-shopping"></i>
+
+<span id="cartCount">0</span>
+
+</div>
+
+</header>
+
+<!--================ SEARCH =================-->
+
+<section class="search">
+
+<div class="search-box">
+
+<i class="fa-solid fa-search"></i>
+
+<input
+type="text"
+placeholder="Search groceries...">
+
+</div>
+
+</section>
+
+<!--================ CATEGORIES =================-->
+
+<section>
+
+<h2>Categories</h2>
+
+<div class="category-row">
+
+<div class="category-card">
+
+🥛
+
+<p>Milk</p>
+
+</div>
+
+<div class="category-card">
+
+🍎
+
+<p>Fruits</p>
+
+</div>
+
+<div class="category-card">
+
+🍅
+
+<p>Vegetables</p>
+
+</div>
+
+<div class="category-card">
+
+🍚
+
+<p>Rice</p>
+
+</div>
+
+<div class="category-card">
+
+🛢
+
+<p>Oil</p>
+
+</div>
+
+<div class="category-card">
+
+🍪
+
+<p>Snacks</p>
+
+</div>
+
+</div>
+
+</section>
+
+<!--================ PRODUCTS =================-->
+
+<section>
+
+<h2>Today's Deals</h2>
+
+<div class="product-grid">
+
+<!-- Product -->
+
+<div class="product-card">
+
+<div class="fav">
+
+<i class="fa-regular fa-heart"></i>
+
+</div>
+
+<div class="product-image">
+
+🥛
+
+</div>
+
+<h3>Amul Milk</h3>
+
+<p>500 ml</p>
+
+<div class="rating">
+
+⭐⭐⭐⭐⭐
+
+</div>
+
+<h4>₹32</h4>
+
+<button>Add</button>
+
+</div>
+
+<!-- Product -->
+
+<div class="product-card">
+
+<div class="fav">
+
+<i class="fa-regular fa-heart"></i>
+
+</div>
+
+<div class="product-image">
+
+🍅
+
+</div>
+
+<h3>Tomato</h3>
+
+<p>1 Kg</p>
+
+<div class="rating">
+
+⭐⭐⭐⭐☆
+
+</div>
+
+<h4>₹45</h4>
+<button onclick="addToCart('Light Installation',199)">
+Add
+</button>
+
+</div>
+
+<!-- Product -->
+
+<div class="product-card">
+
+<div class="fav">
+
+<i class="fa-regular fa-heart"></i>
+
+</div>
+
+<div class="product-image">
+
+🍎
+
+</div>
+
+<h3>Apple</h3>
+
+<p>1 Kg</p>
+
+<div class="rating">
+
+⭐⭐⭐⭐⭐
+
+</div>
+
+<h4>₹180</h4>
+
+<button onclick="addToCart('Light Installation',199)">
+Add
+</button>
+
+</div>
+
+<!-- Product -->
+
+<div class="product-card">
+
+<div class="fav">
+
+<i class="fa-regular fa-heart"></i>
+
+</div>
+
+<div class="product-image">
+
+🍚
+
+</div>
+
+<h3>Basmati Rice</h3>
+
+<p>5 Kg</p>
+
+<div class="rating">
+
+⭐⭐⭐⭐⭐
+
+</div>
+
+<h4>₹420</h4>
+<button onclick="addToCart('Light Installation',199)">
+Add
+</button>
+
+</div>
+
+</div>
+
+</section>
+<!--================ MORE PRODUCTS =================-->
+
+<section>
+
+<h2>Fresh Picks</h2>
+
+<div class="product-grid">
+
+<!-- Product -->
+
+<div class="product-card">
+
+<div class="fav">
+<i class="fa-regular fa-heart"></i>
+</div>
+
+<div class="product-image">
+🥔
+</div>
+
+<h3>Potato</h3>
+
+<p>1 Kg</p>
+
+<div class="rating">
+⭐⭐⭐⭐⭐
+</div>
+
+<h4>₹35</h4>
+<button onclick="addToCart('Light Installation',199)">
+Add
+</button>
+
+</div>
+
+<!-- Product -->
+
+<div class="product-card">
+
+<div class="fav">
+<i class="fa-regular fa-heart"></i>
+</div>
+
+<div class="product-image">
+🧅
+</div>
+
+<h3>Onion</h3>
+
+<p>1 Kg</p>
+
+<div class="rating">
+⭐⭐⭐⭐⭐
+</div>
+
+<h4>₹42</h4>
+<button onclick="addToCart('Light Installation',199)">
+Add
+</button>
+
+</div>
+
+<!-- Product -->
+
+<div class="product-card">
+
+<div class="fav">
+<i class="fa-regular fa-heart"></i>
+</div>
+
+<div class="product-image">
+🥚
+</div>
+
+<h3>Eggs</h3>
+
+<p>12 Pieces</p>
+
+<div class="rating">
+⭐⭐⭐⭐⭐
+</div>
+
+<h4>₹72</h4>
+
+<button onclick="addToCart('Light Installation',199)">
+Add
+</button>
+
+</div>
+
+<!-- Product -->
+
+<div class="product-card">
+
+<div class="fav">
+<i class="fa-regular fa-heart"></i>
+</div>
+
+<div class="product-image">
+🍞
+</div>
+
+<h3>Bread</h3>
+
+<p>400 g</p>
+
+<div class="rating">
+⭐⭐⭐⭐☆
+</div>
+
+<h4>₹40</h4>
+<button onclick="addToCart('Light Installation',199)">
+Add
+</button>
+
+</div>
+
+<!-- Product -->
+
+<div class="product-card">
+
+<div class="fav">
+<i class="fa-regular fa-heart"></i>
+</div>
+
+<div class="product-image">
+🧈
+</div>
+
+<h3>Butter</h3>
+
+<p>500 g</p>
+
+<div class="rating">
+⭐⭐⭐⭐⭐
+</div>
+
+<h4>₹260</h4>
+
+<button onclick="addToCart('Light Installation',199)">
+Add
+</button>
+
+</div>
+
+<!-- Product -->
+
+<div class="product-card">
+
+<div class="fav">
+<i class="fa-regular fa-heart"></i>
+</div>
+
+<div class="product-image">
+🧃
+</div>
+
+<h3>Juice</h3>
+
+<p>1 Litre</p>
+
+<div class="rating">
+⭐⭐⭐⭐⭐
+</div>
+
+<h4>₹110</h4>
+
+<button onclick="addToCart('Light Installation',199)">
+Add
+</button>
+
+</div>
+
+</div>
+
+</section>
+
+<!--================ FLOATING CART =================-->
+
+<div class="floating-cart">
+
+<i class="fa-solid fa-cart-shopping"></i>
+
+<span>View Cart</span>
+
+</div>
+
+<!--================ BOTTOM NAVIGATION =================-->
+
+<nav class="bottom-nav">
+
+<a href="home.html">
+
+<i class="fa-solid fa-house"></i>
+
+<span>Home</span>
+
+</a>
+
+<a href="grocery.html" class="active">
+
+<i class="fa-solid fa-store"></i>
+
+<span>Shop</span>
+
+</a>
+
+<a href="booking.html">
+
+<i class="fa-solid fa-calendar-check"></i>
+
+<span>Bookings</span>
+
+</a>
+
+<a href="partner.html">
+
+<i class="fa-solid fa-handshake"></i>
+
+<span>Partner</span>
+
+</a>
+
+<a href="profile.html">
+
+<i class="fa-solid fa-user"></i>
+
+<span>Profile</span>
+
+</a>
+
+</nav>
+
+<script src="grocery.js"></script>
+
+</body>
+
+</html>

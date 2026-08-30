@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAAHAA Exchange v2.0 — Automated Bid &amp; Ask</title>
+<meta name="description" content="SAAHAA v2.0 — automated hyperlocal bid & ask exchange. Every confirmed deal projected +12%, 8% platform profit.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════ DESIGN TOKENS ═══════════ */
+:root{
+  --bg:#F4F7FA; --surface:#FFFFFF; --surface2:#F8FAFC;
+  --ink:#0F172A; --ink2:#334155; --muted:#64748B; --faint:#94A3B8;
+  --line:#E2E8F0;
+  --brand:#059669; --brand-dk:#047857; --brand-bg:#ECFDF5; --brand-lt:#D1FAE5;
+  --red:#DC2626; --red-bg:#FEF2F2;
+  --amber:#D97706; --amber-bg:#FFFBEB;
+  --purple:#7C3AED; --purple-bg:#F5F3FF;
+  --blue:#2563EB; --blue-bg:#EFF6FF;
+  --sh-sm:0 1px 3px rgba(15,23,42,.06);
+  --sh:0 4px 14px -2px rgba(15,23,42,.08);
+  --sh-lg:0 20px 40px -12px rgba(15,23,42,.18);
+  --r:14px; --r-sm:10px; --r-lg:20px;
+  --ease:cubic-bezier(.25,.46,.45,.94);
+}
+body.dark{
+  --bg:#0B1120; --surface:#151E31; --surface2:#0F172A;
+  --ink:#F1F5F9; --ink2:#CBD5E1; --muted:#94A3B8; --faint:#64748B;
+  --line:#26334D;
+  --brand-bg:#0A2E22; --brand-lt:#065F46;
+  --red-bg:#2A1215; --amber-bg:#271A05; --purple-bg:#1E1533; --blue-bg:#10203C;
+  --sh-sm:0 1px 3px rgba(0,0,0,.4); --sh:0 4px 14px -2px rgba(0,0,0,.5);
+  --sh-lg:0 20px 40px -12px rgba(0,0,0,.6);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;-webkit-font-smoothing:antialiased}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;letter-spacing:-.011em;line-height:1.5;transition:background .3s,color .3s}
+button{cursor:pointer;font-family:inherit}
+input,select{font-family:inherit}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* ═══════════ LOGIN GATE ═══════════ */
+#loginScreen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:1rem;z-index:500;
+  background:radial-gradient(1100px 600px at 15% -10%,rgba(5,150,105,.16),transparent 60%),
+             radial-gradient(900px 500px at 110% 110%,rgba(124,58,237,.13),transparent 55%),var(--bg)}
+.login-card{width:100%;max-width:430px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-lg);padding:2.3rem 2.1rem;animation:rise .45s var(--ease)}
+@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.logo-mark{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#059669,#0EA5E9);display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:#fff;font-weight:900;box-shadow:0 8px 20px rgba(5,150,105,.35);margin-bottom:1rem}
+.login-h{font-size:1.45rem;font-weight:900;letter-spacing:-.03em}
+.login-sub{font-size:.82rem;color:var(--muted);margin:.3rem 0 1.5rem}
+.field{margin-bottom:.95rem}
+.field label{display:block;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.35rem}
+.field input{width:100%;background:var(--surface2);border:1.5px solid var(--line);border-radius:var(--r-sm);padding:.72rem .9rem;font-size:.92rem;color:var(--ink);outline:none;transition:border .2s}
+.field input:focus{border-color:var(--brand)}
+.btn{border:none;border-radius:var(--r-sm);font-weight:800;font-size:.9rem;padding:.8rem 1.2rem;transition:transform .15s,box-shadow .15s}
+.btn:active{transform:scale(.97)}
+.btn-primary{width:100%;background:linear-gradient(135deg,var(--brand),var(--brand-dk));color:#fff;box-shadow:0 6px 16px rgba(5,150,105,.35)}
+.login-hint{margin-top:1.2rem;padding:.8rem .9rem;background:var(--surface2);border:1px dashed var(--line);border-radius:var(--r-sm);font-size:.72rem;color:var(--muted);line-height:1.7}
+.login-hint code{font-family:'JetBrains Mono',monospace;background:var(--brand-bg);color:var(--brand);padding:.05rem .35rem;border-radius:5px;font-size:.7rem}
+.login-err{display:none;margin-top:.7rem;font-size:.78rem;font-weight:700;color:var(--red)}
+
+/* ═══════════ APP SHELL ═══════════ */
+#app{display:none;max-width:1280px;margin:0 auto;padding:0 1.2rem 3rem}
+header{display:flex;align-items:center;gap:.9rem;padding:1rem 0 .8rem;flex-wrap:wrap}
+.h-logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#059669,#0EA5E9);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:1.05rem}
+.h-title{font-weight:900;font-size:1.1rem;letter-spacing:-.02em}
+.h-title span{color:var(--brand)}
+.h-tag{font-size:.65rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.h-right{margin-left:auto;display:flex;align-items:center;gap:.55rem}
+.pill{font-size:.7rem;font-weight:800;padding:.32rem .7rem;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink2)}
+.pill.role-admin{background:var(--purple-bg);color:var(--purple);border-color:transparent}
+.pill.role-user{background:var(--brand-bg);color:var(--brand);border-color:transparent}
+.icon-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:.95rem;display:flex;align-items:center;justify-content:center}
+.btn-ghost{background:var(--surface);border:1px solid var(--line);color:var(--ink2);font-size:.78rem;font-weight:700;padding:.45rem .85rem;border-radius:10px}
+
+/* ticker */
+.ticker-wrap{overflow:hidden;background:var(--ink);border-radius:var(--r-sm);margin-bottom:1.1rem;position:relative}
+body.dark .ticker-wrap{background:#050B18;border:1px solid var(--line)}
+.ticker{display:inline-flex;gap:2.4rem;white-space:nowrap;padding:.5rem 0;animation:tick 40s linear infinite;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:#CBD5E1}
+.ticker b{color:#34D399}.ticker .up{color:#FBBF24}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* generic cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-sm);padding:1.2rem}
+.card-h{font-size:.94rem;font-weight:800;display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem}
+.card-h small{font-weight:600;color:var(--muted);font-size:.7rem;margin-left:auto}
+
+/* ═══════════ USER VIEW ═══════════ */
+.cat-row{display:flex;gap:.55rem;flex-wrap:wrap;margin-bottom:1.1rem}
+.cat-chip{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:.5rem 1rem;font-size:.8rem;font-weight:700;color:var(--ink2);transition:all .2s var(--ease)}
+.cat-chip.on{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 4px 12px rgba(5,150,105,.35)}
+.market-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:1.1rem;align-items:start}
+@media(max-width:900px){.market-grid{grid-template-columns:1fr}}
+
+.quote-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:1rem}
+.quote-cell{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-sm);padding:.6rem .7rem;text-align:center}
+.quote-cell .q-lbl{font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.quote-cell .q-val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:.98rem;margin-top:.15rem}
+.q-bid{color:var(--brand)}.q-ask{color:var(--red)}.q-proj{color:var(--purple)}
+
+.book{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+.book-col-h{font-size:.66rem;font-weight:900;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem;display:flex;justify-content:space-between;color:var(--muted)}
+.book-row{position:relative;display:flex;justify-content:space-between;align-items:center;padding:.34rem .55rem;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:.76rem;margin-bottom:3px;overflow:hidden}
+.book-row .depth{position:absolute;top:0;bottom:0;opacity:.14;border-radius:7px}
+.bid-row .depth{right:0;background:var(--brand)}
+.ask-row .depth{left:0;background:var(--red)}
+.book-row .p{font-weight:700;z-index:1}
+.bid-row .p{color:var(--brand)}.ask-row .p{color:var(--red)}
+.book-row .who{font-family:'Inter',sans-serif;font-size:.66rem;color:var(--muted);z-index:1;max-width:56%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.book-row.mine{outline:1.5px solid var(--brand);outline-offset:-1.5px}
+
+.bid-box{display:flex;gap:.55rem;margin-top:1rem}
+.bid-box input{flex:1;background:var(--surface2);border:1.5px solid var(--line);border-radius:var(--r-sm);padding:.7rem .85rem;font-size:.95rem;color:var(--ink);outline:none;font-family:'JetBrains Mono',monospace}
+.bid-box input:focus{border-color:var(--brand)}
+.btn-bid{background:linear-gradient(135deg,var(--brand),var(--brand-dk));color:#fff;padding:.7rem 1.3rem;border-radius:var(--r-sm);border:none;font-weight:800;font-size:.85rem;box-shadow:0 5px 14px rgba(5,150,105,.3)}
+.note{font-size:.68rem;color:var(--muted);margin-top:.55rem;line-height:1.6}
+
+.deal-item{display:flex;align-items:center;gap:.7rem;padding:.65rem .3rem;border-bottom:1px solid var(--line)}
+.deal-item:last-child{border-bottom:none}
+.deal-ico{width:34px;height:34px;border-radius:10px;background:var(--brand-bg);display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0}
+.deal-t{font-size:.78rem;font-weight:700}
+.deal-s{font-size:.66rem;color:var(--muted)}
+.deal-amt{margin-left:auto;text-align:right}
+.deal-amt .a1{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:.82rem;color:var(--purple)}
+.deal-amt .a2{font-size:.62rem;color:var(--muted)}
+.empty{text-align:center;color:var(--faint);font-size:.78rem;padding:1.4rem 0}
+
+/* ═══════════ ADMIN SANDBOX ═══════════ */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.9rem;margin-bottom:1.1rem}
+@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1rem 1.1rem;box-shadow:var(--sh-sm);position:relative;overflow:hidden}
+.kpi::after{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--kc,var(--brand))}
+.kpi-lbl{font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.kpi-val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:1.35rem;margin-top:.25rem}
+.kpi-sub{font-size:.66rem;color:var(--faint);margin-top:.15rem}
+.sand-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:1.1rem;align-items:start;margin-bottom:1.1rem}
+@media(max-width:900px){.sand-grid{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse;font-size:.76rem}
+th{text-align:left;font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:800;padding:.45rem .5rem;border-bottom:1.5px solid var(--line)}
+td{padding:.5rem;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.t-mono{font-family:'JetBrains Mono',monospace;font-weight:600}
+.tag{font-size:.6rem;font-weight:800;padding:.14rem .5rem;border-radius:999px}
+.tag-g{background:var(--brand-bg);color:var(--brand)}
+.tag-p{background:var(--purple-bg);color:var(--purple)}
+.tag-b{background:var(--blue-bg);color:var(--blue)}
+.perf-row{margin-bottom:.7rem}
+.perf-top{display:flex;justify-content:space-between;font-size:.72rem;font-weight:700;margin-bottom:.25rem}
+.perf-top span:last-child{font-family:'JetBrains Mono',monospace;color:var(--muted);font-weight:600}
+.perf-track{height:8px;border-radius:99px;background:var(--surface2);border:1px solid var(--line);overflow:hidden}
+.perf-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--brand),#0EA5E9);transition:width .5s var(--ease)}
+.admin-controls{display:flex;gap:.55rem;flex-wrap:wrap;align-items:center;margin-bottom:1.1rem}
+.switch{position:relative;width:42px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:var(--faint);border-radius:99px;transition:.25s;cursor:pointer}
+.slider::before{content:'';position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;left:3px;top:3px;transition:.25s}
+.switch input:checked + .slider{background:var(--brand)}
+.switch input:checked + .slider::before{transform:translateX(18px)}
+.ctl-lbl{font-size:.74rem;font-weight:700;color:var(--ink2)}
+select.ctl{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:.4rem .6rem;font-size:.76rem;font-weight:700;color:var(--ink);outline:none}
+.scroll-y{max-height:340px;overflow-y:auto}
+
+/* toast + modal */
+#toast{position:fixed;bottom:1.4rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:var(--bg);padding:.65rem 1.2rem;border-radius:999px;font-size:.78rem;font-weight:700;box-shadow:var(--sh-lg);transition:transform .3s var(--ease);z-index:900}
+body.dark #toast{background:#F1F5F9;color:#0F172A}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#modalWrap{position:fixed;inset:0;background:rgba(2,6,23,.55);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:1rem;z-index:800}
+#modalWrap.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-lg);max-width:400px;width:100%;padding:1.8rem;animation:rise .35s var(--ease)}
+.split-bar{display:flex;height:26px;border-radius:8px;overflow:hidden;margin:.9rem 0 .4rem;border:1px solid var(--line)}
+.split-seg{display:flex;align-items:center;justify-content:center;color:#fff;font-size:.6rem;font-weight:800;text-shadow:0 1px 1px rgba(0,0,0,.3)}
+.leg{display:flex;gap:.8rem;flex-wrap:wrap;font-size:.62rem;font-weight:700;color:var(--muted)}
+.leg span::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;background:var(--c)}
+.flash-deal{animation:flashbg 1s var(--ease)}
+@keyframes flashbg{0%{background:var(--brand-bg)}100%{background:transparent}}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ ORGANISATION LOGIN (one gate, both roles) ═══════════ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="logo-mark">S</div>
+    <div class="login-h">SAAHAA <span style="color:var(--brand)">Exchange</span></div>
+    <div class="login-sub">One organisation login — enters as User or Admin automatically. Together, We Elevate Life.</div>
+    <div class="field"><label>Full Name / Org ID</label><input id="inName" placeholder="e.g. Anoosh  ·  or  admin" autocomplete="off"></div>
+    <div class="field"><label>Mobile Number</label><input id="inMobile" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" autocomplete="off"></div>
+    <div class="field"><label>Passcode <span style="text-transform:none;font-weight:600">(admins only — leave blank for users)</span></label><input id="inPass" type="password" placeholder="••••••••"></div>
+    <button class="btn btn-primary" onclick="doLogin()">Enter SAAHAA →</button>
+    <div class="login-err" id="loginErr"></div>
+    <div class="login-hint">
+      👤 <b>User:</b> any name + 10-digit mobile → live Bid &amp; Ask market<br>
+      👑 <b>Admin:</b> name <code>admin</code> + passcode <code>saahaa123</code> → Sandbox reports
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ APP ═══════════ -->
+<div id="app">
+  <header>
+    <div class="h-logo">S</div>
+    <div>
+      <div class="h-title">SAAHAA <span>Exchange</span></div>
+      <div class="h-tag">Automated Bid · Ask · v2.0</div>
+    </div>
+    <div class="h-right">
+      <span class="pill" id="enginePill">⚙️ Engine LIVE</span>
+      <span class="pill" id="rolePill"></span>
+      <button class="icon-btn" onclick="toggleTheme()" title="Theme">🌓</button>
+      <button class="btn-ghost" onclick="doLogout()">Logout</button>
+    </div>
+  </header>
+
+  <div class="ticker-wrap"><div class="ticker" id="tickerTape"></div></div>
+
+  <!-- ── USER VIEW ── -->
+  <div id="userView" style="display:none">
+    <div class="cat-row" id="catRow"></div>
+    <div class="market-grid">
+      <div class="card">
+        <div class="card-h">📊 Live Order Book — <span id="bookCatName" style="color:var(--brand)"></span><small id="bookMeta"></small></div>
+        <div class="quote-strip">
+          <div class="quote-cell"><div class="q-lbl">Best Bid</div><div class="q-val q-bid" id="qBid">—</div></div>
+          <div class="quote-cell"><div class="q-lbl">Best Ask</div><div class="q-val q-ask" id="qAsk">—</div></div>
+          <div class="quote-cell"><div class="q-lbl">Last Deal</div><div class="q-val" id="qLast">—</div></div>
+          <div class="quote-cell"><div class="q-lbl">You Pay (+12%)</div><div class="q-val q-proj" id="qProj">—</div></div>
+        </div>
+        <div class="book">
+          <div>
+            <div class="book-col-h"><span style="color:var(--brand)">BIDS (customers)</span><span>₹</span></div>
+            <div id="bidCol"></div>
+          </div>
+          <div>
+            <div class="book-col-h"><span style="color:var(--red)">ASKS (providers)</span><span>₹</span></div>
+            <div id="askCol"></div>
+          </div>
+        </div>
+        <div class="bid-box">
+          <input id="myBidInput" type="number" placeholder="Your bid price ₹">
+          <button class="btn-bid" onclick="placeMyBid()">Place Bid ⚡</button>
+        </div>
+        <div class="note">💡 Auto-match engine confirms a deal the moment a bid crosses an ask. Every confirmed price is <b>projected +12%</b> — the platform keeps <b>8% profit</b>, 4% covers GST &amp; ops. Provider always receives the full confirmed price.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1.1rem">
+        <div class="card">
+          <div class="card-h">🧾 My Confirmed Deals<small id="myDealCount"></small></div>
+          <div id="myDeals"></div>
+        </div>
+        <div class="card">
+          <div class="card-h">⚡ Market Pulse<small>all categories</small></div>
+          <div id="pulseList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ADMIN SANDBOX ── -->
+  <div id="adminView" style="display:none">
+    <div class="admin-controls card" style="padding:.8rem 1.1rem">
+      <label class="switch"><input type="checkbox" id="engineToggle" checked onchange="toggleEngine(this.checked)"><span class="slider"></span></label>
+      <span class="ctl-lbl">Auto Bid/Ask Engine</span>
+      <select class="ctl" id="speedSel" onchange="setSpeed(this.value)">
+        <option value="1">Speed 1×</option><option value="2">Speed 2×</option><option value="5">Speed 5×</option><option value="10">Speed 10×</option>
+      </select>
+      <span style="flex:1"></span>
+      <button class="btn-ghost" onclick="exportCSV('deals')">⬇ Deals CSV</button>
+      <button class="btn-ghost" onclick="exportCSV('visitors')">⬇ Visitors CSV</button>
+      <button class="btn-ghost" style="color:var(--red)" onclick="resetSandbox()">Reset Sandbox</button>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi" style="--kc:var(--blue)"><div class="kpi-lbl">Confirmed Deals</div><div class="kpi-val" id="kDeals">0</div><div class="kpi-sub" id="kDealsSub">across all categories</div></div>
+      <div class="kpi" style="--kc:var(--brand)"><div class="kpi-lbl">Deal Volume</div><div class="kpi-val" id="kVol">₹0</div><div class="kpi-sub">sum of confirmed prices</div></div>
+      <div class="kpi" style="--kc:var(--purple)"><div class="kpi-lbl">Projected Revenue (+12%)</div><div class="kpi-val" id="kProj">₹0</div><div class="kpi-sub">what customers pay</div></div>
+      <div class="kpi" style="--kc:var(--amber)"><div class="kpi-lbl">Platform Profit (8%)</div><div class="kpi-val" id="kProfit">₹0</div><div class="kpi-sub" id="kProfitSub">+ 4% GST &amp; ops buffer</div></div>
+    </div>
+
+    <div class="sand-grid">
+      <div class="card">
+        <div class="card-h">📈 Cumulative Profit Curve<small>8% per deal</small></div>
+        <canvas id="profitChart" height="190" style="width:100%"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-h">🏆 Category Performance<small>by profit</small></div>
+        <div id="perfList"></div>
+      </div>
+    </div>
+
+    <div class="sand-grid">
+      <div class="card">
+        <div class="card-h">🤝 Deal Ledger<small id="ledgerMeta"></small></div>
+        <div class="scroll-y"><table>
+          <thead><tr><th>Time</th><th>Category</th><th>Provider</th><th>Customer</th><th>Deal ₹</th><th>Proj ₹</th><th>Profit ₹</th></tr></thead>
+          <tbody id="dealTable"></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <div class="card-h">📇 Visitor Registry<small id="visMeta"></small></div>
+        <div class="scroll-y"><table>
+          <thead><tr><th>Name</th><th>Mobile</th><th>Role</th><th>Visits</th><th>Last Seen</th></tr></thead>
+          <tbody id="visTable"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modalWrap" onclick="if(event.target===this)this.classList.remove('show')"><div class="modal" id="modalBody"></div></div>
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════
+   SAAHAA EXCHANGE v2.0 — AUTOMATED BID/ASK CORE
+   Deal D → customer pays P = D×1.12
+   Platform profit = D×0.08 · GST/ops = D×0.04 · Provider gets D
+   ═══════════════════════════════════════════ */
+const MARKUP = 0.12, PROFIT = 0.08, GSTOPS = 0.04;
+const LS_KEY = 'SAAHAA_V2_STATE';
+
+const CATS = [
+  {id:'plumber',    name:'Plumber',      ico:'🔧', base:520},
+  {id:'electrician',name:'Electrician',  ico:'⚡', base:480},
+  {id:'acrepair',   name:'AC Repair',    ico:'❄️', base:750},
+  {id:'carpenter',  name:'Carpenter',    ico:'🪚', base:600},
+  {id:'cleaning',   name:'Cleaning',     ico:'🧹', base:400},
+  {id:'laundry',    name:'Laundry/Iron', ico:'👕', base:180},
+  {id:'grocery',    name:'Grocery Run',  ico:'🛒', base:250},
+];
+const PROVIDERS = {
+  plumber:['Amit Verma','Raju Plumber','Srinu Waterworks'],
+  electrician:['Vikram Volts','PowerPro Nani','Sparks Anil'],
+  acrepair:['CoolCare Ravi','Arctic Techs','FrostFix Babu'],
+  carpenter:['Kumar Iron Works','WoodCraft Ali','Shiva Carpentry'],
+  cleaning:['SparkleTeam Devi','NeatNest Crew','CleanKart Pros'],
+  laundry:['Press Express','Kumar Iron Works','SteamLine Laxmi'],
+  grocery:['Sai Kirana Store','Ravi Mart','QuickKart Madhapur'],
+};
+const SIM_CUSTOMERS = ['Priya S','Rahul K','Meena D','Farhan A','Lakshmi R','Dev P','Sana I','Kiran T','Asha M','Vijay N'];
+
+let state = { visitors:[], deals:[], profitSeries:[] };
+let session = null;                 // {name, mobile, role}
+let books = {};                     // catId -> {bids:[], asks:[]}
+let activeCat = 'plumber';
+let engineOn = true, speed = 1, engineTimer = null;
+let orderSeq = 1;
+
+/* ── persistence ── */
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} }
+function load(){
+  try{ const s = localStorage.getItem(LS_KEY); if(s) state = Object.assign(state, JSON.parse(s)); }catch(e){}
+}
+
+/* ── helpers ── */
+const r2 = n => Math.round(n*100)/100;
+const fmt = n => '₹' + n.toLocaleString('en-IN',{maximumFractionDigits:0});
+const fmt2 = n => '₹' + n.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const rand = (a,b) => a + Math.random()*(b-a);
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const nowStr = ts => new Date(ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
+
+/* ── order books ── */
+function seedBooks(){
+  CATS.forEach(c=>{
+    books[c.id] = {bids:[],asks:[]};
+    for(let i=0;i<4;i++) addAsk(c.id);
+    for(let i=0;i<4;i++) addBid(c.id);
+  });
+}
+function addAsk(catId){
+  const c = CATS.find(x=>x.id===catId);
+  books[catId].asks.push({id:orderSeq++, price:r2(c.base*rand(1.01,1.22)), who:pick(PROVIDERS[catId]), mine:false});
+  books[catId].asks.sort((a,b)=>a.price-b.price);
+}
+function addBid(catId, price, who, mine){
+  const c = CATS.find(x=>x.id===catId);
+  books[catId].bids.push({id:orderSeq++, price: price!=null?r2(price):r2(c.base*rand(0.80,0.99)), who:who||pick(SIM_CUSTOMERS), mine:!!mine});
+  books[catId].bids.sort((a,b)=>b.price-a.price);
+}
+
+/* ── THE AUTOMATED MATCH ENGINE ── */
+function engineTick(){
+  CATS.forEach(c=>{
+    const bk = books[c.id];
+    // random walk: bids drift up, asks drift down (spread narrows organically)
+    bk.bids.forEach(b=>{ if(!b.mine && Math.random()<.45) b.price = r2(b.price * rand(1.000,1.018)); });
+    bk.asks.forEach(a=>{ if(Math.random()<.45) a.price = r2(a.price * rand(0.985,1.001)); });
+    bk.bids.sort((a,b)=>b.price-a.price); bk.asks.sort((a,b)=>a.price-b.price);
+    matchBook(c.id);
+    // replenish liquidity
+    while(bk.asks.length<4) addAsk(c.id);
+    while(bk.bids.length<4) addBid(c.id);
+    if(bk.asks.length>7) bk.asks.length=7;
+    if(bk.bids.length>7) bk.bids.length=7;
+  });
+  renderMarket(); renderPulse();
+  if(session && session.role==='admin') renderSandbox();
+}
+function matchBook(catId){
+  const bk = books[catId];
+  let guard = 0;
+  while(bk.bids.length && bk.asks.length && bk.bids[0].price >= bk.asks[0].price && guard++<5){
+    const bid = bk.bids.shift(), ask = bk.asks.shift();
+    confirmDeal(catId, r2((bid.price+ask.price)/2), ask.who, bid.who, bid.mine);
+  }
+}
+function confirmDeal(catId, dealPrice, provider, customer, isMine){
+  const c = CATS.find(x=>x.id===catId);
+  const projected = r2(dealPrice*(1+MARKUP));
+  const profit = r2(dealPrice*PROFIT);
+  const gst = r2(dealPrice*GSTOPS);
+  const deal = {ts:Date.now(), cat:c.name, ico:c.ico, provider, customer, deal:dealPrice, projected, profit, gst, mine:!!isMine};
+  state.deals.unshift(deal);
+  if(state.deals.length>600) state.deals.length = 600;
+  const prev = state.profitSeries.length ? state.profitSeries[state.profitSeries.length-1] : 0;
+  state.profitSeries.push(r2(prev+profit));
+  if(state.profitSeries.length>400) state.profitSeries.shift();
+  save();
+  renderTicker();
+  if(isMine) showDealTicket(deal);
+}
+
+/* ── engine controls ── */
+function startEngine(){
+  clearInterval(engineTimer);
+  if(engineOn) engineTimer = setInterval(engineTick, 1600/speed);
+  const pill = document.getElementById('enginePill');
+  pill.textContent = engineOn ? '⚙️ Engine LIVE' : '⏸ Engine PAUSED';
+  pill.style.color = engineOn ? 'var(--brand)' : 'var(--red)';
+}
+function toggleEngine(on){ engineOn = on; startEngine(); toast(on?'Auto engine resumed':'Auto engine paused'); }
+function setSpeed(v){ speed = +v; startEngine(); toast('Engine speed '+v+'×'); }
+
+/* ═══════════ LOGIN / ROLES ═══════════ */
+function doLogin(){
+  const name = document.getElementById('inName').value.trim();
+  const mobile = document.getElementById('inMobile').value.trim();
+  const pass = document.getElementById('inPass').value;
+  const err = document.getElementById('loginErr');
+  err.style.display='none';
+  let role = null;
+  if(name.toLowerCase()==='admin'){
+    if(pass==='saahaa123') role='admin';
+    else { err.textContent='⚠ Wrong admin passcode.'; err.style.display='block'; return; }
+  } else {
+    if(!name){ err.textContent='⚠ Enter your name.'; err.style.display='block'; return; }
+    if(!/^[6-9]\d{9}$/.test(mobile)){ err.textContent='⚠ Enter a valid 10-digit Indian mobile number.'; err.style.display='block'; return; }
+    role='user';
+  }
+  session = {name, mobile: role==='admin' ? (mobile||'—') : mobile, role};
+  // visitor registry (name + mobile capture → sandbox)
+  const key = (name+'|'+session.mobile).toLowerCase();
+  let v = state.visitors.find(x=>x.key===key);
+  if(v){ v.visits++; v.lastSeen=Date.now(); v.role=role; }
+  else state.visitors.unshift({key, name, mobile:session.mobile, role, visits:1, firstSeen:Date.now(), lastSeen:Date.now()});
+  save();
+  enterApp();
+}
+function enterApp(){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('app').style.display='block';
+  const rp = document.getElementById('rolePill');
+  if(session.role==='admin'){
+    rp.textContent='👑 '+session.name+' · Admin'; rp.className='pill role-admin';
+    document.getElementById('adminView').style.display='block';
+    document.getElementById('userView').style.display='none';
+    renderSandbox();
+  } else {
+    rp.textContent='👤 '+session.name; rp.className='pill role-user';
+    document.getElementById('userView').style.display='block';
+    document.getElementById('adminView').style.display='none';
+    renderCats(); renderMarket(); renderMyDeals(); renderPulse();
+  }
+  renderTicker();
+  toast('Welcome, '+session.name+'!');
+}
+function doLogout(){ location.reload(); }
+function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem('SAAHAA_THEME', document.body.classList.contains('dark')?'dark':'light'); }
+
+/* ═══════════ USER VIEW RENDER ═══════════ */
+function renderCats(){
+  document.getElementById('catRow').innerHTML = CATS.map(c=>
+    `<button class="cat-chip ${c.id===activeCat?'on':''}" onclick="setCat('${c.id}')">${c.ico} ${c.name}</button>`).join('');
+}
+function setCat(id){ activeCat=id; renderCats(); renderMarket(); }
+function renderMarket(){
+  if(!session || session.role!=='user') return;
+  const c = CATS.find(x=>x.id===activeCat), bk = books[activeCat];
+  if(!bk) return;
+  document.getElementById('bookCatName').textContent = c.ico+' '+c.name;
+  document.getElementById('bookMeta').textContent = bk.bids.length+' bids · '+bk.asks.length+' asks';
+  const bestBid = bk.bids[0], bestAsk = bk.asks[0];
+  document.getElementById('qBid').textContent = bestBid?fmt2(bestBid.price):'—';
+  document.getElementById('qAsk').textContent = bestAsk?fmt2(bestAsk.price):'—';
+  const lastDeal = state.deals.find(d=>d.cat===c.name);
+  document.getElementById('qLast').textContent = lastDeal?fmt2(lastDeal.deal):'—';
+  document.getElementById('qProj').textContent = lastDeal?fmt2(lastDeal.projected):'—';
+  const maxB = Math.max(...bk.bids.map(b=>b.price),1), maxA = Math.max(...bk.asks.map(a=>a.price),1);
+  document.getElementById('bidCol').innerHTML = bk.bids.map(b=>
+    `<div class="book-row bid-row ${b.mine?'mine':''}"><div class="depth" style="width:${(b.price/maxB*88).toFixed(1)}%"></div><span class="who">${b.mine?'⭐ You':b.who}</span><span class="p">${b.price.toFixed(2)}</span></div>`).join('') || '<div class="empty">No bids</div>';
+  document.getElementById('askCol').innerHTML = bk.asks.map(a=>
+    `<div class="book-row ask-row"><span class="p">${a.price.toFixed(2)}</span><span class="who">${a.who}</span><div class="depth" style="width:${(a.price/maxA*88).toFixed(1)}%"></div></div>`).join('') || '<div class="empty">No asks</div>';
+  renderMyDeals();
+}
+function placeMyBid(){
+  const inp = document.getElementById('myBidInput');
+  const p = parseFloat(inp.value);
+  if(!p || p<=0){ toast('Enter a valid bid price'); return; }
+  const bk = books[activeCat];
+  bk.bids = bk.bids.filter(b=>!b.mine);           // one live bid per user per category
+  addBid(activeCat, p, session.name, true);
+  matchBook(activeCat);
+  inp.value='';
+  renderMarket();
+  toast('Bid placed at '+fmt2(p));
+}
+function renderMyDeals(){
+  if(!session) return;
+  const mine = state.deals.filter(d=>d.mine).slice(0,8);
+  document.getElementById('myDealCount').textContent = mine.length+' deals';
+  document.getElementById('myDeals').innerHTML = mine.length ? mine.map(d=>
+    `<div class="deal-item"><div class="deal-ico">${d.ico}</div>
+      <div><div class="deal-t">${d.cat} · ${d.provider}</div><div class="deal-s">Confirmed ${fmt2(d.deal)} · ${nowStr(d.ts)}</div></div>
+      <div class="deal-amt"><div class="a1">${fmt2(d.projected)}</div><div class="a2">you pay (+12%)</div></div></div>`).join('')
+    : '<div class="empty">Place a bid above best ask to get instantly matched ⚡</div>';
+}
+function renderPulse(){
+  if(!session || session.role!=='user') return;
+  document.getElementById('pulseList').innerHTML = CATS.map(c=>{
+    const bk = books[c.id];
+    const spread = bk.bids[0]&&bk.asks[0] ? r2(bk.asks[0].price-bk.bids[0].price) : null;
+    const n = state.deals.filter(d=>d.cat===c.name).length;
+    return `<div class="deal-item"><div class="deal-ico">${c.ico}</div>
+      <div><div class="deal-t">${c.name}</div><div class="deal-s">${n} deals · spread ${spread!=null?fmt2(Math.max(spread,0)):'—'}</div></div>
+      <div class="deal-amt"><div class="a1" style="color:${spread!=null&&spread<20?'var(--brand)':'var(--muted)'}">${spread!=null&&spread<20?'HOT 🔥':'live'}</div></div></div>`;
+  }).join('');
+}
+
+/* deal ticket modal (user's own match) */
+function showDealTicket(d){
+  const wSeg = (100/(1+MARKUP)).toFixed(1), pSeg = (PROFIT*100/(1+MARKUP)).toFixed(1), gSeg = (GSTOPS*100/(1+MARKUP)).toFixed(1);
+  document.getElementById('modalBody').innerHTML = `
+    <div style="font-size:2rem">🎉</div>
+    <div style="font-weight:900;font-size:1.15rem;margin:.4rem 0">Deal Confirmed!</div>
+    <div style="font-size:.8rem;color:var(--muted);margin-bottom:.8rem">${d.ico} ${d.cat} with <b>${d.provider}</b></div>
+    <div class="quote-strip" style="grid-template-columns:1fr 1fr">
+      <div class="quote-cell"><div class="q-lbl">Confirmed Price</div><div class="q-val q-bid">${fmt2(d.deal)}</div></div>
+      <div class="quote-cell"><div class="q-lbl">You Pay (+12%)</div><div class="q-val q-proj">${fmt2(d.projected)}</div></div>
+    </div>
+    <div class="split-bar">
+      <div class="split-seg" style="width:${wSeg}%;background:#059669">Provider ${fmt2(d.deal)}</div>
+      <div class="split-seg" style="width:${pSeg}%;background:#7C3AED">${fmt2(d.profit)}</div>
+      <div class="split-seg" style="width:${gSeg}%;background:#D97706">${fmt2(d.gst)}</div>
+    </div>
+    <div class="leg"><span style="--c:#059669">Provider (100% of deal)</span><span style="--c:#7C3AED">Platform profit 8%</span><span style="--c:#D97706">GST &amp; ops 4%</span></div>
+    <button class="btn btn-primary" style="margin-top:1.2rem" onclick="document.getElementById('modalWrap').classList.remove('show')">Done</button>`;
+  document.getElementById('modalWrap').classList.add('show');
+}
+
+/* ═══════════ TICKER ═══════════ */
+function renderTicker(){
+  const items = state.deals.slice(0,12).map(d=>
+    `<span>${d.ico} ${d.cat} <b>${fmt(d.deal)}</b> <span class="up">→ ${fmt(d.projected)} (+12%)</span></span>`);
+  const html = items.length?items.join(''):'<span>⚙️ SAAHAA auto bid/ask engine warming up — deals will stream here…</span>';
+  document.getElementById('tickerTape').innerHTML = html + html; /* duplicate for seamless loop */
+}
+
+/* ═══════════ ADMIN SANDBOX ═══════════ */
+function renderSandbox(){
+  const D = state.deals;
+  const vol = D.reduce((s,d)=>s+d.deal,0), proj = D.reduce((s,d)=>s+d.projected,0), prof = D.reduce((s,d)=>s+d.profit,0), gst = D.reduce((s,d)=>s+d.gst,0);
+  document.getElementById('kDeals').textContent = D.length;
+  document.getElementById('kDealsSub').textContent = state.visitors.length+' visitors registered';
+  document.getElementById('kVol').textContent = fmt(vol);
+  document.getElementById('kProj').textContent = fmt(proj);
+  document.getElementById('kProfit').textContent = fmt(prof);
+  document.getElementById('kProfitSub').textContent = '+ '+fmt(gst)+' GST & ops buffer';
+
+  // deal ledger
+  document.getElementById('ledgerMeta').textContent = 'last '+Math.min(D.length,40)+' of '+D.length;
+  document.getElementById('dealTable').innerHTML = D.slice(0,40).map(d=>
+    `<tr><td class="t-mono" style="font-size:.66rem">${nowStr(d.ts)}</td><td>${d.ico} ${d.cat}</td><td>${d.provider}</td>
+     <td>${d.mine?'⭐ ':''}${d.customer}</td><td class="t-mono">${d.deal.toFixed(0)}</td>
+     <td class="t-mono" style="color:var(--purple)">${d.projected.toFixed(0)}</td>
+     <td class="t-mono" style="color:var(--brand)">${d.profit.toFixed(0)}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">No deals yet</td></tr>';
+
+  // visitor registry
+  document.getElementById('visMeta').textContent = state.visitors.length+' unique';
+  document.getElementById('visTable').innerHTML = state.visitors.map(v=>
+    `<tr><td style="font-weight:700">${v.name}</td><td class="t-mono">${v.mobile}</td>
+     <td><span class="tag ${v.role==='admin'?'tag-p':'tag-g'}">${v.role}</span></td>
+     <td class="t-mono">${v.visits}</td><td style="font-size:.66rem;color:var(--muted)">${new Date(v.lastSeen).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="empty">No visitors yet</td></tr>';
+
+  // category performance
+  const byCat = CATS.map(c=>{
+    const ds = D.filter(d=>d.cat===c.name);
+    return {c, n:ds.length, profit:ds.reduce((s,d)=>s+d.profit,0)};
+  }).sort((a,b)=>b.profit-a.profit);
+  const maxP = Math.max(...byCat.map(x=>x.profit),1);
+  document.getElementById('perfList').innerHTML = byCat.map(x=>
+    `<div class="perf-row"><div class="perf-top"><span>${x.c.ico} ${x.c.name}</span><span>${x.n} deals · ${fmt(x.profit)}</span></div>
+     <div class="perf-track"><div class="perf-fill" style="width:${(x.profit/maxP*100).toFixed(1)}%"></div></div></div>`).join('');
+
+  drawChart();
+}
+function drawChart(){
+  const cv = document.getElementById('profitChart');
+  const ctx = cv.getContext('2d');
+  const W = cv.width = cv.clientWidth*2, H = cv.height = 380;
+  ctx.clearRect(0,0,W,H);
+  const S = state.profitSeries;
+  if(S.length<2){ ctx.fillStyle='#94A3B8'; ctx.font='24px Inter'; ctx.textAlign='center'; ctx.fillText('Profit curve builds as deals confirm…', W/2, H/2); return; }
+  const max = Math.max(...S), min = 0, pad = 30;
+  const x = i => pad + i*(W-2*pad)/(S.length-1);
+  const y = v => H-pad - (v-min)/(max-min||1)*(H-2*pad);
+  // area fill
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(5,150,105,.35)'); grad.addColorStop(1,'rgba(5,150,105,0)');
+  ctx.beginPath(); ctx.moveTo(x(0),H-pad);
+  S.forEach((v,i)=>ctx.lineTo(x(i),y(v)));
+  ctx.lineTo(x(S.length-1),H-pad); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+  // line
+  ctx.beginPath(); S.forEach((v,i)=> i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)));
+  ctx.strokeStyle='#059669'; ctx.lineWidth=4; ctx.lineJoin='round'; ctx.stroke();
+  // last value dot + label
+  ctx.beginPath(); ctx.arc(x(S.length-1),y(S[S.length-1]),7,0,7); ctx.fillStyle='#059669'; ctx.fill();
+  ctx.fillStyle=document.body.classList.contains('dark')?'#F1F5F9':'#0F172A';
+  ctx.font='700 26px JetBrains Mono, monospace'; ctx.textAlign='right';
+  ctx.fillText('₹'+S[S.length-1].toLocaleString('en-IN',{maximumFractionDigits:0}), W-pad, y(S[S.length-1])-16);
+}
+
+/* ── exports & reset ── */
+function exportCSV(kind){
+  let rows, name;
+  if(kind==='deals'){
+    rows = [['Time','Category','Provider','Customer','DealPrice','ProjectedPrice(+12%)','Profit(8%)','GST_Ops(4%)']]
+      .concat(state.deals.map(d=>[new Date(d.ts).toISOString(), d.cat, d.provider, d.customer, d.deal, d.projected, d.profit, d.gst]));
+    name = 'saahaa_deals.csv';
+  } else {
+    rows = [['Name','Mobile','Role','Visits','FirstSeen','LastSeen']]
+      .concat(state.visitors.map(v=>[v.name, v.mobile, v.role, v.visits, new Date(v.firstSeen).toISOString(), new Date(v.lastSeen).toISOString()]));
+    name = 'saahaa_visitors.csv';
+  }
+  const csv = rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = name; a.click();
+  toast('Exported '+name);
+}
+function resetSandbox(){
+  if(!confirm('Reset ALL sandbox data (deals, profit curve, visitor registry)?')) return;
+  state = {visitors:[], deals:[], profitSeries:[]}; save();
+  seedBooks(); renderSandbox(); renderTicker();
+  toast('Sandbox reset ✓');
+}
+
+/* ═══════════ BOOT ═══════════ */
+load();
+if(localStorage.getItem('SAAHAA_THEME')==='dark') document.body.classList.add('dark');
+seedBooks();
+startEngine();
+renderTicker();
+document.getElementById('inPass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('inMobile').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+</script>
+</body>
+</html>
