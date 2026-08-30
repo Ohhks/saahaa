@@ -9,10 +9,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="SAAHAA">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
-<title>SAAHAA Exchange v3.0 — Fully Automated P2P</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzNEQzOTkiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIuNTUiIHN0b3AtY29sb3I9IiMwNTk2NjkiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMEVBNUU5Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEyMCIgZmlsbD0idXJsKCNnKSIvPgogIDxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjQ4MCIgaGVpZ2h0PSIyNDAiIHJ4PSIxMDQiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9Ii4xNCIvPgogIDx0ZXh0IHg9IjI1NiIgeT0iMzUyIiBmb250LWZhbWlseT0iQXJpYWwsIEhlbHZldGljYSwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMDAiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNmZmZmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlM8L3RleHQ+Cjwvc3ZnPgo=" type="image/svg+xml">
+<title>SAAHAA Exchange — Single-File Test Build</title>
 <meta name="description" content="SAAHAA v3.0 — fully automated peer-to-peer bid/ask exchange. +12% projection, 8% profit, escrow OTP pipeline, hash-chained ledger.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -578,9 +576,64 @@ let mesh=null, peers={};
 
 /* ── security primitives ── */
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function sha256Fallback(ascii){
+  function rightRotate(v,a){return (v>>>a)|(v<<(32-a));}
+  var mathPow=Math.pow, maxWord=mathPow(2,32), result='';
+  var words=[], asciiBitLength=ascii.length*8;
+  var hash=[], k=[], primeCounter=0, isComposite={}, i, j;
+  for(var candidate=2; primeCounter<64; candidate++){
+    if(!isComposite[candidate]){
+      for(i=0;i<313;i+=candidate) isComposite[i]=candidate;
+      hash[primeCounter]=(mathPow(candidate,.5)*maxWord)|0;
+      k[primeCounter++]=(mathPow(candidate,1/3)*maxWord)|0;
+    }
+  }
+  ascii+='\x80';
+  while(ascii.length%64-56) ascii+='\x00';
+  for(i=0;i<ascii.length;i++){
+    j=ascii.charCodeAt(i);
+    if(j>>8) return '';
+    words[i>>2]|=j<<((3-i)%4*8);
+  }
+  words[words.length]=(asciiBitLength/maxWord)|0;
+  words[words.length]=asciiBitLength;
+  for(j=0;j<words.length;){
+    var w=words.slice(j,j+=16), oldHash=hash;
+    hash=hash.slice(0,8);
+    for(i=0;i<64;i++){
+      var w15=w[i-15], w2=w[i-2];
+      var a=hash[0], e=hash[4];
+      var temp1=hash[7]
+        +(rightRotate(e,6)^rightRotate(e,11)^rightRotate(e,25))
+        +((e&hash[5])^((~e)&hash[6]))
+        +k[i]
+        +(w[i]=(i<16)?w[i]:(w[i-16]
+          +(rightRotate(w15,7)^rightRotate(w15,18)^(w15>>>3))
+          +w[i-7]
+          +(rightRotate(w2,17)^rightRotate(w2,19)^(w2>>>10)))|0);
+      var temp2=(rightRotate(a,2)^rightRotate(a,13)^rightRotate(a,22))
+        +((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
+      hash=[(temp1+temp2)|0].concat(hash);
+      hash[4]=(hash[4]+temp1)|0;
+    }
+    for(i=0;i<8;i++) hash[i]=(hash[i]+oldHash[i])|0;
+  }
+  for(i=0;i<8;i++){
+    for(j=3;j+1;j--){
+      var b2=(hash[i]>>(j*8))&255;
+      result+=((b2<16)?0:'')+b2.toString(16);
+    }
+  }
+  return result;
+}
 async function sha256(str){
-  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
-  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  if(window.crypto&&crypto.subtle){
+    try{
+      const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+      return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+    }catch(e){}
+  }
+  return sha256Fallback(str);
 }
 function rateLimited(){
   const now=Date.now();
@@ -1294,7 +1347,35 @@ startEngine();
 enterGuest();   /* land directly on the live user page — auth only when acting */
 document.getElementById('inPass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 document.getElementById('inMobile').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
-if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});   /* installable PWA + offline shell */
+/* single-file test build: PWA manifest & service worker omitted (they require hosting) */
+
+/* ══ TESTER GUIDE (single-file build) ══ */
+function openTesterGuide(){
+  document.getElementById('modalBody').innerHTML=
+  '<div class="paper" style="max-height:80vh;overflow-y:auto">'
+  +'<div class="stamp">Test Build</div>'
+  +'<div style="font-weight:900;font-size:1.15rem">🧪 SAAHAA Tester Guide</div>'
+  +'<div style="font-size:.72rem;color:#6B7280;margin:.2rem 0 .7rem">Single-file build — data stays in THIS browser (localStorage). Fonts need internet; everything else works offline.</div>'
+  +'<div style="font-size:.74rem;color:#374151;line-height:1.9">'
+  +'<b>Credentials</b><br>• Customer/Worker: Sign Up with any name + 10-digit mobile (starts 6-9)<br>• Admin: name <code style="background:#EEF2F7;padding:0 4px;border-radius:4px">admin</code> + passcode <code style="background:#EEF2F7;padding:0 4px;border-radius:4px">saahaa123</code><br><br>'
+  +'<b>Checklist — Guest</b><br>☐ Lands directly on live market (no login wall)<br>☐ LED ticker streams deals with +12% projection<br>☐ Tap catalog card → order book switches<br>☐ Any action (AUTO-BOOK / Bid / Auto-Pilot) → Login/Sign-Up sheet opens<br><br>'
+  +'<b>Checklist — Customer</b><br>☐ Sign Up (Customer) → pending action executes, Auto-Pilot turns ON<br>☐ Auto-deals arrive with zero clicks (counter rises)<br>☐ Manual bid ≥ best ask → paper receipt (price, +12%, split bar, OTP)<br>☐ My Deals stages advance ESCROW → OTP → PAID by themselves<br>☐ Login with unregistered number → rejected with "Use Sign Up"<br><br>'
+  +'<b>Checklist — Worker</b><br>☐ Sign Up (Worker) with category + ask price → Worker dashboard<br>☐ Your ask appears as ⭐ You in the book; Auto-Ask re-prices it down toward best bid<br>☐ "Job won!" toasts arrive hands-free; Jobs list + leather Wallet update<br>☐ Toggle OFFLINE → ask withdrawn; ONLINE → reposted<br>☐ Logout → Login again restores role, category, price<br><br>'
+  +'<b>Checklist — Admin</b><br>☐ Login as admin → Sandbox (KPIs, profit curve)<br>☐ Visitor Registry shows every signup: name, mobile, customer/worker/admin tag<br>☐ 🚀 1 Lakh Stress Test → ~100k deals, ratios exactly 1.12 / 0.08, 0 mismatches<br>☐ ⛓ Verify Ledger Chain → "intact"<br>☐ Deals CSV / Visitors CSV download<br><br>'
+  +'<b>Checklist — General</b><br>☐ 🌓 dark mode<br>☐ Narrow window (&lt;700px) → bottom tab bar per role<br>☐ Open this file in a 2nd tab → header Mesh counter shows 1 peer, deals sync<br>☐ Wrong admin passcode ×6 → rate-limited for 60s'
+  +'</div>'
+  +'<button class="sk-btn sk-green" style="width:100%;margin-top:1rem" onclick="document.getElementById(&quot;modalWrap&quot;).classList.remove(&quot;show&quot;)">Close</button>'
+  +'</div>';
+  document.getElementById('modalWrap').classList.add('show');
+}
+(function(){
+  var b=document.createElement('button');
+  b.textContent='🧪'; b.title='Tester Guide'; b.id='testerBtn';
+  b.style.cssText='position:fixed;bottom:5.6rem;right:1rem;z-index:700;width:54px;height:54px;border-radius:50%;font-size:1.45rem;border:1px solid rgba(0,0,0,.28);cursor:pointer;background:linear-gradient(180deg,#A78BFA,#7C3AED 55%,#6D28D9);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.3),0 6px 16px rgba(124,58,237,.5)';
+  b.onclick=openTesterGuide;
+  document.body.appendChild(b);
+  setTimeout(function(){ toast('🧪 Test build — tap the purple flask for the tester guide'); }, 1500);
+})();
 </script>
 </body>
 </html>
