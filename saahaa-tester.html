@@ -10,8 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="SAAHAA">
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzNEQzOTkiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIuNTUiIHN0b3AtY29sb3I9IiMwNTk2NjkiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMEVBNUU5Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEyMCIgZmlsbD0idXJsKCNnKSIvPgogIDxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjQ4MCIgaGVpZ2h0PSIyNDAiIHJ4PSIxMDQiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9Ii4xNCIvPgogIDx0ZXh0IHg9IjI1NiIgeT0iMzUyIiBmb250LWZhbWlseT0iQXJpYWwsIEhlbHZldGljYSwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMDAiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNmZmZmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlM8L3RleHQ+Cjwvc3ZnPgo=" type="image/svg+xml">
-<title>SAAHAA Exchange — Single-File Test Build</title>
-<meta name="description" content="SAAHAA v3.0 — fully automated peer-to-peer bid/ask exchange. +12% projection, 8% profit, escrow OTP pipeline, hash-chained ledger.">
+<title>SAAHAA Exchange — Single-File Test Build v4</title>
+<meta name="description" content="SAAHAA v4.0 — fully automated peer-to-peer bid/ask exchange. +10% GST & charges, 8% profit, escrow OTP pipeline, hash-chained ledger, deal chat.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -287,6 +287,17 @@ select.ctl{background:var(--surface);border:1px solid var(--line);border-radius:
   .auto-panel{flex-wrap:wrap}
 }
 
+/* chat */
+.chat-wrap{max-height:290px;min-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:.45rem;padding:.6rem;background:var(--surface2);border:1px solid var(--line);border-radius:12px;margin:.8rem 0;box-shadow:inset 0 2px 5px rgba(15,23,42,.08)}
+.chat-b{max-width:80%;padding:.5rem .75rem;border-radius:14px;font-size:.78rem;line-height:1.45;word-break:break-word}
+.chat-me{align-self:flex-end;background:linear-gradient(180deg,#34D399,#059669);color:#fff;border-bottom-right-radius:4px;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 2px 5px rgba(5,150,105,.35)}
+.chat-them{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px}
+.chat-meta{font-size:.55rem;opacity:.65;margin-top:.15rem}
+.chat-sys{align-self:center;font-size:.62rem;color:var(--muted);background:var(--surface);border:1px dashed var(--line);padding:.25rem .7rem;border-radius:99px}
+.deal-item.chatable{cursor:pointer;border-radius:10px;transition:background .15s}
+.deal-item.chatable:hover{background:var(--surface2)}
+.track-strip{display:flex;align-items:center;gap:.5rem;font-size:.72rem;font-weight:700;background:var(--brand-bg);color:var(--brand);border-radius:10px;padding:.5rem .8rem;margin-top:.6rem}
+
 /* toast + modal */
 #toast{position:fixed;bottom:1.4rem;left:50%;transform:translateX(-50%) translateY(90px);background:var(--ink);color:var(--bg);padding:.65rem 1.2rem;border-radius:999px;font-size:.78rem;font-weight:700;box-shadow:var(--sh-lg);transition:transform .3s var(--ease);z-index:900;max-width:92vw}
 body.dark #toast{background:#F1F5F9;color:#0F172A}
@@ -328,7 +339,7 @@ body.dark #toast{background:#F1F5F9;color:#0F172A}
       </div>
       <div class="field"><label>My Ask Price (₹)</label><input id="inWAsk" type="number" min="1" max="99999" placeholder="e.g. 550"></div>
     </div>
-    <div class="field" id="passField"><label>Passcode <span style="text-transform:none;font-weight:600">(admins only)</span></label><input id="inPass" type="password" placeholder="••••••••" maxlength="40"></div>
+    <div class="field" id="passField"><label>Password <span style="text-transform:none;font-weight:600" id="passHint">(min 3 characters)</span></label><input id="inPass" type="password" placeholder="••••••••" maxlength="40"></div>
     <button class="sk-btn sk-green" style="width:100%" id="authCta" onclick="doLogin()">Sign In →</button>
     <div class="login-err" id="loginErr"></div>
     <div class="sec-chips">
@@ -388,7 +399,7 @@ body.dark #toast{background:#F1F5F9;color:#0F172A}
           <div class="quote-cell"><div class="q-lbl">Best Bid</div><div class="q-val q-bid" id="qBid">—</div></div>
           <div class="quote-cell"><div class="q-lbl">Best Ask</div><div class="q-val q-ask" id="qAsk">—</div></div>
           <div class="quote-cell"><div class="q-lbl">Last Deal</div><div class="q-val" id="qLast">—</div></div>
-          <div class="quote-cell"><div class="q-lbl">You Pay (+12%)</div><div class="q-val q-proj" id="qProj">—</div></div>
+          <div class="quote-cell"><div class="q-lbl">You Pay (+10%)</div><div class="q-val q-proj" id="qProj">—</div></div>
         </div>
         <div class="book">
           <div><div class="book-col-h"><span style="color:var(--brand)">BIDS (customers)</span><span>₹</span></div><div id="bidCol"></div></div>
@@ -398,7 +409,7 @@ body.dark #toast{background:#F1F5F9;color:#0F172A}
           <input id="myBidInput" type="number" min="1" max="99999" placeholder="Manual bid ₹ (optional — Auto-Pilot handles it)">
           <button class="sk-btn sk-green" onclick="placeMyBid()">Bid ⚡</button>
         </div>
-        <div class="note">💡 Direct P2P: your bid matches a worker's ask with no middleman — funds lock in escrow, the 4-digit OTP releases payout. Confirmed price is <b>projected +12%</b>: platform profit <b>8%</b>, GST &amp; ops 4%. Worker receives the full confirmed price.</div>
+        <div class="note">💡 Direct P2P: your bid matches a worker's ask with no middleman — funds lock in escrow, the 4-digit OTP releases payout. Confirmed price + <b>10% GST &amp; charges</b> = what you pay (platform profit 8%, GST 2%). Worker receives the full confirmed price. Tap any deal to 📍 track &amp; 💬 chat with your worker.</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:1.1rem">
         <div class="card" id="dealsAnchor">
@@ -434,7 +445,7 @@ body.dark #toast{background:#F1F5F9;color:#0F172A}
             <div class="quote-cell"><div class="q-lbl">Best Bid</div><div class="q-val q-bid" id="wqBid">—</div></div>
             <div class="quote-cell"><div class="q-lbl">My Ask</div><div class="q-val q-ask" id="wqAsk">—</div></div>
             <div class="quote-cell"><div class="q-lbl">Last Deal</div><div class="q-val" id="wqLast">—</div></div>
-            <div class="quote-cell"><div class="q-lbl">Cust. Pays (+12%)</div><div class="q-val q-proj" id="wqProj">—</div></div>
+            <div class="quote-cell"><div class="q-lbl">Cust. Pays (+10%)</div><div class="q-val q-proj" id="wqProj">—</div></div>
           </div>
           <div class="book">
             <div><div class="book-col-h"><span style="color:var(--brand)">BIDS (customers)</span><span>₹</span></div><div id="wBidCol"></div></div>
@@ -444,7 +455,7 @@ body.dark #toast{background:#F1F5F9;color:#0F172A}
             <input id="wAskInput" type="number" min="1" max="99999" placeholder="New ask price ₹">
             <button class="sk-btn sk-amber" onclick="updateWorkerAsk()">Update Ask 🏷</button>
           </div>
-          <div class="note">💡 You receive <b>100% of your confirmed price</b> — the +12% projection is charged to the customer on top. Matches settle to your wallet through escrow → OTP automatically.</div>
+          <div class="note">💡 You receive <b>100% of your confirmed price</b> — the +10% GST &amp; charges is added to the customer on top. Matches settle to your wallet through escrow → OTP automatically.</div>
         </div>
         <div class="card" id="wJobsCard">
           <div class="card-h">💼 My Jobs<small id="wJobCount"></small></div>
@@ -483,7 +494,7 @@ body.dark #toast{background:#F1F5F9;color:#0F172A}
     <div class="kpi-grid" id="kpiAnchor">
       <div class="kpi metal" style="--kc:#2563EB"><div class="kpi-lbl">Confirmed Deals</div><div class="kpi-val" id="kDeals">0</div><div class="kpi-sub" id="kDealsSub"></div></div>
       <div class="kpi metal" style="--kc:#059669"><div class="kpi-lbl">Deal Volume</div><div class="kpi-val" id="kVol">₹0</div><div class="kpi-sub">sum of confirmed prices</div></div>
-      <div class="kpi metal" style="--kc:#7C3AED"><div class="kpi-lbl">Projected Revenue (+12%)</div><div class="kpi-val" id="kProj">₹0</div><div class="kpi-sub">what customers pay</div></div>
+      <div class="kpi metal" style="--kc:#7C3AED"><div class="kpi-lbl">Collections (+10% GST &amp; charges)</div><div class="kpi-val" id="kProj">₹0</div><div class="kpi-sub">what customers pay</div></div>
       <div class="kpi metal" style="--kc:#D97706"><div class="kpi-lbl">Platform Profit (8%)</div><div class="kpi-val" id="kProfit">₹0</div><div class="kpi-sub" id="kProfitSub"></div></div>
     </div>
 
@@ -540,12 +551,12 @@ body.dark #toast{background:#F1F5F9;color:#0F172A}
    SAAHAA EXCHANGE v3.0 — FULLY AUTOMATED P2P CORE
    Pipeline (zero manual steps in Auto-Pilot):
    AGENT BID → P2P MATCH → ESCROW LOCK → OTP VERIFY → PAYOUT
-   Deal D → customer pays D×1.12 · profit 8% · GST/ops 4%
+   Deal D → customer pays D×1.10 (GST & charges) · profit 8% · GST 2%
    Security: SHA-256 auth · CSP · XSS escaping · rate limit
              hash-chained ledger · BroadcastChannel P2P mesh
    ═══════════════════════════════════════════════════════ */
-const MARKUP=0.12, PROFIT=0.08, GSTOPS=0.04;
-const LS_KEY='SAAHAA_V3_STATE';
+const MARKUP=0.10, PROFIT=0.08, GSTOPS=0.02;
+const LS_KEY='SAAHAA_V4_STATE';
 const ADMIN_PASS_HASH='103291d01ffa6b14328a1e853eb37a4f98718a2312b732399c2749f5a9f678d8'; /* sha256("saahaa123") */
 
 const CATS=[
@@ -568,7 +579,23 @@ const PROVIDERS={
 };
 const SIM_CUSTOMERS=['Priya S','Rahul K','Meena D','Farhan A','Lakshmi R','Dev P','Sana I','Kiran T','Asha M','Vijay N'];
 
-let state={visitors:[], deals:[], profitSeries:[], agg:{deals:0,vol:0,proj:0,profit:0,gst:0}, chain:{length:0,lastHash:'GENESIS'}, stress:null};
+let state={visitors:[], deals:[], profitSeries:[], agg:{deals:0,vol:0,proj:0,profit:0,gst:0}, chain:{length:0,lastHash:'GENESIS'}, stress:null, chats:{}, testSeeded:false};
+const AREAS=['Madhapur','Ameerpet','Jubilee Hills','Kondapur','Gachibowli','Banjara Hills','Kukatpally'];
+const areaOf=n=>AREAS[[...String(n)].reduce((s,c)=>s+c.charCodeAt(0),0)%AREAS.length];
+/* 5 customers + 5 workers pre-registered for manual testing — password for all: 123 */
+const TEST_ACCOUNTS={
+  custs:[['Anoosh Kumar','9000000001'],['Priya Sharma','9000000002'],['Rahul Verma','9000000003'],['Sneha Reddy','9000000004'],['Farhan Ali','9000000005']],
+  wkrs:[['Amit Verma','9100000001','plumber',520],['Vikram Volts','9100000002','electrician',480],['CoolCare Ravi','9100000003','acrepair',750],['SparkleTeam Devi','9100000004','cleaning',400],['Press Express','9100000005','laundry',180]]
+};
+async function seedTestAccounts(){
+  if(state.testSeeded) return;
+  const h=await sha256('123'), now=Date.now();
+  TEST_ACCOUNTS.custs.forEach(([n,m])=>{ const key=(n+'|'+m).toLowerCase();
+    if(!state.visitors.some(v=>v.key===key)) state.visitors.push({key,name:n,mobile:m,role:'user',pass:h,visits:0,firstSeen:now,lastSeen:now}); });
+  TEST_ACCOUNTS.wkrs.forEach(([n,m,c,a])=>{ const key=(n+'|'+m).toLowerCase();
+    if(!state.visitors.some(v=>v.key===key)) state.visitors.push({key,name:n,mobile:m,role:'worker',pass:h,wcat:c,wask:a,visits:0,firstSeen:now,lastSeen:now}); });
+  state.testSeeded=true; save();
+}
 let session=null, books={}, activeCat='plumber';
 let engineOn=true, speed=1, engineTimer=null, orderSeq=1, apDeals=0;
 const PEER_ID='peer-'+Math.random().toString(36).slice(2,10);
@@ -674,6 +701,15 @@ function initMesh(){
     if(m.type==='visitor' && m.v && !state.visitors.some(x=>x.key===m.v.key)){
       state.visitors.unshift(m.v); save();
     }
+    if(m.type==='chat' && m.dealId && m.msg){
+      if(!state.chats) state.chats={};
+      const list=state.chats[m.dealId]=state.chats[m.dealId]||[];
+      if(!list.some(x=>x.id===m.msg.id)){
+        list.push(m.msg); save();
+        if(currentChatDeal===m.dealId) renderChatMsgs();
+        else toast('💬 '+m.msg.name+': '+String(m.msg.text).slice(0,42));
+      }
+    }
     renderMeshPill();
   };
   mesh.postMessage({type:'hello',peer:PEER_ID});
@@ -720,6 +756,7 @@ function engineTick(){
   autoPilotTick();
   workerTick();
   renderMarket(); renderPulse(); renderCatalogLive();
+  if(currentChatDeal) renderChatMsgs();
   if(session&&session.role==='worker') renderWorker();
   if(session&&session.role==='admin') renderSandbox();
 }
@@ -734,8 +771,8 @@ function matchBook(catId){
 function advanceLifecycles(){
   let changed=false;
   state.deals.forEach(d=>{
-    if(d.stage==='ESCROW'){d.stage='OTP';changed=true;}
-    else if(d.stage==='OTP'){d.stage='PAID';changed=true;}
+    if(d.stage==='ESCROW'&&Math.random()<.30){d.stage='OTP';changed=true;}
+    else if(d.stage==='OTP'&&Math.random()<.30){d.stage='PAID';changed=true;}
   });
   if(changed) save();
 }
@@ -812,10 +849,10 @@ function renderWorker(){
   const jobs=state.deals.filter(d=>d.provider===session.name).slice(0,8);
   document.getElementById('wJobCount').textContent=jobs.length+' jobs';
   document.getElementById('wJobs').innerHTML=jobs.length?jobs.map(d=>
-    `<div class="deal-item"><div class="deal-ico" style="--cl:${c.cl};--cc:${c.cc}">${d.ico}</div>
+    `<div class="deal-item chatable" onclick="openChat('${d.id}')"><div class="deal-ico" style="--cl:${c.cl};--cc:${c.cc}">${d.ico}</div>
       <div><div class="deal-t">${esc(d.customer)}</div>
-      <div class="deal-s">${nowStr(d.ts)} · <span class="stage st-${d.stage}">${d.stage==='PAID'?'✔ PAID':d.stage==='OTP'?'🔑 OTP '+d.otp:'🔒 ESCROW'}</span></div></div>
-      <div class="deal-amt"><div class="a1" style="color:var(--brand)">${fmt2(d.deal)}</div><div class="a2">you earn 100%</div></div></div>`).join('')
+      <div class="deal-s">${nowStr(d.ts)} · <span class="stage st-${d.stage}">${d.stage==='PAID'?'✔ PAID':d.stage==='OTP'?'🔑 OTP '+d.otp:'🔒 ESCROW'}</span> · 📍 ${esc(d.area||'')}</div></div>
+      <div class="deal-amt"><div class="a1" style="color:var(--brand)">${fmt2(d.deal)}</div><div class="a2">100% yours · 💬 chat</div></div></div>`).join('')
     :'<div class="empty">Stay online — your first job is on the way ⚡</div>';
   const all=state.deals.filter(d=>d.provider===session.name);
   const earned=all.filter(d=>d.stage==='PAID').reduce((s,d)=>s+d.deal,0);
@@ -837,8 +874,10 @@ function renderWorker(){
 function confirmDeal(catId,dealPrice,provider,customer,isMine,askMine){
   const c=CATS.find(x=>x.id===catId);
   const projected=r2(dealPrice*(1+MARKUP)), profit=r2(dealPrice*PROFIT), gst=r2(dealPrice*GSTOPS);
+  const km=+(rand(0.8,6.5).toFixed(1));
   const deal={id:PEER_ID+'-'+(orderSeq++)+'-'+Date.now(),ts:Date.now(),cat:c.name,ico:c.ico,provider,customer,
-    deal:dealPrice,projected,profit,gst,mine:!!isMine,workerMine:!!askMine,stage:'ESCROW',otp:String(1000+Math.floor(Math.random()*9000)),hash:'…'};
+    deal:dealPrice,projected,profit,gst,mine:!!isMine,workerMine:!!askMine,stage:'ESCROW',otp:String(1000+Math.floor(Math.random()*9000)),hash:'…',
+    area:areaOf(provider),km,eta:Math.round(km*4+6)};
   state.deals.unshift(deal); trimDeals(); applyAgg(deal);
   const prev=state.profitSeries.length?state.profitSeries[state.profitSeries.length-1]:0;
   state.profitSeries.push(r2(prev+profit));
@@ -856,7 +895,13 @@ function confirmDeal(catId,dealPrice,provider,customer,isMine,askMine){
     if(session&&session.role==='worker') renderWorker();
   }
 }
-function trimDeals(){ if(state.deals.length>300) state.deals.length=300; }
+function trimDeals(){
+  if(state.deals.length>300){
+    state.deals.length=300;
+    const ids=new Set(state.deals.map(d=>d.id));
+    Object.keys(state.chats||{}).forEach(k=>{ if(!ids.has(k)) delete state.chats[k]; });
+  }
+}
 function applyAgg(d){ const a=state.agg; a.deals++; a.vol=r2(a.vol+d.deal); a.proj=r2(a.proj+d.projected); a.profit=r2(a.profit+d.profit); a.gst=r2(a.gst+d.gst); }
 
 /* ── HASH-CHAINED LEDGER ── */
@@ -916,8 +961,8 @@ function setAuthTab(mode){
   authMode=mode;
   document.getElementById('tabLogin').classList.toggle('on',mode==='login');
   document.getElementById('tabSignup').classList.toggle('on',mode==='signup');
-  document.getElementById('passField').style.display=mode==='login'?'block':'none';
   document.getElementById('roleField').style.display=mode==='signup'?'block':'none';
+  document.getElementById('passHint').textContent=mode==='login'?'(admin: saahaa123)':'(min 3 characters — you need it to login)';
   document.getElementById('authCta').textContent=mode==='login'?'Sign In →':'Create Account →';
   document.getElementById('authSub').textContent=mode==='login'
     ?'Welcome back — sign in to bid, book & track your deals.'
@@ -956,11 +1001,17 @@ async function doLogin(){
       wask=r2(wask);
     }
   }
+  if(role!=='admin'&&(!pass||pass.length<3)){ err.textContent='⚠ Password required (min 3 characters).'; err.style.display='block'; return; }
+  const passHash=role!=='admin'?await sha256(pass):null;
   const mob=role==='admin'?(mobile||'—'):mobile;
   const key=(name+'|'+mob).toLowerCase();
   let v=state.visitors.find(x=>x.key===key);
   if(role!=='admin'&&authMode==='login'&&!v){
     err.innerHTML='⚠ No account found for this name + mobile. <b>Use Sign Up.</b>'; err.style.display='block';
+    return;
+  }
+  if(role!=='admin'&&v&&v.pass&&v.pass!==passHash){
+    err.textContent=authMode==='login'?'⚠ Wrong password.':'⚠ This name + mobile is already registered — wrong password.'; err.style.display='block';
     return;
   }
   if(role!=='admin'&&authMode==='signup'&&v) toast('You were already registered — signed you in!');
@@ -974,8 +1025,8 @@ async function doLogin(){
     session.wask=wask||CATS.find(c=>c.id===session.wcat).base;
     session.online=true; session.autoAsk=true;
   }
-  if(v){ v.visits++; v.lastSeen=Date.now(); }
-  else { v={key,name,mobile:mob,role,visits:1,firstSeen:Date.now(),lastSeen:Date.now()}; if(role==='worker'){v.wcat=session.wcat;v.wask=session.wask;} state.visitors.unshift(v); }
+  if(v){ v.visits++; v.lastSeen=Date.now(); if(role!=='admin'&&!v.pass) v.pass=passHash; }
+  else { v={key,name,mobile:mob,role,visits:1,firstSeen:Date.now(),lastSeen:Date.now(),pass:passHash}; if(role==='worker'){v.wcat=session.wcat;v.wask=session.wask;} state.visitors.unshift(v); }
   save(); gossip('visitor',{v});
   closeAuthKeepPending(); enterApp();
 }
@@ -1125,10 +1176,10 @@ function renderMyDeals(){
   document.getElementById('myDealCount').textContent=mine.length+' deals';
   document.getElementById('myDeals').innerHTML=mine.length?mine.map(d=>{
     const c=catByName(d.cat)||{};
-    return `<div class="deal-item"><div class="deal-ico" style="--cl:${c.cl};--cc:${c.cc}">${d.ico}</div>
+    return `<div class="deal-item chatable" onclick="openChat('${d.id}')"><div class="deal-ico" style="--cl:${c.cl};--cc:${c.cc}">${d.ico}</div>
       <div><div class="deal-t">${esc(d.cat)} · ${esc(d.provider)}</div>
-      <div class="deal-s">${fmt2(d.deal)} · ${nowStr(d.ts)} · <span class="stage st-${d.stage}">${d.stage==='PAID'?'✔ PAID':d.stage==='OTP'?'🔑 OTP '+d.otp:'🔒 ESCROW'}</span></div></div>
-      <div class="deal-amt"><div class="a1">${fmt2(d.projected)}</div><div class="a2">you pay (+12%)</div></div></div>`;
+      <div class="deal-s">${fmt2(d.deal)} · <span class="stage st-${d.stage}">${d.stage==='PAID'?'✔ PAID':d.stage==='OTP'?'🔑 OTP '+d.otp:'🔒 ESCROW'}</span> · 📍 ${esc(d.area||'')}</div></div>
+      <div class="deal-amt"><div class="a1">${fmt2(d.projected)}</div><div class="a2">you pay (+10%) · 💬 chat</div></div></div>`;
   }).join(''):'<div class="empty">Auto-Pilot will land your first deal shortly ⚡</div>';
 }
 function renderPulse(){
@@ -1155,7 +1206,7 @@ function showDealTicket(d){
     <div style="border-top:1.5px dashed #D1D5DB;margin:.9rem 0"></div>
     <table style="width:100%;font-size:.8rem;color:#374151">
       <tr><td>Confirmed price</td><td class="t-mono" style="text-align:right;border:none">${fmt2(d.deal)}</td></tr>
-      <tr><td>Projection (+12%)</td><td class="t-mono" style="text-align:right;border:none">+ ${fmt2(r2(d.projected-d.deal))}</td></tr>
+      <tr><td>GST &amp; charges (+10%)</td><td class="t-mono" style="text-align:right;border:none">+ ${fmt2(r2(d.projected-d.deal))}</td></tr>
       <tr><td style="font-weight:900;border:none">You pay</td><td class="t-mono" style="text-align:right;font-weight:900;color:#7C3AED;border:none">${fmt2(d.projected)}</td></tr>
     </table>
     <div class="split-bar">
@@ -1163,19 +1214,96 @@ function showDealTicket(d){
       <div class="split-seg" style="width:${pSeg}%;background-color:#7C3AED">${fmt2(d.profit)}</div>
       <div class="split-seg" style="width:${gSeg}%;background-color:#D97706">${fmt2(d.gst)}</div>
     </div>
-    <div class="leg"><span style="--c:#059669">Worker 100%</span><span style="--c:#7C3AED">Profit 8%</span><span style="--c:#D97706">GST/ops 4%</span></div>
+    <div class="leg"><span style="--c:#059669">Worker 100%</span><span style="--c:#7C3AED">Profit 8%</span><span style="--c:#D97706">GST 2%</span></div>
     <div style="border-top:1.5px dashed #D1D5DB;margin:.9rem 0"></div>
     <div style="font-size:.72rem;color:#6B7280">🔒 Escrow locked · 🔑 Release OTP: <b class="t-mono" style="color:#DC2626;font-size:.9rem;letter-spacing:.2em">${d.otp}</b></div>
+    <div style="font-size:.74rem;font-weight:700;color:#047857;background:#ECFDF5;border-radius:8px;padding:.45rem .7rem;margin-top:.6rem">📍 ${esc(d.provider)} is in <b>${esc(d.area)}</b> · ${d.km} km away · ETA ~${d.eta} min</div>
     <div style="font-size:.6rem;color:#9CA3AF;margin-top:.3rem" class="t-mono">block #${d.blockIdx!=null?d.blockIdx:'…'} · ${d.hash?String(d.hash).slice(0,18):''}…</div>
-    <button class="sk-btn sk-green" style="width:100%;margin-top:1.1rem" onclick="document.getElementById('modalWrap').classList.remove('show')">Done ✔</button>
+    <div style="display:flex;gap:.6rem;margin-top:1.1rem">
+      <button class="sk-btn sk-green" style="flex:1" onclick="document.getElementById('modalWrap').classList.remove('show');openChat('${d.id}')">💬 Chat with worker</button>
+      <button class="sk-btn sk-slate" onclick="document.getElementById('modalWrap').classList.remove('show')">Done ✔</button>
+    </div>
   </div>`;
   document.getElementById('modalWrap').classList.add('show');
+}
+
+/* ── DEAL CHAT + WORKER TRACKING ── */
+let currentChatDeal=null;
+function trackLine(d){
+  if(d.stage==='PAID') return '✅ Job completed · '+esc(d.area);
+  if(d.stage==='OTP') return '🛵 Arriving now — almost at your door';
+  return '📍 '+esc(d.area)+' · '+d.km+' km away · ETA ~'+d.eta+' min';
+}
+function openChat(dealId){
+  const d=state.deals.find(x=>x.id===dealId); if(!d){ toast('Deal not found'); return; }
+  currentChatDeal=dealId;
+  const iAmWorker=session&&session.role==='worker';
+  const other=iAmWorker?d.customer:d.provider;
+  document.getElementById('modalBody').innerHTML=`
+  <div class="card" style="box-shadow:var(--sh-lg)">
+    <div class="card-h" style="margin-bottom:.3rem">${d.ico} ${esc(other)}<small><span class="stage st-${d.stage}">${d.stage}</span></small></div>
+    <div class="track-strip" id="chatTrack">${iAmWorker?('📍 Customer in '+esc(d.area)+' · '+d.km+' km · OTP with customer'):trackLine(d)}</div>
+    <div class="chat-wrap" id="chatMsgs"></div>
+    <div class="bid-box" style="margin-top:.2rem">
+      <input id="chatInput" maxlength="200" placeholder="Type a message…" autocomplete="off">
+      <button class="sk-btn sk-green" onclick="sendChat()">Send ➤</button>
+    </div>
+    <button class="btn-ghost" style="width:100%;margin-top:.7rem" onclick="document.getElementById('modalWrap').classList.remove('show');currentChatDeal=null">Close</button>
+  </div>`;
+  document.getElementById('modalWrap').classList.add('show');
+  renderChatMsgs();
+  const inp=document.getElementById('chatInput');
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter') sendChat(); });
+  inp.focus();
+}
+function renderChatMsgs(){
+  const box=document.getElementById('chatMsgs'); if(!box||!currentChatDeal) return;
+  const d=state.deals.find(x=>x.id===currentChatDeal); if(!d) return;
+  const tr=document.getElementById('chatTrack');
+  if(tr&&!(session&&session.role==='worker')) tr.innerHTML=trackLine(d);
+  const myFrom=session&&session.role==='worker'?'worker':'customer';
+  const list=(state.chats||{})[currentChatDeal]||[];
+  box.innerHTML='<div class="chat-sys">🔒 P2P deal chat — synced after match</div>'+list.map(m=>
+    `<div class="chat-b ${m.from===myFrom?'chat-me':'chat-them'}">${esc(m.text)}<div class="chat-meta">${esc(m.name)} · ${nowStr(m.ts)}</div></div>`).join('');
+  box.scrollTop=box.scrollHeight;
+}
+function sendChat(){
+  const inp=document.getElementById('chatInput');
+  const text=(inp.value||'').trim();
+  if(!text||!currentChatDeal||!session) return;
+  const d=state.deals.find(x=>x.id===currentChatDeal); if(!d) return;
+  const from=session.role==='worker'?'worker':'customer';
+  const msg={id:PEER_ID+'-c'+(orderSeq++),from,name:session.name,text,ts:Date.now()};
+  if(!state.chats) state.chats={};
+  (state.chats[currentChatDeal]=state.chats[currentChatDeal]||[]).push(msg);
+  if(state.chats[currentChatDeal].length>60) state.chats[currentChatDeal].shift();
+  save(); inp.value=''; renderChatMsgs();
+  gossip('chat',{dealId:currentChatDeal,msg});
+  /* simulated counterpart answers when the other peer isn't a real logged-in account */
+  const counterpartSim=from==='customer'?!d.workerMine:!d.mine;
+  if(counterpartSim) setTimeout(()=>simReply(d,from==='customer'?'worker':'customer'),1200+Math.random()*1800);
+}
+function simReply(d,asRole){
+  const workerLines={
+    ESCROW:['🛵 Got your booking! Leaving from '+d.area+' now — about '+d.eta+' min.','On my way! I am '+d.km+' km out.','Booking confirmed 👍 starting now from '+d.area+'.'],
+    OTP:['Almost there! Please keep the 4-digit OTP ready 🙏','2 minutes away — see you soon!'],
+    PAID:['Thanks for the OTP — job marked complete ✅','Done! Please rate me 5⭐ 🙏']};
+  const custLines={
+    ESCROW:['Ok, waiting for you 🙏','Please come fast, gate is open.'],
+    OTP:['I can see you on the street! OTP is ready ✅','Come up, 2nd floor.'],
+    PAID:['Great work, thank you! ⭐⭐⭐⭐⭐','Payment done via OTP, thanks!']};
+  const pool=(asRole==='worker'?workerLines:custLines)[d.stage]||['👍'];
+  const msg={id:PEER_ID+'-c'+(orderSeq++),from:asRole,name:asRole==='worker'?d.provider:d.customer,text:pick(pool),ts:Date.now()};
+  (state.chats[d.id]=state.chats[d.id]||[]).push(msg);
+  save();
+  if(currentChatDeal===d.id) renderChatMsgs();
+  else toast('💬 '+msg.name+': '+msg.text.slice(0,42));
 }
 
 /* ── TICKER ── */
 function renderTicker(){
   const items=state.deals.slice(0,12).map(d=>
-    `<span>${d.ico} ${esc(d.cat)} <b>${fmt(d.deal)}</b> <span class="up">→ ${fmt(d.projected)} (+12%)</span></span>`);
+    `<span>${d.ico} ${esc(d.cat)} <b>${fmt(d.deal)}</b> <span class="up">→ ${fmt(d.projected)} (+10%)</span></span>`);
   const html=items.length?items.join(''):'<span>⚙️ SAAHAA P2P engine warming up — automated deals will stream here…</span>';
   document.getElementById('tickerTape').innerHTML=html+html;
 }
@@ -1188,7 +1316,7 @@ function renderSandbox(){
   document.getElementById('kVol').textContent=fmt(a.vol);
   document.getElementById('kProj').textContent=fmt(a.proj);
   document.getElementById('kProfit').textContent=fmt(a.profit);
-  document.getElementById('kProfitSub').textContent='+ '+fmt(a.gst)+' GST & ops buffer';
+  document.getElementById('kProfitSub').textContent='+ '+fmt(a.gst)+' GST collected (2%)';
 
   document.getElementById('ledgerMeta').textContent='last '+Math.min(state.deals.length,40)+' of '+a.deals.toLocaleString('en-IN');
   document.getElementById('dealTable').innerHTML=state.deals.slice(0,40).map(d=>
@@ -1269,7 +1397,7 @@ async function runStress(){
       const c=CATS[i%CATS.length];
       const D=r2(c.base*rand(0.85,1.15));
       const P=r2(D*(1+MARKUP)), pr=r2(D*PROFIT), g=r2(D*GSTOPS);
-      if(Math.abs(P-D*1.12)>0.011||Math.abs(pr-D*0.08)>0.011||Math.abs(g-D*0.04)>0.011) mismatches++;
+      if(Math.abs(P-D*1.10)>0.011||Math.abs(pr-D*0.08)>0.011||Math.abs(g-D*0.02)>0.011) mismatches++;
       vol+=D; proj+=P; profit+=pr; gst+=g;
     }
     done=end;
@@ -1294,9 +1422,9 @@ function renderStressReport(r){
     'Deals settled ......... <b>'+r.deals.toLocaleString('en-IN')+'</b><br>'+
     'Runtime ............... <b>'+r.secs+'s</b> ('+r.ops.toLocaleString('en-IN')+' deals/sec)<br>'+
     'Deal volume ........... <b>'+fmt(r.vol)+'</b><br>'+
-    'Projected (+12%) ...... <b>'+fmt(r.proj)+'</b> (ratio '+r.ratioProj+')<br>'+
+    'Collected (+10%) ...... <b>'+fmt(r.proj)+'</b> (ratio '+r.ratioProj+')<br>'+
     'Platform profit (8%) .. <b>'+fmt(r.profit)+'</b> (ratio '+r.ratioProfit+')<br>'+
-    'GST & ops (4%) ........ <b>'+fmt(r.gst)+'</b><br>'+
+    'GST (2%) .............. <b>'+fmt(r.gst)+'</b><br>'+
     'Math mismatches ....... <b style="color:'+(r.mismatches?'#F87171':'#4ADE80')+'">'+r.mismatches+'</b> '+(r.mismatches?'⚠':'✔ all invariants hold');
 }
 
@@ -1304,7 +1432,7 @@ function renderStressReport(r){
 function exportCSV(kind){
   let rows,name;
   if(kind==='deals'){
-    rows=[['Time','Category','Worker','Customer','Stage','DealPrice','Projected(+12%)','Profit(8%)','GST_Ops(4%)','BlockHash']]
+    rows=[['Time','Category','Worker','Customer','Stage','DealPrice','CustomerPays(+10%)','Profit(8%)','GST(2%)','BlockHash']]
       .concat(state.deals.map(d=>[new Date(d.ts).toISOString(),d.cat,d.provider,d.customer,d.stage,d.deal,d.projected,d.profit,d.gst,d.hash||'']));
     name='saahaa_deals.csv';
   } else {
@@ -1320,8 +1448,8 @@ function exportCSV(kind){
 }
 function resetSandbox(){
   if(!confirm('Reset ALL sandbox data (deals, chain, profit curve, visitors, stress report)?')) return;
-  state={visitors:[],deals:[],profitSeries:[],agg:{deals:0,vol:0,proj:0,profit:0,gst:0},chain:{length:0,lastHash:'GENESIS'},stress:null};
-  save(); seedBooks(); renderSandbox(); renderTicker();
+  state={visitors:[],deals:[],profitSeries:[],agg:{deals:0,vol:0,proj:0,profit:0,gst:0},chain:{length:0,lastHash:'GENESIS'},stress:null,chats:{},testSeeded:false};
+  save(); seedTestAccounts(); seedBooks(); renderSandbox(); renderTicker();
   document.getElementById('stressReport').textContent='No run yet — hit the purple button above.';
   toast('Sandbox reset ✓');
 }
@@ -1342,6 +1470,7 @@ load();
 try{ if(localStorage.getItem('SAAHAA_THEME')==='dark') document.body.classList.add('dark'); }catch(e){}
 document.getElementById('inWCat').innerHTML=CATS.map(c=>`<option value="${c.id}">${c.ico} ${c.name} (base ₹${c.base})</option>`).join('');
 seedBooks();
+seedTestAccounts();   /* 5 customers + 5 workers, password 123 */
 initMesh();
 startEngine();
 enterGuest();   /* land directly on the live user page — auth only when acting */
@@ -1349,20 +1478,23 @@ document.getElementById('inPass').addEventListener('keydown',e=>{ if(e.key==='En
 document.getElementById('inMobile').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 /* single-file test build: PWA manifest & service worker omitted (they require hosting) */
 
-/* ══ TESTER GUIDE (single-file build) ══ */
+/* ══ TESTER GUIDE (single-file build v4) ══ */
 function openTesterGuide(){
   document.getElementById('modalBody').innerHTML=
   '<div class="paper" style="max-height:80vh;overflow-y:auto">'
   +'<div class="stamp">Test Build</div>'
-  +'<div style="font-weight:900;font-size:1.15rem">🧪 SAAHAA Tester Guide</div>'
-  +'<div style="font-size:.72rem;color:#6B7280;margin:.2rem 0 .7rem">Single-file build — data stays in THIS browser (localStorage). Fonts need internet; everything else works offline.</div>'
+  +'<div style="font-weight:900;font-size:1.15rem">🧪 SAAHAA Tester Guide v4</div>'
+  +'<div style="font-size:.72rem;color:#6B7280;margin:.2rem 0 .7rem">Single-file build — data stays in THIS browser. Economics: customer pays deal +10% GST &amp; charges (8% profit + 2% GST).</div>'
   +'<div style="font-size:.74rem;color:#374151;line-height:1.9">'
-  +'<b>Credentials</b><br>• Customer/Worker: Sign Up with any name + 10-digit mobile (starts 6-9)<br>• Admin: name <code style="background:#EEF2F7;padding:0 4px;border-radius:4px">admin</code> + passcode <code style="background:#EEF2F7;padding:0 4px;border-radius:4px">saahaa123</code><br><br>'
-  +'<b>Checklist — Guest</b><br>☐ Lands directly on live market (no login wall)<br>☐ LED ticker streams deals with +12% projection<br>☐ Tap catalog card → order book switches<br>☐ Any action (AUTO-BOOK / Bid / Auto-Pilot) → Login/Sign-Up sheet opens<br><br>'
-  +'<b>Checklist — Customer</b><br>☐ Sign Up (Customer) → pending action executes, Auto-Pilot turns ON<br>☐ Auto-deals arrive with zero clicks (counter rises)<br>☐ Manual bid ≥ best ask → paper receipt (price, +12%, split bar, OTP)<br>☐ My Deals stages advance ESCROW → OTP → PAID by themselves<br>☐ Login with unregistered number → rejected with "Use Sign Up"<br><br>'
-  +'<b>Checklist — Worker</b><br>☐ Sign Up (Worker) with category + ask price → Worker dashboard<br>☐ Your ask appears as ⭐ You in the book; Auto-Ask re-prices it down toward best bid<br>☐ "Job won!" toasts arrive hands-free; Jobs list + leather Wallet update<br>☐ Toggle OFFLINE → ask withdrawn; ONLINE → reposted<br>☐ Logout → Login again restores role, category, price<br><br>'
-  +'<b>Checklist — Admin</b><br>☐ Login as admin → Sandbox (KPIs, profit curve)<br>☐ Visitor Registry shows every signup: name, mobile, customer/worker/admin tag<br>☐ 🚀 1 Lakh Stress Test → ~100k deals, ratios exactly 1.12 / 0.08, 0 mismatches<br>☐ ⛓ Verify Ledger Chain → "intact"<br>☐ Deals CSV / Visitors CSV download<br><br>'
-  +'<b>Checklist — General</b><br>☐ 🌓 dark mode<br>☐ Narrow window (&lt;700px) → bottom tab bar per role<br>☐ Open this file in a 2nd tab → header Mesh counter shows 1 peer, deals sync<br>☐ Wrong admin passcode ×6 → rate-limited for 60s'
+  +'<b>Ready-made test accounts (password for ALL: <code style="background:#EEF2F7;padding:0 4px;border-radius:4px">123</code>)</b><br>'
+  +'<u>Customers</u><br>• Anoosh Kumar — 9000000001<br>• Priya Sharma — 9000000002<br>• Rahul Verma — 9000000003<br>• Sneha Reddy — 9000000004<br>• Farhan Ali — 9000000005<br>'
+  +'<u>Workers</u><br>• Amit Verma — 9100000001 (Plumber ₹520)<br>• Vikram Volts — 9100000002 (Electrician ₹480)<br>• CoolCare Ravi — 9100000003 (AC Repair ₹750)<br>• SparkleTeam Devi — 9100000004 (Cleaning ₹400)<br>• Press Express — 9100000005 (Laundry ₹180)<br>'
+  +'<u>Admin</u>: name <code style="background:#EEF2F7;padding:0 4px;border-radius:4px">admin</code> · passcode <code style="background:#EEF2F7;padding:0 4px;border-radius:4px">saahaa123</code><br><br>'
+  +'<b>Checklist — Auth</b><br>☐ Signup needs password (min 3 chars); blank rejected<br>☐ Login with wrong password → "Wrong password"<br>☐ Login unregistered → "Use Sign Up"<br>☐ 6 attempts in 60s → rate-limited<br>☐ Worker login restores category + ask price<br><br>'
+  +'<b>Checklist — Customer</b><br>☐ AUTO-BOOK → paper receipt: price, +10% GST &amp; charges, split bar, OTP, 📍 worker location + ETA<br>☐ Receipt → 💬 Chat with worker; worker replies; track strip updates ESCROW→OTP→PAID<br>☐ Tap any deal in My Deals → chat reopens with history<br>☐ Auto-Pilot lands deals hands-free<br><br>'
+  +'<b>Checklist — Worker</b><br>☐ Own ask ⭐ in book; Auto-Ask re-prices to win jobs<br>☐ Tap a job → chat with customer (sim customer replies)<br>☐ Wallet: paid / escrow / avg<br><br>'
+  +'<b>Checklist — Admin</b><br>☐ KPIs show Collections (+10%) &amp; Profit (8%)<br>☐ Registry lists all 10 test accounts + your signups with mobiles<br>☐ 1 Lakh Stress Test → ratios 1.10 / 0.08, 0 mismatches<br>☐ Verify Ledger Chain → intact<br>☐ CSVs download<br><br>'
+  +'<b>General</b><br>☐ Two tabs of this file → Mesh: 1 peer; deals AND chat sync between tabs (login customer in one, its worker in the other, chat live!)<br>☐ 🌓 dark mode · narrow window → bottom tab bar'
   +'</div>'
   +'<button class="sk-btn sk-green" style="width:100%;margin-top:1rem" onclick="document.getElementById(&quot;modalWrap&quot;).classList.remove(&quot;show&quot;)">Close</button>'
   +'</div>';
@@ -1374,7 +1506,7 @@ function openTesterGuide(){
   b.style.cssText='position:fixed;bottom:5.6rem;right:1rem;z-index:700;width:54px;height:54px;border-radius:50%;font-size:1.45rem;border:1px solid rgba(0,0,0,.28);cursor:pointer;background:linear-gradient(180deg,#A78BFA,#7C3AED 55%,#6D28D9);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.3),0 6px 16px rgba(124,58,237,.5)';
   b.onclick=openTesterGuide;
   document.body.appendChild(b);
-  setTimeout(function(){ toast('🧪 Test build — tap the purple flask for the tester guide'); }, 1500);
+  setTimeout(function(){ toast('🧪 Test build — tap the purple flask for accounts & checklist'); }, 1500);
 })();
 </script>
 </body>
