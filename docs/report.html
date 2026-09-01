@@ -1,0 +1,654 @@
+<title>SAAHAA Build Statement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  --plum-950:#12061A; --plum-900:#1B0C24; --plum-800:#2E1739; --plum-700:#3F2150;
+  --gold-100:#FBEDC8; --gold-200:#F3DDA4; --gold-300:#EBC97C; --gold-500:#D4A24A; --gold-700:#8A6124;
+  --ivory:#FBF7F3;
+
+  /* LIGHT (default, un-stamped) */
+  --ground:#FBF7F3;
+  --panel:#FFFFFF;
+  --panel-2:#F6F0F4;
+  --ink:#22102C;
+  --ink-2:#584464;
+  --ink-3:#816E8C;
+  --rule:#E6DAE6;
+  --rule-strong:#CDBBD0;
+  --accent:#8A6124;
+  --accent-bright:#B07F32;
+  --good:#0E7C57;
+  --warn:#A65B12;
+  --crit:#B22745;
+  --chip:#F1E7F4;
+  --shadow:0 1px 2px rgba(34,16,44,.05), 0 8px 28px -12px rgba(34,16,44,.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#1B0C24; --panel:#25102F; --panel-2:#2E1739;
+    --ink:#FFF6E8; --ink-2:#D6C4DF; --ink-3:#9C86AA;
+    --rule:rgba(235,201,124,.17); --rule-strong:rgba(235,201,124,.34);
+    --accent:#EBC97C; --accent-bright:#F3DDA4;
+    --good:#6FD9AE; --warn:#F0B573; --crit:#F27F98;
+    --chip:rgba(224,181,88,.12);
+    --shadow:0 1px 0 rgba(255,246,232,.05) inset, 0 18px 44px rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#1B0C24; --panel:#25102F; --panel-2:#2E1739;
+  --ink:#FFF6E8; --ink-2:#D6C4DF; --ink-3:#9C86AA;
+  --rule:rgba(235,201,124,.17); --rule-strong:rgba(235,201,124,.34);
+  --accent:#EBC97C; --accent-bright:#F3DDA4;
+  --good:#6FD9AE; --warn:#F0B573; --crit:#F27F98;
+  --chip:rgba(224,181,88,.12);
+  --shadow:0 1px 0 rgba(255,246,232,.05) inset, 0 18px 44px rgba(0,0,0,.55);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font:500 16px/1.62 "Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  letter-spacing:-.008em;
+  -webkit-font-smoothing:antialiased;
+}
+.page{max-width:78rem;margin:0 auto;padding:0 clamp(1.1rem,4vw,2.6rem) 6rem}
+.col{max-width:62ch}
+
+/* ─── masthead ─────────────────────────────────────── */
+.mast{
+  display:grid;grid-template-columns:auto 1fr;gap:clamp(1.1rem,3vw,2.2rem);
+  align-items:center;
+  padding:clamp(2.6rem,7vw,4.6rem) 0 clamp(1.6rem,4vw,2.4rem);
+  border-bottom:1px solid var(--rule-strong);
+}
+.mark{width:clamp(74px,11vw,104px);height:auto;display:block}
+.mast h1{
+  font-family:"Bodoni Moda",Didot,Georgia,serif;
+  font-weight:700;font-size:clamp(2.3rem,6.4vw,4.1rem);line-height:.98;
+  letter-spacing:.16em;text-transform:uppercase;margin:0;
+  text-wrap:balance;
+  background:linear-gradient(128deg,var(--gold-200) 0%,var(--gold-500) 44%,var(--gold-100) 56%,var(--gold-700) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+:root:not([data-theme="dark"]) .mast h1{
+  background:linear-gradient(128deg,#B07F32 0%,#8A6124 46%,#C9993F 60%,#6B4A19 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.mast .kicker{
+  font:700 .69rem/1.4 "Manrope",sans-serif;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 .7rem;
+}
+.mast .sub{
+  font:500 .95rem/1.5 "IBM Plex Mono",ui-monospace,monospace;
+  color:var(--ink-3);margin:.85rem 0 0;letter-spacing:0;
+}
+.lede{
+  font-size:clamp(1.05rem,2.1vw,1.28rem);line-height:1.58;color:var(--ink-2);
+  margin:clamp(1.8rem,4vw,2.6rem) 0 0;max-width:64ch;
+}
+.lede strong{color:var(--ink);font-weight:700}
+
+/* ─── sections ─────────────────────────────────────── */
+section{padding-top:clamp(3rem,7vw,4.8rem)}
+h2{
+  font-family:"Bodoni Moda",Didot,Georgia,serif;
+  font-weight:600;font-size:clamp(1.5rem,3.3vw,2.1rem);line-height:1.12;
+  margin:0 0 .35rem;text-wrap:balance;letter-spacing:-.01em;
+}
+h2 + .note{color:var(--ink-3);font-size:.94rem;margin:0 0 1.7rem;max-width:60ch}
+h3{
+  font:800 .74rem/1.4 "Manrope",sans-serif;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:2.1rem 0 .9rem;
+}
+.hr{height:1px;background:var(--rule-strong);margin-top:clamp(2.4rem,5vw,3.4rem)}
+p{margin:0 0 1rem;max-width:64ch}
+a{color:var(--accent);text-underline-offset:3px}
+
+/* ─── the statement device: dotted-leader rows ─────── */
+.stmt{display:flex;flex-direction:column;gap:.05rem;margin:0 0 1.4rem}
+.stmt .row{
+  display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:.7rem;
+  padding:.52rem 0;border-bottom:1px dotted var(--rule);
+}
+.stmt .row.total{border-bottom:0;border-top:1.5px solid var(--rule-strong);margin-top:.35rem;padding-top:.75rem}
+.stmt .lbl{color:var(--ink-2);font-size:.95rem}
+.stmt .row.total .lbl{color:var(--ink);font-weight:700}
+.stmt .val{
+  font:600 .97rem/1 "IBM Plex Mono",ui-monospace,monospace;
+  font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;
+}
+.stmt .row.total .val{font-size:1.22rem;font-weight:600;color:var(--accent-bright)}
+.stmt .val.dim{color:var(--ink-3);font-weight:400}
+.stmt .val.good{color:var(--good)}
+.stmt .val.strike{color:var(--ink-3);text-decoration:line-through}
+.stmt .sub{display:block;font:400 .78rem/1.4 "Manrope",sans-serif;color:var(--ink-3);margin-top:.1rem}
+
+/* ─── cards ────────────────────────────────────────── */
+.grid{display:grid;gap:.85rem}
+.g2{grid-template-columns:repeat(auto-fit,minmax(19rem,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))}
+.card{
+  background:var(--panel);border:1px solid var(--rule);border-radius:.7rem;
+  padding:1.15rem 1.25rem;box-shadow:var(--shadow);
+}
+.card h4{
+  font:800 .95rem/1.35 "Manrope",sans-serif;margin:0 0 .45rem;color:var(--ink);
+  display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;
+}
+.card p{font-size:.9rem;color:var(--ink-2);margin:0 0 .55rem;max-width:none}
+.card p:last-child{margin-bottom:0}
+.card ul{margin:.5rem 0 0;padding-left:1.05rem;font-size:.86rem;color:var(--ink-2)}
+.card li{margin-bottom:.22rem}
+
+/* ─── ballot ───────────────────────────────────────── */
+.ballot{border-left:2px solid var(--accent);padding-left:1.05rem;margin:0 0 1.5rem}
+.ballot .q{font-weight:700;font-size:.95rem;margin:0 0 .3rem}
+.ballot .a{font-size:.9rem;color:var(--ink-2);margin:0}
+.ballot .a b{color:var(--accent-bright);font-weight:700}
+
+/* ─── chips ────────────────────────────────────────── */
+.chip{
+  display:inline-flex;align-items:center;gap:.3rem;
+  font:600 .71rem/1 "Manrope",sans-serif;letter-spacing:.04em;
+  padding:.33rem .6rem;border-radius:999px;background:var(--chip);color:var(--accent);
+  white-space:nowrap;
+}
+.chip.good{color:var(--good);background:color-mix(in srgb,var(--good) 12%,transparent)}
+.chip.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent)}
+.chip.crit{color:var(--crit);background:color-mix(in srgb,var(--crit) 13%,transparent)}
+.chips{display:flex;flex-wrap:wrap;gap:.4rem;margin:.55rem 0 0}
+
+/* ─── tables ───────────────────────────────────────── */
+.scroll{overflow-x:auto;border:1px solid var(--rule);border-radius:.7rem;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:34rem}
+th,td{text-align:left;padding:.62rem .9rem;border-bottom:1px solid var(--rule);vertical-align:top}
+th{
+  font:800 .68rem/1.3 "Manrope",sans-serif;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink-3);background:var(--panel-2);position:sticky;top:0;
+}
+tr:last-child td{border-bottom:0}
+td.mono,th.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+td b{color:var(--ink)}
+.dim{color:var(--ink-3)}
+
+/* ─── catalog entries ──────────────────────────────── */
+.cat{padding:.85rem 0;border-bottom:1px dotted var(--rule)}
+.cat:last-child{border-bottom:0}
+.cat .top{display:flex;align-items:baseline;justify-content:space-between;gap:.8rem;flex-wrap:wrap}
+.cat .nm{font-weight:700;font-size:.98rem}
+.cat .meta{
+  font:500 .78rem/1 "IBM Plex Mono",ui-monospace,monospace;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.cat .subs{font-size:.855rem;color:var(--ink-2);margin:.35rem 0 0}
+
+/* ─── flow ─────────────────────────────────────────── */
+.flow{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;margin:.6rem 0 0}
+.flow span{
+  font:600 .74rem/1 "IBM Plex Mono",ui-monospace,monospace;
+  padding:.35rem .55rem;border-radius:.35rem;background:var(--panel-2);
+  border:1px solid var(--rule);color:var(--ink-2);
+}
+.flow span.key{border-color:var(--rule-strong);color:var(--accent);font-weight:600}
+.flow i{color:var(--ink-3);font-style:normal;font-size:.8rem}
+
+pre{
+  background:var(--panel-2);border:1px solid var(--rule);border-radius:.6rem;
+  padding:.85rem 1rem;overflow-x:auto;
+  font:500 .82rem/1.65 "IBM Plex Mono",ui-monospace,monospace;color:var(--ink-2);margin:.6rem 0 1rem;
+}
+code{font:500 .88em/1 "IBM Plex Mono",ui-monospace,monospace;color:var(--accent)}
+
+footer{
+  margin-top:clamp(3.4rem,8vw,5.5rem);padding-top:1.7rem;border-top:1px solid var(--rule-strong);
+  color:var(--ink-3);font-size:.82rem;text-align:center;
+}
+footer .credo{
+  font:700 .7rem/1 "Manrope",sans-serif;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:.7rem;
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="page">
+
+<header class="mast">
+  <svg class="mark" viewBox="0 0 200 200" role="img" aria-label="SAAHAA emblem">
+    <defs>
+      <linearGradient id="au" x1="8%" y1="0%" x2="92%" y2="100%">
+        <stop offset="0" stop-color="#F7E4A8"/><stop offset=".22" stop-color="#E9C87A"/>
+        <stop offset=".46" stop-color="#D4A24A"/><stop offset=".58" stop-color="#FBEFC6"/>
+        <stop offset=".74" stop-color="#C08F3C"/><stop offset="1" stop-color="#8A6124"/>
+      </linearGradient>
+      <g id="fg"><circle cx="0" cy="-14" r="6.4"/><path d="M-10.6 4.4C-10.6-5.4-6-8.6 0-8.6S10.6-5.4 10.6 4.4Z"/></g>
+    </defs>
+    <circle cx="100" cy="100" r="64" fill="none" stroke="url(#au)" stroke-width="5"
+            stroke-linecap="round" stroke-dasharray="31.5 2" stroke-dashoffset="-1"/>
+    <g fill="url(#au)">
+      <g transform="rotate(0 100 100) translate(100 36)"><use href="#fg"/></g>
+      <g transform="rotate(30 100 100) translate(100 36)"><use href="#fg"/></g>
+      <g transform="rotate(60 100 100) translate(100 36)"><use href="#fg"/></g>
+      <g transform="rotate(90 100 100) translate(100 36)"><use href="#fg"/></g>
+      <g transform="rotate(120 100 100) translate(100 36)"><use href="#fg"/></g>
+      <g transform="rotate(150 100 100) translate(100 36)"><use href="#fg"/></g>
+      <g transform="rotate(180 100 100) translate(100 36)"><use href="#fg"/></g>
+      <g transform="rotate(210 100 100) translate(100 36)"><use href="#fg"/></g>
+      <g transform="rotate(240 100 100) translate(100 36)"><use href="#fg"/></g>
+      <g transform="rotate(270 100 100) translate(100 36)"><use href="#fg"/></g>
+      <g transform="rotate(300 100 100) translate(100 36)"><use href="#fg"/></g>
+      <g transform="rotate(330 100 100) translate(100 36)"><use href="#fg"/></g>
+    </g>
+    <circle cx="100" cy="100" r="21" fill="none" stroke="url(#au)" stroke-width="2.5" opacity=".55"/>
+    <circle cx="100" cy="100" r="7" fill="url(#au)"/>
+  </svg>
+  <div>
+    <p class="kicker">Build statement · v6.0.0 “One Circle”</p>
+    <h1>Saahaa</h1>
+    <p class="sub">1 Sept 2026 · 22 modules · 24 categories · 62 tests green</p>
+  </div>
+</header>
+
+<p class="lede">
+  SAAHAA is now one circle for <strong>every service and every shop</strong> in the neighbourhood —
+  and, more importantly, it is now a codebase you can change every week without breaking what
+  already works. The five design questions that had real trade-offs were put to a
+  <strong>panel of five agents</strong> voting on a fixed ballot; where the vote overturned an
+  existing decision, that is recorded below with the reasoning.
+</p>
+
+<div class="hr"></div>
+
+<!-- ══════════ 1. THE VOTE ══════════ -->
+<section id="vote">
+  <h2>How the decisions were made</h2>
+  <p class="note">Five agents, one ballot each, scored by confidence. Three votes changed the
+    product materially — two of them corrected things that were already shipped and wrong.</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <h4>Marketplace flow <span class="chip">conf 5</span></h4>
+      <p>Auto-suggest <b>one</b> pro who has <em>already accepted</em>, plus “see others”. Not
+        auto-assign (breaks humans-decide), not a list (two extra taps).</p>
+      <p class="dim" style="font-size:.84rem">Biggest risk in a 3-tap flow is the confirm-moment
+        trust collapse: you deleted every step that normally builds confidence, so all the doubt
+        lands on one screen. The Locked-Match card is the fix.</p>
+    </div>
+    <div class="card">
+      <h4>Local commerce <span class="chip crit">changed the economics</span></h4>
+      <p>Retail <b>cannot</b> carry the 10% service rate. A kirana's gross margin on staples is
+        3–6%, so a 10% cut is <em>larger than the entire margin</em> on the items people order most.
+        The shop would refuse, or quietly inflate MRP and destroy price trust.</p>
+      <p class="dim" style="font-size:.84rem">Adopted: 3% staples / 5% higher-margin, capped per
+        order, charged to the shop. Delivery is a separate visible line to the customer.</p>
+    </div>
+    <div class="card">
+      <h4>Platform architecture <span class="chip">conf 5</span></h4>
+      <p>Native ES modules for real boundaries, <b>plus</b> a single-file bundle so double-clicking
+        still works. One store, versioned migrations with rollback, runtime registries as the
+        open/closed seam, flags as the kill-switch, an in-app test suite as CI.</p>
+    </div>
+    <div class="card">
+      <h4>Trust &amp; payments <span class="chip crit">changed the tax model</span></h4>
+      <p>The “8% profit + 2% GST” label was <b>wrong</b>. GST on a marketplace commission is
+        <b>18% of the commission</b>, not 2% of the deal. Same customer total, correct invoice.</p>
+      <p class="dim" style="font-size:.84rem">Also adopted: tiered escrow rather than
+        review-everything, and the rule that no photo means never auto-release.</p>
+    </div>
+    <div class="card">
+      <h4>UI / UX <span class="chip">conf 5</span></h4>
+      <p>Midnight plum + gold, flat with soft depth. The logo is already an ornate artefact — the
+        UI must be the quiet frame around it, not compete with it.</p>
+      <p class="dim" style="font-size:.84rem">Light content canvas, plum brand chrome: your
+        audience is on sunlit ₹8–15k Android LCDs where a full dark theme turns to grey mud.</p>
+    </div>
+    <div class="card">
+      <h4>Where the panel split</h4>
+      <p>Only one real disagreement: the customer-savings claim. One voter showed near-parity at a
+        ₹1,000 job; the honest framing is <b>equal take-home</b> — a pro paid the same earns 33%
+        more here, so they can quote less.</p>
+      <p class="dim" style="font-size:.84rem">The app now prints that assumption on screen under
+        every savings figure rather than claiming a number it can't defend.</p>
+    </div>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ══════════ 2. THE MONEY ══════════ -->
+<section id="money">
+  <h2>The money, line by line</h2>
+  <p class="note">Every rupee in the app is an integer number of paise. Floats never touch a
+    currency value, and the test suite asserts that the parts always sum back to the whole.</p>
+
+  <h3>A service job · pro quotes ₹1,000</h3>
+  <div class="stmt col">
+    <div class="row"><span class="lbl">Plumbing · per item<span class="sub">the pro's own quote — SAAHAA never takes a cut of it</span></span><span class="val">₹1,000.00</span></div>
+    <div class="row"><span class="lbl">Platform fee<span class="sub">uplift ÷ 1.18 — this is SAAHAA's actual revenue</span></span><span class="val">₹84.75</span></div>
+    <div class="row"><span class="lbl">GST @18% on the fee<span class="sub">remitted, never revenue</span></span><span class="val">₹15.25</span></div>
+    <div class="row total"><span class="lbl">Customer pays</span><span class="val">₹1,100.00</span></div>
+  </div>
+  <div class="stmt col">
+    <div class="row"><span class="lbl">Pro receives</span><span class="val good">₹1,000.00 · 100%</span></div>
+    <div class="row"><span class="lbl">A 25%-commission app would pay them</span><span class="val strike">₹750.00</span></div>
+    <div class="row"><span class="lbl">Which is why the same pro can quote you less</span><span class="val dim">+₹250 to them</span></div>
+  </div>
+
+  <h3>A grocery basket · ₹335 of items, 4.9 km</h3>
+  <div class="stmt col">
+    <div class="row"><span class="lbl">Items<span class="sub">weight-based lines stay “est.” until the shop weighs them</span></span><span class="val">₹335.00</span></div>
+    <div class="row"><span class="lbl">Delivery · 4–6 km band<span class="sub">a separate visible line — never baked into item prices</span></span><span class="val">₹39.00</span></div>
+    <div class="row total"><span class="lbl">Customer pays</span><span class="val">₹374.00</span></div>
+  </div>
+  <div class="stmt col">
+    <div class="row"><span class="lbl">Shop keeps</span><span class="val good">₹325.00</span></div>
+    <div class="row"><span class="lbl">SAAHAA fee · 3%, capped ₹25</span><span class="val">₹10.00</span></div>
+    <div class="row"><span class="lbl">A delivery aggregator would take</span><span class="val strike">₹67–100</span></div>
+    <div class="row"><span class="lbl">Shop's first 30 orders</span><span class="val good">free</span></div>
+  </div>
+
+  <h3>Take rate by category</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Category</th><th class="mono">Rate</th><th class="mono">Cap / order</th><th>Why this number</th></tr></thead>
+      <tbody>
+        <tr><td><b>All 16 services</b></td><td class="mono">10%</td><td class="mono">—</td><td>Added on top; the pro keeps 100% of their quote</td></tr>
+        <tr><td>Kirana, veg, meat</td><td class="mono">3%</td><td class="mono">₹25</td><td>Staples run 3–6% gross margin — anything more exceeds it</td></tr>
+        <tr><td>Dairy &amp; bakery, water &amp; gas</td><td class="mono">5%</td><td class="mono">₹25</td><td>30–45% margin, and water cans are the highest-repeat SKU you have</td></tr>
+        <tr><td>Pharmacy, stationery, pet</td><td class="mono">5%</td><td class="mono">₹50</td><td>16–40% margin; larger basket, so a larger cap</td></tr>
+        <tr><td>Certified pros (tier 4)</td><td class="mono">6%</td><td class="mono">—</td><td>The only discount in the system, and it buys retention</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ══════════ 3. THE CATALOG ══════════ -->
+<section id="catalog">
+  <h2>What sits in every section</h2>
+  <p class="note">24 categories. Each carries its sub-services, its pricing unit, and the minimum
+    verification tier a partner must reach before they can take that work — so childcare and
+    nursing are gated where a fan repair is not.</p>
+
+  <h3>Services · 16 · grouped into three home-screen rails</h3>
+  <div class="grid g2">
+    <div class="card">
+      <h4>🏠 Home &amp; repairs · 7</h4>
+      <div class="cat"><div class="top"><span class="nm">🔧 Home Repair &amp; Carpentry</span><span class="meta">₹600 · per visit · T2</span></div>
+        <p class="subs">Furniture assembly · door &amp; lock · drilling &amp; mounting · curtain rods · modular kitchen · wardrobe hinges · bed &amp; sofa · false ceiling</p></div>
+      <div class="cat"><div class="top"><span class="nm">⚡ Electrical</span><span class="meta">₹480 · per item · T2</span></div>
+        <p class="subs">Fan install · switchboard &amp; socket · MCB trip · inverter &amp; battery · lights &amp; chandelier · doorbell &amp; CCTV point · fault trace</p></div>
+      <div class="cat"><div class="top"><span class="nm">🚿 Plumbing</span><span class="meta">₹520 · per item · T2</span></div>
+        <p class="subs">Tap &amp; mixer · leak detection · blocked drain · toilet &amp; flush · motor &amp; pump · tank cleaning · geyser · pipeline</p></div>
+      <div class="cat"><div class="top"><span class="nm">❄️ AC &amp; Appliance Repair</span><span class="meta">₹750 · per item · T2</span></div>
+        <p class="subs">AC service &amp; install · gas refill · fridge · washing machine · microwave · water purifier · chimney deep clean</p></div>
+      <div class="cat"><div class="top"><span class="nm">🧹 Home Cleaning</span><span class="meta">₹400 · per sq.ft · T2</span></div>
+        <p class="subs">Full home deep clean · bathroom · kitchen · sofa &amp; carpet · post-construction · water tank · move-in/out · balcony</p></div>
+      <div class="cat"><div class="top"><span class="nm">🐜 Pest Control</span><span class="meta">₹1,100 · per sq.ft · 90-day warranty</span></div>
+        <p class="subs">Cockroach gel · general 2/3 BHK · termite · bed bugs · fogging · rodent · herbal child-safe</p></div>
+      <div class="cat"><div class="top"><span class="nm">🏍️ Vehicle Care</span><span class="meta">₹550 · per item · T2</span></div>
+        <p class="subs">Bike service at home · car wash · interior detailing · battery jumpstart · puncture · towing · pickup-drop service</p></div>
+    </div>
+
+    <div class="card">
+      <h4>💗 Care &amp; wellbeing · 5 <span class="chip warn">background checks</span></h4>
+      <div class="cat"><div class="top"><span class="nm">👩‍🍳 Domestic Help &amp; Cook</span><span class="meta">₹6,000 · per month · T3</span></div>
+        <p class="subs">Daily maid · cook · full-time housekeeping · elder companion · baby sitter · driver on call</p></div>
+      <div class="cat"><div class="top"><span class="nm">💇 Salon &amp; Beauty at Home</span><span class="meta">₹900 · per item · T2</span></div>
+        <p class="subs">Waxing · facial &amp; cleanup · haircut · mani &amp; pedi · threading · bridal makeup · hair spa &amp; colour · men's grooming</p></div>
+      <div class="cat"><div class="top"><span class="nm">💆 Wellness &amp; Massage</span><span class="meta">₹1,300 · per session · T3</span></div>
+        <p class="subs">Full body · Ayurvedic · physiotherapy · yoga trainer · fitness trainer · post-natal</p></div>
+      <div class="cat"><div class="top"><span class="nm">🩺 Health &amp; Care at Home</span><span class="meta">₹700 · per visit · T4 + licence</span></div>
+        <p class="subs">Nurse visit · blood sample · teleconsult · clinical physio · elder attendant 12/24h · BP &amp; sugar · equipment rental</p></div>
+      <div class="cat"><div class="top"><span class="nm">🐕 Pet Care</span><span class="meta">₹600 · per visit · T2</span></div>
+        <p class="subs">Grooming &amp; bath · vet home visit · walking · boarding · vaccination · cat grooming · pet taxi · aquarium</p></div>
+    </div>
+
+    <div class="card">
+      <h4>🚀 Learn, move &amp; live · 4</h4>
+      <div class="cat"><div class="top"><span class="nm">📚 Tutoring &amp; Skills</span><span class="meta">₹500 · per hour · T3</span></div>
+        <p class="subs">Class 1–10 · IIT-JEE / NEET · SSC &amp; banking · spoken English · music · dance · coding for kids · abacus</p></div>
+      <div class="cat"><div class="top"><span class="nm">🚚 Moving &amp; Transport</span><span class="meta">₹2,500 · on survey · T2</span></div>
+        <p class="subs">House shifting 1/2/3 BHK · single item · tempo on demand · packers · parcel pickup · loading labour · bike parcel</p></div>
+      <div class="cat"><div class="top"><span class="nm">🎪 Events &amp; Occasions</span><span class="meta">₹3,500 · on survey · T2</span></div>
+        <p class="subs">Birthday decor · catering per plate · tent &amp; lighting · photography · DJ · pandit · mehndi · house-warming pooja</p></div>
+      <div class="cat"><div class="top"><span class="nm">👕 Laundry &amp; Tailoring</span><span class="meta">₹180 · per kg · T1</span></div>
+        <p class="subs">Wash &amp; fold · dry cleaning · steam iron · shoe cleaning · saree fall &amp; pico · blouse &amp; alterations · curtains</p></div>
+    </div>
+  </div>
+
+  <h3>Shops · 8 · every one lists its own products</h3>
+  <p class="col">This is the part you asked for directly. A shop owner never types a product from
+    scratch: they search a seeded catalogue of about 180 real Hyderabad SKUs, tap the item,
+    overtype the price and set stock. Roughly six seconds each. The editor <b>refuses</b> to save
+    a price above MRP — selling above MRP is illegal under Legal Metrology, and letting shops do
+    it quietly is how price trust dies.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Shop type</th><th>Aisles it opens with</th><th class="mono">Fee</th><th>Rules that apply</th></tr></thead>
+      <tbody>
+        <tr><td><b>🛒 Grocery &amp; Kirana</b></td><td>Staples &amp; flour · dals · oils &amp; ghee · spices · sugar &amp; salt · snacks · beverages · home &amp; cleaning · personal care · baby</td><td class="mono">3%</td><td>FSSAI shown on the card</td></tr>
+        <tr><td><b>🥬 Fruits &amp; Vegetables</b></td><td>Daily vegetables · leafy greens · gourds · fruits · the ₹399 weekly basket</td><td class="mono">3%</td><td>Sold by weight · dated “fresh today” photo expires in 24h</td></tr>
+        <tr><td><b>🍗 Meat, Fish &amp; Eggs</b></td><td>Chicken · mutton · fish &amp; seafood · eggs</td><td class="mono">3%</td><td>Cut style · cleaned · <b>halal/jhatka declared</b> · cold chain · never auto-substituted</td></tr>
+        <tr><td><b>🥛 Dairy &amp; Bakery</b></td><td>Milk · curd &amp; paneer · bakery · local sweets</td><td class="mono">5%</td><td>Manufacture date mandatory · auto-delist at expiry</td></tr>
+        <tr><td><b>💊 Pharmacy</b></td><td>Pain &amp; fever · cold &amp; digestive · first aid · devices · wellness · <b>Rx</b></td><td class="mono">5%</td><td>Drug licence required before any Rx SKU · no returns · prescription gate</td></tr>
+        <tr><td><b>💧 Water Cans &amp; Gas</b></td><td>Water · LPG &amp; fuel</td><td class="mono">5%</td><td>Subscription-first · LPG is booking-only at the official rate, never marked up</td></tr>
+        <tr><td><b>✏️ Stationery</b></td><td>Notebooks · writing · art &amp; school · office · exam kits</td><td class="mono">5%</td><td>—</td></tr>
+        <tr><td><b>🦴 Pet Supplies</b></td><td>Dog food · cat · accessories · birds &amp; fish · vet meds</td><td class="mono">5%</td><td>Vet meds gated like Rx</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid g3" style="margin-top:1rem">
+    <div class="card"><h4>One shop per cart</h4><p>Enforced, with a friendly swap dialog. Multi-shop carts mean split delivery, split settlement, split blame — unreasonable to run and unpleasant to debug.</p></div>
+    <div class="card"><h4>You choose the substitution rule</h4><p>Per line: <b>similar brand OK</b>, <b>ask me</b>, or <b>just refund</b>. Defaults per category — staples swap, pharmacy and meat never. No reply in 90 seconds refunds the line. Nothing is ever swapped silently.</p></div>
+    <div class="card"><h4>“Est.” until it's weighed</h4><p>Anything sold by weight shows an estimate and bills on the actual weighed weight. Hiding that is the single biggest trust bug in Indian grocery apps.</p></div>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ══════════ 4. FLOWS ══════════ -->
+<section id="flows">
+  <h2>How an order moves</h2>
+  <p class="note">Two machines, because a plumber's appointment and a bag of tomatoes are genuinely
+    different objects. Illegal transitions throw loudly rather than passing silently — the suite
+    checks that you cannot skip the arrival code.</p>
+
+  <h3>Service · from three taps to settled</h3>
+  <div class="flow">
+    <span class="key">MATCHING</span><i>→</i><span>ASSIGNED</span><i>→</i><span>EN_ROUTE</span><i>→</i>
+    <span class="key">ARRIVED · OTP</span><i>→</i><span>IN_PROGRESS</span><i>→</i>
+    <span class="key">WORK_DONE · photo</span><i>→</i><span>SETTLED</span><i>→</i><span>RATED</span>
+  </div>
+  <p style="margin-top:.9rem">The customer reads out a 4-digit code at the door — that proves the
+    <em>right person</em> arrived, which is the real safety risk, not the payment. At the end the
+    pro attaches a photo and the customer confirms with one tap; no second code to type, because a
+    second code is a second chance for someone to be unreachable while the pro's money is stranded.
+    <b>No photo means it never auto-releases</b> — that one rule does more anti-fraud work than
+    everything else combined.</p>
+
+  <h3>Grocery · from cart to settled</h3>
+  <div class="flow">
+    <span class="key">R_PLACED</span><i>→</i><span>R_ACCEPTED</span><i>→</i><span>R_PICKING</span><i>→</i>
+    <span class="key">R_SUB_PENDING</span><i>→</i><span>R_PACKED · weighed</span><i>→</i>
+    <span>R_OUT</span><i>→</i><span class="key">R_DELIVERED · OTP</span><i>→</i><span>R_SETTLED</span>
+  </div>
+
+  <h3>Escrow releases on a sliding scale, not one rule</h3>
+  <div class="stmt col">
+    <div class="row"><span class="lbl">Instant<span class="sub">≤₹1,500 · trust ≥70 · 10+ jobs · code verified · photo attached</span></span><span class="val good">on confirm</span></div>
+    <div class="row"><span class="lbl">Fast<span class="sub">≤₹5,000 · trust ≥55 · code verified</span></span><span class="val">6 hours</span></div>
+    <div class="row"><span class="lbl">Standard<span class="sub">everything else that has evidence</span></span><span class="val">24 hours</span></div>
+    <div class="row"><span class="lbl">Held for review<span class="sub">&gt;₹10,000, or trust &lt;55, or fewer than 3 jobs, or <b>no photo</b></span></span><span class="val warn">you decide</span></div>
+    <div class="row"><span class="lbl">Frozen<span class="sub">suspended partner, or 2+ upheld disputes</span></span><span class="val" style="color:var(--crit)">investigation</span></div>
+  </div>
+  <p class="col">Reviewing every job by hand stops scaling at about 30 bookings a day. Releasing
+    everything automatically hands fraudsters an ATM. The risk score picks which one you get.</p>
+
+  <h3>A dispute takes three taps to raise, one to settle</h3>
+  <p class="col">Report → pick a reason chip → submit. Escrow freezes on the spot. If the pro never
+    arrived and no start code was entered, it refunds in full with no admin involvement at all.</p>
+</section>
+
+<div class="hr"></div>
+
+<!-- ══════════ 5. THE CODE ══════════ -->
+<section id="code">
+  <h2>The functions, and who owns what</h2>
+  <p class="note">22 modules. The rule that matters: three concerns have exactly one owner each,
+    and the build fails if anything else touches them.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th class="mono">Module</th><th>Responsibility</th><th>Why it's alone</th></tr></thead>
+      <tbody>
+        <tr><td class="mono"><b>core/money.js</b></td><td>All currency arithmetic, integer paise</td><td>A float multiplication anywhere else corrupts a ledger silently and you never find it</td></tr>
+        <tr><td class="mono"><b>core/persist.js</b></td><td>The only reader/writer of localStorage</td><td>Moving to Supabase later touches this file and nothing else</td></tr>
+        <tr><td class="mono"><b>ui/dom.js</b></td><td>The only module touching the DOM API</td><td>Focus, caret and scroll preservation live in one place</td></tr>
+        <tr><td class="mono">core/registry.js</td><td>The open/closed seam</td><td>Categories, order stages and reducers register themselves — no switch statements exist</td></tr>
+        <tr><td class="mono">core/migrate.js<br>core/migrations.js</td><td>Versioned upgrade chain</td><td>Snapshot → migrate → verify → roll back on any throw. Append-only</td></tr>
+        <tr><td class="mono">core/flags.js</td><td>Feature flags</td><td>The kill-switch and the canary for an app with no backend</td></tr>
+        <tr><td class="mono">core/selftest.js<br>core/selftests.js</td><td>62-case suite</td><td>This is the CI. A release with a failure does not ship</td></tr>
+        <tr><td class="mono">core/health.js</td><td>Boot invariants</td><td>Degrades to safe mode instead of a white screen</td></tr>
+        <tr><td class="mono">core/adminauth.js</td><td>PBKDF2 admin login</td><td>Replaces the hardcoded password check that used to be in the file</td></tr>
+        <tr><td class="mono">core/crypto.js · audit.js</td><td>Hash-chained ledger, audit log</td><td>Every privileged action is reconstructible</td></tr>
+        <tr><td class="mono">domain/pricing.js</td><td>Service + retail money engine</td><td>Every quote returns a <code>reconciles</code> flag the tests assert on</td></tr>
+        <tr><td class="mono">domain/orders.js</td><td>Both state machines</td><td>The tracker, badges, admin queues and legality guard all derive from it</td></tr>
+        <tr><td class="mono">domain/trust.js</td><td>Tiers, trust score, escrow tiering</td><td>Weights sum to exactly 1.00 — asserted</td></tr>
+        <tr><td class="mono">domain/flow.js</td><td>The use-cases</td><td>Views call these; they never dispatch raw actions, so every money move is auditable in one place</td></tr>
+        <tr><td class="mono">domain/starter-catalog.js</td><td>~180 seed SKUs</td><td>The reason a kirana owner can go live in two minutes</td></tr>
+        <tr><td class="mono">ui/logo.js</td><td>The emblem, as inline SVG</td><td>Crisp at 28px and 220px; swaps to a real PNG with one call if you ever add one</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ══════════ 6. DEVOPS ══════════ -->
+<section id="devops">
+  <h2>Shipping updates without breaking things</h2>
+  <p class="note">This was the actual brief. Here is what now protects you, and the failure it
+    was built for.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>What could break</th><th>What stops it</th></tr></thead>
+      <tbody>
+        <tr><td><b>Users lose their data on an update</b></td><td>Versioned migration chain writes a snapshot first, migrates, verifies, and <b>rolls back automatically</b> if anything throws. Your v5 accounts, orders and chats all survived this rewrite.</td></tr>
+        <tr><td><b>Two tabs migrate at once and corrupt the tree</b></td><td>A migration lock with a 10-second TTL; every step is idempotent, and the suite asserts that migrating twice equals migrating once.</td></tr>
+        <tr><td><b>A new feature breaks an old one</b></td><td>Features ship behind a flag defaulting to <b>off</b>. Turn it on for yourself for one release, default it on in the next, delete the flag the release after.</td></tr>
+        <tr><td><b>Money quietly drifts</b></td><td>Integer paise, a <code>reconciles</code> assertion on every quote, a build lint that rejects float arithmetic outside <code>money.js</code>, and an admin screen showing escrow against ledger replay side by side.</td></tr>
+        <tr><td><b>You rename a category and old orders render blank</b></td><td>Registry entries are append-only. An unknown id returns a <b>tombstone</b> that renders “Legacy: x” instead of throwing, and migrations remap ids rather than dropping them.</td></tr>
+        <tr><td><b>One bad screen white-screens the app</b></td><td>Each view renders inside try/catch and fails to an error card with the version on it. Everything else still works.</td></tr>
+        <tr><td><b>A stale cached stylesheet meets new code</b></td><td>The build stamps every <code>?v=</code> from BUILD_ID. This bit us once during the build and is now automated so it can't recur.</td></tr>
+        <tr><td><b>You can't get back to a working version</b></td><td>Every release is git-tagged and every migration leaves a restorable snapshot listed in the admin panel. An untagged release isn't a release.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Adding something new — the whole procedure</h3>
+  <pre>a new service category   →  append one object to domain/catalog.services.js
+a new order stage        →  append one entry to domain/orders.js
+a new slice of state     →  register('reducer', {...}) in a new file
+a new shop type          →  append to catalog.retail.js + its SKUs
+
+then:  index.html?selftest=1   must read  0 failed
+       python tools/build.py   rebuild + relint + restamp
+       git tag -a v6.1.0       the rollback point</pre>
+  <p class="col">If you find yourself editing <code>orders.js</code> or <code>app.js</code> to add a
+    feature, that is the signal to stop: the registry contract is missing a field. Extend the
+    contract first, as its own commit, with tests.</p>
+</section>
+
+<div class="hr"></div>
+
+<!-- ══════════ 7. ADMIN ══════════ -->
+<section id="admin">
+  <h2>The admin console, inside the site</h2>
+  <p class="note">Sign in as <code>admin</code> on the normal login screen, or open
+    <code>#/admin</code>. Eight sections — a console with twenty nav items is an unused console.
+    Each screen separates what you decide from what the system computes.</p>
+
+  <div class="grid g2">
+    <div class="card"><h4>You decide</h4>
+      <ul>
+        <li>Approve or reject partners, and their tier upgrades</li>
+        <li>Approve, reject or spot-check listings</li>
+        <li>Release 100%, release 60%, or refund a dispute — with a written reason</li>
+        <li>Suspend or unsuspend a partner; ban with hash propagation</li>
+        <li>Hide a review; action a flagged chat</li>
+        <li>Mark a payout batch paid, against its UTR</li>
+        <li>Flip feature flags; change the admin password; restore a backup</li>
+      </ul>
+    </div>
+    <div class="card"><h4>The system computes</h4>
+      <ul>
+        <li>Users, partners, shops, orders, revenue, GMV, escrow held, customer savings</li>
+        <li>Booking statistics by stage and rating distribution</li>
+        <li>Trust scores, verification bands, partner earnings</li>
+        <li>Escrow tiering and release timers</li>
+        <li>Dispute SLA clock, auto-resolution, evidence bundling</li>
+        <li>Off-platform payment detection in chat</li>
+        <li>GST liability at 18% of the fee, and the payout queue</li>
+        <li>Health checks, registry integrity, storage quota, the audit log</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:.85rem;border-color:var(--rule-strong)">
+    <h4>The screen that matters most <span class="chip good">balanced</span></h4>
+    <p><b>Reconciliation</b> sits at the top of Finance and shows three numbers that must agree:
+      escrow held, ledger replay, and the difference. If they ever disagree, every other number in
+      the console is fiction — which is exactly why it sits above them rather than buried in a tab.</p>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ══════════ 8. STATE ══════════ -->
+<section id="state">
+  <h2>Where it stands</h2>
+  <div class="grid g3">
+    <div class="card"><h4>Tests <span class="chip good">62 / 62</span></h4>
+      <p>Money reconciliation, transition legality, migration idempotence, referential integrity,
+        catalog validity, trust-score bounds, distance sanity.</p>
+      <p class="dim" style="font-size:.82rem">Two failures were found and fixed during the build:
+        terminal order stages that still declared exits, and a registry test asserting the wrong
+        guard.</p></div>
+    <div class="card"><h4>Also fixed in flight</h4>
+      <ul><li>Re-seeding on every reload</li><li>Bottom sheets outliving their screen</li>
+        <li>Blank shop distance on a deep link</li><li>Horizontal overflow on a 375px phone</li>
+        <li>The emblem's figures scattering off the ring</li></ul></div>
+    <div class="card"><h4>Try it <span class="chip">password 123</span></h4>
+      <p style="font-family:'IBM Plex Mono',monospace;font-size:.82rem;line-height:1.85">
+        customer · 9000000001<br>pro · 9100000001<br>shop · 9200000001<br>
+        admin · <span style="color:var(--accent)">saahaa123</span></p></div>
+  </div>
+
+  <h3 style="color:var(--crit)">What is honestly not safe yet</h3>
+  <p class="col">Client-side auth is <b>UI hiding, not authorization</b>. Anyone with developer
+    tools can set a variable, and balances kept in browser storage are editable by the person
+    holding the browser. Before real money moves you need server-side auth, escrow, OTP issuance
+    and the ledger; an RBI-compliant nodal account through a licensed payment aggregator; GST
+    registration with 1% TCS; and TDS §194-O on partner payouts. The demo admin password is seeded
+    on purpose so you can't lock yourself out — the console shows a standing banner about it, and
+    changing it is one screen away. All of this is written up plainly in
+    <code>docs/SECURITY.md</code>, including the cheapest genuine improvement available today: a
+    signed daily ledger snapshot kept outside the browser.</p>
+</section>
+
+<footer>
+  <div class="credo">One circle · One purpose</div>
+  SAAHAA v6.0.0 “One Circle” · schema v6 · build 20260901b · tagged <code>v6.0.0</code><br>
+  <span class="dim">Prototype build — simulated escrow, no real funds.</span>
+</footer>
+
+</div>
