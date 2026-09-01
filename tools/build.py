@@ -221,6 +221,20 @@ def build():
     os.makedirs(DIST, exist_ok=True)
     out = os.path.join(DIST, 'saahaa.html')
     io.open(out, 'w', encoding='utf-8').write(html)
+
+    if '--site' in sys.argv:
+        # GitHub Pages payload. index.html IS the bundle, so there is nothing
+        # to fetch and no module CORS problem. 404.html is a byte-identical
+        # copy: it catches a deep link like /saahaa/order/123 typed without the
+        # hash, boots the same app, and lets the router normalise — which is
+        # what makes a hard refresh survive on Pages with zero server config.
+        io.open(os.path.join(DIST, 'index.html'), 'w', encoding='utf-8').write(html)
+        io.open(os.path.join(DIST, '404.html'),   'w', encoding='utf-8').write(html)
+        io.open(os.path.join(DIST, '.nojekyll'),  'w', encoding='utf-8').write('')
+        for asset in ('manifest.json', 'icon.svg', 'sw.js'):
+            src_p = os.path.join(ROOT, asset)
+            if os.path.exists(src_p):
+                io.open(os.path.join(DIST, asset), 'w', encoding='utf-8').write(read(src_p))
     return out, len(mods), len(html)
 
 

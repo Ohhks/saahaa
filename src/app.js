@@ -24,6 +24,7 @@ import { buildSeed } from './domain/seed.js';
 import * as flow from './domain/flow.js';
 import { AREA_NAMES } from './domain/match.js';
 import './core/selftests.js';
+import './core/selftests.money.js';
 
 /* ui */
 import { mount, action, initActions, toast, sheet, closeSheet, esc } from './ui/dom.js';

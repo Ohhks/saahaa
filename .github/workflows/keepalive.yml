@@ -1,0 +1,49 @@
+name: Supabase Keepalive
+
+# A free Supabase project PAUSES after ~7 days of no API traffic, and a paused
+# project's pg_cron does not run — escrow would silently never release and the
+# marketplace would look dead to real users. This job is therefore a liveness
+# REQUIREMENT, not a nicety. If it fails, GitHub emails you; that email is the
+# monitoring system.
+
+on:
+  schedule:
+    - cron: '17 6 */3 * *'      # every 3rd day, off-the-hour to dodge cron congestion
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Real authenticated read against production
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -e
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::SUPABASE_URL / SUPABASE_ANON_KEY secrets are not set. Supabase WILL pause."
+            exit 1
+          fi
+          CODE=$(curl -s -o /tmp/ka.json -w '%{http_code}' \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "${SUPABASE_URL}/rest/v1/keepalive?select=id&limit=1")
+          echo "HTTP $CODE"; cat /tmp/ka.json || true
+          case "$CODE" in
+            200|206) echo "Supabase is awake." ;;
+            401|403) echo "::error::RLS rejected the read. Add the keepalive SELECT policy (migration 0002)."; exit 1 ;;
+            404)     echo "::error::keepalive table missing. Run migration 0001."; exit 1 ;;
+            *)       echo "::error::Supabase returned $CODE — the project may already be PAUSED. Open the dashboard now."; exit 1 ;;
+          esac
+
+      - name: Confirm the live site is still serving
+        run: |
+          URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          CODE=$(curl -sL -o /dev/null -w '%{http_code}' "$URL" || echo 000)
+          echo "Pages $URL -> $CODE"
+          [ "$CODE" = "200" ] || { echo "::error::live site returned $CODE"; exit 1; }

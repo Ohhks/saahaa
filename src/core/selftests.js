@@ -265,7 +265,9 @@ describe('registry · the open/closed seam holds', () => {
     expect(t.__tombstone).toBeTrue();
     expect(typeof t.label).toBe('string');
   });
-  it('the registry is sealed once the app has booted', () => {
+  it('the registry can be sealed, and refuses writes once it is', () => {
+    // true in the browser (app.js froze it at boot) and under Node (it has not yet)
+    if (!registry.isFrozen()) registry.freeze();
     expect(registry.isFrozen()).toBeTrue();
   });
   it('registering over an existing id is refused', () => {

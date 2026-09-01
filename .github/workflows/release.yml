@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      - id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Tag must match src/core/version.js and CHANGELOG
+        run: python tools/check-version.py "${{ steps.ver.outputs.version }}"
+
+      - name: Tests and build
+        run: |
+          node tools/test-node.mjs
+          python tools/build.py --site
+          bash tools/preflight.sh
+
+      - name: Name and checksum the artifact
+        run: |
+          cp dist/saahaa.html "dist/saahaa-${{ steps.ver.outputs.tag }}.html"
+          cd dist && sha256sum "saahaa-${{ steps.ver.outputs.tag }}.html" > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Extract this version's changelog section
+        run: |
+          awk -v ver="${{ steps.ver.outputs.version }}" '
+            $0 ~ "^##+ *\[?" ver "\]?" {flag=1; next}
+            flag && /^##+ *\[?[0-9]+\.[0-9]+\.[0-9]+/ {exit}
+            flag {print}' CHANGELOG.md > NOTES.md
+          {
+            echo ""
+            echo "---"
+            echo "Single-file build — download the .html and open it directly."
+            echo "Rollback: Actions -> Deploy to Pages -> Run workflow -> pick tag \`${{ steps.ver.outputs.tag }}\`."
+          } >> NOTES.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: SAAHAA ${{ steps.ver.outputs.tag }}
+          body_path: NOTES.md
+          files: |
+            dist/saahaa-${{ steps.ver.outputs.tag }}.html
+            dist/SHA256SUMS

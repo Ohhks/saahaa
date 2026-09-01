@@ -6,6 +6,113 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [6.1.0] — 2026-09-01 — "Open Circle"
+
+Everything runs on **GitHub + Supabase free tier**, and most of it runs without
+you. Design decisions were again taken by a five-agent panel voting on a fixed
+ballot (Supabase architecture, escrow & verification protocol, auction
+mechanism, zero-cost DevOps, automation boundary).
+
+### Added — the backend, on a free tier
+- **Postgres schema** (`supabase/migrations/0001_schema.sql`): 24 tables, money
+  as BIGINT paise, and CHECK constraints that make illegal states
+  unrepresentable — a pharmacy without a drug licence, a price above MRP, a
+  perishable with no manufacture date and a second accepted bid on one request
+  are all rejected by the database, not by a hopeful client.
+- **Row Level Security + money RPCs** (`0002_money_rls.sql`). The rule the file
+  enforces: **the browser cannot move a rupee.** Every money table has writes
+  revoked and *no write policy at all*; the only mutators are SECURITY DEFINER
+  functions that re-check the caller, the state machine and the arithmetic in
+  SQL. Bid privacy is enforced so a rival pro can never read another's price.
+- **Double-entry ledger in Postgres**: hash-chained, append-only (UPDATE and
+  DELETE raise), balanced by a deferred constraint trigger, with a
+  trigger-maintained balance table and a `reconcile()` invariant.
+- **pg_cron automation** (`0003_automation.sql`): auctions close, bids expire,
+  escrow auto-releases, no-shows refund themselves, holdbacks mature, and
+  ~60% of disputes resolve with no human at all. Every job uses a
+  **deterministic idempotency key**, so a catch-up run after the free project
+  un-pauses can never double-release money.
+- **`today_queue` view** — one query for everything blocked on a human. An
+  eight-section admin console is a reporting tool; the owner needs an operating
+  tool that answers "is anything waiting on me?" in one screen.
+- **`safety_incidents`** as a separate table from disputes, with its own SLA.
+  An automated "we've refunded you" reply to an assault report is catastrophic,
+  so the schema refuses to let them share a queue.
+
+### Added — bidding, done "reasonably"
+`src/domain/bidding.js`. Sealed bids with a **published price band**, and four
+interlocking rules that make "reasonably" mechanical instead of aspirational:
+1. **The floor** (0.85× fair price, min ₹199) stops the cliff — the worst
+   SAAHAA outcome still beats a commission app's typical one.
+2. **The peaked price score** stops the slide: it is highest *at* the fair
+   price, not at the floor, so undercutting costs points and wins nothing.
+   A floor alone just becomes the new market price.
+3. **The ceiling** caps what a bidding ring can extract.
+4. **The counter-offer is blocked against honest bidders** — a pro who bids at
+   or below fair price cannot be haggled with at all.
+Bidding is **banned outright** in five cases where an auction harms someone:
+emergencies, sub-₹300 jobs, licence-gated safety work, care work, and any
+category with fewer than 6 verified pros.
+
+### Added — verification
+- Virtual OTP with **alternating direction**: check-in is shown by the customer
+  and typed by the pro (proving the pro is physically there); check-out is
+  shown by the pro and typed by the customer (proving the customer accepted the
+  work). Same direction twice means one screenshot covers both gates.
+- Codes are stored as a **salted, peppered SHA-256 hash** and never in
+  plaintext. Without the pepper a leaked 6-digit hash is brute-forced in
+  milliseconds, so `app.otp_pepper` is a required database setting.
+- Constant-time comparison, 5 attempts, 3-second and hourly rate limits, and a
+  geo gate at verification.
+- **Holdback instead of a joining deposit**: 10% of each payout, capped at
+  ₹500, released after 7 clean days. A cold-start marketplace cannot demand
+  cash up front from supply, but stake should still grow with volume.
+
+### Added — the client seam
+- `src/net/supabase.js` — a **zero-dependency Supabase client** (~200 lines).
+  The official SDK cannot be used here: the CSP is `script-src 'self'` and
+  there is no bundler. PostgREST, GoTrue and Realtime are plain HTTP/WebSocket.
+- `src/core/backend.js` — one interface, two adapters. The UI never knows
+  whether it is talking to localStorage or Postgres, so the app keeps working
+  offline and money operations are hard-blocked rather than optimistically faked.
+- `src/domain/ledger.js` — double-entry accounting client-side too, with
+  invariants that freeze releases rather than auto-repairing. An auto-repair is
+  indistinguishable from an attacker covering their tracks.
+
+### Added — zero-cost CI/CD
+- `.github/workflows/`: **ci** (syntax, tests, build, preflight, migration
+  lint), **deploy** (Pages, with a post-deploy smoke test), **release**
+  (tag → checksummed single-file build), **keepalive** (a free Supabase project
+  pauses after ~7 days and its pg_cron stops with it — this is a liveness
+  requirement, not a nicety).
+- `tools/test-node.mjs` — runs the suites under plain Node with **honest
+  stubs**: real WebCrypto, and `document`/`window` as poison pills that throw,
+  so a browser-only suite identifies itself mechanically rather than by anyone's
+  judgement.
+- `tools/preflight.sh` — decodes any shipped JWT and **reads its role claim**,
+  catching the realistic mistake of pasting the service_role key, which looks
+  identical to the anon key at a glance.
+- 25 new tests (87 total, all green).
+
+### Changed
+- **Rollback is now a button**: Actions → Deploy to Pages → re-run the last
+  green run. Anything needing correctly-typed git under stress gets typed wrong
+  on the one day it matters.
+- Migrations are committed and CI-linted, but **applying to production stays a
+  manual paste**. The free tier has no point-in-time recovery, so no automation
+  may ever touch production data.
+
+### Fixed
+- Quote-based categories were being given a percentage price band —
+  `null ?? DEFAULT` fell through, when `null` was exactly the "quote only"
+  signal.
+- The price band could invert for cheap categories: a ₹180 ironing job's
+  absolute travel minimum exceeded its own fair price, putting the floor above
+  the ceiling.
+- The registry-seal test assumed the app had booted, so it failed under Node.
+
+---
+
 ## [6.0.0] — 2026-09-01 — "One Circle"
 
 A full rewrite around one requirement: **ship updates every week without

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, build, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      - name: Syntax-check every ES module
+        run: |
+          set -e
+          fail=0
+          for f in $(find src -name '*.js'); do
+            node --check "$f" || { echo "::error file=$f::Syntax error"; fail=1; }
+          done
+          exit $fail
+
+      - name: Domain test suite (Node)
+        run: node tools/test-node.mjs
+
+      - name: Build single-file bundle
+        run: python tools/build.py
+
+      - name: Pre-flight gate
+        run: bash tools/preflight.sh
+
+      - name: Migration safety lint
+        run: python tools/lint-migrations.py
+
+      - name: Upload bundle for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: saahaa-bundle-${{ github.sha }}
+          path: dist/
+          retention-days: 7
