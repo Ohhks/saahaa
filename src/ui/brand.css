@@ -1,0 +1,126 @@
+/* SAAHAA · ui/brand.css — the welcome splash, the emblem's motion, pillars.
+   Timeline follows the design ballot exactly: the screen is INTERACTIVE from
+   900ms even though it keeps settling until ~2050ms. */
+
+/* ── emblem ─────────────────────────────────────────────────── */
+.mk{overflow:visible}
+.mk-glow{transform-origin:100px 100px}
+.mk--anim .mk-band{
+  stroke-dasharray:var(--circ,402) !important;stroke-dashoffset:var(--circ,402);
+  animation:mkdraw 700ms var(--ease-in-out) 120ms forwards}
+@keyframes mkdraw{to{stroke-dashoffset:0}}
+/* the OUTER g keeps its SVG placement transform untouched; only the inner
+   wrapper is animated, so figures can never drift off the ring */
+.mk--anim .mk-figs > g > .figw{opacity:0;transform-origin:0 -8px;
+  animation:mkfig 260ms var(--ease-back) forwards}
+@keyframes mkfig{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:scale(1)}}
+.mk--anim .mk-core{opacity:0;animation:fadein 300ms var(--ease-emph) 900ms forwards}
+.mk--anim .mk-glow{opacity:0;animation:fadein 300ms linear 620ms forwards,mkbreath 4200ms var(--ease-in-out) 920ms infinite}
+@keyframes fadein{to{opacity:1}}
+@keyframes mkbreath{0%,100%{opacity:.7}50%{opacity:1}}
+
+/* the figure stagger — 12 slots at 34ms */
+.mk--anim .mk-figs > g:nth-child(1) > .figw{animation-delay:200ms}
+.mk--anim .mk-figs > g:nth-child(2) > .figw{animation-delay:234ms}
+.mk--anim .mk-figs > g:nth-child(3) > .figw{animation-delay:268ms}
+.mk--anim .mk-figs > g:nth-child(4) > .figw{animation-delay:302ms}
+.mk--anim .mk-figs > g:nth-child(5) > .figw{animation-delay:336ms}
+.mk--anim .mk-figs > g:nth-child(6) > .figw{animation-delay:370ms}
+.mk--anim .mk-figs > g:nth-child(7) > .figw{animation-delay:404ms}
+.mk--anim .mk-figs > g:nth-child(8) > .figw{animation-delay:438ms}
+.mk--anim .mk-figs > g:nth-child(9) > .figw{animation-delay:472ms}
+.mk--anim .mk-figs > g:nth-child(10) > .figw{animation-delay:506ms}
+.mk--anim .mk-figs > g:nth-child(11) > .figw{animation-delay:540ms}
+.mk--anim .mk-figs > g:nth-child(12) > .figw{animation-delay:574ms}
+
+/* ── splash ─────────────────────────────────────────────────── */
+.splash{
+  position:fixed;inset:0;z-index:var(--z-splash);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:0;padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);
+  text-align:center;overflow:hidden;
+  animation:spbg 380ms var(--ease-emph) both;
+}
+@keyframes spbg{from{opacity:0}to{opacity:1}}
+.splash::before{
+  content:"";position:absolute;inset:-10%;pointer-events:none;
+  background:radial-gradient(60% 45% at 50% 34%,rgba(212,162,74,.10),transparent 70%);
+  animation:spzoom 380ms var(--ease-emph) both}
+@keyframes spzoom{from{transform:scale(1.06)}to{transform:scale(1)}}
+.splash.out{animation:spout 320ms var(--ease-exit) forwards}
+@keyframes spout{to{opacity:0;transform:scale(1.045)}}
+
+.splash .sp-inner{position:relative;z-index:1;display:flex;flex-direction:column;
+  align-items:center;max-width:340px;width:100%}
+.splash .sp-mark{margin-bottom:28px;opacity:0;
+  animation:spmark 640ms var(--ease-emph) 260ms forwards}
+@keyframes spmark{from{opacity:0;transform:scale(.88) rotate(-6deg)}to{opacity:1;transform:none}}
+
+.splash .sp-wm{font-family:var(--font-display);font-weight:700;font-size:var(--fs-4xl);
+  line-height:var(--lh-4xl);text-transform:uppercase;
+  background:var(--gold-grad);-webkit-background-clip:text;background-clip:text;color:transparent;
+  letter-spacing:.42em;text-indent:.42em;filter:blur(6px);opacity:0;
+  animation:spwm 340ms var(--ease-emph) 840ms forwards}
+@keyframes spwm{to{opacity:1;letter-spacing:var(--ls-brand);text-indent:var(--ls-brand);filter:blur(0)}}
+
+.splash .sp-rule{display:flex;align-items:center;justify-content:center;gap:8px;
+  margin:10px 0;width:88px;opacity:0;animation:fadein 1ms 1120ms forwards}
+.splash .sp-rule i{height:1px;flex:1;background:linear-gradient(90deg,transparent,var(--gold-500));
+  transform:scaleX(0);transform-origin:right;animation:sprule 240ms var(--ease-emph) 1120ms forwards}
+.splash .sp-rule i + i{background:linear-gradient(90deg,var(--gold-500),transparent);transform-origin:left}
+.splash .sp-rule b{width:5px;height:5px;background:var(--gold-400);transform:rotate(45deg) scale(0);
+  animation:spdia 200ms var(--ease-back) 1280ms forwards}
+@keyframes sprule{to{transform:scaleX(1)}}
+@keyframes spdia{to{transform:rotate(45deg) scale(1)}}
+
+.splash .sp-tag{font-size:var(--fs-cap);letter-spacing:var(--ls-widest);text-transform:uppercase;
+  color:var(--ink-2);font-weight:var(--fw-semi);opacity:0;
+  animation:sprise 260ms var(--ease-emph) 1180ms forwards}
+@keyframes sprise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.splash .pillars{margin-top:40px}
+.splash .sp-cta{margin-top:44px;width:100%;max-width:280px;opacity:0;
+  animation:sprise 280ms var(--ease-emph) 1720ms forwards}
+.splash .sp-guest{margin-top:14px;background:none;border:0;color:var(--ink-3);
+  font-size:13px;font-weight:var(--fw-semi);text-decoration:underline;text-underline-offset:4px;
+  opacity:0;animation:fadein 200ms 1860ms forwards;padding:8px}
+.splash .sp-credo{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 24px);
+  font-size:10px;letter-spacing:var(--ls-brand);text-transform:uppercase;color:var(--ink-4);
+  font-weight:var(--fw-bold);opacity:0;animation:fadein 200ms 1860ms forwards}
+.splash .sp-ver{position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:16px;
+  font-size:10px;color:var(--ink-4);letter-spacing:.06em}
+
+/* returning-visit flash — 900ms, no CTA */
+.splash--flash .sp-wm{animation:spwmf 360ms var(--ease-emph) 200ms forwards}
+@keyframes spwmf{to{opacity:.9;letter-spacing:var(--ls-brand);text-indent:var(--ls-brand);filter:blur(0)}}
+.splash--flash .sp-mark{animation:spmark 260ms var(--ease-emph) 0ms forwards}
+.splash--flash{animation:spbg 200ms linear both,spout 280ms var(--ease-exit) 620ms forwards}
+
+/* ── pillars ────────────────────────────────────────────────── */
+.pillars{display:flex;align-items:flex-start;justify-content:center;gap:6px;width:100%}
+.pillars .pill{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;
+  opacity:0;animation:sprise 240ms var(--ease-emph) forwards}
+.splash .pillars .pill:nth-child(1){animation-delay:1360ms}
+.splash .pillars .pill:nth-child(2){animation-delay:1440ms}
+.splash .pillars .pill:nth-child(3){animation-delay:1520ms}
+.splash .pillars .pill:nth-child(4){animation-delay:1600ms}
+.splash .pillars .pill:nth-child(5){animation-delay:1680ms}
+.pillars .plbl{font-size:9px;letter-spacing:var(--ls-wider);text-transform:uppercase;
+  color:var(--ink-3);font-weight:var(--fw-bold);white-space:nowrap}
+.pillars--c{justify-content:flex-start;overflow-x:auto;scrollbar-width:none;
+  scroll-snap-type:x proximity;padding:2px 0;
+  /* fixed-width items must scroll, not widen the page: five pillars are wider
+     than a 360px phone and would otherwise force horizontal body scroll */
+  margin:0 calc(var(--gutter) * -1);padding-inline:var(--gutter)}
+.pillars--c::-webkit-scrollbar{display:none}
+.pillars--c .pill{opacity:1;animation:none;flex-direction:row;gap:6px;
+  padding:10px 12px;border:1px solid var(--accent-border);border-radius:var(--r-md);
+  flex:0 0 auto;background:transparent;scroll-snap-align:start}
+.pillars--c .plbl{font-size:10px}
+
+/* ── plum hero band used on the home screen ─────────────────── */
+.herostrip{margin:0 calc(var(--gutter) * -1);padding:var(--sp-7) var(--gutter) var(--sp-8);
+  border-radius:0 0 var(--r-2xl) var(--r-2xl);position:relative;overflow:hidden}
+.herostrip .hs-mark{position:absolute;right:-30px;top:-24px;opacity:.10;pointer-events:none}
+.herostrip h1{font-size:var(--fs-xl);line-height:var(--lh-xl);margin-bottom:6px}
+.herostrip p{font-size:var(--fs-sm);color:var(--ink-2);max-width:30ch}

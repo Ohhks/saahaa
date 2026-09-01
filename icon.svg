@@ -1,12 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#34D399"/>
-      <stop offset=".55" stop-color="#059669"/>
-      <stop offset="1" stop-color="#0EA5E9"/>
+    <linearGradient id="g" x1="8%" y1="0%" x2="92%" y2="100%">
+      <stop offset="0" stop-color="#F7E4A8"/><stop offset=".22" stop-color="#E9C87A"/>
+      <stop offset=".46" stop-color="#D4A24A"/><stop offset=".58" stop-color="#FBEFC6"/>
+      <stop offset=".74" stop-color="#C08F3C"/><stop offset="1" stop-color="#8A6124"/>
     </linearGradient>
+    <radialGradient id="bg" cx="50%" cy="0%" r="120%">
+      <stop offset="0" stop-color="#4A2158"/><stop offset=".42" stop-color="#2E1739"/>
+      <stop offset="1" stop-color="#12061A"/>
+    </radialGradient>
+    <g id="f"><circle cx="0" cy="-18" r="9"/><path d="M-15 5.6C-15-8.3-8.5-12.9 0-12.9S15-8.3 15 5.6Z"/></g>
   </defs>
-  <rect width="512" height="512" rx="120" fill="url(#g)"/>
-  <rect x="16" y="16" width="480" height="240" rx="104" fill="#ffffff" opacity=".14"/>
-  <text x="256" y="352" font-family="Arial, Helvetica, sans-serif" font-size="300" font-weight="900" fill="#ffffff" text-anchor="middle">S</text>
+  <rect width="200" height="200" rx="44" fill="url(#bg)"/>
+  <circle cx="100" cy="100" r="64" fill="none" stroke="url(#g)" stroke-width="7" stroke-linecap="round"/>
+  <g fill="url(#g)">
+    <g transform="rotate(0 100 100) translate(100 36)"><use href="#f"/></g>
+    <g transform="rotate(45 100 100) translate(100 36)"><use href="#f"/></g>
+    <g transform="rotate(90 100 100) translate(100 36)"><use href="#f"/></g>
+    <g transform="rotate(135 100 100) translate(100 36)"><use href="#f"/></g>
+    <g transform="rotate(180 100 100) translate(100 36)"><use href="#f"/></g>
+    <g transform="rotate(225 100 100) translate(100 36)"><use href="#f"/></g>
+    <g transform="rotate(270 100 100) translate(100 36)"><use href="#f"/></g>
+    <g transform="rotate(315 100 100) translate(100 36)"><use href="#f"/></g>
+  </g>
+  <circle cx="100" cy="100" r="21" fill="none" stroke="url(#g)" stroke-width="2.5" opacity=".55"/>
+  <circle cx="100" cy="100" r="7" fill="url(#g)"/>
 </svg>
