@@ -247,18 +247,20 @@ footer .credo{
     <circle cx="100" cy="100" r="7" fill="url(#au)"/>
   </svg>
   <div>
-    <p class="kicker">Build statement · v6.0.0 “One Circle”</p>
+    <p class="kicker">Build statement · v6.1.0 “Open Circle”</p>
     <h1>Saahaa</h1>
-    <p class="sub">1 Sept 2026 · 22 modules · 24 categories · 62 tests green</p>
+    <p class="sub">1 Sept 2026 · 26 modules · 24 categories · 87 tests green</p>
   </div>
 </header>
 
 <p class="lede">
-  SAAHAA is now one circle for <strong>every service and every shop</strong> in the neighbourhood —
-  and, more importantly, it is now a codebase you can change every week without breaking what
-  already works. The five design questions that had real trade-offs were put to a
-  <strong>panel of five agents</strong> voting on a fixed ballot; where the vote overturned an
-  existing decision, that is recorded below with the reasoning.
+  SAAHAA now runs entirely on <strong>GitHub + Supabase free tier</strong>, and most of it runs
+  <strong>without you</strong>. Money is locked and released by the database, not the browser;
+  multiple pros can bid on one job without racing each other to the bottom; and the whole thing
+  is designed around one constraint that matters more than any feature — <strong>one person
+  operates this in about fifteen minutes a day</strong>. Two rounds of a five-agent voting panel
+  produced the decisions below; where a vote overturned something already shipped, that is
+  recorded with the reasoning.
 </p>
 
 <div class="hr"></div>
@@ -613,20 +615,199 @@ then:  index.html?selftest=1   must read  0 failed
 
 <div class="hr"></div>
 
+<!-- ══════════ 9. THE BACKEND ══════════ -->
+<section id="backend">
+  <h2>Running on GitHub + Supabase, for ₹0</h2>
+  <p class="note">The whole system now has a real backend on a free tier. The rule the schema
+    enforces is one sentence long, and everything else follows from it.</p>
+
+  <div class="card card--gold">
+    <h4>The browser cannot move a rupee</h4>
+    <p>The anon key ships inside a public page, so anything the browser is <em>allowed</em> to
+      write is effectively a public API. Every money table therefore has INSERT, UPDATE and DELETE
+      revoked and <b>no write policy at all</b>. The only things that can move money are database
+      functions that re-check the caller, the state machine and the arithmetic in SQL.</p>
+  </div>
+
+  <h3>What the database refuses to let you do</h3>
+  <div class="stmt col">
+    <div class="row"><span class="lbl">Sell above MRP<span class="sub">illegal under Legal Metrology — now a CHECK constraint</span></span><span class="val" style="color:var(--crit)">rejected</span></div>
+    <div class="row"><span class="lbl">List an Rx medicine without a drug licence</span><span class="val" style="color:var(--crit)">rejected</span></div>
+    <div class="row"><span class="lbl">Sell a perishable with no manufacture date</span><span class="val" style="color:var(--crit)">rejected</span></div>
+    <div class="row"><span class="lbl">Accept a second bid on the same request<span class="sub">a partial unique index — double-accept is unrepresentable</span></span><span class="val" style="color:var(--crit)">rejected</span></div>
+    <div class="row"><span class="lbl">Read a rival pro's bid<span class="sub">the leak that would kill the auction on day one</span></span><span class="val" style="color:var(--crit)">rejected</span></div>
+    <div class="row"><span class="lbl">Edit or delete a ledger entry</span><span class="val" style="color:var(--crit)">rejected</span></div>
+    <div class="row"><span class="lbl">Post a transaction that does not balance to zero</span><span class="val" style="color:var(--crit)">rejected</span></div>
+    <div class="row"><span class="lbl">Approve your own verification tier<span class="sub">the classic RLS bug: WITH CHECK gates the row, not the column</span></span><span class="val" style="color:var(--crit)">rejected</span></div>
+  </div>
+
+  <h3>How the money is verified — the virtual OTP</h3>
+  <p class="col">There is no paid SMS, and Indian DLT registration is a blocker anyway. So the
+    verification primitive is a code that exists only inside the app. What makes it trustworthy is
+    <b>the direction it travels, and the fact that it alternates</b>.</p>
+  <div class="grid g2">
+    <div class="card"><h4>Check-in <span class="chip">customer → pro</span></h4>
+      <p>The customer's screen shows the code; the pro types it. That proves the pro is
+        <b>physically at the door</b> and the customer agreed to start.</p></div>
+    <div class="card"><h4>Check-out <span class="chip">pro → customer</span></h4>
+      <p>Now it reverses: the pro's screen shows the code; the customer types it. That proves the
+        customer <b>accepted the finished work</b>. Running the same direction twice would mean one
+        screenshot at the start covers both gates.</p></div>
+  </div>
+  <div class="stmt col" style="margin-top:1rem">
+    <div class="row"><span class="lbl">Stored as<span class="sub">a plain hash of a 6-digit code is brute-forced in milliseconds, so the pepper is mandatory</span></span><span class="val">salted + peppered SHA-256</span></div>
+    <div class="row"><span class="lbl">Compared with</span><span class="val">constant time, no early exit</span></div>
+    <div class="row"><span class="lbl">Attempts before lockout</span><span class="val">5</span></div>
+    <div class="row"><span class="lbl">Rate limit</span><span class="val">1 per 3s · 12 per hour</span></div>
+    <div class="row"><span class="lbl">Location gate at check-in</span><span class="val">2 km</span></div>
+    <div class="row"><span class="lbl">Can the pro read the customer's code?<span class="sub">the table has no read policy at all — it is reachable only through the two functions</span></span><span class="val good">never</span></div>
+  </div>
+
+  <h3>Both sides have something at stake</h3>
+  <p class="col">The customer's money is locked at booking. The pro's stake is a <b>holdback</b>:
+    10% of each payout, capped at ₹500, released after seven clean days. They never pay to join —
+    a cold-start marketplace cannot demand cash up front from supply — but their skin in the game
+    grows exactly as their volume, and therefore their capacity to defraud, grows.</p>
+</section>
+
+<div class="hr"></div>
+
+<!-- ══════════ 10. BIDDING ══════════ -->
+<section id="bidding">
+  <h2>When several pros want the same job</h2>
+  <p class="note">You asked for bidding, done <em>reasonably</em>. Reasonably is the hard part, so
+    the panel made it mechanical rather than aspirational. Four rules, interlocking.</p>
+
+  <div class="grid g2">
+    <div class="card"><h4>1 · The floor stops the cliff</h4>
+      <p>No bid below <b>0.85× the fair price</b>, never under ₹199. So the <em>worst</em> possible
+        SAAHAA outcome still beats what a 25%-commission app typically pays. The promise becomes a
+        constraint instead of a slogan.</p></div>
+    <div class="card"><h4>2 · The peaked score stops the slide</h4>
+      <p>This is the one that actually works. The price score is highest <b>at</b> the fair price,
+        not at the floor — so undercutting costs points and wins nothing. A floor on its own just
+        becomes the new market price.</p></div>
+    <div class="card"><h4>3 · The ceiling caps collusion</h4>
+      <p>A ring cannot extract more than 1.30×, and the fixed-price fallback is the credible threat
+        against one. Bids are <b>sealed</b> — nobody sees another's price, so a ring cannot even
+        verify its own members are complying.</p></div>
+    <div class="card"><h4>4 · Honest bidders cannot be haggled</h4>
+      <p>The customer's one-tap counter-offer is <b>unavailable</b> against anyone who bid at or
+        below the fair price. Bidding honestly is strictly safer than bidding opportunistically.
+        One counter per request, ever — no haggling loop.</p></div>
+  </div>
+
+  <h3>A worked auction · plumbing, fair price ₹500</h3>
+  <div class="stmt col">
+    <div class="row"><span class="lbl">Bidder A · bids the floor, 9 km away, brand new, bid at 13 min</span><span class="val">₹450 → score 47</span></div>
+    <div class="row"><span class="lbl">Bidder B · bids fair price, 2.5 km, 4.8★ over 120 jobs, bid at 1 min</span><span class="val good">₹500 → score 83</span></div>
+    <div class="row total"><span class="lbl">Result</span><span class="val">B wins by 36</span></div>
+  </div>
+  <p class="col">A is fifty rupees cheaper and loses decisively. They still appear under a
+    <b>Cheapest</b> tab, labelled honestly — hiding the cheap bid entirely reads as a con — but the
+    default recommendation steers to the fair-price bidder. After the auction closes, A is told
+    exactly why: <em>"you were ₹50 cheaper and still lost; it came down to distance and reviews,
+    not price."</em> That delayed feedback is the teaching loop. Showing live prices during the
+    window would teach the opposite lesson.</p>
+
+  <h3>Five places where bidding is banned outright</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Banned for</th><th>Because</th></tr></thead>
+      <tbody>
+        <tr><td><b>Emergencies</b></td><td>A twelve-minute auction while a pipe floods is a product failure</td></tr>
+        <tr><td><b>Jobs under ₹300</b></td><td>The whole spread is about ₹40 — five pros' attention for ₹40 destroys supply</td></tr>
+        <tr><td><b>Licence-gated safety work</b></td><td>Price competition selects for whoever will skip a step</td></tr>
+        <tr><td><b>Care work</b></td><td>Ranks the cheapest human on the most trust-sensitive job</td></tr>
+        <tr><td><b>Fewer than 6 pros nearby</b></td><td>A two-bidder auction is theatre, and invites collusion</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="col" style="margin-top:1rem">Bidding never taxes the fast path. Instant Book stays three
+    taps and stays the default; bidding is a grey link underneath it, and becomes the primary path
+    only when there is no pro nearby, or the job is large, or the price is genuinely unknowable.</p>
+</section>
+
+<div class="hr"></div>
+
+<!-- ══════════ 11. AUTOMATION ══════════ -->
+<section id="automation">
+  <h2>What runs itself, and what waits for you</h2>
+  <p class="note">You asked me to vote on this too. Here is where I drew the line, and why. The
+    scarcest resource in this system is your attention — not compute, not money.</p>
+
+  <div class="grid g2">
+    <div class="card"><h4>Fully automatic <span class="chip good">~60% of tasks</span></h4>
+      <ul>
+        <li>Escrow locks, and releases — target <b>85% with no human</b></li>
+        <li>Auctions open, close, expire and fall back</li>
+        <li>No-shows detect and refund themselves</li>
+        <li>~60% of disputes resolve with nobody watching</li>
+        <li>Holdbacks mature; trust scores recompute</li>
+        <li>Nightly reconciliation, backups, keepalive</li>
+        <li>Tests, build, deploy, smoke test</li>
+      </ul></div>
+    <div class="card"><h4>You only <span class="chip crit">~7% — and all the risk</span></h4>
+      <ul>
+        <li><b>A partner's first in-home job.</b> One bad actor in a home ends the business, and no free signal predicts it.</li>
+        <li><b>Any safety, harassment or injury report.</b> Needs a human in minutes. An automated "we've refunded you" reply to an assault report is catastrophic — which is why it is a separate table, not a dispute.</li>
+        <li><b>Permanent bans.</b> Irreversible action against someone's livelihood needs a name attached.</li>
+        <li><b>Fee changes.</b> Silently rewrites every open order at once.</li>
+        <li><b>Applying a database migration.</b> The free tier has no point-in-time recovery, so no automation may ever touch production data.</li>
+      </ul></div>
+  </div>
+
+  <h3>The three disputes that need nobody</h3>
+  <div class="stmt col">
+    <div class="row"><span class="lbl">No arrival code was ever entered<span class="sub">the pro was never provably there</span></span><span class="val good">full refund, automatic</span></div>
+    <div class="row"><span class="lbl">Both codes verified and photos on file<span class="sub">the customer typed the completion code themselves</span></span><span class="val good">released, automatic</span></div>
+    <div class="row"><span class="lbl">Claim under ₹200, first in 30 days<span class="sub">cheaper than two minutes of your time</span></span><span class="val good">refunded as goodwill</span></div>
+    <div class="row"><span class="lbl">“He did a bad job”</span><span class="val warn">always you</span></div>
+  </div>
+
+  <h3>Your 15 minutes</h3>
+  <p class="col">One screen — the <b>TODAY queue</b> — showing only what is blocked on a human,
+    ordered by money at risk. If it is empty, the app says so and shows you nothing else. That view
+    exists because an eight-section admin console is a <em>reporting</em> tool; at 50 orders a day
+    it turns the daily ritual into 45 minutes, and a 45-minute daily ritual gets skipped inside
+    three weeks.</p>
+
+  <div class="card" style="border-color:var(--rule-strong)">
+    <h4>Turn most of this OFF for the first 30 days</h4>
+    <p>With zero users, automation has nothing to work on and manual is genuinely better. Switch
+      off auto-release (look at every settlement — it is how you learn where the rules are wrong),
+      auto-disputes (your first twenty are the curriculum), algorithmic matching (you will know all
+      ten partners personally), <b>and bidding itself</b> — it needs six or more competing pros or
+      it produces empty auctions that just look broken.</p>
+    <p class="dim" style="font-size:.84rem">Keep on from day one: the ledger, escrow holding, the
+      state machines, the OTP, backups and the tests. The plumbing, not the intelligence.</p>
+  </div>
+</section>
+
+<div class="hr"></div>
+
 <!-- ══════════ 8. STATE ══════════ -->
 <section id="state">
   <h2>Where it stands</h2>
   <div class="grid g3">
-    <div class="card"><h4>Tests <span class="chip good">62 / 62</span></h4>
-      <p>Money reconciliation, transition legality, migration idempotence, referential integrity,
-        catalog validity, trust-score bounds, distance sanity.</p>
-      <p class="dim" style="font-size:.82rem">Two failures were found and fixed during the build:
-        terminal order stages that still declared exits, and a registry test asserting the wrong
-        guard.</p></div>
-    <div class="card"><h4>Also fixed in flight</h4>
-      <ul><li>Re-seeding on every reload</li><li>Bottom sheets outliving their screen</li>
-        <li>Blank shop distance on a deep link</li><li>Horizontal overflow on a 375px phone</li>
-        <li>The emblem's figures scattering off the ring</li></ul></div>
+    <div class="card"><h4>Tests <span class="chip good">87 / 87</span></h4>
+      <p>Money reconciliation, ledger invariants, transition legality, migration idempotence,
+        referential integrity, catalog validity, trust bounds, and the bidding band.</p>
+      <p class="dim" style="font-size:.82rem">They now run in CI under plain Node with honest
+        stubs — real WebCrypto, and <code>document</code> as a poison pill so a browser-only suite
+        identifies itself mechanically rather than by anyone's judgement.</p></div>
+    <div class="card"><h4>Bugs the new tests caught</h4>
+      <ul>
+        <li>Quote-based categories were being given a percentage price band —
+          <code>null ?? DEFAULT</code> fell through, when <code>null</code> was exactly the
+          “quote only” signal</li>
+        <li>The band <b>inverted</b> for cheap categories: a ₹180 ironing job's travel minimum
+          exceeded its own fair price, putting the floor above the ceiling</li>
+        <li>A ledger fixture that looked right but left a customer with a negative balance —
+          the invariant was correct to reject it</li>
+      </ul>
+      <p class="dim" style="font-size:.82rem">Earlier rounds also fixed: re-seeding on reload,
+        sheets outliving their screen, a stale cached stylesheet, and the emblem scattering.</p></div>
     <div class="card"><h4>Try it <span class="chip">password 123</span></h4>
       <p style="font-family:'IBM Plex Mono',monospace;font-size:.82rem;line-height:1.85">
         customer · 9000000001<br>pro · 9100000001<br>shop · 9200000001<br>
@@ -634,20 +815,26 @@ then:  index.html?selftest=1   must read  0 failed
   </div>
 
   <h3 style="color:var(--crit)">What is honestly not safe yet</h3>
-  <p class="col">Client-side auth is <b>UI hiding, not authorization</b>. Anyone with developer
-    tools can set a variable, and balances kept in browser storage are editable by the person
-    holding the browser. Before real money moves you need server-side auth, escrow, OTP issuance
-    and the ledger; an RBI-compliant nodal account through a licensed payment aggregator; GST
-    registration with 1% TCS; and TDS §194-O on partner payouts. The demo admin password is seeded
-    on purpose so you can't lock yourself out — the console shows a standing banner about it, and
-    changing it is one screen away. All of this is written up plainly in
-    <code>docs/SECURITY.md</code>, including the cheapest genuine improvement available today: a
-    signed daily ledger snapshot kept outside the browser.</p>
+  <p class="col">Much of what was unsafe in v6.0 is now fixed: auth, escrow, OTP issuance and the
+    ledger all moved server-side, where Row Level Security and SECURITY DEFINER functions decide
+    everything and the browser decides nothing. What remains genuinely open, in order:</p>
+  <div class="stmt col">
+    <div class="row"><span class="lbl"><b>Two-sided collusion.</b> Two accounts running fake jobs at each other satisfies every OTP check perfectly — both people are real and both consent<span class="sub">the honest answer: OTP proves co-presence, not honesty</span></span><span class="val" style="color:var(--crit)">unfixable by protocol</span></div>
+    <div class="row"><span class="lbl">A code read out over the phone, with a spoofed location</span><span class="val warn">needs live camera capture</span></div>
+    <div class="row"><span class="lbl">Money is still simulated — no gateway, no custody</span><span class="val warn">needs an RBI nodal account via a licensed aggregator</span></div>
+    <div class="row"><span class="lbl">Off-platform cash settlement</span><span class="val warn">solved by being worth the cut, not by rules</span></div>
+    <div class="row"><span class="lbl">Chargebacks, once real payments exist</span><span class="val warn">use UPI collect, never pay out before settlement</span></div>
+    <div class="row"><span class="lbl">You are the entire dispute court and on-call</span><span class="val warn">the 7-day auto-rule is the safety valve</span></div>
+  </div>
+  <p class="col">Before real money: GST registration with 1% TCS, TDS §194-O on partner payouts,
+    and a payment aggregator licensed under the RBI's rules — a marketplace collecting on behalf of
+    third parties may not hold funds in an ordinary current account. The full account is in
+    <code>docs/SECURITY.md</code>.</p>
 </section>
 
 <footer>
   <div class="credo">One circle · One purpose</div>
-  SAAHAA v6.0.0 “One Circle” · schema v6 · build 20260901b · tagged <code>v6.0.0</code><br>
+  SAAHAA v6.1.0 “Open Circle” · schema v6 · build 20260901c · tagged <code>v6.1.0</code><br>
   <span class="dim">Prototype build — simulated escrow, no real funds.</span>
 </footer>
 
