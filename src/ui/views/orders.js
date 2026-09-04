@@ -4,7 +4,7 @@
 import { esc, sheet, closeSheet, toast, clockTime, timeAgo } from '../dom.js';
 import { ctx, getState, me, myOrders } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
-import { trackerFor, trackerIndex, stage } from '../../domain/orders.js';
+import { trackerFor, trackerIndex, stage, canTransition } from '../../domain/orders.js';
 import * as flow from '../../domain/flow.js';
 import * as M from '../../core/money.js';
 import { header, emptyBlock } from './shops.js';
@@ -127,16 +127,25 @@ export function renderDetail(orderId) {
           ${m.flagged ? '<p class="micro" style="color:var(--warn)">Contact details hidden — keep payments in SAAHAA.</p>' : ''}
         </div>`).join('') : '<p class="tiny muted">No messages yet.</p>'}
       </div>
+      ${/* sendChat returns early with no session, so the composer silently did
+           nothing for a guest deep-linking an order. */
+        (isCustomer || isPartner || isShop) ? `
       <div class="row" style="margin-top:10px">
         <input id="chatIn" class="grow" placeholder="Type a message"
           style="height:44px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--r-pill);
                  background:var(--surface-2);color:var(--ink-1);font-size:15px">
         <button class="btn btn--secondary" data-act="chat.send" data-id="${o.id}">Send</button>
-      </div>
+      </div>` : '<p class="micro muted" style="margin-top:10px">Sign in to reply.</p>'}
     </div>
 
+    ${/* raiseDispute guards on canTransition, so at a stage with no DISPUTED
+          exit it created the dispute record and toasted "your money is frozen"
+          while leaving the order flowing — and admin's Resolve then failed on
+          the illegal transition. Offer the button only where it can act, and
+          only to someone with standing in the order. */
+      (isCustomer || isPartner || isShop) && canTransition(o.stage, 'DISPUTED') ? `
     <button class="btn btn--ghost btn--block" style="margin-top:20px;color:var(--danger)"
-      data-act="dispute.open" data-id="${o.id}">Report an issue</button>
+      data-act="dispute.open" data-id="${o.id}">Report an issue</button>` : ''}
     <div style="height:40px"></div>
   </main>`;
 }
@@ -155,6 +164,10 @@ function actionPanel(o, r) {
     `<button class="btn ${cls} btn--lg btn--block" data-act="${act}" data-id="${o.id}">${label}</button>`;
 
   if (r.isPartner) {
+    // MATCHING -> ASSIGNED used to happen ONLY inside a 900ms setTimeout in
+    // bookService. A reload inside that window stranded the order forever with
+    // no legal move but cancel. The pro can now accept it themselves.
+    if (s === 'MATCHING')    return panel('New job for you', B('stage.accept', 'Accept this job'));
     if (s === 'ASSIGNED')    return panel('Head to the customer', B('stage.enroute', 'Start travelling'));
     if (s === 'EN_ROUTE')    return panel('Arrived?', B('stage.arrived', "I've arrived"));
     if (s === 'ARRIVED')     return panel('Ask the customer for their 4-digit code', `
@@ -167,7 +180,12 @@ function actionPanel(o, r) {
         <button class="btn btn--secondary grow" data-act="ev.add" data-id="${o.id}" data-label="After">📷 After</button>
       </div>
       <p class="tiny muted" style="margin-bottom:12px">${(o.evidence || []).length} photo(s) attached</p>
-      ${B('stage.done', 'Mark work finished')}`);
+      ${(o.evidence || []).length
+        // markDone refuses without evidence anyway; an enabled button that only
+        // fails on tap teaches the pro nothing about why.
+        ? B('stage.done', 'Mark work finished')
+        : `<button class="btn btn--primary btn--lg btn--block" disabled
+             style="opacity:.5;cursor:not-allowed">Add a photo first</button>`}`);
     if (s === 'WORK_DONE')   return panel('Waiting on the customer',
       `<p class="tiny muted">${o.escrowTier === 'HOLD' ? 'Under team review.' : 'Auto-releases if the customer does not respond.'}</p>`);
   }
@@ -184,6 +202,18 @@ function actionPanel(o, r) {
       ${B('release.full', `Confirm & release ${M.fmt(o.deal)}`)}
       <button class="btn btn--ghost btn--block" style="margin-top:8px;color:var(--danger)"
         data-act="dispute.open" data-id="${o.id}">Something was wrong</button>`);
+    /* Every service order dead-ended at SETTLED: nothing in the app targeted
+       RATED, so partner/rate and review/add were never dispatched, trust
+       scores could never move on real work, and the admin's review moderation
+       list was permanently empty. This panel is the missing terminal step. */
+    if ((s === 'SETTLED' || s === 'PARTIAL') && !o.rated) return panel('How did it go?', `
+      <p class="tiny muted" style="margin-bottom:12px">Your rating is what decides who gets recommended next.</p>
+      <div class="row" style="gap:8px;justify-content:center">
+        ${[1,2,3,4,5].map(n => `<button class="btn btn--ghost" style="font-size:24px;padding:6px 10px"
+          data-act="rate.submit" data-id="${o.id}" data-stars="${n}" aria-label="${n} stars">★</button>`).join('')}
+      </div>
+      <button class="btn btn--ghost btn--block btn--sm" style="margin-top:10px"
+        data-act="rate.skip" data-id="${o.id}">Skip</button>`);
     if (s === 'R_DELIVERED') return panel('Delivered — confirm', B('retail.settle', 'Confirm delivery'));
     if (['MATCHING','ASSIGNED','EN_ROUTE'].includes(s))
       return panel('Need to cancel?', `<button class="btn btn--ghost btn--block" style="color:var(--danger)"
@@ -191,6 +221,10 @@ function actionPanel(o, r) {
   }
 
   if (r.isShop) {
+    // Same stranding bug as MATCHING: R_PLACED -> R_ACCEPTED only ever
+    // happened in a 1100ms timer, and the shop console promises an accept step
+    // that did not exist.
+    if (s === 'R_PLACED')   return panel('New order', B('stage.accept', 'Accept order'));
     if (s === 'R_ACCEPTED') return panel('Pack this order', B('stage.picking', 'Start packing'));
     if (s === 'R_PICKING')  return panel('Weigh and pack', B('stage.packed', 'Weighed & packed'));
     if (s === 'R_PACKED')   return panel('Hand over', B('stage.out', 'Out for delivery'));

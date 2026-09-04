@@ -227,7 +227,36 @@ function escrow(st) {
     <div class="row" style="margin-top:12px;gap:8px">
       <button class="btn btn--primary btn--sm grow" data-act="admin.release" data-id="${o.id}" data-pct="1">Release 100%</button>
       <button class="btn btn--secondary btn--sm grow" data-act="admin.release" data-id="${o.id}" data-pct="0.6">Partial 60%</button>
-    </div></div>`).join('') : '<p class="tiny muted">Nothing awaiting release.</p>'}`;
+    </div></div>`).join('') : '<p class="tiny muted">Nothing awaiting release.</p>'}
+
+  ${stuckRetail(st)}`;
+}
+
+/* Shop orders that stalled mid-fulfilment. They are deliberately NOT in the
+   release list above — releasing one through the service path posted a Rs.0
+   transfer to PARTNER:undefined — but leaving them out entirely meant a
+   customer's money could be frozen with no way for anyone to free it. The
+   only honest remedy when a shop goes dark is to give the money back. */
+function stuckRetail(st) {
+  const STALE_MS = 45 * 60e3;
+  const now = Date.now();
+  const stuck = st.orders.filter(o => o.kind === 'retail'
+    && ['R_PLACED','R_ACCEPTED','R_PICKING','R_PACKED','R_OUT','R_REAUTH'].includes(o.stage));
+  if (!stuck.length) return '';
+  return `<div class="sec"><div class="hd"><h2>Shop orders in flight</h2>
+      <span class="tiny muted">${stuck.filter(o => now - (o.stageTs || 0) > STALE_MS).length} stalled</span></div>
+    ${stuck.map(o => {
+      const stale = now - (o.stageTs || 0) > STALE_MS;
+      return `<div class="card" style="margin-bottom:10px;${stale ? 'border-color:var(--warn)' : ''}">
+        <div class="between"><div class="grow">
+          <b>${esc(o.shopName || 'Shop')}</b>
+          <p class="tiny muted">${esc(o.customerName)} · ${esc(stage(o.stage).label)} · ${timeAgo(o.stageTs)}</p>
+          ${stale ? '<p class="micro" style="color:var(--warn)">Stalled — the shop has not moved this on.</p>' : ''}
+        </div><b class="num">${M.fmt(o.customerPays)}</b></div>
+        <button class="btn btn--secondary btn--sm btn--block" style="margin-top:10px"
+          data-act="admin.refundretail" data-id="${o.id}">Refund the customer in full</button>
+      </div>`;
+    }).join('')}</div>`;
 }
 
 /* ── 4. DISPUTES ──────────────────────────────────────────── */
@@ -269,7 +298,8 @@ function people(st) {
         <div class="row" style="margin-top:8px;gap:6px">
           <button class="btn btn--ghost btn--sm" data-act="admin.suspend" data-id="${p.id}">
             ${p.suspended ? 'Unsuspend' : 'Suspend'}</button>
-          <button class="btn btn--ghost btn--sm" data-act="admin.approve" data-id="${p.id}">Promote</button>
+          ${(p.tier | 0) >= 4 ? '<span class="badge badge--gold">Top tier</span>'
+            : `<button class="btn btn--ghost btn--sm" data-act="admin.approve" data-id="${p.id}">Promote</button>`}
         </div></div>`;
     }).join('')}</div>
   <div class="sec"><div class="hd"><h2>Customers · ${st.users.filter(u => u.role === 'customer').length}</h2></div>
@@ -353,18 +383,28 @@ function replayLedger(ledger) {
   });
   return bal;
 }
+/* What is owed is decided by "escrow was released and we have not paid it
+   out", NOT by the order's current stage. Filtering on stage === 'SETTLED'
+   meant a rated job — which now moves on to RATED/CLOSED — silently dropped
+   out of the payout queue still unpaid. And with no id on the button, Mark
+   paid changed nothing and the row never left the list. */
 function payoutQueue(st) {
   const owed = {};
-  st.orders.filter(o => o.stage === 'SETTLED' || o.stage === 'R_SETTLED').forEach(o => {
-    const k = o.kind === 'service' ? o.partnerName : o.shopName;
-    owed[k] = (owed[k] || 0) + (o.workerPayout || o.shopPayout || 0);
-  });
+  st.orders
+    .filter(o => o.settledAt && !o.paidOut && (o.workerPayout || o.shopPayout))
+    .forEach(o => {
+      const k = o.kind === 'service' ? (o.partnerName || 'Unknown pro') : (o.shopName || 'Unknown shop');
+      if (!owed[k]) owed[k] = { amt: 0, ids: [] };
+      owed[k].amt += (o.workerPayout || o.shopPayout || 0);
+      owed[k].ids.push(o.id);
+    });
   const rows = Object.entries(owed);
   if (!rows.length) return '<p class="tiny muted">Nothing to pay out yet.</p>';
-  return rows.map(([who, amt]) => `<div class="card" style="padding:11px;margin-bottom:7px">
-    <div class="between"><span class="tiny">${esc(who)}</span>
-      <div class="row" style="gap:8px"><b class="num tiny">${M.fmt(amt)}</b>
-        <button class="btn btn--secondary btn--sm" data-act="admin.markpaid">Mark paid</button></div></div></div>`).join('');
+  return rows.map(([who, v]) => `<div class="card" style="padding:11px;margin-bottom:7px">
+    <div class="between"><span class="tiny">${esc(who)}<span class="micro muted"> · ${v.ids.length} order(s)</span></span>
+      <div class="row" style="gap:8px"><b class="num tiny">${M.fmt(v.amt)}</b>
+        <button class="btn btn--secondary btn--sm" data-act="admin.markpaid"
+          data-ids="${esc(v.ids.join(','))}">Mark paid</button></div></div></div>`).join('');
 }
 
 /* ── 8. SYSTEM & AUDIT — the DevOps screen ────────────────── */
@@ -475,10 +515,16 @@ export function suspend(id) {
   toast(p.suspended ? 'Unsuspended' : 'Suspended'); ctx.render();
 }
 export async function release(id, pct) { await flow.confirmAndRelease(id, Number(pct)); ctx.render(); }
+export async function refundRetail(id) { await flow.refundRetail(id); ctx.render(); }
 export async function resolve(id, outcome) {
   const d = getState().disputes.find(x => x.id === id); if (!d) return;
   dispatch({ type: 'dispute/resolve', payload: { id, patch: { status: 'RESOLVED', outcome } } });
-  if (outcome === 'release') await flow.confirmAndRelease(d.orderId, 1);
+  const ord = getState().orders.find(x => x.id === d.orderId);
+  // confirmAndRelease bails on a retail order AFTER the dispute has already
+  // been flipped to RESOLVED, which is how a shop order ended up marked
+  // settled with its money still locked.
+  if (ord && ord.kind === 'retail') await flow.refundRetail(d.orderId, 'dispute upheld');
+  else if (outcome === 'release') await flow.confirmAndRelease(d.orderId, 1);
   else if (outcome === 'partial') await flow.confirmAndRelease(d.orderId, 0.6);
   else await flow.confirmAndRelease(d.orderId, 0);
   audit.record('dispute.resolved', { id, outcome }, 'admin');

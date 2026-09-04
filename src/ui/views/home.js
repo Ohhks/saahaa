@@ -144,6 +144,9 @@ export function render() {
         <span>💰 Pros keep 100%</span>
       </div>
 
+      <!-- the "See all" target: the full category listing, which exists
+           regardless of which feature flags are on -->
+      <div id="allCats"></div>
       ${GROUPS.filter(g => g.id !== 'shops').map(g => {
         const list = services().filter(c => c.group === g.id);
         if (!list.length) return '';

@@ -168,3 +168,45 @@ describe('bidding · the band makes "reasonably" mechanical', () => {
     expect(BID.auctionState(req, now).phase).toBe('awaiting_choice');
   });
 });
+
+/* ── the auction, as a mechanism ────────────────────────────── */
+describe('auction mechanism', () => {
+  const band = () => BID.priceBand('appliance');
+
+  it('a counter can never land BELOW the fair price', () => {
+    // A flat -7% off a bid just above target used to cross under it, which is
+    // the haggle button defeating the anti-undercutting rule it sits inside.
+    const b = band();
+    const justAbove = b.target + 100;
+    const c = BID.counterOffer({ amount: justAbove }, b, {});
+    if (c.available) expect(c.amount >= b.target).toBeTrue();
+  });
+  it('a pro who already bid at or below fair cannot be haggled with at all', () => {
+    const b = band();
+    expect(BID.counterOffer({ amount: b.target }, b, {}).available).toBeFalse();
+    expect(BID.counterOffer({ amount: b.floor }, b, {}).available).toBeFalse();
+  });
+  it('only one counter per request, ever', () => {
+    const b = band();
+    expect(BID.counterOffer({ amount: b.ceiling }, b, { counterUsed: true }).available).toBeFalse();
+  });
+  it('undercutting to the floor costs score and wins nothing', () => {
+    const b = band();
+    expect(BID.priceScore(b.target, b) > BID.priceScore(b.floor, b)).toBeTrue();
+    expect(BID.priceScore(b.target, b) > BID.priceScore(b.ceiling, b)).toBeTrue();
+  });
+  it('a thin market never goes to auction', () => {
+    expect(BID.biddingAllowed('appliance', { poolSize: 2 }).reason).toBe('thinSupply');
+  });
+  it('emergencies and care work are never auctioned', () => {
+    expect(BID.biddingAllowed('appliance', { urgent: true }).reason).toBe('emergency');
+    expect(BID.biddingAllowed('health', {}).allowed).toBeFalse();
+  });
+  it('a retail category has no band, so a Rs.1 bid cannot validate', () => {
+    expect(BID.priceBand('kirana')).toBe(null);
+    expect(BID.validateBid(100, BID.priceBand('kirana')).ok).toBeFalse();
+  });
+  it('the scoring weights sum to exactly 100', () => {
+    expect(Object.values(BID.WEIGHTS).reduce((a, b) => a + b, 0)).toBe(100);
+  });
+});

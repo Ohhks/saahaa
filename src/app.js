@@ -168,7 +168,11 @@ function wireActions() {
   A('nav.account', () => go('account'));
   A('nav.admin',   () => go('admin'));
   A('auth.open',   () => go('auth'));
-  A('scroll.all',  () => document.getElementById('shopsSec')?.scrollIntoView({ behavior: 'smooth' }));
+  /* Pointed at #shopsSec, which only exists while the RETAIL flag is on — so
+     in safe mode (every flag off) it silently did nothing, and even when it
+     worked it scrolled to shops rather than to all categories. */
+  A('scroll.all',  () => (document.getElementById('allCats') || document.getElementById('shopsSec'))
+                          ?.scrollIntoView({ behavior: 'smooth' }));
   A('nav.tab', d => {
     // A partner or shop owner already earns here, so the tab is their console.
     // Everyone else — including a signed-out guest — gets the invitation to
@@ -279,6 +283,14 @@ function wireActions() {
 
   /* order lifecycle */
   A('order.open',    d => go('order', d.id));
+  // one button, both machines: a pro accepting a job and a shop accepting an
+  // order are the same act, and both stages previously had no UI at all
+  A('stage.accept',  d => {
+    const o = getState().orders.find(x => x.id === d.id);
+    if (o) flow.advance(d.id, o.kind === 'service' ? 'ASSIGNED' : 'R_ACCEPTED');
+  });
+  A('rate.submit',   d => { flow.rateOrder(d.id, d.stars); render(); });
+  A('rate.skip',     d => { flow.skipRating(d.id); render(); });
   A('stage.enroute', d => flow.advance(d.id, 'EN_ROUTE'));
   A('stage.arrived', d => flow.advance(d.id, 'ARRIVED'));
   A('stage.done',    d => flow.markDone(d.id));
@@ -334,6 +346,7 @@ function wireActions() {
   A('admin.suspend', d => admin.suspend(d.id));
   A('admin.release', d => admin.release(d.id, d.pct));
   A('admin.resolve', d => admin.resolve(d.id, d.out));
+  A('admin.refundretail', d => admin.refundRetail(d.id));
   A('admin.hidereview', d => admin.hideReview(d.id));
   A('admin.flag',    d => admin.toggleFlag(d.name));
   A('admin.runtests',() => admin.runTests());
@@ -344,7 +357,17 @@ function wireActions() {
   A('admin.exportaudit',  () => admin.exportAudit());
   A('admin.exportledger', () => admin.exportLedger());
   A('admin.changepw',() => admin.changePassword());
-  A('admin.markpaid',() => toast('Marked paid — record the UTR in production'));
+  /* Was a bare toast with no data-id and no state change, so the same payout
+     stayed in the queue after every tap. It now actually marks the order. */
+  A('admin.markpaid', d => {
+    const ids = String(d.ids || '').split(',').filter(Boolean);
+    if (!ids.length) { toast('No payout selected', 'warn'); return; }
+    const at = Date.now();
+    ids.forEach(id => dispatch({ type: 'order/patch', payload: { id, patch: { paidOut: true, paidOutAt: at } } }));
+    audit.record('payout.marked', { ids, count: ids.length }, 'admin');
+    toast(`Marked ${ids.length} payout(s) paid — record the UTR in production`);
+    render();
+  });
   A('selftest.run',  () => admin.runTests());
 }
 
@@ -363,16 +386,27 @@ function wireInputs() {
       case 'shopsearch':    shops.setShopFilter(t.value); debounceRender(); break;
       case 'catalogsearch': partner.setCatalogQuery(t.value); debounceRender(); break;
       case 'pickersearch':  partner.setPickerQuery(t.value); debouncePicker(); break;
-      // An empty field is someone mid-edit, not a free product. Writing 0 here
-      // published the item at Rs.0 and hid it from buyers at stock 0.
-      case 'price':  if (String(t.value).trim()) partner.priceEdit(t.dataset.id, t.value); break;
-      case 'stock':  if (String(t.value).trim()) partner.stockEdit(t.dataset.id, t.value); break;
+      /* Price and stock are committed on `change` (blur / Enter), NOT here.
+         Writing on every keystroke meant typing "150" published the item at
+         Rs.1, then Rs.15, then Rs.150 — and when setProductPrice rejected an
+         above-MRP value there was no re-render, so the field kept showing the
+         illegal number while state held the old one. */
       case 'otp': {
         const i = Number(t.id.replace('otp', ''));
         if (t.value && i < 3) document.getElementById('otp' + (i + 1))?.focus();
         break;
       }
     }
+  });
+
+  // committed edits: one write per completed value, and always re-render so a
+  // rejected value cannot stay on screen pretending it was accepted
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (!t || !t.dataset) return;
+    const v = String(t.value).trim();
+    if (t.dataset.role === 'price' && v) { partner.priceEdit(t.dataset.id, v); render(); }
+    if (t.dataset.role === 'stock' && v) { partner.stockEdit(t.dataset.id, v); render(); }
   });
 }
 let rt = null, pt = null;

@@ -144,13 +144,17 @@ export async function confirmAndRelease(orderId, pct = 1) {
   // THE GUARD. advance() returns null on an illegal transition, and this used
   // to ignore it and post to the ledger regardless — so a double-tap on
   // "Confirm & release" paid the pro twice and double-counted every total.
-  const moved = advance(orderId, pct >= 1 ? 'SETTLED' : 'PARTIAL', {
+  /* A full refund landed the order in PARTIAL ("Partly released") and posted
+     a zero-value ESCROW_RELEASE block. The money was right; the record was a
+     lie, and REFUNDED existed the whole time with no caller. */
+  const endStage = pct >= 1 ? 'SETTLED' : pct <= 0 ? 'REFUNDED' : 'PARTIAL';
+  const moved = advance(orderId, endStage, {
     releasedPct: pct, workerPayout: r.workerPayout, refund: r.refund,
     platformFee: r.platformFee, gst: r.gst, settledAt: Date.now(),
   });
   if (!moved) return;
 
-  await ledger('ESCROW_RELEASE', r.workerPayout, acct.escrow(o.id), acct.partner(o.partnerId), { pct });
+  if (r.workerPayout) await ledger('ESCROW_RELEASE', r.workerPayout, acct.escrow(o.id), acct.partner(o.partnerId), { pct });
   if (r.platformFee) await ledger('FEE', r.platformFee, acct.escrow(o.id), acct.fee(), {});
   if (r.gst)         await ledger('GST', r.gst, acct.escrow(o.id), acct.gst(), {});
   if (r.refund)      await ledger('REFUND', r.refund, acct.escrow(o.id), acct.customer(o.customerKey), {});
@@ -173,6 +177,14 @@ export async function confirmAndRelease(orderId, pct = 1) {
     onTimeStarts: (p.onTimeStarts || 0) + 1, lastActiveTs: Date.now() } } });
   else if (p) dispatch({ type: 'partner/patch', payload: { id: p.id, patch: {
     disputesUpheld: (p.disputesUpheld || 0) + 1 } } });
+
+  /* Releasing escrow on a disputed order left the dispute OPEN, and its three
+     Resolve buttons then all failed on an illegal transition — while
+     dispute/resolve had ALREADY marked it resolved. Close it here, where the
+     money actually moved. */
+  const open = getState().disputes.find(d => d.orderId === o.id && !d.resolvedAt);
+  if (open) dispatch({ type: 'dispute/resolve', payload: { id: open.id,
+    patch: { outcome: pct >= 1 ? 'released' : pct <= 0 ? 'refund' : 'partial', resolvedBy: 'release' } } });
 
   audit.record(pct >= 1 ? audit.ACTIONS.ESCROW_RELEASE : audit.ACTIONS.ESCROW_PARTIAL,
                { id: o.id, amount: r.workerPayout, refund: r.refund, pct }, me() ? me().key : 'admin');
@@ -220,6 +232,14 @@ export function getCart() {
 export function addToCart(product, qty = 1) {
   const s = me();
   if (!s) { toast('Sign in to start a cart'); return { needsAuth: true }; }
+  /* The shop's Close switch flipped a badge and nothing else: closed shops
+     still ranked, their products still showed an Add button, and checkout
+     never looked. Customers could order from a shop that was shut. */
+  const shop0 = getState().shops.find(x => x.id === product.shopId);
+  if (shop0 && shop0.isOpen === false) {
+    toast(`${shop0.name} is closed right now`, 'warn');
+    return { closed: true };
+  }
   const cart = getCart();
   if (cart && cart.shopId !== product.shopId && cart.lines.length) {
     return { conflict: true, currentShopId: cart.shopId, product, qty };
@@ -261,6 +281,9 @@ export function cartQuote(mode = 'rider') {
 
 export async function placeRetailOrder(mode = 'rider') {
   const s = me(); if (!s) throw new Error('Please sign in first');
+  const c0 = getCart();
+  const sh0 = c0 && getState().shops.find(x => x.id === c0.shopId);
+  if (sh0 && sh0.isOpen === false) { toast(`${sh0.name} closed before you checked out`, 'warn'); return null; }
   const cart = getCart(); const q = cartQuote(mode);
   if (!cart || !q) return null;
   const now = Date.now();
@@ -303,7 +326,74 @@ export async function settleRetail(orderId) {
   bumpAgg({ retailOrders: a.retailOrders + 1, gmv: a.gmv + o.itemsTotal,
             revenue: a.revenue + feeExGst, gst: a.gst + (o.gst | 0),
             escrow: Math.max(0, a.escrow - (o.customerPays | 0)) });
+  // R_SETTLED was the end of the road: nothing advanced to R_CLOSED, so every
+  // retail order sat in a non-terminal stage forever and two views had to
+  // hard-code R_SETTLED into their "hide it" lists instead of using isTerminal.
+  advance(orderId, 'R_CLOSED', { closedAt: Date.now() });
   toast(`Settled — ${M.fmt(o.shopPayout)} to ${o.shopName}`);
+}
+
+/* ── the admin's escape hatch for a stuck shop order ──────────
+   A retail order abandoned at R_ACCEPTED/R_PICKING/R_PACKED/R_OUT (shop went
+   dark) had NO admin remedy: the escrow queue listed service orders only, and
+   the disputes path called confirmAndRelease, which early-returns for retail
+   — after dispute/resolve had already marked the dispute resolved. The
+   customer's money was frozen permanently. The correct remedy when a shop
+   goes dark is to give it back. */
+export async function refundRetail(orderId, reason = 'shop unresponsive') {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o) return null;
+  if (o.kind !== 'retail') { toast('That is a service order — release it from Escrow.', 'warn'); return null; }
+  if (['R_SETTLED', 'R_CLOSED', 'R_CANCELLED'].includes(o.stage)) { toast('Already closed', 'warn'); return null; }
+
+  // R_OUT cannot cancel directly; it must fail first. Walk the legal path
+  // rather than forcing an illegal jump.
+  if (o.stage === 'R_OUT') advance(orderId, 'R_FAILED', {});
+  if (!advance(orderId, 'R_CANCELLED', { refund: o.customerPays, cancelledAt: Date.now(), cancelReason: reason })) {
+    toast('That order cannot be cancelled from its current stage', 'danger');
+    return null;
+  }
+  await ledger('REFUND', o.customerPays, acct.escrow(o.id), acct.customer(o.customerKey), { reason });
+  const a = getState().agg;
+  bumpAgg({ refunds: a.refunds + o.customerPays, escrow: Math.max(0, a.escrow - (o.customerPays | 0)) });
+
+  const open = getState().disputes.find(d => d.orderId === o.id && !d.resolvedAt);
+  if (open) dispatch({ type: 'dispute/resolve', payload: { id: open.id, patch: { status: 'RESOLVED', outcome: 'refund' } } });
+  audit.record('retail.refunded', { id: o.id, amount: o.customerPays, reason }, me() ? me().key : 'admin');
+  toast(`${M.fmt(o.customerPays)} refunded to ${o.customerName}`);
+  return o;
+}
+
+/* ── rating: the missing terminal step of a service order ─────
+   Without this nothing ever dispatched partner/rate or review/add, so trust
+   scores were frozen at their seed values and admin's review moderation list
+   could never be anything but empty. */
+export function rateOrder(orderId, starsRaw, text = '') {
+  const stars = Math.max(1, Math.min(5, Math.round(Number(starsRaw) || 0)));
+  const o = getState().orders.find(x => x.id === orderId);
+  const s = me();
+  if (!o || !s) return null;
+  if (o.customerKey !== s.key) { toast('Only the customer can rate this job', 'warn'); return null; }
+  if (o.rated) return null;                       // idempotent: one rating per order
+  const now = Date.now();
+  if (o.partnerId) dispatch({ type: 'partner/rate', payload: { id: o.partnerId, rating: { stars, ts: now, orderId } } });
+  dispatch({ type: 'review/add', payload: {
+    id: nid('rv'), orderId, partnerId: o.partnerId, partnerName: o.partnerName,
+    byKey: s.key, byName: s.name, stars, text: String(text || '').slice(0, 400), ts: now } });
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { rated: stars, ratedAt: now } } });
+  // SETTLED -> RATED -> CLOSED, and PARTIAL -> CLOSED. All three existed in
+  // the machine with no caller.
+  if (advance(orderId, 'RATED', {})) advance(orderId, 'CLOSED', {});
+  else advance(orderId, 'CLOSED', {});
+  audit.record('order.rated', { id: orderId, stars }, s.key);
+  toast('Thanks — that decides who gets recommended next.');
+  return stars;
+}
+
+/** Declining to rate still has to close the order, or it sits open forever. */
+export function skipRating(orderId) {
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { rated: 0, ratedAt: Date.now() } } });
+  advance(orderId, 'CLOSED', {});
 }
 
 /* ── shop owner: self-listing ──────────────────────────────── */

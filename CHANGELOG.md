@@ -6,6 +6,102 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [6.3.0] — 2026-09-05 — "Ask Rates"
+
+The bidding mechanism has existed since 6.1 and nothing outside the test suite
+imported it. This release makes it a product, and clears the defects two audit
+agents found across the rest of the app.
+
+### Added — the P2P auction, end to end
+- **`domain/auction.js`** — post a request, sealed bids in waves, close,
+  accept, one counter-offer, or take the price you already had.
+- **The held price is the whole conversion mechanism.** The locked match stays
+  reserved for the entire window, so asking cannot cost the customer anything.
+  It is not education, it is downside elimination — and a customer who
+  believes they cannot lose will try anything once.
+- **`ui/views/ask.js`** — the customer never sees the word "bid". A bid is a
+  *rate*, a bidder a *worker*, the locked match the *held price*. "Auction",
+  "P2P" and "cheapest" appear nowhere on screen: the score peaks at fair
+  value, so promising cheapest would be the product lying about its own
+  mechanism.
+- The waiting screen seeds reply one with the held price at 8s so it is never
+  empty; elapsed counts **up**, because a 12:00 countdown reads as a wall.
+  Both escapes are one tap and neither asks "are you sure".
+- The choosing screen sorts by score and never by price. The cheapest reply is
+  always shown and always bookable, with one honest line naming what it costs
+  in rating and distance — hiding it is the fastest way to lose trust in a
+  market where people compare notes.
+- The receipt shows the rupees **they** saved. Zero is never rendered as zero:
+  "your held price was already the best rate" instead.
+- Worker screen: slider pre-filled at the fair price with a live chance meter,
+  normalised across the band so dragging to the floor actually reads *weak*.
+  Workers don't read scoring functions; they watch a bar shrink.
+- 8 new self-tests pin the mechanism (96 total).
+
+### Fixed — market depth (why none of it could run)
+- The seed had **one pro per category**. `biddingAllowed` needs 6 and the UI
+  gate needs 8, so ask-and-bid was unreachable on every install — correct code
+  that could never execute. `seed.depth.js` adds 9 deterministic pros per
+  category; migration **v6 → v7** tops up existing installs. Ids derive from
+  (category, index), which is what makes the top-up idempotent.
+
+### Fixed — money and mechanism
+- **A counter could land below the fair price.** A flat −7% off a bid just
+  above target crossed under it: the haggle button defeating the
+  anti-undercutting rule it sits inside. Clamped to target.
+- **Customer-facing prices were the worker's raw rate while the charge was the
+  all-in total**, so every saving figure was overstated. Workers bid the deal;
+  customers see what they pay, everywhere.
+- **The self-bid guard compared the session to the customer instead of the
+  bidder**, so every bid on your own request tripped it and no rate landed.
+- **A stuck shop order had no admin remedy and its escrow was frozen
+  permanently** — the escrow queue was service-only and the dispute path called
+  `confirmAndRelease`, which bails on retail *after* the dispute was already
+  marked resolved. `flow.refundRetail` plus a "Shop orders in flight" block.
+- **A full refund landed in PARTIAL** ("partly released") and posted a ₹0
+  ledger block. `REFUNDED` existed the whole time with no caller.
+- **Releasing escrow left the linked dispute OPEN**, and its Resolve buttons
+  then all failed on an illegal transition.
+- **Mark paid changed nothing** — a bare toast with no order id, so the same
+  payout stayed in the queue forever. The queue now keys on "released and not
+  paid out" rather than on stage, which also stopped rated jobs vanishing
+  from it unpaid.
+- **Closed shops still took orders.** The Close switch flipped a badge and
+  nothing else; `addToCart` and checkout now both refuse.
+- **Price and stock wrote on every keystroke**, so typing "150" published ₹1,
+  then ₹15, then ₹150 — and a rejected value stayed on screen. Committed on
+  change, with a re-render.
+
+### Fixed — dead ends in the state machines
+- **Service orders could never be rated.** Nothing targeted `RATED`, so
+  `partner/rate` and `review/add` were never dispatched, trust scores were
+  frozen at their seed values and admin's review moderation was permanently
+  empty. `SETTLED → RATED → CLOSED` now has a UI.
+- **Retail orders never reached `R_CLOSED`**, which is why two views hard-coded
+  `R_SETTLED` into their "hide it" lists instead of using `isTerminal`.
+- **`MATCHING → ASSIGNED` and `R_PLACED → R_ACCEPTED` existed only inside
+  `setTimeout`.** A reload inside that window stranded the order with no legal
+  move but cancel. Both now have an Accept button.
+- **"Report an issue" appeared at stages with no `DISPUTED` exit**, creating a
+  dispute record and promising frozen money while the order kept flowing.
+  Shown only where it can act, and only to someone with standing in the order.
+- "Mark work finished" is disabled until a photo is attached, rather than
+  failing on tap.
+- The Promote button is hidden at tier 4 instead of being a silent no-op.
+
+### Fixed — UI correctness
+- **A sheet could outlive its screen**: `hashchange` re-rendered without
+  closing it, and `closeSheet` could not cancel a pending open. `go()`'s own
+  hash echo is now ignored, which is what kept the ask-rates receipt alive.
+- **`book.sub` dropped the chosen sub-service** — `openCategory` took one
+  argument, so the sheet re-rendered byte-identical and the tap did nothing
+  visible. Threaded through to the order.
+- Double-escaped headers rendered `&amp;` in three views.
+- "See all" pointed at `#shopsSec`, which does not exist when the RETAIL flag
+  is off; it now targets a category anchor that always exists.
+
+---
+
 ## [6.2.0] — 2026-09-02 — "Bright Circle"
 
 Six agents audited the app in parallel and found 40 issues. Everything that
