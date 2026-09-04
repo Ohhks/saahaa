@@ -247,9 +247,9 @@ footer .credo{
     <circle cx="100" cy="100" r="7" fill="url(#au)"/>
   </svg>
   <div>
-    <p class="kicker">Build statement · v6.1.0 “Open Circle”</p>
+    <p class="kicker">Build statement · v6.2.0 “Bright Circle”</p>
     <h1>Saahaa</h1>
-    <p class="sub">1 Sept 2026 · 26 modules · 24 categories · 87 tests green</p>
+    <p class="sub">2 Sept 2026 · 28 modules · 24 categories · 87 tests green</p>
   </div>
 </header>
 
@@ -786,6 +786,105 @@ then:  index.html?selftest=1   must read  0 failed
 
 <div class="hr"></div>
 
+<!-- ══════════ 12. THE AUDIT ══════════ -->
+<section id="audit">
+  <h2>What six agents found</h2>
+  <p class="note">This round was an audit, not a feature build. Six specialists went through the
+    code in parallel and returned 40 findings. These are the ones that could have cost money.</p>
+
+  <div class="grid g2">
+    <div class="card"><h4>Double-tap paid the pro twice <span class="chip crit">critical</span></h4>
+      <p>The state machine correctly <em>refused</em> the second transition — and every caller
+        ignored that refusal and posted to the ledger anyway. Two taps on <b>Confirm &amp; release</b>
+        meant two payouts and double-counted totals.</p></div>
+    <div class="card"><h4>A ₹1 bid validated on groceries <span class="chip crit">critical</span></h4>
+      <p>Retail categories have no base price, so every price-band value was <code>NaN</code> — and
+        because every comparison against <code>NaN</code> is false, the floor, ceiling and
+        minimum-value guards <b>all passed</b>.</p></div>
+    <div class="card"><h4>Certified pros released more than was locked <span class="chip crit">critical</span></h4>
+      <p>Booking escrowed at the 6% loyalty rate; release hardcoded 10%. Every Tier-4 job released
+        4% more than existed, quietly draining other orders' escrow.</p></div>
+    <div class="card"><h4>One bad rating made a pro “Elite” <span class="chip warn">high</span></h4>
+      <p>A rating with no star value made the trust score <code>NaN</code>, and the banding function
+        fell through every branch to the top grade. A gold badge and top ranking from one malformed
+        record.</p></div>
+    <div class="card"><h4>The cart showed a price it would not charge <span class="chip crit">critical</span></h4>
+      <p>Tapping “I'll pick up” moved no highlight and left the total showing a delivery fee — but
+        the order was created at the pickup price. Displayed price and charged price must be the
+        same number.</p></div>
+    <div class="card"><h4>Refreshing signed you out <span class="chip warn">high</span></h4>
+      <p>The session lived only in memory. This was the other half of “the Work tab doesn't work”:
+        sign in, reload, and you were a guest again on your own console.</p></div>
+  </div>
+
+  <h3>Also fixed</h3>
+  <div class="stmt col">
+    <div class="row"><span class="lbl">Money past ₹2.14 crore went <b>negative</b><span class="sub">32-bit truncation, and the totals are cumulative</span></span><span class="val good">fixed</span></div>
+    <div class="row"><span class="lbl">Losing a dispute <b>raised</b> the pro's trust score</span><span class="val good">fixed</span></div>
+    <div class="row"><span class="lbl">The promised ₹100 no-show credit was computed and thrown away</span><span class="val good">fixed</span></div>
+    <div class="row"><span class="lbl">An unrecognised old order stage was silently closed, escrow still held</span><span class="val good">fixed</span></div>
+    <div class="row"><span class="lbl">The ledger hash-chain forked on concurrent writes<span class="sub">the head was read before an await, so two calls claimed the same block</span></span><span class="val good">fixed</span></div>
+    <div class="row"><span class="lbl">“Free delivery over ₹499” was advertised and never applied</span><span class="val good">fixed</span></div>
+    <div class="row"><span class="lbl">Three wrong door codes flagged nothing — the code was brute-forceable</span><span class="val good">fixed</span></div>
+    <div class="row"><span class="lbl">Clearing a price field published the item at ₹0</span><span class="val good">fixed</span></div>
+    <div class="row"><span class="lbl">A stored old schema bricked the app into permanent safe mode</span><span class="val good">fixed</span></div>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ══════════ 13. THE LOOK ══════════ -->
+<section id="look">
+  <h2>Bright purple, and the number that chose it</h2>
+  <p class="note">You asked for bright purple with the text in the most readable opposite.
+    Readability is measurable, so it decided the palette rather than taste doing it.</p>
+
+  <div class="stmt col">
+    <div class="row"><span class="lbl">White on violet-400 <code>#A78BFA</code></span><span class="val" style="color:var(--crit)">2.72 · fail</span></div>
+    <div class="row"><span class="lbl">White on violet-500 <code>#8B5CF6</code></span><span class="val" style="color:var(--crit)">4.23 · fail</span></div>
+    <div class="row"><span class="lbl">White on violet-550 <code>#8551F2</code><span class="sub">the exact ceiling</span></span><span class="val">4.71 · pass</span></div>
+    <div class="row total"><span class="lbl">White on <b>#7C3AED</b> — the chosen primary</span><span class="val good">5.70 · pass</span></div>
+  </div>
+  <p class="col"><b>#7C3AED is the brightest, most saturated purple that still carries white body
+    text at AA.</b> Anything brighter and the text stops being readable in Hyderabad sunlight on a
+    cheap LCD — which is exactly where these users are.</p>
+
+  <h3>The trap: the old gold fails on bright purple</h3>
+  <div class="stmt col">
+    <div class="row"><span class="lbl">Existing gold <code>#EBC97C</code> as text on violet</span><span class="val" style="color:var(--crit)">3.58 · fail</span></div>
+    <div class="row"><span class="lbl">Darker gold <code>#B07F32</code></span><span class="val" style="color:var(--crit)">1.61 · invisible</span></div>
+    <div class="row"><span class="lbl">Light gold <code>#FBE8B8</code> — now used for gold text on violet</span><span class="val good">4.70 · pass</span></div>
+  </div>
+  <p class="col">So gold split by role: fills and the emblem keep the metallic ramp, gold
+    <em>text</em> on violet uses the light stops, and the dark golds may never sit on violet at all.
+    The wordmark's gradient was retargeted too — its dark stop measured 1.61, so the bottom third
+    of the letterforms was simply disappearing.</p>
+
+  <h3>Keeping a vivid colour from looking cheap</h3>
+  <p class="col">Bright violet is <b>chrome, never field</b> — capped at roughly a fifth of any
+    screen. Every large surface is violet-<em>tinted neutral</em> (<code>#F8F5FE</code>), never a
+    flat <code>#8B5CF6</code>, and never set against pure white or pure black. It is the
+    area-times-saturation product that reads as cheap, not the hue itself.</p>
+
+  <h3>The icons had to be drawn, not borrowed</h3>
+  <p class="col">This was a bug, not a preference. The cook emoji is a joined sequence that
+    <b>fragments into two separate glyphs on Android 8 and 9</b>, and several newer emoji render as
+    <b>empty boxes</b> on those same phones — a large share of a ₹8–15k device base. All 24
+    categories and the whole navigation bar are now flat SVGs that look identical everywhere. That
+    also resolved the collisions: broom against soap, ant against dog, lettuce against milk, and
+    haircut against massage — both were people-shapes and indistinguishable at 22px.</p>
+
+  <div class="card card--gold" style="margin-top:1rem">
+    <h4>“from ₹600” had to go</h4>
+    <p>It was a floor almost nobody actually pays, so the first real quote felt like a
+      bait-and-switch — and it contradicted the product's own promise that the pro sets the price.
+      Tiles now show <b>supply proof</b>: “12 nearby”, or “New here — be first”. True, self-updating,
+      and it answers the question the customer is actually asking.</p>
+  </div>
+</section>
+
+<div class="hr"></div>
+
 <!-- ══════════ 8. STATE ══════════ -->
 <section id="state">
   <h2>Where it stands</h2>
@@ -834,7 +933,7 @@ then:  index.html?selftest=1   must read  0 failed
 
 <footer>
   <div class="credo">One circle · One purpose</div>
-  SAAHAA v6.1.0 “Open Circle” · schema v6 · build 20260901c · tagged <code>v6.1.0</code><br>
+  SAAHAA v6.2.0 “Bright Circle” · schema v6 · build 20260902b · tagged <code>v6.2.0</code><br>
   <span class="dim">Prototype build — simulated escrow, no real funds.</span>
 </footer>
 
