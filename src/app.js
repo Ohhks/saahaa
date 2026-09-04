@@ -2,7 +2,7 @@
    about every other module, and it does nothing but wire them together. */
 
 import { VERSION, SCHEMA_VERSION, BUILD_ID } from './core/version.js';
-import { ctx, getState, me } from './core/ctx.js';
+import { ctx, getState, me, restoreSession } from './core/ctx.js';
 import { createStore, combineFromRegistry } from './core/store.js';
 import * as persist from './core/persist.js';
 import * as registry from './core/registry.js';
@@ -371,6 +371,12 @@ async function boot() {
     persist.flush(persist.KEYS.state);          // commit the seed immediately
     console.info('[saahaa] seeded', seed.shops.length, 'shops,', seed.products.length, 'products');
   }
+
+  // Bring the signed-in user back. Without this the session was written but
+  // never read, so every refresh — and every PWA relaunch — silently signed
+  // the user out and showed a partner the guest pitch on their own Earn tab.
+  const restored = restoreSession(store.getState().users);
+  if (restored) console.info('[saahaa] session restored:', restored.role);
 
   const health = checkHealth(store.getState());
   if (!health.ok) console.warn('[saahaa] health', health.checks.filter(c => !c.ok));
