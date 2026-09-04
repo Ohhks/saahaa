@@ -1,0 +1,13 @@
+# There is no npm here by design, so the only third-party code in this repo is
+# the GitHub Actions we pin. Those still get CVEs and still break on major
+# bumps, so they are worth watching. Monthly, not weekly — a solo operator does
+# not need four PRs a week about action versions.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"

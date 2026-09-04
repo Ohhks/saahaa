@@ -1,0 +1,10 @@
+# Everything needs the owner's eyes. With one maintainer this is not
+# bureaucracy — it is what makes GitHub tell you when a branch touches the
+# files where a mistake costs real money.
+*                           @Ohhks
+
+# These four are the ones where a bad change is expensive rather than annoying.
+/supabase/migrations/       @Ohhks
+/src/domain/pricing.js      @Ohhks
+/src/domain/ledger.js       @Ohhks
+/src/core/adminauth.js      @Ohhks

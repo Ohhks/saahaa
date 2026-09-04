@@ -36,6 +36,7 @@ import * as ordersView from './ui/views/orders.js';
 import * as auth from './ui/views/auth.js';
 import * as partner from './ui/views/partner.js';
 import * as admin from './ui/views/admin.js';
+import * as earn from './ui/views/earn.js';
 
 /* ══════════════ ROUTES ══════════════ */
 const ROUTES = {
@@ -49,6 +50,7 @@ const ROUTES = {
   partner:   () => partner.renderPartner(),
   shopadmin: () => partner.renderShopAdmin(),
   admin:     () => admin.render(),
+  earn:      () => earn.render(),
   account:   () => accountView(),
 };
 
@@ -56,7 +58,7 @@ const NAV = [
   ['home',   '🏠', 'Home'],
   ['shops',  '🛒', 'Shops'],
   ['orders', '🧾', 'Orders'],
-  ['console','🧰', 'Work'],
+  ['earn',   '💼', 'Earn'],
   ['account','👤', 'You'],
 ];
 
@@ -97,7 +99,7 @@ function render() {
 function navBar() {
   const s = me();
   const cur = ctx.view === 'shop' ? 'shops' : ctx.view === 'order' ? 'orders'
-            : ctx.view === 'partner' || ctx.view === 'shopadmin' ? 'console' : ctx.view;
+            : ctx.view === 'partner' || ctx.view === 'shopadmin' ? 'earn' : ctx.view;
   return `<nav class="nav on-plum" role="tablist">
     ${NAV.map(([id, ic, label]) => `<button role="tab" aria-selected="${cur === id}"
       data-act="nav.tab" data-tab="${id}">
@@ -148,11 +150,13 @@ function wireActions() {
   A('auth.open',   () => go('auth'));
   A('scroll.all',  () => document.getElementById('shopsSec')?.scrollIntoView({ behavior: 'smooth' }));
   A('nav.tab', d => {
-    if (d.tab === 'console') {
-      const s = me();
-      go(!s ? 'auth' : s.role === 'shop' ? 'shopadmin' : s.role === 'partner' ? 'partner' : 'account');
-    } else go(d.tab);
+    // A partner or shop owner already earns here, so the tab is their console.
+    // Everyone else — including a signed-out guest — gets the invitation to
+    // join, which is a real screen, not a redirect to the login form.
+    if (d.tab === 'earn' && earn.wantsConsole()) go(earn.consoleRoute());
+    else go(d.tab);
   });
+  A('earn.start', () => { auth.setAuthTab('signup'); auth.setAuthRole('partner'); go('auth'); });
   A('sheet.close', () => closeSheet());
 
   /* theme + brand */
