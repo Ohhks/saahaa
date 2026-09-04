@@ -2,7 +2,7 @@
    about every other module, and it does nothing but wire them together. */
 
 import { VERSION, SCHEMA_VERSION, BUILD_ID } from './core/version.js';
-import { ctx, getState, me, restoreSession } from './core/ctx.js';
+import { ctx, getState, dispatch, me, restoreSession } from './core/ctx.js';
 import { createStore, combineFromRegistry } from './core/store.js';
 import * as persist from './core/persist.js';
 import * as registry from './core/registry.js';
@@ -22,6 +22,7 @@ import './core/migrations.js';
 import { defaultState } from './domain/state.js';
 import { buildSeed } from './domain/seed.js';
 import * as flow from './domain/flow.js';
+import * as auction from './domain/auction.js';
 import { AREA_NAMES } from './domain/match.js';
 import './core/selftests.js';
 import './core/selftests.money.js';
@@ -38,6 +39,7 @@ import * as auth from './ui/views/auth.js';
 import * as partner from './ui/views/partner.js';
 import * as admin from './ui/views/admin.js';
 import * as earn from './ui/views/earn.js';
+import * as ask from './ui/views/ask.js';
 
 /* ══════════════ ROUTES ══════════════ */
 const ROUTES = {
@@ -52,6 +54,7 @@ const ROUTES = {
   shopadmin: () => partner.renderShopAdmin(),
   admin:     () => admin.render(),
   earn:      () => earn.render(),
+  ask:       p => ask.render(p),
   account:   () => accountView(),
 };
 
@@ -64,6 +67,10 @@ const NAV = [
 ];
 
 let history = [];
+/* one confirmation per bid, not per tap — the guard rail must not become friction */
+const confirmedLowRated = new Set();
+/* set by go() so the hashchange it triggers is recognised as our own echo */
+let selfNav = false;
 
 function go(view, param) {
   closeSheet();                       // a sheet must never outlive its screen
@@ -73,6 +80,10 @@ function go(view, param) {
   const next = param ?? null;
   if (ctx.view !== view || ctx.param !== next) history.push([ctx.view, ctx.param]);
   ctx.view = view; ctx.param = next;
+  // go() has already done the work; the hashchange it is about to fire is an
+  // echo, not a navigation. Without this the handler below re-closed any sheet
+  // opened immediately after a go() — which silently ate the ask-rates receipt.
+  selfNav = true;
   if (view !== 'admin') location.hash = param ? `#/${view}/${param}` : `#/${view}`;
   else location.hash = '#/admin';
   window.scrollTo(0, 0);
@@ -192,10 +203,53 @@ function wireActions() {
   /* catalog + booking */
   A('cat.open',      d => home.openCategory(d.id));
   A('book.sub',      d => home.openCategory(d.id, d.sub));   // the chosen sub used to be dropped
-  A('book.others',   d => home.showAlternates(d.id));
+  A('book.others',   d => home.showAlternates(d.id, d.sub || null));
   A('book.confirm',  d => home.confirmBooking(d.id, d.pid, d.sub));
   A('quick.emergency', () => { home.setSearch('repair'); render(); toast('Showing urgent-capable trades'); });
   A('quick.nearby',    () => go('shops'));
+
+  /* ── ask rates (the P2P auction, in the customer's words) ──── */
+  A('ask.start',  d => ask.startAsk(d.id, d.pid, Number(d.held)));
+  A('ask.cancel', d => { auction.cancelRequest(d.id); toast('Cancelled. Nothing was charged.'); go('home'); });
+  A('ask.background', () => { toast('We will message you when rates come in.'); go('home'); });
+  A('ask.counter', d => auction.sendCounter(d.id, d.bid));
+  A('ask.held',   async d => {
+    const req = auction.requestById(d.id);
+    const o = await auction.bookHeld(d.id);
+    if (!o) return;
+    go('order', o.id);
+    ask.showReceipt(req, req.held.amount, req.held.partnerName);
+  });
+  A('ask.accept', async d => {
+    // The one guard rail: a materially lower-rated pick gets ONE lightweight
+    // sheet stating the fact. Not a warning, not "not recommended" — a fact.
+    const bid = getState().bids.find(b => b.id === d.bid);
+    if (d.warn === '1' && !confirmedLowRated.has(d.bid)) {
+      confirmedLowRated.add(d.bid);
+      sheet('Before you book', `<p class="tiny muted">${esc(bid.partnerName)} is rated lower than the recommended worker.</p>
+        <button class="btn btn--primary btn--lg btn--block" style="margin-top:16px"
+          data-act="ask.accept" data-id="${d.id}" data-bid="${d.bid}">Book ${'₹'}${(bid.amount / 100).toFixed(0)}</button>
+        <button class="btn btn--ghost btn--block" style="margin-top:6px" data-act="sheet.close">Go back</button>`);
+      return;
+    }
+    const req = auction.requestById(d.id);
+    const o = await auction.acceptBid(d.id, d.bid);
+    if (!o) return;
+    const paid = bid.countered || bid.amount;
+    // remember the saving so the NEXT entry row can show their own number
+    dispatch({ type: 'request/patch', payload: { id: d.id, patch: { savedPaise: Math.max(0, (req.held ? req.held.amount : paid) - paid) } } });
+    go('order', o.id);
+    ask.showReceipt(auction.requestById(d.id), paid, bid.partnerName);
+  });
+  A('bid.send', d => {
+    const p = getState().partners.find(x => x.id === d.pid);
+    if (!p) return;
+    if (auction.placeBid({ requestId: d.id, partner: p, amount: Number(d.amt) })) { closeSheet(); render(); }
+  });
+  A('bid.open', d => {
+    const p = getState().partners.find(x => x.id === d.pid);
+    if (p) ask.bidSheet(d.id, p);
+  });
   A('partner.join',    () => { auth.setAuthTab('signup'); auth.setAuthRole('partner'); go('auth'); });
 
   /* auth */
@@ -392,7 +446,13 @@ async function boot() {
     if (ROUTES[v]) { ctx.view = v; ctx.param = p || null; }
   };
   applyHash();
-  window.addEventListener('hashchange', () => { applyHash(); render(); });
+  // A sheet must never outlive its screen. go() closes it, but hash-driven
+  // navigation (browser back, a pasted deep link) bypassed go() entirely and
+  // left the previous screen's sheet sitting on top of the new one.
+  window.addEventListener('hashchange', () => {
+    if (selfNav) { selfNav = false; return; }   // our own echo: go() already rendered
+    closeSheet(); applyHash(); render();
+  });
 
   ctx.ready = true;
 

@@ -12,6 +12,7 @@ import * as M from '../../core/money.js';
 import { tier } from '../../domain/trust.js';
 import * as flags from '../../core/flags.js';
 import { trackerFor, trackerIndex, stage } from '../../domain/orders.js';
+import * as ask from './ask.js';
 
 let search = '';
 export const setSearch = v => { search = v; };
@@ -185,29 +186,34 @@ export function render() {
 }
 
 /* ── category detail ───────────────────────────────────────── */
-export function openCategory(catId) {
+export function openCategory(catId, sub = null) {
   const c = get('category', catId);
   if (c.kind === 'retail') { ctx.go('shops', catId); return; }
   const m = flow.findMatch(catId);
+  // The chosen sub-service used to be dropped on the floor: openCategory took
+  // one argument, so the sheet re-rendered byte-identical, mount() skipped the
+  // write, and tapping a chip did nothing visible. It now selects, and it is
+  // threaded all the way into the booking.
   const subs = (c.subs || []).map(s =>
-    `<button class="chip" data-act="book.sub" data-id="${catId}" data-sub="${esc(s)}">${esc(s)}</button>`).join('');
+    `<button class="chip${s === sub ? ' on' : ''}" data-act="book.sub" data-id="${catId}"
+       data-sub="${esc(s)}" aria-pressed="${s === sub}">${esc(s)}</button>`).join('');
 
   sheet(c.name, `
     <p class="tiny muted" style="margin-bottom:14px">${esc(c.blurb || '')} · priced ${esc(c.unit)}</p>
     <div class="chiprow" style="flex-wrap:wrap;gap:8px;margin-bottom:18px">${subs}</div>
-    ${m.hero ? heroCard(catId, m.hero) : `
+    ${m.hero ? heroCard(catId, m.hero, sub) : `
       <div class="empty"><h3>No pro free right now</h3>
       <p>Nobody in ${esc(myArea())} is online for this. Try another area or check back shortly.</p></div>`}
     ${m.alternates.length ? `
       <button class="btn btn--ghost btn--block" style="margin-top:10px"
-        data-act="book.others" data-id="${catId}">See ${m.alternates.length} other pros</button>` : ''}
+        data-act="book.others" data-id="${catId}" data-sub="${esc(sub || '')}">See ${m.alternates.length} other pros</button>` : ''}
   `);
 }
 
 /* The Locked-Match card — identity proof and price finality fused into one
    indivisible unit. This is the single most important trust element in the
    product (V5-B7, confidence 5). */
-export function heroCard(catId, p) {
+export function heroCard(catId, p, sub = null) {
   const pv = flow.previewBooking(catId, p);
   const t = tier(p.tier);
   return `
@@ -262,11 +268,14 @@ export function heroCard(catId, p) {
     </details>
 
     <button class="btn btn--primary btn--lg btn--block" data-act="book.confirm"
-            data-id="${catId}" data-pid="${p.id}">
+            data-id="${catId}" data-pid="${p.id}" data-sub="${esc(sub || '')}">
       Confirm booking · ${M.fmt(pv.quote.customerPays)}
     </button>
+
+    ${ask.entryRow(catId, p, pv.quote.deal)}
+
     <button class="btn btn--ghost btn--block" style="margin-top:6px"
-            data-act="book.others" data-id="${catId}">Someone else</button>
+            data-act="book.others" data-id="${catId}" data-sub="${esc(sub || '')}">Someone else</button>
   </div>`;
 }
 
@@ -276,13 +285,13 @@ export function avgOf(p) {
   return r.reduce((a, x) => a + x.stars, 0) / r.length;
 }
 
-export function showAlternates(catId) {
+export function showAlternates(catId, sub = null) {
   const m = flow.findMatch(catId);
   const list = [m.hero, ...m.alternates].filter(Boolean);
   sheet('Choose your pro', list.map(p => {
     const pv = flow.previewBooking(catId, p);
     return `<button class="card card--tap" style="width:100%;text-align:left;margin-bottom:10px"
-        data-act="book.confirm" data-id="${catId}" data-pid="${p.id}">
+        data-act="book.confirm" data-id="${catId}" data-pid="${p.id}" data-sub="${esc(sub || '')}">
       <div class="between">
         <div class="grow"><b>${esc(p.name)}</b>
           <p class="tiny muted">${ratingStars(avgOf(p))} ${avgOf(p).toFixed(1)} · ${p.km} km · ~${p.eta} min · ${tier(p.tier).label}</p>

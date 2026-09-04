@@ -48,6 +48,8 @@ const SHOPS = [
   ['Petzone Supplies',     'petshop',    'Jubilee Hills', '9200000012', 25, 4],
 ];
 
+import { depthRoster } from './seed.depth.js';
+
 const jitter = (base, lo, hi) => Math.round(base * (lo + Math.random() * (hi - lo)));
 
 export async function buildSeed(now = Date.now()) {
@@ -76,6 +78,13 @@ export async function buildSeed(now = Date.now()) {
       ratings, lastActiveTs: now - Math.random() * 86400000 * 3,
     });
   });
+
+  /* Market depth. Without this every service category has one pro, which is
+     below both the bidding floor (6) and the UI gate (8) — the whole ask-and-
+     bid feature would be unreachable code. */
+  const depth = depthRoster(now, pass);
+  users.push(...depth.users);
+  partners.push(...depth.partners);
 
   SHOPS.forEach(([name, catId, area, mobile, prepMins, radiusKm]) => {
     const key = (name + '|' + mobile).toLowerCase();

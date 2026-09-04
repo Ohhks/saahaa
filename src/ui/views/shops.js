@@ -40,7 +40,7 @@ export function renderList(catId) {
   const shops = rankShops(st.shops, { catId: active || retailCats[0].id, area: myArea() });
 
   return `
-  ${header('Shops near you', `${esc(myArea())} · ${shops.length} open`)}
+  ${header('Shops near you', `${myArea()} · ${shops.length} open`)}
   <main class="wrap">
     <div class="chiprow" style="margin:var(--sp-6) 0">
       ${retailCats.map(c => `<button class="chip ${c.id === (active || retailCats[0].id) ? 'on' : ''}"
@@ -97,7 +97,7 @@ export function renderShop(shopId) {
   const count = cart && cart.shopId === s.id ? cart.lines.reduce((n, l) => n + l.qty, 0) : 0;
 
   return `
-  ${header(s.name, `${cat.ico} ${esc(cat.name)} · ${s.km} km · ~${s.eta} min`)}
+  ${header(s.name, `${cat.ico} ${cat.name} · ${s.km} km · ~${s.eta} min`)}
   <main class="wrap">
     <div class="row" style="gap:6px;flex-wrap:wrap;margin:var(--sp-6) 0">
       ${(s.badges || []).map(b => `<span class="badge badge--soft">${esc(BADGE_LABEL[b] || b)}</span>`).join('')}
@@ -167,7 +167,7 @@ export function renderCart() {
   const provisional = cart.lines.some(l => l.variableWeight);
 
   return `
-  ${header('Your cart', esc(q.shop.name))}
+  ${header('Your cart', q.shop.name)}
   <main class="wrap">
     ${cart.lines.map(l => `
       <div class="card" style="margin:10px 0;padding:12px">

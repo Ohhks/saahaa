@@ -18,6 +18,7 @@ import { trustScore, tier, TIERS } from '../../domain/trust.js';
 import { searchStarter, aislesOf } from '../../domain/starter-catalog.js';
 import { header, emptyBlock } from './shops.js';
 import { quoteRetail } from '../../domain/pricing.js';
+import * as auction from '../../domain/auction.js';
 
 let pickerQuery = '', catalogQuery = '', shopTab = 'orders';
 export const setPickerQuery = v => { pickerQuery = v; };
@@ -25,6 +26,32 @@ export const setCatalogQuery = v => { catalogQuery = v; };
 export const setShopTab = v => { shopTab = v; };
 
 /* ══════════════ PRO CONSOLE ══════════════ */
+/* Jobs out for rates. He sees the public band, the COUNT of workers asked,
+   and nothing else — no rival's price, no name, not even whether anyone has
+   replied. That is what "sealed" means, and it is the only reason a worker
+   can quote against the fair price instead of against a rival. */
+function rateAsks(p) {
+  const open = auction.openRequestsForPartner(p);
+  if (!open.length) return '';
+  return `<div class="sec"><div class="hd"><h2>Asking for rates</h2>
+      <span class="tiny muted">${open.length} near you</span></div>
+    ${open.map(r => {
+      const c = get('category', r.catId);
+      const left = Math.max(0, Math.round((r.closesAt - Date.now()) / 60000));
+      return `<button class="card card--tap" style="width:100%;text-align:left;margin-bottom:8px"
+        data-act="bid.open" data-id="${r.id}" data-pid="${p.id}">
+        <div class="between">
+          <div class="grow"><b>${esc(r.sub || c.name)}</b>
+            <p class="tiny muted">${esc(r.area)} · ${r.bidCount} workers asked · ${left} min left</p></div>
+          <div style="text-align:right">
+            <b class="num" style="font-size:17px">${M.fmt(r.target)}</b>
+            <p class="micro muted">fair price</p></div>
+        </div></button>`;
+    }).join('')}
+    <p class="micro muted">Sending less than the fair price lowers your chance. It does not raise it.</p>
+  </div>`;
+}
+
 export function renderPartner() {
   const p = myPartner();
   if (!p) return `${header('Partner', '')}<main class="wrap">
@@ -39,7 +66,7 @@ export function renderPartner() {
   const nextTier = TIERS[Math.min(4, (p.tier | 0) + 1)];
 
   return `
-  ${header(p.name, `${cat.ico} ${esc(cat.name)} · ${esc(p.area)}`)}
+  ${header(p.name, `${cat.ico} ${cat.name} · ${p.area}`)}
   <main class="wrap">
 
     <div class="card on-plum" style="margin-top:var(--sp-6);border:0">
@@ -67,6 +94,8 @@ export function renderPartner() {
     <p class="micro muted" style="margin:-4px 0 0">
       You keep <b>100%</b> of your rate. A commission app would pay you about
       ${M.fmt(Math.round(p.ask * 0.75))} for the same job.</p>
+
+    ${rateAsks(p)}
 
     <div class="sec"><div class="hd"><h2>Your jobs</h2><span class="tiny muted">${inbox.length} active</span></div>
       ${inbox.length ? inbox.map(jobCard).join('') : emptyBlock('No live jobs', 'Stay online — requests land here.')}

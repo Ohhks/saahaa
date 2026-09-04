@@ -14,6 +14,8 @@ export function defaultState() {
     partners: [],   // worker/pro profiles (1:1 with a user of role 'partner')
     shops:    [],
     products: [],
+    requests: [],   // open service requests, out for bids
+    bids:     [],   // sealed bids against those requests
     orders:   [],   // service AND retail, discriminated by .kind
     carts:    {},   // userKey -> { shopId, lines:[] }   (one shop per cart)
     ledger:   [],
@@ -89,6 +91,29 @@ register('reducer', { id:'orders', slice:'orders', reduce(s = [], a) {
     case 'order/patch': return patch(s, a.payload.id, o => ({ ...o, ...a.payload.patch }));
     case 'order/replace': return patch(s, a.payload.id, () => a.payload.order);
     case 'seed/orders': return a.payload;
+    default: return s;
+  }
+}});
+
+/* Requests and bids are the P2P auction. Bids are SEALED — the reducer stores
+   them all, and it is the VIEW's job never to show one bidder another's price
+   while the window is open. */
+register('reducer', { id:'requests', slice:'requests', reduce(s = [], a) {
+  switch (a.type) {
+    case 'request/add':   return [a.payload].concat(s).slice(0, 200);
+    case 'request/patch': return patch(s, a.payload.id, r => ({ ...r, ...a.payload.patch }));
+    default: return s;
+  }
+}});
+
+register('reducer', { id:'bids', slice:'bids', reduce(s = [], a) {
+  switch (a.type) {
+    case 'bid/add':   return s.concat([a.payload]);
+    case 'bid/patch': return patch(s, a.payload.id, b => ({ ...b, ...a.payload.patch }));
+    case 'bid/rejectOthers':
+      return s.map(b => (b.requestId === a.payload.requestId && b.id !== a.payload.keepId
+                         && ['submitted','shortlisted','countered'].includes(b.status))
+                        ? { ...b, status: 'rejected' } : b);
     default: return s;
   }
 }});

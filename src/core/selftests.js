@@ -169,9 +169,21 @@ describe('migrations · idempotent, reversible, never destructive', () => {
     expect(r.state.schemaVersion).toBe(SCHEMA_VERSION);
   });
   it('accounts survive — nobody is logged out by an update', () => {
+    // The property under test is SURVIVAL, not an exact count. v7 tops the
+    // pro roster up, so asserting a fixed length made a legitimate data
+    // migration look like account loss. Assert what actually matters:
+    // every pre-existing key is still there, and none was duplicated.
+    const before = v5();
+    const r = run(before);
+    const keys = r.state.users.map(u => u.key);
+    before.visitors.forEach(v => expect(keys).toContain(v.key));
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(r.state.partners.some(p => p.userKey === before.visitors[1].key)).toBeTrue();
+  });
+  it('v7 gives every service category enough pros to hold an auction', () => {
     const r = run(v5());
-    expect(r.state.users).toHaveLength(2);
-    expect(r.state.partners).toHaveLength(1);
+    ['plumbing', 'electrical', 'cleaning', 'repair'].forEach(c =>
+      expect(r.state.partners.filter(p => p.cat === c).length >= 6).toBeTrue());
   });
   it('rupee floats become integer paise', () => {
     const r = run(v5());

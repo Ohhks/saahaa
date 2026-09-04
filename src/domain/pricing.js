@@ -136,13 +136,25 @@ export function quoteRetail(lines, opts = {}) {
   platformFee = Math.min(platformFee, itemsTotal);
 
   const mode = opts.mode || 'rider';
-  // shops advertise "free delivery over Rs.X" on their card; it was never
-  // applied, so customers were charged on baskets we promised were free
+
+  /* "Free delivery over Rs.499" means free TO THE CUSTOMER — the rider still
+     has to be paid. Charging the customer nothing and paying the rider nothing
+     is not a discount, it is unpaid labour. So the two numbers are separate:
+       customerDelivery — what appears on the bill
+       riderCost        — what the ride actually costs, always paid
+     and when delivery is free, the SHOP absorbs the rider cost out of its own
+     margin, which is exactly what "free delivery" costs a real shop. */
   const freeAbove = opts.freeDeliveryAbove || 0;
-  const delivery = (freeAbove > 0 && itemsTotal >= freeAbove) ? 0 : deliveryFee(opts.km ?? 2, mode);
-  const riderPayout = mode === 'rider' ? Math.max(0, delivery - RIDER_DISPATCH_CUT) : 0;
-  const dispatchCut = mode === 'rider' ? Math.min(delivery, RIDER_DISPATCH_CUT) : 0;
-  const shopDeliveryShare = mode === 'self' ? delivery : 0;
+  const bandFee = deliveryFee(opts.km ?? 2, mode);
+  const isFree = freeAbove > 0 && itemsTotal >= freeAbove && mode !== 'pickup';
+  const customerDelivery = isFree ? 0 : bandFee;
+  const riderCost = mode === 'rider' ? bandFee : 0;
+
+  const riderPayout = Math.max(0, riderCost - RIDER_DISPATCH_CUT);
+  const dispatchCut = Math.min(riderCost, RIDER_DISPATCH_CUT);
+  const shopDeliveryShare = mode === 'self' ? customerDelivery : 0;
+  const shopAbsorbs = isFree ? riderCost : 0;
+  const delivery = customerDelivery;
 
   // GST on OUR commission (the shop's own product GST is the shop's business)
   const feeExGst = Math.round(platformFee / (1 + GST_RATE));
@@ -158,11 +170,16 @@ export function quoteRetail(lines, opts = {}) {
     takePct,
     riderPayout,
     dispatchCut,
-    shopPayout: itemsTotal - platformFee + shopDeliveryShare,
+    shopPayout: itemsTotal - platformFee + shopDeliveryShare - shopAbsorbs,
+    shopAbsorbs,
+    riderCost,
+    freeDelivery: isFree,
     platformRevenue: feeExGst + dispatchCut,
     mode,
-    reconciles: (itemsTotal - platformFee + shopDeliveryShare) + platformFee + riderPayout + dispatchCut
-                === itemsTotal + delivery,
+    reconciles:
+      (itemsTotal - platformFee + shopDeliveryShare - shopAbsorbs)   // shop
+      + platformFee + riderPayout + dispatchCut                       // us + rider
+      === itemsTotal + customerDelivery,                              // customer
   };
 }
 

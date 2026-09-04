@@ -15,6 +15,8 @@ export const DEFAULTS = {
   MESH:              true,   // cross-tab BroadcastChannel sync
   SIM_MARKET:        true,   // ambient simulated demand
   SUBSCRIPTIONS:     true,   // recurring orders
+  ASK_RATES:         true,   // the P2P ask-and-bid flow
+  ASK_NIGHT_GUARD:   false,  // real rule, off in the prototype so it can be demoed at any hour
   RIDER_POOL:        false,  // canary — SAAHAA-managed delivery riders
   VOICE_SEARCH:      false,  // canary
   DEV_PANEL:         false,

@@ -93,7 +93,7 @@ export function toast(msg, tone = '') {
 }
 
 /* ── bottom sheet ──────────────────────────────────────────── */
-let scrimEl = null, sheetEl = null, onClose = null;
+let scrimEl = null, sheetEl = null, onClose = null, openRaf = 0;
 export function sheet(title, bodyHtml, opts = {}) {
   if (!scrimEl) {
     scrimEl = document.createElement('div');
@@ -112,7 +112,11 @@ export function sheet(title, bodyHtml, opts = {}) {
     <div class="shd"><h3>${esc(title)}</h3>
       <button class="btn btn--ghost tap" data-act="sheet.close" aria-label="Close">✕</button></div>
     <div class="sbody">${bodyHtml}</div>`;
-  requestAnimationFrame(() => { scrimEl.classList.add('on'); sheetEl.classList.add('on'); });
+  // The open is deferred a frame for the slide-in. A close arriving inside
+  // that frame used to be undone by the pending callback, re-opening a sheet
+  // the app had already dismissed — so the handle is cancellable.
+  cancelAnimationFrame(openRaf);
+  openRaf = requestAnimationFrame(() => { scrimEl.classList.add('on'); sheetEl.classList.add('on'); });
   const first = sheetEl.querySelector('input,button,select,textarea');
   if (first && !opts.noFocus) setTimeout(() => first.focus({ preventScroll: true }), 340);
   return sheetEl;
@@ -121,6 +125,7 @@ export function updateSheet(bodyHtml) {
   if (sheetEl) mount(sheetEl.querySelector('.sbody'), bodyHtml);
 }
 export function closeSheet() {
+  cancelAnimationFrame(openRaf); openRaf = 0;
   if (!sheetEl) return;
   scrimEl.classList.remove('on');
   sheetEl.classList.remove('on');

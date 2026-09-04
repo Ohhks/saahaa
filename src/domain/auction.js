@@ -1,0 +1,323 @@
+/* SAAHAA · domain/auction.js — the P2P ask-and-bid use-cases.
+
+   THE SHAPE OF THE THING. A customer posts what they need. Pros nearby are
+   invited in waves and each sends ONE sealed price. Nobody sees anybody else's
+   number while the window is open. When it closes, the customer gets a
+   recommendation and can take it, take someone else, or make one counter-offer.
+
+   WHY SEALED. An open descending auction is the fastest way to destroy the
+   product's whole promise — pros would compete the "you keep 100%" advantage
+   straight into the customer's pocket and end up earning less than they would
+   on a commission app. Sealed bids plus a PUBLISHED FAIR PRICE means a pro
+   quotes against the band, not against a rival.
+
+   WHY THE PRICE SCORE PEAKS AT FAIR VALUE. A floor alone just becomes the new
+   market price. Because scoring is highest AT the fair price, undercutting
+   costs points and wins nothing — which is what actually stops the race to the
+   bottom. See domain/bidding.js. */
+
+import { getState, dispatch, me, myArea } from '../core/ctx.js';
+import * as flags from '../core/flags.js';
+import { nid } from '../core/id.js';
+import { find } from '../core/registry.js';
+import * as audit from '../core/audit.js';
+import { toast } from '../ui/dom.js';
+import { bookService } from './flow.js';
+import { rankPartners, kmBetween } from './match.js';
+import {
+  priceBand, validateBid, biddingAllowed, rankBids, counterOffer,
+  auctionState, loserFeedback, WINDOW, MAX_BIDS, WAVE_SIZE, MAX_INVITES,
+  HOLD_MS, waveRadiusKm,
+} from './bidding.js';
+
+/* ── reads ─────────────────────────────────────────────────── */
+export const requestById = id => getState().requests.find(r => r.id === id) || null;
+export const bidsFor = id => getState().bids.filter(b => b.requestId === id);
+export function myRequests() {
+  const s = me(); if (!s) return [];
+  return getState().requests.filter(r => r.customerKey === s.key);
+}
+export function openRequestsForPartner(partner) {
+  if (!partner) return [];
+  const now = Date.now();
+  return getState().requests.filter(r =>
+    r.status === 'bidding' && r.closesAt > now &&
+    r.catId === partner.cat &&
+    !getState().bids.some(b => b.requestId === r.id && b.partnerId === partner.id));
+}
+export const myBid = (requestId, partnerId) =>
+  getState().bids.find(b => b.requestId === requestId && b.partnerId === partnerId) || null;
+
+/** How many pros could actually bid — the number that decides whether an
+    auction is worth running at all. Fewer than six and it is theatre. */
+export function poolSize(catId, area) {
+  return rankPartners(getState().partners, { catId, area: area || myArea() }).length;
+}
+
+/* ── the entry gate ────────────────────────────────────────────
+   The DOMAIN floor is 6 pros (below that an auction is theatre). The UI floor
+   is 8, because 6 invitations at a ~45% reply rate is a two-reply screen that
+   looks broken — and a feature that looks broken on first exposure is dead for
+   that customer forever. Correctness gate and product gate are different
+   numbers on purpose. */
+export const UI_MIN_POOL = 8;
+const NIGHT = h => h < 6 || h >= 21;
+
+/**
+ * Should the "Ask rates" row appear under this locked-match card?
+ * Suppressed SILENTLY when there is nothing to win — twelve minutes spent to
+ * save nothing is a pure loss, and offering it teaches the customer the
+ * feature is noise.
+ */
+export function askOffer(catId, heldAmount, opts = {}) {
+  const no = why => ({ show: false, why });
+  if (!flags.isOn('ASK_RATES')) return no('off');
+  const gate = canAuction(catId, opts);
+  if (!gate.allowed) return no(gate.why);
+  const band = priceBand(catId, { complexity: opts.complexity || 'simple' });
+  if (!band || band.quoteOnly) return no('This job is quoted, not rated.');
+  if (poolSize(catId) < UI_MIN_POOL) return no('Not enough workers nearby right now.');
+  /* Nobody waits twelve minutes at 10pm for a leaking tap — a real rule, and
+     it stays a real rule. It rides a flag only so the prototype can be shown
+     at any hour; in production ASK_NIGHT_GUARD is on. */
+  if (flags.isOn('ASK_NIGHT_GUARD') && NIGHT(new Date().getHours()))
+    return no('Rates are asked between 6am and 9pm.');
+  if (myRequests().some(r => ['bidding', 'awaiting_choice'].includes(r.status)))
+    return no('You already have one going.');
+  /* Compare the held price against what the ask would ACTUALLY produce, not
+     against the fair price. The locked match is already chosen partly on
+     price, so it usually quotes at or below fair — measuring the gap from
+     `target` therefore suppressed the feature on almost every real job, which
+     is not a tuning problem but the wrong question. The right question is
+     "would asking beat what you already have?", and the answer is the
+     expected best of five bids. */
+  const gap = heldAmount - expectedBest(band);
+  if (!(gap >= 2500 && heldAmount >= expectedBest(band) * 1.03))
+    return no('Your price is already the best rate here.');
+  return { show: true, band, est: roundEst(gap), mins: Math.round(WINDOW.now / 60000) };
+}
+/* Bids cluster in a narrow band around the fair price, so the best of five
+   draws lands a little under it. 0.955 is that empirical centre — see the
+   spread in seed.depth.js and the simulated supply in scheduleSimulatedBids. */
+export const expectedBest = band => Math.round(band.target * 0.955);
+const roundEst = paise => Math.max(2500, Math.round(paise / 2500) * 2500);
+
+/* ── post a request ────────────────────────────────────────── */
+export function canAuction(catId, opts = {}) {
+  const band = priceBand(catId);
+  return biddingAllowed(catId, { ...opts, poolSize: poolSize(catId), band });
+}
+
+export function postRequest({ catId, sub, note, complexity = 'simple', budgetBand = 'standard', slotType = 'now', held = null }) {
+  const s = me();
+  if (!s) throw new Error('Please sign in first');
+  const gate = canAuction(catId);
+  if (!gate.allowed) { toast(gate.why, 'warn'); return null; }
+
+  const band = priceBand(catId, { complexity });
+  const cat = find('category', catId);
+  const now = Date.now();
+  const req = {
+    id: nid('req'), customerKey: s.key, customerName: s.name, area: s.area,
+    catId, sub: sub || null, note: note || '', complexity, budgetBand, slotType,
+    /* the band is SNAPSHOTTED here. Editing a category's base price later must
+       never retroactively invalidate a bid someone already placed. */
+    beff: band.beff, floor: band.floor, target: band.target, ceiling: band.ceiling,
+    status: 'bidding', bidCount: 0, counterUsed: false,
+    openedAt: now, closesAt: now + (WINDOW[slotType] || WINDOW.now), holdUntil: null,
+    invited: WAVE_SIZE, awardedBidId: null,
+    /* The held price is the ENTIRE conversion mechanism. The customer's
+       locked match stays reserved for the whole window, so asking cannot
+       lose them anything — and because it cannot, they will try it once. */
+    held: held ? { ...held } : null,
+  };
+  dispatch({ type: 'request/add', payload: req });
+  audit.record('request.posted', { id: req.id, catId, target: band.target }, s.key);
+  scheduleSimulatedBids(req);
+  return req;
+}
+
+/* ── the demo's supply side ────────────────────────────────────
+   In production a real pro taps "Bid" on their phone. Here we let ranked
+   local pros answer in waves so the flow can be seen end to end. Their bids
+   cluster near the FAIR price, not the floor, because that is what the
+   scoring actually rewards — the simulation must not teach a lesson the
+   mechanism contradicts. */
+const SIM_MAX_BIDS = MAX_BIDS - 2;      // three of five; two stay open for real pros
+const timers = new Map();
+function scheduleSimulatedBids(req) {
+  const pool = rankPartners(getState().partners, { catId: req.catId, area: req.area }).slice(0, MAX_INVITES);
+  if (!pool.length) return;
+  const ids = [];
+  pool.forEach((p, i) => {
+    /* Replies must start landing while the customer is still looking. The
+       first at ~2.5s, the rest inside ~20s: slow enough to feel like people
+       answering, fast enough that the screen never looks dead. */
+    const delay = 2500 + i * (1800 + Math.random() * 2600);
+    if (delay > (req.closesAt - req.openedAt)) return;
+    ids.push(setTimeout(() => {
+      const live = requestById(req.id);
+      if (!live || live.status !== 'bidding') return;
+      /* Leave room for a REAL worker. Simulated supply filling all five slots
+         early-closed the window within ~20 seconds, so a partner signing in to
+         bid always found the job already gone — the entire worker-side flow
+         was unreachable in practice. */
+      if (bidsFor(req.id).length >= SIM_MAX_BIDS) return;
+      const spread = 0.94 + Math.random() * 0.10;          // clustered around target
+      const amount = Math.max(req.floor, Math.min(req.ceiling, Math.round(req.target * spread)));
+      placeBid({ requestId: req.id, partner: p, amount, quiet: true });
+    }, delay));
+  });
+  timers.set(req.id, ids);
+}
+function clearTimers(id) { (timers.get(id) || []).forEach(clearTimeout); timers.delete(id); }
+
+/* ── place a bid ───────────────────────────────────────────── */
+export function placeBid({ requestId, partner, amount, note, quiet }) {
+  const req = requestById(requestId);
+  if (!req) return null;
+  if (req.status !== 'bidding' || Date.now() > req.closesAt) {
+    if (!quiet) toast('Bidding on this job has closed', 'warn');
+    return null;
+  }
+  /* The self-bid guard must compare the BIDDER to the customer, not the
+     current session to the customer. Comparing to me() meant every simulated
+     bid on your own request tripped it — the customer sat on a waiting screen
+     being told they could not bid on their own job, and no rate ever landed. */
+  if (partner.userKey && partner.userKey === req.customerKey) {
+    if (!quiet) toast('You cannot bid on your own request', 'danger');
+    return null;
+  }
+  if (myBid(requestId, partner.id)) {
+    if (!quiet) toast('You have already bid on this job — one bid each', 'warn');
+    return null;
+  }
+  const band = { beff: req.beff, floor: req.floor, target: req.target, ceiling: req.ceiling, quoteOnly: false };
+  const v = validateBid(amount, band);
+  if (!v.ok) { if (!quiet) toast(v.reason, 'danger'); return null; }
+
+  const bid = {
+    id: nid('bid'), requestId, partnerId: partner.id, partnerName: partner.name,
+    amount, note: note || null, status: 'submitted',
+    afterSeconds: Math.max(0, Math.round((Date.now() - req.openedAt) / 1000)),
+    km: kmBetween(req.area, partner.area),
+    submittedAt: Date.now(), expiresAt: req.closesAt + HOLD_MS,
+  };
+  dispatch({ type: 'bid/add', payload: bid });
+
+  const count = bidsFor(requestId).length;
+  const patch = { bidCount: count };
+  // early close: once enough pros have answered there is nothing to wait for
+  if (count >= MAX_BIDS) { patch.status = 'awaiting_choice'; patch.holdUntil = Date.now() + HOLD_MS; clearTimers(requestId); }
+  dispatch({ type: 'request/patch', payload: { id: requestId, patch } });
+
+  if (!quiet) toast(`Your price of ${amount / 100} is in. You will know shortly.`);
+  return bid;
+}
+
+/* ── close, accept, counter ────────────────────────────────── */
+export function closeIfDue(requestId) {
+  const req = requestById(requestId);
+  if (!req) return null;
+  const st = auctionState({ ...req, bids: bidsFor(requestId) });
+  if (req.status === 'bidding' && st.phase !== 'bidding') {
+    clearTimers(requestId);
+    const patch = bidsFor(requestId).length
+      ? { status: 'awaiting_choice', holdUntil: Date.now() + HOLD_MS }
+      : { status: 'no_bids' };
+    dispatch({ type: 'request/patch', payload: { id: requestId, patch } });
+  }
+  return st;
+}
+
+export function ranked(requestId) {
+  const req = requestById(requestId);
+  if (!req) return { hero: null, others: [], cheapest: null, all: [] };
+  const byId = {};
+  getState().partners.forEach(p => { byId[p.id] = p; });
+  const band = { beff: req.beff, floor: req.floor, target: req.target, ceiling: req.ceiling, quoteOnly: false };
+  return rankBids(bidsFor(requestId), byId, band, { area: req.area });
+}
+
+export async function acceptBid(requestId, bidId) {
+  const req = requestById(requestId);
+  const bid = getState().bids.find(b => b.id === bidId);
+  if (!req || !bid) return null;
+  if (req.awardedBidId) { toast('This request is already awarded', 'warn'); return null; }
+  if (req.customerKey !== (me() && me().key)) { toast('Only the person who asked can accept', 'danger'); return null; }
+  const partner = getState().partners.find(p => p.id === bid.partnerId);
+  if (!partner) return null;
+
+  clearTimers(requestId);
+  dispatch({ type: 'bid/patch', payload: { id: bidId, patch: { status: 'accepted' } } });
+  dispatch({ type: 'bid/rejectOthers', payload: { requestId, keepId: bidId } });
+  dispatch({ type: 'request/patch', payload: { id: requestId, patch: { status: 'awarded', awardedBidId: bidId } } });
+
+  const order = await bookService({
+    catId: req.catId, partner, sub: req.sub,
+    deal: bid.countered || bid.amount, slot: req.slotType,
+  });
+  audit.record('bid.accepted', { requestId, bidId, amount: bid.amount }, me().key);
+  return order;
+}
+
+/** The one-tap counter. Deliberately UNAVAILABLE against a pro who already
+    bid at or below the fair price — so bidding honestly is strictly safer
+    than bidding high, which is the whole meaning of "reasonably". */
+export function counterFor(requestId, bidId) {
+  const req = requestById(requestId);
+  const bid = getState().bids.find(b => b.id === bidId);
+  if (!req || !bid) return { available: false };
+  const band = { beff: req.beff, floor: req.floor, target: req.target, ceiling: req.ceiling, quoteOnly: false };
+  return counterOffer(bid, band, { counterUsed: req.counterUsed });
+}
+
+export function sendCounter(requestId, bidId) {
+  const c = counterFor(requestId, bidId);
+  if (!c.available) { toast(c.why || 'Cannot counter this quote', 'warn'); return null; }
+  dispatch({ type: 'bid/patch', payload: { id: bidId, patch: { status: 'countered', countered: c.amount } } });
+  dispatch({ type: 'request/patch', payload: { id: requestId, patch: { counterUsed: true } } });
+  toast(`Asked for ${c.amount / 100}. If they say no, their original price still stands.`);
+
+  // the pro answers; declining is free and costs them nothing in score
+  setTimeout(() => {
+    const bid = getState().bids.find(b => b.id === bidId);
+    if (!bid || bid.status !== 'countered') return;
+    const accepts = Math.random() < 0.62;
+    dispatch({ type: 'bid/patch', payload: { id: bidId, patch: accepts
+      ? { status: 'submitted', amount: c.amount, counterAccepted: true }
+      : { status: 'submitted', countered: null, counterDeclined: true } } });
+    toast(accepts ? 'They agreed to your price.' : 'They kept their original price.');
+  }, 2600);
+  return c;
+}
+
+/** Take the original locked match instead. Always one tap, never confirmed —
+    a customer who has to argue with a dialog to escape will not enter again. */
+export async function bookHeld(requestId) {
+  const req = requestById(requestId);
+  if (!req || !req.held) return null;
+  if (req.status === 'awarded' || req.status === 'held_booked') return null;
+  const partner = getState().partners.find(p => p.id === req.held.partnerId);
+  if (!partner) { toast('That worker is no longer free', 'warn'); return null; }
+  clearTimers(requestId);
+  dispatch({ type: 'bid/rejectOthers', payload: { requestId, keepId: null } });
+  dispatch({ type: 'request/patch', payload: { id: requestId, patch: { status: 'held_booked' } } });
+  const order = await bookService({ catId: req.catId, partner, sub: req.sub, deal: req.held.amount, slot: req.slotType });
+  audit.record('request.tookHeld', { requestId, amount: req.held.amount }, me().key);
+  return order;
+}
+
+/** What the customer actually saved, for the receipt. Never rendered as
+    "You saved 0" — a zero shown as zero kills the second use permanently. */
+export function savings(req, paid) {
+  if (!req || !req.held) return { amount: 0, replies: 0 };
+  return { amount: Math.max(0, req.held.amount - paid), replies: bidsFor(req.id).length, held: req.held.amount, paid };
+}
+
+export function cancelRequest(requestId) {
+  clearTimers(requestId);
+  dispatch({ type: 'request/patch', payload: { id: requestId, patch: { status: 'cancelled' } } });
+}
+
+export { priceBand, auctionState, loserFeedback, waveRadiusKm, MAX_BIDS, MAX_INVITES };

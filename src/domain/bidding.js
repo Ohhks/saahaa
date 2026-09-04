@@ -256,8 +256,11 @@ export function counterOffer(bid, band, req = {}) {
   if (req.counterUsed) return { available: false, why: 'You have already made your one counter-offer.' };
   if (bid.amount <= band.target)
     return { available: false, why: 'This pro already bid at or below the fair price.' };
-  const amount = Math.max(band.floor, roundPrice(bid.amount * (1 - COUNTER_STEP)));
-  if (amount >= bid.amount) return { available: false, why: 'Already at the minimum.' };
+  /* Clamp to the FAIR price, not the floor. A -7% counter on a bid just above
+     target would otherwise land BELOW target — which is the product using its
+     own haggle button to defeat the anti-undercutting rule it is built on. */
+  const amount = Math.max(band.target, roundPrice(bid.amount * (1 - COUNTER_STEP), 'up'));
+  if (amount >= bid.amount) return { available: false, why: 'Already at the fair price.' };
   return { available: true, amount, expiresMs: CONFIRM_MS };
 }
 

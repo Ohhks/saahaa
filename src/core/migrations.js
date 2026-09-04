@@ -8,6 +8,7 @@
 import { registerMigration } from './migrate.js';
 import { defaultState } from '../domain/state.js';
 import { toPaise } from './money.js';
+import { depthRoster } from '../domain/seed.depth.js';
 
 /* v0 -> v6 : anything with no recognisable schema starts fresh but keeps
    any accounts we can salvage, so a returning user is not logged out. */
@@ -86,6 +87,37 @@ registerMigration({
     return next;
   },
   verify: s => Array.isArray(s.users) && Array.isArray(s.partners) && s.schemaVersion !== 5,
+});
+
+/* v6 -> v7 : market depth + the requests/bids slices.
+
+   An existing install has one pro per category, so ask-and-bid can never open
+   for it. Topping the roster up is a data fix, not a schema fix, but it has to
+   ride a migration because seeding only ever runs on a fresh install.
+
+   IDEMPOTENT because depthRoster derives its ids from (category, index): the
+   filter below drops anything already present, so running it twice adds
+   nothing the second time. */
+registerMigration({
+  from: 6, to: 7, label: 'v6 -> v7 (market depth, ask-and-bid slices)',
+  up(old) {
+    const next = { ...old, schemaVersion: 7 };
+    next.requests = Array.isArray(old.requests) ? old.requests : [];
+    next.bids     = Array.isArray(old.bids)     ? old.bids     : [];
+
+    const users = Array.isArray(old.users) ? old.users.slice() : [];
+    const partners = Array.isArray(old.partners) ? old.partners.slice() : [];
+    // every seeded account shares one demo hash; reuse it so the new pros can log in
+    const pass = (users.find(u => u.role === 'partner' && u.pass) || {}).pass || '';
+    const roster = depthRoster(old.createdAt || Date.now(), pass);
+    const haveP = new Set(partners.map(p => p.id));
+    const haveU = new Set(users.map(u => u.key));
+    next.partners = partners.concat(roster.partners.filter(p => !haveP.has(p.id)));
+    next.users    = users.concat(roster.users.filter(u => !haveU.has(u.key)));
+    return next;
+  },
+  verify: s => s.schemaVersion === 7 && Array.isArray(s.requests) && Array.isArray(s.bids)
+            && s.partners.filter(p => p.cat === 'plumbing').length >= 6,
 });
 
 /* ── id remaps: retired ids must MAP, never disappear ─────────
