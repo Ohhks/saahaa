@@ -16,6 +16,15 @@ import { mark } from '../logo.js';
 let shopFilter = '';
 export const setShopFilter = v => { shopFilter = v; };
 
+/* The delivery mode lives here, next to the view that renders it. It used to
+   live in app.js while this file hardcoded 'rider', so tapping "I'll pick up"
+   moved no highlight and left the total showing a delivery fee the customer
+   was not going to be charged. Displayed price and charged price must be the
+   same number, always. */
+let cartMode = 'rider';
+export const setCartMode = m => { cartMode = m; };
+export const getCartMode = () => cartMode;
+
 const BADGE_LABEL = {
   verified_shop:'Verified shop', fssai:'FSSAI', reliable_stock:'Reliable stock',
   mrp_parity:'MRP parity', fresh_today:'Fresh today', weighs_right:'Weighs right',
@@ -25,6 +34,8 @@ const BADGE_LABEL = {
 export function renderList(catId) {
   const st = getState();
   const retailCats = live('category').filter(c => c.kind === 'retail');
+  if (!retailCats.length) return `${header('Shops near you', '')}<main class="wrap">
+    ${emptyBlock('No shop categories are live', 'Every retail category is currently switched off.')}</main>`;
   const active = catId && get('category', catId).kind === 'retail' ? catId : null;
   const shops = rankShops(st.shops, { catId: active || retailCats[0].id, area: myArea() });
 
@@ -151,7 +162,8 @@ export function renderCart() {
       ${emptyBlock('Cart is empty', 'Add items from any shop near you.',
         '<button class="btn btn--secondary" data-act="nav.shops">Browse shops</button>')}</main>`;
 
-  const q = flow.cartQuote('rider');
+  const q = flow.cartQuote(cartMode);
+  if (!q) { flow.clearCart(); return renderCart(); }   // shop vanished under us
   const provisional = cart.lines.some(l => l.variableWeight);
 
   return `
@@ -202,9 +214,9 @@ export function renderCart() {
     </div>
 
     <div class="chiprow" style="margin:14px 0">
-      <button class="chip on" data-act="cart.mode" data-mode="rider">🛵 SAAHAA rider</button>
-      <button class="chip" data-act="cart.mode" data-mode="self">🏪 Shop delivers</button>
-      <button class="chip" data-act="cart.mode" data-mode="pickup">🚶 I'll pick up</button>
+      ${[['rider','SAAHAA rider'],['self','Shop delivers'],['pickup',"I'll pick up"]]
+        .map(([m, l]) => `<button class="chip ${cartMode === m ? 'on' : ''}"
+          data-act="cart.mode" data-mode="${m}">${esc(l)}</button>`).join('')}
     </div>
 
     <button class="btn btn--primary btn--lg btn--block" data-act="cart.place">
@@ -221,7 +233,7 @@ export function header(title, sub) {
     <div class="wrap inner">
       <button class="btn btn--ghost tap" data-act="nav.back" aria-label="Back">←</button>
       <div class="grow"><b style="font-size:17px;display:block">${esc(title)}</b>
-        ${sub ? `<span class="tiny muted">${sub}</span>` : ''}</div>
+        ${sub ? `<span class="tiny muted">${esc(sub)}</span>` : ''}</div>
       ${mark(26, { glow: false })}
     </div>
   </header>`;

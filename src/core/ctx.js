@@ -2,6 +2,8 @@
    Views import THIS, never app.js, so there is no import cycle and any view
    can be loaded, tested or removed independently. app.js fills it at boot. */
 
+import * as persist from './persist.js';
+
 export const ctx = {
   store: null,
   session: null,          // { key, name, role, area, ... } or null for guest
@@ -16,7 +18,30 @@ export const getState = () => ctx.store.getState();
 export const dispatch = a => ctx.store.dispatch(a);
 export const me = () => ctx.session;
 export const isGuest = () => !ctx.session;
-export const myArea = () => (ctx.session && ctx.session.area) || 'Madhapur';
+/* A guest who picks an area was previously ignored: the value was written to
+   localStorage and never read back, so the header kept saying Madhapur and
+   every distance was wrong. */
+export const myArea = () =>
+  (ctx.session && ctx.session.area) || persist.read(persist.KEYS.guestArea, '') || 'Madhapur';
+
+/* The session used to live only in memory, so every refresh — and every PWA
+   relaunch — silently signed the user out. A partner would sign in, reload,
+   and find the Earn tab showing the guest pitch instead of their console. */
+export function saveSession(s) {
+  ctx.session = s;
+  if (s) persist.write(persist.KEYS.session, s);
+  else persist.remove(persist.KEYS.session);
+  return s;
+}
+export function restoreSession(users) {
+  const saved = persist.read(persist.KEYS.session, null);
+  if (!saved || !saved.key) return null;
+  // trust the stored key, but re-read the record so a role or tier change lands
+  const fresh = (users || []).find(u => u.key === saved.key);
+  ctx.session = fresh ? { ...fresh, area: saved.area || fresh.area } : null;
+  if (!ctx.session) persist.remove(persist.KEYS.session);
+  return ctx.session;
+}
 
 export function userByKey(key) { return getState().users.find(u => u.key === key) || null; }
 export function myPartner() {

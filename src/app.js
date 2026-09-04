@@ -29,6 +29,7 @@ import './core/selftests.money.js';
 /* ui */
 import { mount, action, initActions, toast, sheet, closeSheet, esc } from './ui/dom.js';
 import { defs, mark } from './ui/logo.js';
+import { icon } from './ui/icons.js';
 import { showSplash, replaySplash } from './ui/splash.js';
 import * as home from './ui/views/home.js';
 import * as shops from './ui/views/shops.js';
@@ -55,19 +56,23 @@ const ROUTES = {
 };
 
 const NAV = [
-  ['home',   '🏠', 'Home'],
-  ['shops',  '🛒', 'Shops'],
-  ['orders', '🧾', 'Orders'],
-  ['earn',   '💼', 'Earn'],
-  ['account','👤', 'You'],
+  ['home',    'navHome',   'Home'],
+  ['shops',   'navShops',  'Shops'],   // a shopfront, not a cart: 🛒 means "my basket"
+  ['orders',  'navOrders', 'Orders'],
+  ['earn',    'navEarn',   'Earn'],    // a rupee coin, not 💰 which reads "my wallet"
+  ['account', 'navYou',    'You'],
 ];
 
 let history = [];
 
 function go(view, param) {
   closeSheet();                       // a sheet must never outlive its screen
-  if (ctx.view !== view || ctx.param !== param) history.push([ctx.view, ctx.param]);
-  ctx.view = view; ctx.param = param ?? null;
+  // `param` arrives undefined from the nav bar while ctx.param is null, and
+  // null !== undefined, so every re-tap of the current tab pushed a junk entry
+  // and the back button needed five presses to leave Home.
+  const next = param ?? null;
+  if (ctx.view !== view || ctx.param !== next) history.push([ctx.view, ctx.param]);
+  ctx.view = view; ctx.param = next;
   if (view !== 'admin') location.hash = param ? `#/${view}/${param}` : `#/${view}`;
   else location.hash = '#/admin';
   window.scrollTo(0, 0);
@@ -75,8 +80,12 @@ function go(view, param) {
 }
 function back() {
   const prev = history.pop();
-  if (prev) { ctx.view = prev[0]; ctx.param = prev[1]; render(); }
-  else go('home');
+  if (!prev) return go('home');
+  ctx.view = prev[0]; ctx.param = prev[1];
+  // the hash used to be left pointing at the screen we just left, so a refresh
+  // (or any later hash navigation) snapped forward again
+  location.hash = ctx.param ? `#/${ctx.view}/${ctx.param}` : `#/${ctx.view}`;
+  render();
 }
 
 function render() {
@@ -102,8 +111,8 @@ function navBar() {
             : ctx.view === 'partner' || ctx.view === 'shopadmin' ? 'earn' : ctx.view;
   return `<nav class="nav on-plum" role="tablist">
     ${NAV.map(([id, ic, label]) => `<button role="tab" aria-selected="${cur === id}"
-      data-act="nav.tab" data-tab="${id}">
-      <span class="ic" aria-hidden="true">${ic}</span>${label}</button>`).join('')}
+      data-act="nav.tab" data-tab="${id}" aria-label="${label}">
+      <span class="ic">${icon(ic, { size: 22 })}</span>${label}</button>`).join('')}
   </nav>`;
 }
 
@@ -116,7 +125,7 @@ function accountView() {
       <div class="row">
         <span style="width:54px;height:54px;border-radius:50%;background:var(--accent-fill);
           color:var(--accent-on-fill);display:grid;place-items:center;font-weight:800;font-size:21px">
-          ${esc(s.name[0])}</span>
+          ${esc((s.name || '?')[0])}</span>
         <div class="grow"><b style="font-size:18px">${esc(s.name)}</b>
           <p class="tiny muted">${esc(s.role)} · ${esc(s.area)}</p></div>
       </div>
@@ -182,9 +191,9 @@ function wireActions() {
 
   /* catalog + booking */
   A('cat.open',      d => home.openCategory(d.id));
-  A('book.sub',      d => home.openCategory(d.id));
+  A('book.sub',      d => home.openCategory(d.id, d.sub));   // the chosen sub used to be dropped
   A('book.others',   d => home.showAlternates(d.id));
-  A('book.confirm',  d => home.confirmBooking(d.id, d.pid));
+  A('book.confirm',  d => home.confirmBooking(d.id, d.pid, d.sub));
   A('quick.emergency', () => { home.setSearch('repair'); render(); toast('Showing urgent-capable trades'); });
   A('quick.nearby',    () => go('shops'));
   A('partner.join',    () => { auth.setAuthTab('signup'); auth.setAuthRole('partner'); go('auth'); });
@@ -205,9 +214,9 @@ function wireActions() {
   A('cart.dec',   d => { const l = findLine(d.id); if (l) flow.setLineQty(d.id, l.qty - 1); render(); });
   A('cart.sub',   d => { flow.setLineSubPolicy(d.id, d.pol); render(); });
   A('cart.clear', () => { flow.clearCart(); toast('Cart emptied'); render(); });
-  A('cart.mode',  d => { cartMode = d.mode; render(); });
+  A('cart.mode',  d => { shops.setCartMode(d.mode); render(); });
   A('cart.place', async () => {
-    const o = await flow.placeRetailOrder(cartMode);
+    const o = await flow.placeRetailOrder(shops.getCartMode());
     if (o) { toast('Order placed'); go('order', o.id); }
   });
   A('rx.info', () => sheet('Prescription needed', `<p>This medicine needs a valid prescription.
@@ -285,7 +294,6 @@ function wireActions() {
   A('selftest.run',  () => admin.runTests());
 }
 
-let cartMode = 'rider';
 function findLine(lineId) {
   const c = flow.getCart();
   return c ? c.lines.find(l => l.lineId === lineId) : null;
@@ -301,8 +309,10 @@ function wireInputs() {
       case 'shopsearch':    shops.setShopFilter(t.value); debounceRender(); break;
       case 'catalogsearch': partner.setCatalogQuery(t.value); debounceRender(); break;
       case 'pickersearch':  partner.setPickerQuery(t.value); debouncePicker(); break;
-      case 'price':         partner.priceEdit(t.dataset.id, t.value); break;
-      case 'stock':         partner.stockEdit(t.dataset.id, t.value); break;
+      // An empty field is someone mid-edit, not a free product. Writing 0 here
+      // published the item at Rs.0 and hid it from buyers at stock 0.
+      case 'price':  if (String(t.value).trim()) partner.priceEdit(t.dataset.id, t.value); break;
+      case 'stock':  if (String(t.value).trim()) partner.stockEdit(t.dataset.id, t.value); break;
       case 'otp': {
         const i = Number(t.id.replace('otp', ''));
         if (t.value && i < 3) document.getElementById('otp' + (i + 1))?.focus();

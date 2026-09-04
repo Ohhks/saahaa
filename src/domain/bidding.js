@@ -58,7 +58,10 @@ const BANDS = {
  */
 export function priceBand(catId, { complexity = 'simple', units = 1, damagePhoto = false } = {}) {
   const cat = find('category', catId);
-  if (!cat || cat.__tombstone) return null;
+  // A retail category has no `base`, so every arithmetic result was NaN — and
+  // because every NaN comparison is false, floor/ceiling/tooSmall ALL passed.
+  // A Rs.1 bid on a bag of rice validated. Bands are for services only.
+  if (!cat || cat.__tombstone || cat.kind !== 'service' || !Number.isFinite(cat.base)) return null;
   const shape = (cat.unit in BANDS) ? BANDS[cat.unit] : BANDS.DEFAULT;
   if (shape === null) return { quoteOnly: true, cat };
 
@@ -88,7 +91,7 @@ export function budgetChips(band) {
 }
 
 export function validateBid(amount, band) {
-  if (!band) return { ok: false, reason: 'No price band for this category.' };
+  if (!band) return { ok: false, reason: 'This category is not open to bidding.' };
   if (band.quoteOnly) return { ok: true };
   if (!Number.isInteger(amount)) return { ok: false, reason: 'Price must be a whole rupee amount.' };
   if (amount < band.floor)
@@ -128,7 +131,8 @@ export function biddingAllowed(catId, { urgent = false, poolSize = 99, isRenewal
   if (poolSize < MIN_POOL_FOR_BIDDING)
                                return { allowed: false, reason: 'thinSupply', why: NO_BID_REASONS.thinSupply };
   const b = band || priceBand(catId);
-  if (b && !b.quoteOnly && b.beff < 30000)
+  if (!b) return { allowed: false, reason: 'thinSupply', why: NO_BID_REASONS.thinSupply };
+  if (!b.quoteOnly && b.beff < 30000)
                                return { allowed: false, reason: 'tooSmall', why: NO_BID_REASONS.tooSmall };
   return { allowed: true };
 }

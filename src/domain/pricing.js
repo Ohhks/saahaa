@@ -131,9 +131,15 @@ export function quoteRetail(lines, opts = {}) {
   let platformFee = M.pct(itemsTotal, takePct);
   platformFee = Math.min(platformFee, cap);
   if (itemsTotal > 0) platformFee = Math.max(platformFee, opts.firstOrders ? 0 : RETAIL_FEE_FLOOR);
+  // the floor must never exceed the basket, or the shop is paid a negative
+  // amount — which would trip the ledger's fatal non-negative invariant
+  platformFee = Math.min(platformFee, itemsTotal);
 
   const mode = opts.mode || 'rider';
-  const delivery = deliveryFee(opts.km ?? 2, mode);
+  // shops advertise "free delivery over Rs.X" on their card; it was never
+  // applied, so customers were charged on baskets we promised were free
+  const freeAbove = opts.freeDeliveryAbove || 0;
+  const delivery = (freeAbove > 0 && itemsTotal >= freeAbove) ? 0 : deliveryFee(opts.km ?? 2, mode);
   const riderPayout = mode === 'rider' ? Math.max(0, delivery - RIDER_DISPATCH_CUT) : 0;
   const dispatchCut = mode === 'rider' ? Math.min(delivery, RIDER_DISPATCH_CUT) : 0;
   const shopDeliveryShare = mode === 'self' ? delivery : 0;
@@ -171,9 +177,11 @@ export const CANCEL_RULES = {
   WORKER_CANCEL:   { refundPct: 1.00, workerPct: 0.00, label: 'Pro cancelled — full refund', workerFee: 10000 },
 };
 
-export function cancelSplit(dealPaise, ruleId) {
+export function cancelSplit(dealPaise, ruleId, opts = {}) {
   const rule = CANCEL_RULES[ruleId] || CANCEL_RULES.BEFORE_ACCEPT;
-  const q = quoteService(dealPaise);
+  // must use the SAME markup the booking was escrowed at. A Tier-4 job is
+  // escrowed at 6%; refunding it at 10% overdraws escrow by the difference.
+  const q = quoteService(dealPaise, opts);
   const refund = M.mul(q.customerPays, rule.refundPct);
   const worker = M.mul(q.deal, rule.workerPct);
   const platform = q.customerPays - refund - worker;

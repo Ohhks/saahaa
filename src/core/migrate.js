@@ -83,7 +83,12 @@ export function runMigrations(raw, opts = {}) {
   } catch (err) {
     out.error = err;
     out.rolledBack = true;
-    out.state = (out.backupKey && restore(out.backupKey)) || fresh();
+    // Restoring the snapshot is right when a step THREW, but wrong when no step
+    // exists at all (a stored v1-v4 tree): we would restore the same
+    // unmigratable state and fail the fatal health check on every boot,
+    // forever, with no path out. Fall through to a fresh tree in that case.
+    const restored = out.backupKey ? restore(out.backupKey) : null;
+    out.state = (restored && restored.schemaVersion === SCHEMA_VERSION) ? restored : fresh();
     console.error('[migrate] rolled back:', err);
   } finally { releaseLock(); }
   return out;

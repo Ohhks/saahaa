@@ -4,7 +4,7 @@
    lets a kirana owner who also does delivery hold both roles on one number. */
 
 import { esc, toast } from '../dom.js';
-import { ctx, getState, dispatch } from '../../core/ctx.js';
+import { ctx, getState, dispatch, saveSession } from '../../core/ctx.js';
 import { sha256 } from '../../core/crypto.js';
 import { nid } from '../../core/id.js';
 import { toPaise } from '../../core/money.js';
@@ -118,7 +118,7 @@ export async function doLogin() {
   if (!u) { toast('No account with those details — create one first', 'danger'); return; }
   const h = await sha256(pw);
   if (u.pass && u.pass !== h) { toast('Wrong password', 'danger'); return; }
-  ctx.session = { ...u };
+  saveSession({ ...u });          // survives a refresh and a PWA relaunch
   audit.record('user.login', { key, role: u.role }, key);
   toast(`Welcome back, ${u.name.split(' ')[0]}`);
   ctx.go(u.role === 'partner' ? 'partner' : u.role === 'shop' ? 'shopadmin' : 'home');
@@ -163,7 +163,7 @@ export async function doSignup() {
 }
 
 export function logout() {
-  ctx.session = null;
+  saveSession(null);
   toast('Signed out');
   ctx.go('home');
 }

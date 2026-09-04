@@ -21,6 +21,7 @@ import { live } from '../../core/registry.js';
 import { mark, pillarIcon, PILLARS } from '../logo.js';
 import * as M from '../../core/money.js';
 import { header } from './shops.js';
+import { renderPartner, renderShopAdmin } from './partner.js';
 
 /* A worked example beats an adjective. Same job, same pro, two platforms. */
 const EXAMPLE_DEAL = 100000;            // ₹1,000 quote
@@ -150,9 +151,13 @@ function invite() {
 
 /* ── router for the tab ────────────────────────────────────── */
 export function render() {
+  // Must ALWAYS return markup. Returning null here rendered the literal string
+  // "null" on the page, because app.js concatenates the body with the nav bar
+  // and `null + "<nav>"` is a string — so it never threw and the error card
+  // never fired. Reaching #/earn directly (back button, deep link) did this.
   const s = me();
-  if (s && s.role === 'partner') return null;    // app.js sends these to their console
-  if (s && s.role === 'shop')    return null;
+  if (s && s.role === 'partner') return renderPartner();
+  if (s && s.role === 'shop')    return renderShopAdmin();
   return invite();
 }
 

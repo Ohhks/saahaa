@@ -6,6 +6,7 @@ import { ctx, getState, me, myArea, isGuest, myOrders } from '../../core/ctx.js'
 import { live, get } from '../../core/registry.js';
 import { GROUPS } from '../../domain/catalog.services.js';
 import { mark, pillarRow } from '../logo.js';
+import { icon, medallion, hasIcon } from '../icons.js';
 import * as flow from '../../domain/flow.js';
 import * as M from '../../core/money.js';
 import { tier } from '../../domain/trust.js';
@@ -27,10 +28,21 @@ function matchCat(c, q) {
 }
 
 function tileHtml(c) {
-  const from = c.kind === 'service' && c.base ? `<span class="from">from ${M.fmt(c.base)}</span>` : '';
+  /* "from Rs.X" was a floor almost nobody actually pays, so the first real
+     quote felt like bait-and-switch — and it contradicted our own promise that
+     the pro sets the price. Supply proof is true, self-updating and more
+     persuasive: it answers "can I actually get this right now?". */
+  const pool = getState().partners.filter(p => p.cat === c.id && !p.suspended);
+  const online = pool.filter(p => p.online !== false).length;
+  const sub = c.kind === 'retail'
+    ? `${getState().shops.filter(x => x.catId === c.id && x.isOpen).length} open now`
+    : online ? `${online} nearby`
+    : pool.length ? `${pool.length} nearby`
+    : 'New here — be first';
   return `<button class="tile" data-act="cat.open" data-id="${c.id}" aria-label="${esc(c.name)}">
-    <span class="med" aria-hidden="true">${c.ico}</span>
-    <span class="lbl">${esc(c.name)}</span>${from}
+    ${hasIcon(c.id) ? medallion(c.id) : `<span class="med" aria-hidden="true">${c.ico}</span>`}
+    <span class="lbl">${esc(c.name)}</span>
+    <span class="from">${esc(sub)}</span>
   </button>`;
 }
 
@@ -84,11 +96,13 @@ export function render() {
     </div>
     <div class="wrap" style="margin-top:12px">
       <div class="search">
-        <span aria-hidden="true">🔎</span>
-        <input id="q" type="search" placeholder="Electrician… maid… tomatoes… tuition…"
-               value="${esc(search)}" data-role="search" aria-label="Search services and shops">
+        ${icon('search', { size: 20 })}
+        <input id="q" type="search" placeholder="Search: plumber, AC repair, tomatoes, milk"
+               value="${esc(search)}" data-role="search" aria-label="Search services and shop products">
         ${q ? '<button class="btn btn--ghost btn--sm tap" data-act="search.clear">✕</button>' : ''}
       </div>
+      <p class="micro muted" style="margin:7px 4px 0">
+        One search finds people who come to you, and shops that deliver to you.</p>
     </div>
   </header>
 

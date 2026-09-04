@@ -5,6 +5,8 @@ export const KEYS = {
   flags:  'SAAHAA_FLAGS',
   audit:  'SAAHAA_AUDIT',
   lock:   'SAAHAA_MIGRATION_LOCK',
+  session:'SAAHAA_SESSION',
+  guestArea:'SAAHAA_GUEST_AREA',
   backup: p => `SAAHAA_BACKUP_${p}`,
 };
 

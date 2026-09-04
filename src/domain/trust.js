@@ -32,9 +32,11 @@ export function trustScore(p, now = Date.now()) {
   // R — Bayesian-smoothed, recency-weighted rating quality
   let num = PRIOR_K * PRIOR_MEAN, den = PRIOR_K;
   for (const r of ratings) {
+    const stars = Number(r && r.stars);
+    if (!Number.isFinite(stars)) continue;        // a malformed rating is ignored, not fatal
     const ageDays = (now - (r.ts || now)) / 86400000;
     const w = Math.pow(0.5, ageDays / HALF_LIFE_DAYS);
-    num += r.stars * w; den += w;
+    num += stars * w; den += w;
   }
   const R = Math.max(0, Math.min(1, (num / den - 1) / 4));
 
@@ -74,6 +76,9 @@ export function trustScore(p, now = Date.now()) {
 }
 
 export function band(score) {
+  // fail CLOSED: every comparison against NaN is false, so the old version fell
+  // through every branch and returned Elite
+  if (!Number.isFinite(score)) return { id:'restricted', label:'Unrated', tone:'bad' };
   if (score < 40) return { id:'restricted', label:'Restricted', tone:'bad' };
   if (score < 55) return { id:'watch',      label:'New / Watch', tone:'warn' };
   if (score < 70) return { id:'standard',   label:'Standard',    tone:'info' };

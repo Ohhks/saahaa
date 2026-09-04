@@ -9,18 +9,26 @@ import * as audit from '../core/audit.js';
 import * as M from '../core/money.js';
 import { find } from '../core/registry.js';
 import { applyTransition, canTransition } from './orders.js';
+import { acct } from './ledger.js';
 import { quoteService, quoteRetail, compareWithApps, releaseService, cancelSplit } from './pricing.js';
 import { lockedMatch, rankShops, kmBetween, etaMins } from './match.js';
 import { escrowTier, markupFor, trustScore } from './trust.js';
 import { toast } from '../ui/dom.js';
 
 /* ── ledger (double-entry, hash-chained) ───────────────────── */
-async function ledger(kind, amountPaise, partyA, partyB, meta = {}) {
-  const st = getState();
-  const rec = { id: nid('led'), kind, amountPaise, partyA, partyB, ts: Date.now(), meta };
-  const block = await appendBlock(st.chain, rec);
-  dispatch({ type: 'ledger/append', payload: block });
-  return block;
+/* Serialised. The chain head used to be read BEFORE `await digest(...)`, so
+   two overlapping calls both claimed the same blockIdx and prevHash, and the
+   admin's "Verify chain" then reported the book tampered. A double-tap on
+   Confirm was enough to cause it. */
+let ledgerQ = Promise.resolve();
+function ledger(kind, amountPaise, partyA, partyB, meta = {}) {
+  ledgerQ = ledgerQ.then(async () => {
+    const rec = { id: nid('led'), kind, amountPaise, partyA, partyB, ts: Date.now(), meta };
+    const block = await appendBlock(getState().chain, rec);   // read AFTER the await
+    dispatch({ type: 'ledger/append', payload: block });
+    return block;
+  }).catch(err => { console.error('[ledger]', err); });
+  return ledgerQ;
 }
 
 /* ── SERVICE: the 3-tap booking ────────────────────────────── */
@@ -126,30 +134,45 @@ export function markDone(orderId) {
 export async function confirmAndRelease(orderId, pct = 1) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return;
-  const r = releaseService(o.deal, pct, { markup: markupFor({}) });
-  advance(orderId, pct >= 1 ? 'SETTLED' : 'PARTIAL', {
+  if (o.kind !== 'service') { toast('That is a shop order — settle it from the order screen.', 'warn'); return; }
+  // Must use the markup this order was ESCROWED at. markupFor({}) always
+  // returned 10%, so a Tier-4 job (escrowed at 6%) released 4% MORE than was
+  // ever locked, quietly draining other orders' money out of escrow.
+  const partner0 = getState().partners.find(p => p.id === o.partnerId) || {};
+  const r = releaseService(o.deal, pct, { markup: markupFor(partner0) });
+
+  // THE GUARD. advance() returns null on an illegal transition, and this used
+  // to ignore it and post to the ledger regardless — so a double-tap on
+  // "Confirm & release" paid the pro twice and double-counted every total.
+  const moved = advance(orderId, pct >= 1 ? 'SETTLED' : 'PARTIAL', {
     releasedPct: pct, workerPayout: r.workerPayout, refund: r.refund,
     platformFee: r.platformFee, gst: r.gst, settledAt: Date.now(),
   });
-  await ledger('ESCROW_RELEASE', r.workerPayout, 'ESCROW:' + o.id, 'PARTNER:' + o.partnerId, { pct });
-  if (r.platformFee) await ledger('FEE', r.platformFee, 'ESCROW:' + o.id, 'PLATFORM:FEE', {});
-  if (r.gst)         await ledger('GST', r.gst, 'ESCROW:' + o.id, 'PLATFORM:GST', {});
-  if (r.refund)      await ledger('REFUND', r.refund, 'ESCROW:' + o.id, 'CUSTOMER:' + o.customerKey, {});
+  if (!moved) return;
+
+  await ledger('ESCROW_RELEASE', r.workerPayout, acct.escrow(o.id), acct.partner(o.partnerId), { pct });
+  if (r.platformFee) await ledger('FEE', r.platformFee, acct.escrow(o.id), acct.fee(), {});
+  if (r.gst)         await ledger('GST', r.gst, acct.escrow(o.id), acct.gst(), {});
+  if (r.refund)      await ledger('REFUND', r.refund, acct.escrow(o.id), acct.customer(o.customerKey), {});
 
   const a = getState().agg;
   bumpAgg({
-    serviceOrders: a.serviceOrders + 1,
+    serviceOrders: a.serviceOrders + (pct > 0 ? 1 : 0),
     gmv: a.gmv + r.workerPayout,
     revenue: a.revenue + r.platformFee,
     gst: a.gst + r.gst,
     refunds: a.refunds + r.refund,
-    escrow: Math.max(0, a.escrow - o.customerPays),
+    escrow: Math.max(0, a.escrow - (o.customerPays | 0)),
     saved: a.saved + (o.saved || 0),
   });
+  // Losing a dispute used to RAISE the pro's trust score, because this ran
+  // unconditionally — including on the admin's full-refund path.
   const p = getState().partners.find(x => x.id === o.partnerId);
-  if (p) dispatch({ type: 'partner/patch', payload: { id: p.id, patch: {
+  if (p && pct > 0) dispatch({ type: 'partner/patch', payload: { id: p.id, patch: {
     completed: (p.completed || 0) + 1, starts: (p.starts || 0) + 1,
     onTimeStarts: (p.onTimeStarts || 0) + 1, lastActiveTs: Date.now() } } });
+  else if (p) dispatch({ type: 'partner/patch', payload: { id: p.id, patch: {
+    disputesUpheld: (p.disputesUpheld || 0) + 1 } } });
 
   audit.record(pct >= 1 ? audit.ACTIONS.ESCROW_RELEASE : audit.ACTIONS.ESCROW_PARTIAL,
                { id: o.id, amount: r.workerPayout, refund: r.refund, pct }, me() ? me().key : 'admin');
@@ -159,12 +182,16 @@ export async function confirmAndRelease(orderId, pct = 1) {
 export async function cancelOrder(orderId, ruleId) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return;
-  const split = cancelSplit(o.deal, ruleId);
-  advance(orderId, 'CANCELLED', { cancelRule: ruleId, refund: split.refund, cancelledAt: Date.now() });
-  if (split.refund) await ledger('REFUND', split.refund, 'ESCROW:' + o.id, 'CUSTOMER:' + o.customerKey, { ruleId });
-  if (split.worker) await ledger('COMPENSATION', split.worker, 'ESCROW:' + o.id, 'PARTNER:' + o.partnerId, { ruleId });
+  const pc = getState().partners.find(p => p.id === o.partnerId) || {};
+  const split = cancelSplit(o.deal, ruleId, { markup: markupFor(pc) });
+  if (!advance(orderId, 'CANCELLED', { cancelRule: ruleId, refund: split.refund, cancelledAt: Date.now() })) return;
+  if (split.refund) await ledger('REFUND', split.refund, acct.escrow(o.id), acct.customer(o.customerKey), { ruleId });
+  if (split.worker) await ledger('COMPENSATION', split.worker, acct.escrow(o.id), acct.partner(o.partnerId), { ruleId });
+  // The rule promised "full refund + Rs.100 credit" and the toast said so, but
+  // the credit was computed and then thrown away — the customer never got it.
+  if (split.credit) await ledger('GOODWILL', split.credit, acct.goodwill(), acct.customer(o.customerKey), { ruleId });
   const a = getState().agg;
-  bumpAgg({ escrow: Math.max(0, a.escrow - o.customerPays), refunds: a.refunds + split.refund });
+  bumpAgg({ escrow: Math.max(0, a.escrow - (o.customerPays | 0)), refunds: a.refunds + split.refund });
   audit.record('booking.cancelled', { id: o.id, ruleId, refund: split.refund }, me() ? me().key : 'system');
   toast(split.label);
 }
@@ -228,7 +255,8 @@ export function cartQuote(mode = 'rider') {
   if (!shop) return null;
   const km = kmBetween(myArea(), shop.area);
   const first = (shop.ordersCompleted || 0) < 30;
-  return { shop, km, ...quoteRetail(cart.lines, { catId: shop.catId, km, mode, firstOrders: first }) };
+  return { shop, km, ...quoteRetail(cart.lines, { catId: shop.catId, km, mode, firstOrders: first,
+                                                  freeDeliveryAbove: shop.freeDeliveryAbove }) };
 }
 
 export async function placeRetailOrder(mode = 'rider') {
@@ -260,13 +288,21 @@ export async function placeRetailOrder(mode = 'rider') {
 export async function settleRetail(orderId) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return;
-  advance(orderId, 'R_SETTLED', { settledAt: Date.now() });
-  await ledger('SHOP_PAYOUT', o.shopPayout, 'ESCROW:' + o.id, 'SHOP:' + o.shopId, {});
-  if (o.platformFee) await ledger('FEE', o.platformFee, 'ESCROW:' + o.id, 'PLATFORM:FEE', {});
-  if (o.riderPayout) await ledger('RIDER', o.riderPayout, 'ESCROW:' + o.id, 'RIDER:pool', {});
+  if (!advance(orderId, 'R_SETTLED', { settledAt: Date.now() })) return;
+  // The dispatch cut was posted NOWHERE, stranding Rs.5 in escrow on every
+  // rider order; and GST sat inside the fee leg, so `revenue` mixed
+  // gross-of-GST retail with net-of-GST service in the same total.
+  const feeExGst = Math.max(0, o.platformFee - (o.gst | 0));
+  const dispatchCut = Math.max(0, (o.deliveryFee | 0) - (o.riderPayout | 0));
+  await ledger('SHOP_PAYOUT', o.shopPayout, acct.escrow(o.id), acct.shop(o.shopId), {});
+  if (feeExGst)      await ledger('FEE', feeExGst, acct.escrow(o.id), acct.fee(), {});
+  if (o.gst)         await ledger('GST', o.gst, acct.escrow(o.id), acct.gst(), {});
+  if (o.riderPayout) await ledger('RIDER', o.riderPayout, acct.escrow(o.id), acct.rider(), {});
+  if (dispatchCut)   await ledger('DISPATCH', dispatchCut, acct.escrow(o.id), acct.fee(), {});
   const a = getState().agg;
   bumpAgg({ retailOrders: a.retailOrders + 1, gmv: a.gmv + o.itemsTotal,
-            revenue: a.revenue + o.platformFee, escrow: Math.max(0, a.escrow - o.customerPays) });
+            revenue: a.revenue + feeExGst, gst: a.gst + (o.gst | 0),
+            escrow: Math.max(0, a.escrow - (o.customerPays | 0)) });
   toast(`Settled — ${M.fmt(o.shopPayout)} to ${o.shopName}`);
 }
 

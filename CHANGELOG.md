@@ -6,6 +6,103 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [6.2.0] — 2026-09-02 — "Bright Circle"
+
+Six agents audited the app in parallel and found 40 issues. Everything that
+could cost money or break a screen is fixed here.
+
+### Changed — a bright purple theme, with contrast as the constraint
+- **`#7C3AED` is the new primary.** It is the brightest, most saturated violet
+  that still carries white body text at AA. The measurements decided it:
+  white on violet-500 `#8B5CF6` is **4.23 — fail**; violet-550 `#8551F2` is
+  4.71; violet-600 `#7C3AED` is **5.70**. Every pair in `tokens.css` has a
+  measured ratio beside it.
+- **The old gold fails on bright purple.** `#EBC97C` gives only 3.58 as text.
+  Gold now splits by role: fills and the emblem keep the metallic ramp; gold
+  *text* on violet uses the light stops (`#FBE8B8` = 4.70); `gold-600/700`
+  (1.61) may never sit on violet at all.
+- **Bright violet is chrome, never field** — capped at roughly 20% of any
+  screen, over violet-*tinted* neutral grounds (`#F8F5FE`), never a flat
+  `#8B5CF6` against pure white. That area-times-saturation rule is what keeps
+  a vivid colour from reading cheap.
+- `opacity:.4` disabled states replaced with explicit tokens; on a violet fill
+  they produced an unreadable ~2.2:1 lavender.
+
+### Changed — icons are drawn now, because emoji break on our users' phones
+Not a style preference. `👩‍🍳` is a ZWJ sequence that **fragments into two
+glyphs on Android 8 and 9**, and `🪳 🪷 🧺` render as **empty tofu boxes** on
+those same devices — which is a large share of a ₹8–15k phone base. All 24
+categories and the whole nav are now flat SVGs in `src/ui/icons.js`.
+Collisions the audit found and this resolves: broom/soap, ant/dog,
+lettuce/milk, haircut/massage (both person-shapes, indistinguishable at 22px),
+bolt/droplet, and the cart glyph serving as both the Shops tab and every cart
+button.
+
+### Changed — search and tiles say what they actually do
+- `Search: plumber, AC repair, tomatoes, milk`, with a helper line —
+  replacing a rotating hint a slow reader cannot finish reading.
+- Tiles show **supply proof** ("12 nearby", "New here — be first") instead of
+  "from ₹X", which was a floor almost nobody pays and contradicted our own
+  promise that the pro sets the price.
+
+### Added — the Work tab finally goes somewhere
+It had no route: a guest was thrown to the sign-in screen (which hides the nav,
+so the tab appeared to vanish) and a customer was silently redirected to
+Account. It is now **Earn**, a real screen, and it is where "ask everyone to
+join as a partner" lives — leading with the worked example that a pro keeps
+₹1,000 of a ₹1,000 job against about ₹750 on a commission app.
+
+### Fixed — critical
+- **Double-tapping "Confirm & release" paid the pro twice.** `advance()`
+  returns null on an illegal transition and every caller ignored it, posting to
+  the ledger regardless. Now guarded in release, cancel and retail settle.
+- **Tier-4 orders released 4% more than was ever escrowed** — booking used the
+  6% loyalty markup, release hardcoded 10%. Same bug in `cancelSplit`.
+- **The cart's delivery-mode chips were display-dead.** Tapping "I'll pick up"
+  moved no highlight and left the total showing a fee that would not be
+  charged. Displayed price and charged price must be the same number.
+- **A ₹1 bid validated on groceries.** Retail categories have no base price, so
+  every band value was `NaN` — and because every `NaN` comparison is false,
+  the floor, ceiling and minimum-value guards *all* passed.
+- **A rating with no `stars` made the trust score `NaN`, and `band(NaN)` fell
+  through every branch and returned Elite** — a gold badge and top ranking from
+  one malformed record.
+- **Money past ₹2.14 crore went negative** — `x | 0` truncates to int32, and
+  `agg.gmv` is cumulative.
+- **Sessions were never persisted**, so every refresh silently signed the user
+  out — the other half of "the Work tab doesn't work".
+- Retail orders in the admin escrow queue were settled through the *service*
+  path, posting a ₹0 release to `PARTNER:undefined` and staying re-settleable.
+- `earn.render()` returned `null` for partners, rendering the literal word
+  "null" as the page — string concatenation, so it never threw.
+
+### Fixed — also
+Ledger hash-chain forked on concurrent writes (head read before an `await`);
+ledger account names mismatched (`PLATFORM:FEE` vs `PLATFORM:fee`) so the GST
+invariant read a permanently empty account; retail settle stranded ₹5 per rider
+order and booked GST as revenue; **a lost dispute raised the pro's trust
+score**; the promised ₹100 no-show credit was computed and thrown away;
+migrated orders turned `agg.escrow` into `NaN` permanently; an unrecognised v5
+stage was silently `CLOSED` with escrow still held; a stored schema of v1–v4
+bricked the app into permanent safe mode; "free delivery over ₹499" was
+advertised and never applied; the ₹5 retail fee floor could exceed a tiny
+basket and pay the shop a negative amount; clearing a price field published the
+item at ₹0; three wrong OTPs "flagged" nothing, so a 4-digit code was
+brute-forceable; `back()` left the hash stale; re-tapping a tab piled up junk
+history; a guest's chosen area was written and never read.
+
+### Added — DevOps
+- **`tools/serve.py`** — a dev server with caching off. The cache-buster only
+  stamps the *entry* module, so every imported module was served stale: editing
+  a view and reloading showed the old screen running under new code. Production
+  is immune (one inlined file), so the fix belongs in the dev server.
+- `docs/RUNBOOK.md` — referenced by the workflows but never written. Rollback
+  in 40 seconds, ledger-imbalance response, safety-report response, kill switch.
+- Dependabot for Action versions, CODEOWNERS on the four files where a mistake
+  costs money, PR template matching the safe-update rules, issue template.
+
+---
+
 ## [6.1.0] — 2026-09-01 — "Open Circle"
 
 Everything runs on **GitHub + Supabase free tier**, and most of it runs without

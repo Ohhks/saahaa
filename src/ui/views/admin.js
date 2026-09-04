@@ -205,7 +205,10 @@ function approvals(st) {
 
 /* ── 3. ESCROW ────────────────────────────────────────────── */
 function escrow(st) {
-  const held = st.orders.filter(o => ['WORK_DONE','DISPUTED','R_DELIVERED'].includes(o.stage));
+  // Retail orders must NOT appear here: releasing one through the SERVICE path
+  // posted a Rs.0 release to PARTNER:undefined, decremented escrow, and left
+  // the order still settleable by the customer afterwards.
+  const held = st.orders.filter(o => o.kind === 'service' && ['WORK_DONE','DISPUTED'].includes(o.stage));
   return `
   ${note('escrow state machine, release tiering (instant / 6h / 24h / hold), release timers, stuck-order detection',
          'force-release, partial release, refund, extend a hold, reassign a pro')}

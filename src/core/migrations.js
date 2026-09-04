@@ -65,6 +65,9 @@ registerMigration({
       customerKey: d.customer, customerArea: d.customerArea || 'Madhapur',
       partnerName: d.provider, partnerArea: d.area || 'Madhapur',
       deal: toPaise(d.deal || 0),
+      // without this, `agg.escrow - o.customerPays` was NaN on the first
+      // settle or cancel of a migrated order — and NaN is permanent
+      customerPays: toPaise(d.deal || 0) + Math.round(toPaise(d.deal || 0) * 0.10),
       stage: mapStage(d.stage),
       stageTs: d.stageTs || d.ts || Date.now(),
       history: [{ stage: mapStage(d.stage), at: d.stageTs || Date.now() }],
@@ -102,6 +105,9 @@ const STAGE_MAP = {
   REVIEW:'WORK_DONE', RELEASED:'SETTLED', PARTIAL:'PARTIAL',
   EXPIRED:'EXPIRED', CANCELLED:'CANCELLED',
 };
-const mapStage = s => STAGE_MAP[s] || 'CLOSED';
+/* CLOSED is terminal. Falling back to it silently KILLED any in-flight v5
+   order whose stage we did not recognise, with its money still notionally
+   held. DISPUTED is recoverable: it lands in the admin queue for a human. */
+const mapStage = s => STAGE_MAP[s] || (s ? 'DISPUTED' : 'MATCHING');
 
 export { mapCat, mapStage, CAT_MAP, STAGE_MAP };
