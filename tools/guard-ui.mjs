@@ -36,7 +36,8 @@ if (!fs.existsSync(SNAP)) { console.error(`guard: snapshot missing at ${SNAP}`);
 
 /* ── 1. the engine is frozen ─────────────────────────────────── */
 const FROZEN = ['src/domain', 'src/core', 'src/net', 'supabase', '.github', 'tools'];
-const OWN = new Set(['tools/guard-ui.mjs', 'tools/deck.py', 'tools/shots.py']);   // the guard and the deck builder are tooling, not engine
+const OWN = new Set(['tools/guard-ui.mjs', 'tools/deck.py', 'tools/shots.py',   // tooling, not engine
+                     'src/core/version.js']);                                   // release metadata: every release must change it
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
