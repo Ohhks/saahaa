@@ -67,7 +67,7 @@ export function render(id) {
   ${proCSS}
   <main class="wrap" style="padding-bottom:110px">
 
-    <div class="hero glass glass--deep sheen rise" style="margin-top:var(--sp-6);text-align:center;
+    <div class="card glass glass--deep sheen rise" style="margin-top:var(--sp-6);text-align:center;
          padding:24px 16px;border-radius:var(--r-lg)">
       <span class="avatar avatar--lg" style="width:84px;height:84px;border-radius:50%;margin:0 auto 10px;
         background:var(--accent-fill);color:var(--accent-on-fill);

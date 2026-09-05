@@ -6,6 +6,33 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [6.5.1] — 2026-09-06 — desktop composition
+
+Photographing every screen at 1440px showed where the desktop was still a
+stretched phone layout. UI-only; engine byte-identical (guard green).
+
+- **The bottom sheet becomes a centred 720px dialog on desktop** — a phone
+  gesture has no place on a 27-inch screen, and a 1440px-wide sheet read as a
+  broken page.
+- **Command cards without an action are a stack, not a row.** At ≥1024 a
+  `.cmd` laid out as a row so its action could sit at the right, and any
+  capsules inside collapsed into a single stacked column beside nothing —
+  the order hero, the account hero and every shop card. Content grows,
+  actions hug; the row layout is earned only by a card that carries one.
+- Cockpit metric strips wrap instead of scrolling off the edge; `--nav-h` is
+  zero above 768px so sticky bars and toasts no longer reserve room for a bar
+  that is not there.
+- Home's hero was hidden with its header on desktop; only the duplicated top
+  row is hidden now. Pillars wrap in the side column.
+- The onboarding ladder stays a vertical track on every width (the horizontal
+  desktop timeline mangled it) and sits in a 760px reading column; the sign-in
+  form is a 560px column; the pro page's portrait card no longer inherits the
+  Home hero's two-column grid.
+- Deck: a "One design, every screen" section with seven desktop captures;
+  `tools/shots.py --desktop` photographs any scene at 1440×900.
+
+---
+
 ## [6.5.0] — 2026-09-05 — "Open Circle — Living Glass"
 
 A UI-only release. **Keep the engine, rebuild the experience.** Every file under

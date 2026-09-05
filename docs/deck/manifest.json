@@ -9,18 +9,66 @@
       "title": "Customer",
       "intro": "NEED → SERVICE → DETAILS → MATCH → PRICE → CONFIRM. Three taps to a locked price, a code at the door, money held until the work is confirmed.",
       "slides": [
-        { "title": "Home — everything your neighbourhood needs", "caption": "One search finds people who come to you, shops that deliver to you, and your own orders. Services are grouped Home & Repairs · Care & Wellbeing · Learn, Move & Live · Shops Near You, rendered live from the registry.", "image": "docs/deck/c01-home.png" },
-        { "title": "Search is the front door", "caption": "Instant results across services, sub-services, shops, products and orders. Recent searches and suggestions are real destinations, never decoration.", "image": "docs/deck/c02-search.png" },
-        { "title": "Home & Repairs — the Best Match", "caption": "Ranked on trust, distance and price — not cheapest-first. One dominant card: name, rating, trust band, distance, ETA, a locked price, and why this person.", "image": "docs/deck/c03-repairs-match.png" },
-        { "title": "Care & Wellbeing — tier-gated", "caption": "In-home care needs a Background-Checked pro. The match only ever shows people who cleared that rung.", "image": "docs/deck/c04-care-match.png" },
-        { "title": "Learn, Move & Live", "caption": "Tutors, moving, events, pets — the same locked-match card, the same code at the door.", "image": "docs/deck/c05-life-match.png" },
-        { "title": "Ask rates — when more than one pro is free", "caption": "Under Confirm: “Ask rates from 4 more workers.” Your held price stays reserved, so asking cannot cost you anything.", "image": "docs/deck/c06-ask-waiting.png" },
-        { "title": "Rates are in", "caption": "Sorted by score, never by price. The cheapest is always shown with an honest line about rating and distance. One tap books.", "image": "docs/deck/c07-ask-choose.png" },
-        { "title": "The receipt teaches", "caption": "You asked 5 workers. You paid ₹1,161. You saved ₹92. Next time the button says “Last time you saved ₹92.”", "image": "docs/deck/c08-receipt.png" },
-        { "title": "Shops near you", "caption": "Kirana, vegetables, meat, dairy, pharmacy, water — compact, information-rich cards; delivery or pickup; the cart floats in only when it matters.", "image": "docs/deck/c09-shops.png" },
-        { "title": "Cart and checkout", "caption": "One bill, substitution choices per item, minimum order enforced, one primary action.", "image": "docs/deck/c10-cart.png" },
-        { "title": "Live tracker", "caption": "Requested → Matched → Accepted → On the way → Started → Completed → Paid. The current stage is the hero of the screen; the next action sits right under it.", "image": "docs/deck/c11-tracker.png" },
-        { "title": "My SAAHAA", "caption": "Bookings, orders, wallet legs from the ledger, chats, reviews, settings — one connected hub, not a settings list.", "image": "docs/deck/c12-account.png" }
+        {
+          "title": "Home — everything your neighbourhood needs",
+          "caption": "One search finds people who come to you, shops that deliver to you, and your own orders. Services are grouped Home & Repairs · Care & Wellbeing · Learn, Move & Live · Shops Near You, rendered live from the registry.",
+          "image": "docs/deck/c01-home.png"
+        },
+        {
+          "title": "Search is the front door",
+          "caption": "Instant results across services, sub-services, shops, products and orders. Recent searches and suggestions are real destinations, never decoration.",
+          "image": "docs/deck/c02-search.png"
+        },
+        {
+          "title": "Home & Repairs — the Best Match",
+          "caption": "Ranked on trust, distance and price — not cheapest-first. One dominant card: name, rating, trust band, distance, ETA, a locked price, and why this person.",
+          "image": "docs/deck/c03-repairs-match.png"
+        },
+        {
+          "title": "Care & Wellbeing — tier-gated",
+          "caption": "In-home care needs a Background-Checked pro. The match only ever shows people who cleared that rung.",
+          "image": "docs/deck/c04-care-match.png"
+        },
+        {
+          "title": "Learn, Move & Live",
+          "caption": "Tutors, moving, events, pets — the same locked-match card, the same code at the door.",
+          "image": "docs/deck/c05-life-match.png"
+        },
+        {
+          "title": "Ask rates — when more than one pro is free",
+          "caption": "Under Confirm: “Ask rates from 4 more workers.” Your held price stays reserved, so asking cannot cost you anything.",
+          "image": "docs/deck/c06-ask-waiting.png"
+        },
+        {
+          "title": "Rates are in",
+          "caption": "Sorted by score, never by price. The cheapest is always shown with an honest line about rating and distance. One tap books.",
+          "image": "docs/deck/c07-ask-choose.png"
+        },
+        {
+          "title": "The receipt teaches",
+          "caption": "You asked 5 workers. You paid ₹1,161. You saved ₹92. Next time the button says “Last time you saved ₹92.”",
+          "image": "docs/deck/c08-receipt.png"
+        },
+        {
+          "title": "Shops near you",
+          "caption": "Kirana, vegetables, meat, dairy, pharmacy, water — compact, information-rich cards; delivery or pickup; the cart floats in only when it matters.",
+          "image": "docs/deck/c09-shops.png"
+        },
+        {
+          "title": "Cart and checkout",
+          "caption": "One bill, substitution choices per item, minimum order enforced, one primary action.",
+          "image": "docs/deck/c10-cart.png"
+        },
+        {
+          "title": "Live tracker",
+          "caption": "Requested → Matched → Accepted → On the way → Started → Completed → Paid. The current stage is the hero of the screen; the next action sits right under it.",
+          "image": "docs/deck/c11-tracker.png"
+        },
+        {
+          "title": "My SAAHAA",
+          "caption": "Bookings, orders, wallet legs from the ledger, chats, reviews, settings — one connected hub, not a settings list.",
+          "image": "docs/deck/c12-account.png"
+        }
       ]
     },
     {
@@ -28,18 +76,66 @@
       "title": "Partner",
       "intro": "Ten minutes from “I want to earn” to taking jobs — with the owner touching nothing. You keep 100% of your quote, and SAAHAA runs your professional page for you.",
       "slides": [
-        { "title": "Earn — locally, professionally", "caption": "Your trade. Your price. Your own page. No joining fee, ever.", "image": "docs/deck/p01-earn.png" },
-        { "title": "Sign up", "caption": "Name, mobile, trade, area, your usual rate. Two minutes.", "image": "docs/deck/p02-signup.png" },
-        { "title": "Step 1 · Confirm your number", "caption": "A code to your phone. Your page is already drafted below — the reason to keep going.", "image": "docs/deck/p03-phone.png" },
-        { "title": "Step 2 · Show us your ID", "caption": "Aadhaar, PAN or licence. SAAHAA keeps a scrambled fingerprint and the last 4 digits — never the number.", "image": "docs/deck/p04-id.png" },
-        { "title": "Step 4 · Five trade questions", "caption": "Things every real pro knows and no impostor does. Four of five to pass.", "image": "docs/deck/p05-quiz.png" },
-        { "title": "Step 5 · How SAAHAA works", "caption": "Six rules — OTP at the door, never cash outside, a photo before payout. A wrong answer shows the rule and you try again.", "image": "docs/deck/p06-conduct.png" },
-        { "title": "You are verified", "caption": "Tier 2, online, bookable. Your first jobs are up to ₹1,500; three clean jobs and it becomes ₹10,000 by itself.", "image": "docs/deck/p07-verified.png" },
-        { "title": "Your page is live", "caption": "Badge, rating, jobs done, price, what you do, reviews, Book. Built from your work, maintained by SAAHAA, yours to share on WhatsApp.", "image": "docs/deck/p08-propage.png" },
-        { "title": "The work cockpit", "caption": "Online/offline, new requests, today's jobs, earnings split into released · held · sent to UPI, your rates, your standing.", "image": "docs/deck/p09-console.png" },
-        { "title": "Send a rate", "caption": "The fair price is pre-filled. Drag below it and your chance drops — sending less does not raise it.", "image": "docs/deck/p10-bid.png" },
-        { "title": "A job, step by step", "caption": "Accept → on the way → arrived → the customer's code → before/after photos → finished. Money releases on the customer's confirmation.", "image": "docs/deck/p11-job.png" },
-        { "title": "Shop owner — merchant command center", "caption": "Orders, products with inline price and stock, pricing, sales, customers, payouts, setup, analytics — all from the shop's own data.", "image": "docs/deck/p12-shop.png" }
+        {
+          "title": "Earn — locally, professionally",
+          "caption": "Your trade. Your price. Your own page. No joining fee, ever.",
+          "image": "docs/deck/p01-earn.png"
+        },
+        {
+          "title": "Sign up",
+          "caption": "Name, mobile, trade, area, your usual rate. Two minutes.",
+          "image": "docs/deck/p02-signup.png"
+        },
+        {
+          "title": "Step 1 · Confirm your number",
+          "caption": "A code to your phone. Your page is already drafted below — the reason to keep going.",
+          "image": "docs/deck/p03-phone.png"
+        },
+        {
+          "title": "Step 2 · Show us your ID",
+          "caption": "Aadhaar, PAN or licence. SAAHAA keeps a scrambled fingerprint and the last 4 digits — never the number.",
+          "image": "docs/deck/p04-id.png"
+        },
+        {
+          "title": "Step 4 · Five trade questions",
+          "caption": "Things every real pro knows and no impostor does. Four of five to pass.",
+          "image": "docs/deck/p05-quiz.png"
+        },
+        {
+          "title": "Step 5 · How SAAHAA works",
+          "caption": "Six rules — OTP at the door, never cash outside, a photo before payout. A wrong answer shows the rule and you try again.",
+          "image": "docs/deck/p06-conduct.png"
+        },
+        {
+          "title": "You are verified",
+          "caption": "Tier 2, online, bookable. Your first jobs are up to ₹1,500; three clean jobs and it becomes ₹10,000 by itself.",
+          "image": "docs/deck/p07-verified.png"
+        },
+        {
+          "title": "Your page is live",
+          "caption": "Badge, rating, jobs done, price, what you do, reviews, Book. Built from your work, maintained by SAAHAA, yours to share on WhatsApp.",
+          "image": "docs/deck/p08-propage.png"
+        },
+        {
+          "title": "The work cockpit",
+          "caption": "Online/offline, new requests, today's jobs, earnings split into released · held · sent to UPI, your rates, your standing.",
+          "image": "docs/deck/p09-console.png"
+        },
+        {
+          "title": "Send a rate",
+          "caption": "The fair price is pre-filled. Drag below it and your chance drops — sending less does not raise it.",
+          "image": "docs/deck/p10-bid.png"
+        },
+        {
+          "title": "A job, step by step",
+          "caption": "Accept → on the way → arrived → the customer's code → before/after photos → finished. Money releases on the customer's confirmation.",
+          "image": "docs/deck/p11-job.png"
+        },
+        {
+          "title": "Shop owner — merchant command center",
+          "caption": "Orders, products with inline price and stock, pricing, sales, customers, payouts, setup, analytics — all from the shop's own data.",
+          "image": "docs/deck/p12-shop.png"
+        }
       ]
     },
     {
@@ -47,14 +143,88 @@
       "title": "Admin — one owner, eight sections",
       "intro": "The system computes; you decide. The only two decisions that reach you: a background check to confirm and a Certified badge to award.",
       "slides": [
-        { "title": "Dashboard", "caption": "Users, partners, orders, revenue, GMV, escrow, approvals, disputes, savings, listings, booking and rating statistics — and the money flow CUSTOMER → ESCROW → PARTNER / SHOP.", "image": "docs/deck/a01-dashboard.png" },
-        { "title": "Approvals", "caption": "A background request with its evidence first; Certified candidates after. Nothing below tier 2 ever lands here.", "image": "docs/deck/a02-approvals.png" },
-        { "title": "Bookings & Escrow", "caption": "Held orders with their release tier; a stuck shop order can be refunded in full.", "image": "docs/deck/a03-escrow.png" },
-        { "title": "Disputes", "caption": "Release, partial, or refund — the money moves first; the dispute closes with it.", "image": "docs/deck/a04-disputes.png" },
-        { "title": "Users & Partners", "caption": "Trust band, tier, suspend.", "image": "docs/deck/a05-people.png" },
-        { "title": "Moderation", "caption": "Reviews with their author; hide.", "image": "docs/deck/a06-moderation.png" },
-        { "title": "Finance", "caption": "Revenue net of GST, the payout queue, the hash-chained ledger — replay reconciles to ₹0.", "image": "docs/deck/a07-finance.png" },
-        { "title": "System & Audit", "caption": "Health checks, feature flags as kill switches, backups, exports, the self-test suite, the audit log.", "image": "docs/deck/a08-system.png" }
+        {
+          "title": "Dashboard",
+          "caption": "Users, partners, orders, revenue, GMV, escrow, approvals, disputes, savings, listings, booking and rating statistics — and the money flow CUSTOMER → ESCROW → PARTNER / SHOP.",
+          "image": "docs/deck/a01-dashboard.png"
+        },
+        {
+          "title": "Approvals",
+          "caption": "A background request with its evidence first; Certified candidates after. Nothing below tier 2 ever lands here.",
+          "image": "docs/deck/a02-approvals.png"
+        },
+        {
+          "title": "Bookings & Escrow",
+          "caption": "Held orders with their release tier; a stuck shop order can be refunded in full.",
+          "image": "docs/deck/a03-escrow.png"
+        },
+        {
+          "title": "Disputes",
+          "caption": "Release, partial, or refund — the money moves first; the dispute closes with it.",
+          "image": "docs/deck/a04-disputes.png"
+        },
+        {
+          "title": "Users & Partners",
+          "caption": "Trust band, tier, suspend.",
+          "image": "docs/deck/a05-people.png"
+        },
+        {
+          "title": "Moderation",
+          "caption": "Reviews with their author; hide.",
+          "image": "docs/deck/a06-moderation.png"
+        },
+        {
+          "title": "Finance",
+          "caption": "Revenue net of GST, the payout queue, the hash-chained ledger — replay reconciles to ₹0.",
+          "image": "docs/deck/a07-finance.png"
+        },
+        {
+          "title": "System & Audit",
+          "caption": "Health checks, feature flags as kill switches, backups, exports, the self-test suite, the audit log.",
+          "image": "docs/deck/a08-system.png"
+        }
+      ]
+    },
+    {
+      "id": "desktop",
+      "title": "One design, every screen",
+      "intro": "The same engine and the same screens recompose for the device: a bottom bar and full-height sheets on a phone, an icon rail on a tablet, a persistent side navigation, top bar and centred dialogs on a desktop. Nothing is a stretched phone layout.",
+      "slides": [
+        {
+          "title": "Home on a desktop",
+          "caption": "Side navigation and top bar carry location, search, notifications and profile; the hero and the live order sit side by side.",
+          "image": "docs/deck/c01-home-d.png"
+        },
+        {
+          "title": "Booking becomes a centred dialog",
+          "caption": "The phone's bottom sheet is a 720px dialog on a large screen — same step bar, same Best Match, same one primary action.",
+          "image": "docs/deck/c03-repairs-match-d.png"
+        },
+        {
+          "title": "Tracker in two columns",
+          "caption": "Status hero across the top, the timeline pinned on the left, actions and the bill on the right.",
+          "image": "docs/deck/c11-tracker-d.png"
+        },
+        {
+          "title": "Shops in a grid",
+          "caption": "Category chips, market capsules and information-rich shop cards two across.",
+          "image": "docs/deck/c09-shops-d.png"
+        },
+        {
+          "title": "The work cockpit, wide",
+          "caption": "Jobs and requests on the left; money, standing and the ladder on the right — earnings never blended.",
+          "image": "docs/deck/p09-console-d.png"
+        },
+        {
+          "title": "The merchant command center, wide",
+          "caption": "Tabs as a segmented control, the ready-list picker surfaced, products with inline price and stock two across.",
+          "image": "docs/deck/p12-shop-d.png"
+        },
+        {
+          "title": "Verification stays a reading column",
+          "caption": "A seven-step form is a 760px column on any screen — wide fields are a mistake, not a feature.",
+          "image": "docs/deck/p04-id-d.png"
+        }
       ]
     }
   ]

@@ -47,7 +47,7 @@ export function render() {
 
   return `
   ${header('Getting you verified', `${esc(cat.name)} · ${r.pct}% done`)}
-  <main class="wrap" style="padding-bottom:40px">
+  <main class="wrap" style="padding-bottom:40px;max-width:760px">
     <div class="glass glass--deep sheen rise" style="margin-top:var(--sp-6);padding:16px;border-radius:var(--r-lg)">
       <div class="between" style="align-items:flex-start">
         <div class="grow"><span class="eyebrow">Verification</span>
@@ -61,14 +61,14 @@ export function render() {
     ${r.done.includes('phone') ? draftPage(p, cat) : ''}
 
     <div class="sec">
-      <ol class="track timeline">
+      <ol class="track">
         ${V.STEPS.map((s, i) => {
           const done = r.done.includes(s.id);
           const cur = r.next && r.next.id === s.id;
-          return `<li class="timeline__item ${done ? 'done' : cur ? 'cur' : 'pend'}">
-            <span class="node timeline__node"><span class="dot timeline__dot">${done ? '✓' : s.n}</span>
-              ${i < V.STEPS.length - 1 ? '<span class="bar timeline__bar"></span>' : ''}</span>
-            <span class="body timeline__body"><b>${esc(s.title)}</b>
+          return `<li class="${done ? 'done' : cur ? 'cur' : 'pend'}">
+            <span class="node"><span class="dot">${done ? '✓' : s.n}</span>
+              ${i < V.STEPS.length - 1 ? '<span class="bar"></span>' : ''}</span>
+            <span class="body"><b>${esc(s.title)}</b>
               ${cur ? `<span>${esc(s.sub)}</span>${stepPanel(p, s.id, cat)}` : done ? '' : `<span>${esc(s.sub)}</span>`}
             </span></li>`;
         }).join('')}

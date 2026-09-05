@@ -28,19 +28,20 @@ if not CHROME:
 
 m = json.load(io.open(os.path.join(DECK, 'manifest.json'), encoding='utf-8'))
 scenes = [os.path.splitext(os.path.basename(s['image']))[0] for sec in m['sections'] for s in sec['slides']]
-want = sys.argv[1:]
+DESKTOP = '--desktop' in sys.argv          # photograph everything at desktop size, suffixed -d
+want = [a for a in sys.argv[1:] if not a.startswith('--')]
 if want:
     scenes = [s for s in scenes if any(s.startswith(w) for w in want)]
 
 def size(scene):
-    return (1440, 900) if scene.startswith('a') else (390, 844)
+    return (1440, 900) if (DESKTOP or scene.startswith('a')) else (390, 844)
 
 ok = 0
 for scene in scenes:
     prof = os.path.join(tempfile.gettempdir(), 'saahaa-shot-' + scene)
     shutil.rmtree(prof, ignore_errors=True)
     w, h = size(scene)
-    out = os.path.join(DECK, scene + '.png')
+    out = os.path.join(DECK, scene + ('-d' if DESKTOP and not scene.startswith('a') else '') + '.png')
     cmd = [CHROME, '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--disable-extensions', '--force-prefers-reduced-motion',
            f'--window-size={w},{h}', '--virtual-time-budget=30000', f'--user-data-dir={prof}',
            f'--screenshot={out}', f'{URL}/?shot={scene}']

@@ -36,7 +36,7 @@ export function render() {
     </div>
   </header>
 
-  <main class="wrap">
+  <main class="wrap" style="max-width:560px">
     <div class="chiprow" style="margin:var(--sp-7) 0">
       <button class="chip ${tab === 'login' ? 'on' : ''}" data-act="auth.tab" data-tab="login">Sign in</button>
       <button class="chip ${tab === 'signup' ? 'on' : ''}" data-act="auth.tab" data-tab="signup">Create account</button>

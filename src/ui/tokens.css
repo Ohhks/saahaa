@@ -1319,8 +1319,11 @@ a{color:var(--brand-text);text-underline-offset:3px}
    profile; Home's own header would repeat all four one line below it. And a
    bleed-margin trust bar inside a side column overflows the column. */
 @media (min-width:1024px){
-  .shell__main > .topbar + .hdr--home{display:none}
+  /* the hero LIVES inside Home's header, so hide only the duplicated top row
+     (location / bell / theme / avatar) — the topbar already carries all four */
+  .shell__main > .topbar + .hdr--home > .wrap.inner{display:none}
   .home-lay .trustbar{margin-left:0;margin-right:0;border-radius:var(--r-md)}
+  .home-lay .pillars{flex-wrap:wrap;overflow:visible}
 }
 /* admin and auth render without the shell navigation: one column, no ghost rail */
 .shell--bare{grid-template-columns:1fr !important}
@@ -1333,3 +1336,40 @@ a{color:var(--brand-text);text-underline-offset:3px}
 /* admin/auth render with no side navigation: the ≥768 rule pins .shell__main to
    grid column 2, which conjures an empty implicit first column. Put it back. */
 .shell--bare > .shell__main{grid-column:1}
+
+/* ---------- DESKTOP COMPOSITION FIX-UPS ----------
+   Photographing every screen at 1440px showed one shared fault: at ≥1024 a
+   .cmd lays out as a row so its action can sit at the right — but its content
+   child then shrinks to fit, and any .capsules grid inside it collapses to a
+   single stacked column beside a field of nothing. Content grows; actions
+   hug. The same rule fixes the order hero and the account hero. */
+@media (min-width:768px){
+  :root{--nav-h:0px}                       /* no bottom bar: nothing to leave room for */
+}
+@media (min-width:1024px){
+  .cmd > *{min-width:0}
+  .cmd > .row,.cmd > .grow,.cmd > .cmd__body,.cmd > .capsules{flex:1 1 0%}
+  .row > .grow{flex:1 1 0%;min-width:0}
+  .row > .capsules{flex:1 1 0%}
+  .capsules{width:100%}
+  /* cockpit strips wrap instead of scrolling off the edge */
+  .metricrow{flex-wrap:wrap;overflow:visible}
+  .metricrow > *{flex:1 1 148px}
+  /* the bottom sheet becomes a centred dialog — a phone gesture has no place
+     on a 27-inch screen, and a 1440px-wide sheet reads as a broken page */
+  .sheet{left:50%;right:auto;bottom:auto;top:50%;width:min(720px,92vw);max-height:86vh;
+    border-radius:var(--r-2xl);padding:var(--sp-7) var(--sp-8) var(--sp-8);
+    transform:translate(-50%,-46%);opacity:0;
+    transition:transform var(--dur-slow) var(--ease-emph),opacity var(--dur-quick)}
+  .sheet.on{transform:translate(-50%,-50%);opacity:1}
+  .sheet .grab{display:none}
+}
+/* A command card with no action slot is a stack of content, not a row: the
+   order hero and the account cards had their pills, title, meta and capsules
+   laid out side by side as flex siblings at ≥1024. Only a card that actually
+   carries an action earns the row layout. */
+@media (min-width:1024px){
+  .cmd:not(:has(> .cmd__action)){flex-direction:column}
+  .cmd:not(:has(> .cmd__action)) > *{flex:0 0 auto;width:100%}
+  .cmd .capsules{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+}
