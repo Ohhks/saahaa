@@ -1,5 +1,7 @@
 # SAAHAA — from here to production, step by step
 
+*Why any of this matters: [docs/PROBLEM.md](PROBLEM.md) — the real-world problem SAAHAA solves.*
+
 One person, in order. Each step says what it produces and what it unblocks.
 Steps 1–5 are today. Steps 6–12 are the first two weeks. Step 13 is forever.
 
