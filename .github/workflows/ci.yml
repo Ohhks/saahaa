@@ -40,8 +40,10 @@ jobs:
       - name: Domain test suite (Node)
         run: node tools/test-node.mjs
 
-      - name: Build single-file bundle
-        run: python tools/build.py
+      - name: Build the Pages payload (the same build Deploy ships)
+        # --site also writes index.html / 404.html / version.json; the pre-flight
+        # checks those, so building without it fails the gate on a clean runner
+        run: python tools/build.py --site
 
       - name: Pre-flight gate
         run: bash tools/preflight.sh
