@@ -2,7 +2,7 @@
    core/money.js primitives. Nothing else in the app multiplies a rupee.
 
    ── SERVICES ────────────────────────────────────────────────────────────
-   Deal price D (what the worker quotes). Customer pays D x 1.10.
+   Deal price D (what the worker quotes). Customer pays D x 1.08.
    The worker keeps 100% of D — that is the whole product.
 
    GST CORRECTION (panel V4, confidence 5, adopted):
@@ -10,14 +10,14 @@
    GST on a marketplace commission is 18% OF THE COMMISSION, not 2% of D.
    Same customer total, correct labels:
        Service      D            = 1000.00
-       Platform fee D*0.10/1.18  =   84.75   <- SAAHAA revenue
+       Platform fee D*0.08/1.18  =   67.80   <- SAAHAA revenue
        GST @18%     fee*0.18     =   15.25   <- remitted, never revenue
        Customer pays             = 1100.00
    Invoice-correct, survives an audit, and customers trust a line-itemed bill.
 
    ── RETAIL ──────────────────────────────────────────────────────────────
-   Products CANNOT carry the 10% service rate: kirana gross margin on staples
-   is 3-6%, so 10% would exceed the entire margin on the items people order
+   Products CANNOT carry the 8% service rate: kirana gross margin on staples
+   is 3-6%, so 8% would exceed the entire margin on the items people order
    most (panel V2, confidence 5). Commission comes out of the SHOP's margin
    (3% staples / 5% high-margin, capped per order); the customer pays a
    separate, visible delivery fee — never baked into item prices. */
@@ -26,9 +26,13 @@ import * as M from '../core/money.js';
 import { find } from '../core/registry.js';
 
 /* ── constants ─────────────────────────────────────────────── */
-export const SERVICE_MARKUP = 0.10;   // customer pays D x 1.10
+/* THE COMPANY EARNS ABOVE THE FAIR PRICE, NEVER OUT OF THE WORK. The worker's
+   quote D is paid to the worker in full; SAAHAA's charge is 8% laid on top of
+   it and paid by the customer. 8% is the whole of the platform's take on a
+   service — GST on that fee is remitted, not kept. */
+export const SERVICE_MARKUP = 0.08;   // customer pays D x 1.08
 export const GST_RATE       = 0.18;   // GST on the platform fee
-export const LOYALTY_MARKUP = 0.06;   // Tier-4 certified partners: 10% -> 6%
+export const LOYALTY_MARKUP = 0.06;   // Tier-4 certified partners: 8% -> 6%
 export const RETAIL_FEE_FLOOR = 500;  // Rs.5 minimum per retail order
 
 /* delivery fee bands, in paise, by distance km */
@@ -50,7 +54,7 @@ export const RIDER_DISPATCH_CUT = 500; // Rs.5 of the delivery fee is SAAHAA's
 export function quoteService(dealPaise, opts = {}) {
   const D = Math.max(0, dealPaise | 0);
   const markup = opts.markup ?? SERVICE_MARKUP;
-  const uplift = M.pct(D, markup * 100);              // the whole +10%
+  const uplift = M.pct(D, markup * 100);              // the whole +8%
   const platformFee = Math.round(uplift / (1 + GST_RATE));
   const gst = uplift - platformFee;                   // remainder: never drops a paisa
   return {
@@ -197,7 +201,7 @@ export const CANCEL_RULES = {
 export function cancelSplit(dealPaise, ruleId, opts = {}) {
   const rule = CANCEL_RULES[ruleId] || CANCEL_RULES.BEFORE_ACCEPT;
   // must use the SAME markup the booking was escrowed at. A Tier-4 job is
-  // escrowed at 6%; refunding it at 10% overdraws escrow by the difference.
+  // escrowed at 6%; refunding it at 8% overdraws escrow by the difference.
   const q = quoteService(dealPaise, opts);
   const refund = M.mul(q.customerPays, rule.refundPct);
   const worker = M.mul(q.deal, rule.workerPct);

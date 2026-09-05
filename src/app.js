@@ -149,9 +149,9 @@ function sideNav() {
     ${s && s.role === 'partner' ? `<button class="sidenav__item" data-act="pro.open" data-id="${esc(s.partnerId || '')}">
         <span class="ic">${icon('navYou', { size: 22 })}</span><span class="lbl">My page</span></button>` : ''}
     <div class="sidenav__foot">
-      <button class="sidenav__item" data-act="theme.toggle"><span class="ic">◐</span><span class="lbl">Light / dark</span></button>
-      ${s ? `<button class="sidenav__item" data-act="auth.logout"><span class="ic">↪</span><span class="lbl">Sign out</span></button>`
-          : `<button class="sidenav__item" data-act="auth.open"><span class="ic">→</span><span class="lbl">Sign in</span></button>`}
+      <button class="sidenav__item" data-act="theme.toggle"><span class="ic">${icon('theme', { size: 20 })}</span><span class="lbl">Light / dark</span></button>
+      ${s ? `<button class="sidenav__item" data-act="auth.logout"><span class="ic">${icon('signout', { size: 20 })}</span><span class="lbl">Sign out</span></button>`
+          : `<button class="sidenav__item" data-act="auth.open"><span class="ic">${icon('signin', { size: 20 })}</span><span class="lbl">Sign in</span></button>`}
     </div>
   </aside>`;
 }
@@ -164,8 +164,8 @@ function topBar() {
   return `<div class="topbar">
     <button class="topbar__loc tap" data-act="area.pick"><span class="eyebrow">Serving</span><b>${esc(myArea())} ▾</b></button>
     <button class="topbar__search" data-act="nav.home" aria-label="Search">${icon('search', { size: 18 })}<span>What do you need today?</span></button>
-    ${n ? `<button class="btn btn--secondary btn--sm" data-act="nav.cart">🧺 ${n}</button>` : ''}
-    <button class="btn btn--ghost tap" data-act="nav.orders" aria-label="Notifications">🔔</button>
+    ${n ? `<button class="btn btn--secondary btn--sm" data-act="nav.cart">${icon('basket', { size: 16 })} ${n}</button>` : ''}
+    <button class="btn btn--ghost tap" data-act="nav.orders" aria-label="Notifications">${icon('bell', { size: 20 })}</button>
     ${s ? `<button class="avatar avatar--sm tap" data-act="nav.account" aria-label="Account">${esc(s.name[0])}</button>`
         : `<button class="btn btn--primary btn--sm" data-act="auth.open">Sign in</button>`}
   </div>`;

@@ -36,11 +36,12 @@ describe('pricing · service quote reconciles', () => {
   it('golden vector: D = Rs.1000', () => {
     const q = quoteService(100000);
     expect(q.deal).toBe(100000);
-    expect(q.customerPays).toBe(110000);
+    // 8% on top of the worker's Rs.1000: the worker keeps the whole Rs.1000
+    expect(q.customerPays).toBe(108000);
     expect(q.workerPayout).toBe(100000);
-    expect(q.platformFee + q.gst).toBe(10000);
-    expect(q.platformFee).toBe(8475);     // 10000 / 1.18
-    expect(q.gst).toBe(1525);
+    expect(q.platformFee + q.gst).toBe(8000);
+    expect(q.platformFee).toBe(6780);     // 8000 / 1.18
+    expect(q.gst).toBe(1220);
   });
   it('worker + fee + gst === customerPays, for every price', () => {
     for (let d = 1000; d <= 500000; d += 7331) {
@@ -63,8 +64,8 @@ describe('pricing · partial release is pro-rata and reconciles', () => {
   it('60% release on D = Rs.1000', () => {
     const r = releaseService(100000, 0.6);
     expect(r.workerPayout).toBe(60000);
-    expect(r.uplift).toBe(6000);            // fee scales down with the work
-    expect(r.refund).toBe(44000);
+    expect(r.uplift).toBe(4800);            // 8% of the released Rs.600 — the fee scales down with the work
+    expect(r.refund).toBe(43200);           // 108000 - 60000 - 4800
     expect(r.reconciles).toBeTrue();
   });
   it('full release refunds nothing', () => {
@@ -79,7 +80,7 @@ describe('pricing · partial release is pro-rata and reconciles', () => {
 
 describe('pricing · retail take rate protects kirana margin', () => {
   const lines = [{ qty: 2, unitPrice: 28500 }, { qty: 1, unitPrice: 14200 }];
-  it('staples pay 3%, not the 10% service rate', () => {
+  it('staples pay 3%, not the 8% service rate', () => {
     const q = quoteRetail(lines, { catId: 'kirana', km: 1.5, mode: 'rider' });
     expect(q.takePct).toBe(3);
     expect(q.platformFee <= 2500).toBeTrue();       // capped at Rs.25
@@ -103,7 +104,7 @@ describe('pricing · cancellations reconcile', () => {
       expect(cancelSplit(100000, r).reconciles).toBeTrue();
   });
   it('cancelling before acceptance is free', () => {
-    expect(cancelSplit(100000, 'BEFORE_ACCEPT').refund).toBe(110000);
+    expect(cancelSplit(100000, 'BEFORE_ACCEPT').refund).toBe(108000);
   });
 });
 

@@ -6,6 +6,43 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [6.6.0] — 2026-09-06 — "Eight on top"
+
+### Changed — the company earns above the fair price, never out of the work
+- **Platform charge is 8%, laid on top of the worker's quote and paid by the
+  customer.** The worker is paid the whole of what they quoted; SAAHAA's take
+  on a service is 8% of it, added above. GST (18% of that fee) is remitted,
+  not kept. Golden vector: a ₹1,000 job → customer pays ₹1,080, worker keeps
+  ₹1,000, SAAHAA ₹67.80 net of ₹12.20 GST. Tier-4 loyalty stays at 6%.
+- Retail is unchanged (3–5% capped, first 30 orders free): a shop's products
+  carry an MRP that cannot legally be exceeded, so "on top" is not available
+  there — and kirana margin is 3–6%, which 8% would consume entirely.
+- 5,000-order simulation at 8%: customers pay ₹83.5 lakh; pros ₹35.3 lakh
+  (42.3%), shops ₹35.2 lakh; SAAHAA ₹2.99 lakh net of GST (3.58%, ₹60/order);
+  customers save ₹11.2 lakh and pros + shops earn ₹16.9 lakh more than under a
+  25% app. Reconciles to zero.
+- `payGap` in ask-rates and the fee copy in Earn and sign-up derive from
+  `SERVICE_MARKUP` instead of repeating the number.
+
+### Changed — text, icons and symbols drawn, not borrowed
+- **Every emoji in the interface is gone.** Forty-one drawn glyphs join the
+  category set in `ui/icons.js` — bell, theme, basket, siren, pin, refresh,
+  shield, lock, coin, camera, ID card, share, trash, calendar, plus, warning,
+  star, scale, phone, trend, box, cold chain, prescription, flask, sign in /
+  out, chevron, back, person, check, cross, wallet, chat, and the four group
+  heads. Same hand, same stroke, identical on every phone. What remains are
+  typographic marks (✓ ✗ ★ ✕ ▾) that render everywhere.
+- Headers no longer prefix the category emoji; role chips, Earn's who-cards,
+  the trust bar, the quick chips, the shop console's inventory blocks and
+  the side/top bars all carry drawn glyphs.
+- **Text roles**: uppercase letter-spaced type is for labels and metadata
+  only. Sentences that had been set in `.meta` (admin notes, account empty
+  states, the Home search sub-line, review text) are sentence case again.
+  The huge price's tight tracking no longer leaks into the small line under
+  it ("₹34lessthanheld").
+
+---
+
 ## [6.5.1] — 2026-09-06 — desktop composition
 
 Photographing every screen at 1440px showed where the desktop was still a

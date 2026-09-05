@@ -20,6 +20,8 @@
    on a single sticky action. Every string's meaning is the one it had. */
 
 import { esc } from '../dom.js';
+import { SERVICE_MARKUP } from '../../domain/pricing.js';
+import { icon, hasIcon } from '../icons.js';
 import { me } from '../../core/ctx.js';
 import { live } from '../../core/registry.js';
 import { mark, pillarIcon, PILLARS } from '../logo.js';
@@ -56,16 +58,16 @@ function earningsStrip() {
   </div>
   <p class="micro muted">
     On a ₹1,000 job. A 25%-commission app keeps ₹250 of it. SAAHAA keeps none of your
-    quote — our fee is added on top and paid by the customer.
+    quote — our ${Math.round(SERVICE_MARKUP * 100)}% is added on top and paid by the customer.
   </p>`;
 }
 
 const WHO = [
-  { ico: '🔧', t: 'You do a trade',      s: 'Plumbing, electrical, AC, carpentry, painting, pest control' },
-  { ico: '🧹', t: 'You clean or cook',   s: 'Home cleaning, maid work, cooking, laundry, ironing' },
-  { ico: '🏪', t: 'You run a shop',      s: 'Kirana, vegetables, meat, dairy, chemist, water cans, stationery' },
-  { ico: '💇', t: 'You have a skill',    s: 'Salon, beauty, massage, tuition, music, pet grooming' },
-  { ico: '🚚', t: 'You have a vehicle',  s: 'Shifting, tempo, deliveries, parcels' },
+  { ico: 'repair', t: 'You do a trade',      s: 'Plumbing, electrical, AC, carpentry, painting, pest control' },
+  { ico: 'cleaning', t: 'You clean or cook',   s: 'Home cleaning, maid work, cooking, laundry, ironing' },
+  { ico: 'kirana', t: 'You run a shop',      s: 'Kirana, vegetables, meat, dairy, chemist, water cans, stationery' },
+  { ico: 'salon', t: 'You have a skill',    s: 'Salon, beauty, massage, tuition, music, pet grooming' },
+  { ico: 'moving', t: 'You have a vehicle',  s: 'Shifting, tempo, deliveries, parcels' },
 ];
 
 const HOW = [
@@ -76,10 +78,10 @@ const HOW = [
 ];
 
 const WHY = [
-  { t: '🔒 Money locked before you start', s: `The customer's payment is held the moment they book. You never do a job hoping to be paid.` },
-  { t: '📱 A code at the door', s: 'The customer reads you a 4-digit code when you arrive. It proves you were there, so nobody can claim you never came.' },
-  { t: '⚖️ Fair when there is a dispute', s: 'Your arrival code and your finished-work photo settle most complaints in your favour, automatically.' },
-  { t: '📈 Your price, your call', s: 'Set your own rate. When several pros are free, you bid — and bidding fairly wins more often than bidding cheapest.' },
+  { ic: 'lock', t: 'Money locked before you start', s: `The customer's payment is held the moment they book. You never do a job hoping to be paid.` },
+  { ic: 'phone', t: 'A code at the door', s: 'The customer reads you a 4-digit code when you arrive. It proves you were there, so nobody can claim you never came.' },
+  { ic: 'scale', t: 'Fair when there is a dispute', s: 'Your arrival code and your finished-work photo settle most complaints in your favour, automatically.' },
+  { ic: 'trend', t: 'Your price, your call', s: 'Set your own rate. When several pros are free, you bid — and bidding fairly wins more often than bidding cheapest.' },
 ];
 
 /* ── the invitation (guest and customer) ───────────────────── */
@@ -118,7 +120,7 @@ function invite() {
           <div class="tile--wide card glass rise${i ? ` rise-${Math.min(5, i + 1)}` : ''}" style="padding:13px">
             <div class="row">
               <span class="chip__ic med" style="width:42px;height:42px;border-radius:50%;background:var(--accent-soft);
-                display:grid;place-items:center;font-size:20px;flex:0 0 auto">${w.ico}</span>
+                display:grid;place-items:center;flex:0 0 auto">${icon(w.ico, { size: 22 })}</span>
               <div class="grow"><b style="font-size:15px">${esc(w.t)}</b>
                 <p class="micro muted" style="margin-top:2px">${esc(w.s)}</p></div>
             </div>
@@ -145,7 +147,7 @@ function invite() {
       <div class="hd"><div><span class="eyebrow">The reason</span><h2 class="h-sec">Why pros stay</h2></div></div>
       <div class="grid2 earnwhy">
         ${WHY.map(w => `<div class="card glass">
-          <h4 style="font-size:14px">${esc(w.t)}</h4>
+          <h4 style="font-size:14px"><span style="display:inline-flex;align-items:center;gap:8px">${icon(w.ic, { size: 16 })} ${esc(w.t)}</span></h4>
           <p class="micro muted">${esc(w.s)}</p></div>`).join('')}
       </div>
     </div>

@@ -13,6 +13,7 @@
    things, chipped as four separate states. */
 
 import { esc, ratingStars, timeAgo, clockTime } from '../dom.js';
+import { icon, hasIcon } from '../icons.js';
 import { getState, me, myArea, myOrders } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
 import * as M from '../../core/money.js';
@@ -44,7 +45,7 @@ function card(title, eyebrow, body, opts = {}) {
 
 const smartEmpty = (line, cta) =>
   `<div class="empty empty--smart" style="padding:18px 6px">
-     <p class="meta">${esc(line)}</p>${cta || ''}</div>`;
+     <p class="sentence">${esc(line)}</p>${cta || ''}</div>`;
 
 /* ── money: four separate states, never one blur ───────────── */
 function walletCard(key) {
@@ -200,7 +201,7 @@ export function render() {
           ? reviews.slice(0, 3).map(r => `<div style="margin-top:10px">
               <div class="between"><b class="tiny">${esc(r.partnerName || '')}</b>
                 <span class="micro muted">${timeAgo(r.ts)}</span></div>
-              <p class="meta">${ratingStars(r.stars)} ${r.stars}.0${r.text ? ` · ${esc(r.text)}` : ''}</p>
+              <p class="tiny muted">${ratingStars(r.stars)} ${r.stars}.0${r.text ? ` · ${esc(r.text)}` : ''}</p>
             </div>`).join('')
           : smartEmpty('You have not rated anyone yet. Your rating is what decides who gets recommended next.'),
         { right: reviews.length ? `<span class="pill pill--soft">${reviews.length}</span>` : '' })}
@@ -209,10 +210,10 @@ export function render() {
         <p class="eyebrow">Settings</p>
         <b class="cmd__title">This app</b>
         <div class="acct-set" style="margin-top:12px">
-          ${[['theme.toggle', '◐', 'Light / dark'],
-             ['splash.replay', '✨', 'Replay the welcome screen'],
-             ['selftest.run', '🧪', 'Run self-test'],
-             ['nav.admin', '🛡', 'Admin console']]
+          ${[['theme.toggle', icon('theme', { size: 16 }), 'Light / dark'],
+             ['splash.replay', icon('star', { size: 16 }), 'Replay the welcome screen'],
+             ['selftest.run', icon('flask', { size: 16 }), 'Run self-test'],
+             ['nav.admin', icon('shield', { size: 16 }), 'Admin console']]
             .map(([a, ic, l]) => `<button class="chip chip--smart" data-act="${a}">
               <span class="chip__ic" aria-hidden="true">${ic}</span>${esc(l)}</button>`).join('')}
         </div>

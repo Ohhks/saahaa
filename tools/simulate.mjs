@@ -57,7 +57,7 @@ const OUTCOME = {                    // what actually happens to an order
   cancelledLate:  0.020,             // cancelled within 2h of the slot
   noShow:         0.020,             // pro never arrived — full refund + credit
 };
-const TIER4_SHARE = 0.12;            // certified pros pay 6%, not 10%
+const TIER4_SHARE = 0.12;            // certified pros pay 6%, not 8%
 const FIRST30_SHARE = 0.06;          // a shop's first 30 orders are fee-free
 const BID_ELIGIBLE_SHARE = 0.35;     // share of service jobs that go to auction
 

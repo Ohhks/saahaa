@@ -4,6 +4,8 @@
    lets a kirana owner who also does delivery hold both roles on one number. */
 
 import { esc, toast } from '../dom.js';
+import { SERVICE_MARKUP } from '../../domain/pricing.js';
+import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, dispatch, saveSession } from '../../core/ctx.js';
 import { sha256 } from '../../core/crypto.js';
 import { nid } from '../../core/id.js';
@@ -70,8 +72,8 @@ function loginForm() {
 function signupForm() {
   return `
   <div class="chiprow" style="margin-bottom:var(--sp-6)">
-    ${[['customer','🙋 I need services'],['partner','🔧 I do a trade'],['shop','🏪 I run a shop']]
-      .map(([r, l]) => `<button class="chip ${role === r ? 'on' : ''}" data-act="auth.role" data-role="${r}">${l}</button>`).join('')}
+    ${[['customer', `${icon('person', { size: 15 })} I need services`], ['partner', `${icon('repair', { size: 15 })} I do a trade`], ['shop', `${icon('kirana', { size: 15 })} I run a shop`]]
+      .map(([r, l]) => `<button class="chip ${role === r ? 'on' : ''}" data-act="auth.role" data-role="${r}" style="gap:7px">${l}</button>`).join('')}
   </div>
 
   <div class="field"><input id="suName" placeholder=" " autocomplete="name"><label>${role === 'shop' ? 'Shop name' : 'Full name'}</label></div>
@@ -89,7 +91,7 @@ function signupForm() {
     </div>
     <div class="field"><input id="suAsk" inputmode="numeric" placeholder=" "><label>Your typical price (₹)</label></div>
     <p class="tiny muted" style="margin:-4px 0 16px">
-      You keep <b>100%</b> of this. SAAHAA's fee is added on top of it, paid by the customer.</p>` : ''}
+      You keep <b>100%</b> of this. SAAHAA's ${Math.round(SERVICE_MARKUP * 100)}% is added on top of it, paid by the customer.</p>` : ''}
 
   ${role === 'shop' ? `
     <div class="field">

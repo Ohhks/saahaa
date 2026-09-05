@@ -12,6 +12,7 @@
    that only exists when there is something in it. */
 
 import { esc, sheet, closeSheet, toast, ratingStars } from '../dom.js';
+import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, me, myArea, isGuest } from '../../core/ctx.js';
 import { live, get } from '../../core/registry.js';
 import * as flow from '../../domain/flow.js';
@@ -138,7 +139,7 @@ export function renderShop(shopId) {
   const aisles = [...new Set(items.map(p => p.aisle))];
 
   return `
-  ${header(s.name, `${cat.ico} ${cat.name} · ${s.km} km · ~${s.eta} min`)}
+  ${header(s.name, `${cat.name} · ${s.km} km · ~${s.eta} min`)}
   <main class="wrap">
     <div class="cmd glass rise" style="margin-top:var(--sp-6)">
       <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
@@ -158,14 +159,14 @@ export function renderShop(shopId) {
     </div>
 
     <div class="search" style="margin:var(--sp-6) 0">
-      <span aria-hidden="true">🔎</span>
+      <span aria-hidden="true">${icon('search', { size: 16 })}</span>
       <input id="shopq" type="search" placeholder="Search in ${esc(s.name)}" value="${esc(shopFilter)}"
              data-role="shopsearch" aria-label="Search this shop">
     </div>
 
     ${cat.variableWeight ? `<p class="tiny" style="background:var(--warn-soft);color:var(--warn);
       padding:10px 12px;border-radius:var(--r-md);margin-bottom:var(--sp-6)">
-      ⚖️ Items sold by weight show an estimate. Your final bill uses the actual weighed weight.</p>` : ''}
+      ${icon('scale', { size: 13 })} Items sold by weight show an estimate. Your final bill uses the actual weighed weight.</p>` : ''}
 
     ${aisles.length ? aisles.map((a, i) => `
       <div class="sec rise rise-${Math.min(5, i + 2)}">
@@ -191,7 +192,7 @@ function productCard(p) {
         <b style="font-size:14px;display:block">${esc(p.name)}</b>
         <p class="micro muted" style="margin-top:3px">
           ${esc(p.unit)}${p.variableWeight ? ' · weighed at packing' : ''}
-          ${p.coldChain ? ' · ❄️ cold chain' : ''}${p.rxRequired ? ' · 📋 prescription needed' : ''}
+          ${p.coldChain ? ` · ${icon('cold', { size: 12 })} cold chain` : ''}${p.rxRequired ? ` · ${icon('rx', { size: 12 })} prescription needed` : ''}
           ${p.perishable && p.mfgDate ? ' · packed today' : ''}
         </p>
       </div>

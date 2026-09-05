@@ -17,6 +17,7 @@
    never leaves the screen. */
 
 import { esc, ratingStars, timeAgo, sheet, toast } from '../dom.js';
+import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, me } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
 import * as M from '../../core/money.js';
@@ -137,7 +138,7 @@ export function render(id) {
       background:linear-gradient(transparent,var(--bg) 40%);display:flex;gap:8px">
       ${mine ? `<button class="btn btn--primary btn--lg grow" data-act="pro.share" data-id="${p.id}">Share my page</button>`
              : `<button class="btn btn--primary btn--lg grow" data-act="cat.open" data-id="${p.cat}">Book ${esc(p.name.split(' ')[0])} · ${esc(cat.name)}</button>
-                <button class="btn btn--secondary" data-act="pro.share" data-id="${p.id}" aria-label="Share">↗</button>`}
+                <button class="btn btn--secondary" data-act="pro.share" data-id="${p.id}" aria-label="Share">${icon('share', { size: 18 })}</button>`}
     </div>
   </main>`;
 }

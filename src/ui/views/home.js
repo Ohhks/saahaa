@@ -23,6 +23,9 @@ import * as flags from '../../core/flags.js';
 import { trackerFor, trackerIndex, stage, isTerminal } from '../../domain/orders.js';
 import * as ask from './ask.js';
 
+/* the four sections of the neighbourhood, drawn like everything else */
+const GROUP_ICON = { home: 'groupHome', care: 'groupCare', life: 'groupLife', shops: 'groupShops' };
+
 let search = '';
 /* Recent searches live in module memory only — no store, no persistence, no
    invented "history" feature. Keystrokes collapse: p / pl / plu / plum fold
@@ -241,7 +244,7 @@ export function render() {
           ${liveCount ? `<span class="fab__count" style="position:absolute;top:-5px;right:-6px">${liveCount}</span>` : ''}
         </span>
       </button>
-      <button class="btn btn--ghost tap" data-act="theme.toggle" aria-label="Switch theme">◐</button>
+      <button class="btn btn--ghost tap" data-act="theme.toggle" aria-label="Switch theme">${icon('theme', { size: 20 })}</button>
       ${s ? `<button class="btn btn--ghost tap" data-act="nav.account" aria-label="Account">
               <span class="avatar avatar--sm">${esc(s.name[0])}</span></button>`
            : `<button class="btn btn--secondary btn--sm" data-act="auth.open">Sign in</button>`}
@@ -257,11 +260,11 @@ export function render() {
                aria-label="Search services, shops, products and your orders">
         ${q ? '<button class="btn btn--ghost btn--sm tap" data-act="search.clear" aria-label="Clear search">✕</button>' : ''}
       </div>
-      <p class="meta" style="margin:8px 4px 0">
+      <p class="tiny" style="opacity:.82;max-width:44ch" style="margin:8px 4px 0">
         One search finds people who come to you, shops that deliver to you, and your own orders.</p>
       ${!q ? `<div class="chiprow" style="margin-top:12px;flex-wrap:wrap">
         ${recentChips.length
-          ? recentChips.map(x => smartChip(x.t, x.c.id, '↻')).join('')
+          ? recentChips.map(x => smartChip(x.t, x.c.id, icon('refresh', { size: 14 }))).join('')
           : suggest.map(c => smartChip(c.name, c.id, c.ico)).join('')}
       </div>` : ''}
     </div>
@@ -281,13 +284,13 @@ export function render() {
           <div class="sec">
             <div class="chiprow" style="flex-wrap:wrap">
               ${s ? `<button class="chip chip--smart" data-act="nav.orders">
-                       <span class="chip__ic" aria-hidden="true">↻</span>Book again</button>` : ''}
+                       <span class="chip__ic" aria-hidden="true">${icon('refresh', { size: 14 })}</span>Book again</button>` : ''}
               <button class="chip chip--smart" data-act="quick.emergency">
-                <span class="chip__ic" aria-hidden="true">🚨</span>Emergency</button>
+                <span class="chip__ic" aria-hidden="true">${icon('siren', { size: 14 })}</span>Emergency</button>
               <button class="chip chip--smart" data-act="quick.nearby">
-                <span class="chip__ic" aria-hidden="true">📍</span>Open now</button>
+                <span class="chip__ic" aria-hidden="true">${icon('pin', { size: 14 })}</span>Open now</button>
               ${cartCount ? `<button class="chip chip--smart on" data-act="nav.cart">
-                <span class="chip__ic" aria-hidden="true">🧺</span>Cart · ${cartCount}</button>` : ''}
+                <span class="chip__ic" aria-hidden="true">${icon('basket', { size: 14 })}</span>Cart · ${cartCount}</button>` : ''}
             </div>
           </div>
 
@@ -303,9 +306,9 @@ export function render() {
             <p class="eyebrow">Why this circle holds</p>
             ${pillarRow({ compact: true })}
             <div class="trustbar on-plum" style="margin-top:14px">
-              <span>🛡 Every pro ID-checked</span>
-              <span>🔒 Price locked before booking</span>
-              <span>💰 Pros keep 100%</span>
+              <span>${icon('shield', { size: 14 })} Every pro ID-checked</span>
+              <span>${icon('lock', { size: 14 })} Price locked before booking</span>
+              <span>${icon('coin', { size: 14 })} Pros keep 100%</span>
             </div>
           </div>
         </aside>
@@ -318,14 +321,14 @@ export function render() {
         const list = services().filter(c => c.group === g.id);
         if (!list.length) return '';
         return `<div class="sec rise rise-${Math.min(5, gi + 2)}">
-          <div class="hd"><h2 class="h-sec">${g.ico} ${esc(g.label)}</h2>
+          <div class="hd"><h2 class="h-sec" style="display:flex;align-items:center;gap:8px">${icon(GROUP_ICON[g.id] || 'groupHome', { size: 20 })} ${esc(g.label)}</h2>
             <span class="meta">${list.length} live</span></div>
           <div class="grid3">${list.map(c => tileHtml(c)).join('')}</div></div>`;
       }).join('')}
 
       ${flags.isOn('RETAIL') ? `
       <div class="sec rise rise-5" id="shopsSec">
-        <div class="hd"><h2 class="h-sec">${shopsGroup ? shopsGroup.ico : '🛒'} ${
+        <div class="hd"><h2 class="h-sec" style="display:flex;align-items:center;gap:8px">${icon('groupShops', { size: 20 })} ${
           esc(shopsGroup ? shopsGroup.label : 'Shops Near You')}</h2>
           <button class="more" data-act="nav.shops">Browse all</button></div>
         <p class="meta" style="margin:-8px 0 12px">

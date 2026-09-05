@@ -15,7 +15,7 @@ export const TIERS = [
   { n:3, id:'background', label:'Background Checked',badge:'Background Checked', tone:'ok',
     capPaise:5000000, unlocks:'Unlocks in-home work: maid, cook, childcare, elder care, tuition.' },
   { n:4, id:'certified',  label:'SAAHAA Certified',  badge:'SAAHAA Certified',   tone:'gold',
-    capPaise:Infinity,unlocks:'Top of search, instant payouts, platform fee 10% → 6%.' },
+    capPaise:Infinity,unlocks:'Top of search, instant payouts, platform fee 8% → 6%.' },
 ];
 export const tier = n => TIERS[Math.max(0, Math.min(4, n | 0))];
 export const tierMeets = (partnerTier, required) => (partnerTier | 0) >= (required | 0);
@@ -111,7 +111,7 @@ export function escrowTier(order, partner) {
 
 /* effective platform markup — Tier-4 loyalty rebate is the ONLY discount */
 export function markupFor(partner) {
-  return (partner && (partner.tier | 0) >= 4) ? 0.06 : 0.10;
+  return (partner && (partner.tier | 0) >= 4) ? 0.06 : 0.08;
 }
 
 /* rating tag chips (two-sided) */

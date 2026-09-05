@@ -10,6 +10,7 @@
    The stage labels are the machine's own. They are never renamed here. */
 
 import { esc, sheet, closeSheet, toast, clockTime, timeAgo } from '../dom.js';
+import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, me, myOrders } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
 import { trackerFor, trackerIndex, stage, canTransition, isTerminal } from '../../domain/orders.js';
@@ -42,7 +43,7 @@ export function renderList() {
       <div class="between">
         <div class="grow">
           <div class="row" style="gap:8px;align-items:center">
-            <span style="font-size:18px" aria-hidden="true">${cat.ico || '📦'}</span>
+            <span aria-hidden="true" style="display:inline-flex">${hasIcon(cat.id) ? icon(cat.id, { size: 18 }) : icon('box', { size: 18 })}</span>
             ${running ? '<span class="pill pill--live">Live</span>' : ''}
             <span class="pill ${TONE_PILL[st.tone] || 'pill--soft'}">${esc(st.short)}</span>
           </div>
@@ -253,8 +254,8 @@ function actionPanel(o, r) {
       </div>${B('otp.submit', 'Verify & start work')}`);
     if (s === 'IN_PROGRESS') return panel('Photo evidence is required before payout', `
       <div class="row" style="gap:8px;margin-bottom:12px">
-        <button class="btn btn--secondary grow" data-act="ev.add" data-id="${o.id}" data-label="Before">📷 Before</button>
-        <button class="btn btn--secondary grow" data-act="ev.add" data-id="${o.id}" data-label="After">📷 After</button>
+        <button class="btn btn--secondary grow" data-act="ev.add" data-id="${o.id}" data-label="Before">${icon('camera', { size: 16 })} Before</button>
+        <button class="btn btn--secondary grow" data-act="ev.add" data-id="${o.id}" data-label="After">${icon('camera', { size: 16 })} After</button>
       </div>
       <p class="tiny muted" style="margin-bottom:12px">${(o.evidence || []).length} photo(s) attached</p>
       ${(o.evidence || []).length

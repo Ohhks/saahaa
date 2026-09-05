@@ -1373,3 +1373,11 @@ a{color:var(--brand-text);text-underline-offset:3px}
   .cmd:not(:has(> .cmd__action)) > *{flex:0 0 auto;width:100%}
   .cmd .capsules{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
 }
+
+/* ---------- TEXT ROLES ----------
+   Uppercase letter-spaced type is for labels and metadata, never for a
+   sentence: a full sentence set that way shouts and loses its word-shapes.
+   And a huge price's tight tracking must not leak into the small line under
+   it ("₹34lessthanheld"). */
+.bestmatch__price > p,.bestmatch__price .tiny{letter-spacing:var(--ls-tight);font-size:var(--fs-cap);line-height:var(--lh-cap)}
+.empty--smart .sentence{font-size:var(--fs-sm);line-height:var(--lh-sm);color:var(--ink-3);text-transform:none;letter-spacing:var(--ls-tight);font-weight:var(--fw-med);text-align:center;max-width:36ch}

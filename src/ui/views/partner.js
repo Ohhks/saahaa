@@ -19,6 +19,7 @@
    screen ran. */
 
 import { esc, sheet, closeSheet, toast, ratingStars, timeAgo } from '../dom.js';
+import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, dispatch, me, myPartner, myShop, myOrders } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
 import { stage } from '../../domain/orders.js';
@@ -184,7 +185,7 @@ export function renderPartner() {
 
   const gate = blocker(p);
   return `
-  ${header(p.name, `${cat.ico} ${cat.name} · ${p.area}`)}
+  ${header(p.name, `${cat.name} · ${p.area}`)}
   ${cockpitCSS}
   <main class="wrap workspace">
     <div class="cockpit" style="padding-top:var(--sp-6)">
@@ -319,7 +320,7 @@ export function renderShopAdmin() {
     :                           shopSetup(s);
 
   return `
-  ${header(s.name, `${cat.ico} ${cat.name} · ${esc(s.area)}`)}
+  ${header(s.name, `${cat.name} · ${s.area}`)}
   ${cockpitCSS}
   <main class="wrap workspace">
 
@@ -387,7 +388,7 @@ function shopOrders(orders) {
 /* ── CATALOG MANAGER — inline-editable rows + the starter picker ── */
 function catalogSearch(items) {
   return `<div class="search" style="margin-bottom:var(--sp-6)">
-    <span aria-hidden="true">🔎</span>
+    <span aria-hidden="true">${icon('search', { size: 16 })}</span>
     <input id="catq" type="search" placeholder="Search your ${items.length} items"
            value="${esc(catalogQuery)}" data-role="catalogsearch">
   </div>`;
@@ -403,11 +404,11 @@ const shownItems = items => {
 function pickerCall(items) {
   return `
   <button class="cmd glass--gold sheen" style="width:100%;text-align:left" data-act="cat.picker">
-    <span class="cmd__title">＋ Add items from our ready list</span>
+    <span class="cmd__title" style="display:flex;align-items:center;gap:8px">${icon('plus', { size: 18 })} Add items from our ready list</span>
     <span class="cmd__sub">Tap an item, change the price, set stock. About six seconds each.</span>
     <span class="cmd__action">Open the ready list</span>
   </button>
-  <button class="fab" data-act="cat.picker" aria-label="Add items from our ready list">＋
+  <button class="fab" data-act="cat.picker" aria-label="Add items from our ready list">${icon('plus', { size: 22 })}
     <span class="fab__count">${items.length}</span></button>`;
 }
 
@@ -479,7 +480,7 @@ function catalogRow(p) {
           ${p.variableWeight ? ' · by weight' : ''}${p.rxRequired ? ' · Rx' : ''}</p>
       </div>
       <button class="btn btn--ghost btn--sm tap" data-act="prod.remove" data-id="${p.id}"
-        aria-label="Remove">🗑</button>
+        aria-label="Remove">${icon('trash', { size: 16 })}</button>
     </div>
     <div class="row" style="margin-top:10px;gap:8px">
       <label class="tiny muted" style="width:38px">Price</label>
@@ -501,7 +502,7 @@ export function openPicker() {
   const list = searchStarter(s.catId, pickerQuery).filter(sc => !owned.has(sc.refId));
   sheet('Add items', `
     <div class="search" style="margin-bottom:var(--sp-6)">
-      <span aria-hidden="true">🔎</span>
+      <span aria-hidden="true">${icon('search', { size: 16 })}</span>
       <input id="pickq" type="search" placeholder="Search e.g. atta, tomato, milk"
              value="${esc(pickerQuery)}" data-role="pickersearch" autocomplete="off">
     </div>
@@ -538,9 +539,9 @@ function shopStock(s, items) {
       <b class="h-display" style="display:block">Fill rate ${s.fillRate}%</b>
       <p class="micro muted" style="margin-top:4px">Stay above 85% to keep the “Reliable stock” badge and your ranking.</p>
     </div>
-    ${block('❌ Out of stock (hidden from buyers)', out, out.length ? 'bad' : 'soft')}
-    ${block('⚠️ Running low', low, low.length ? 'warn' : 'soft')}
-    ${block('🗓 Ageing perishables', exp, exp.length ? 'warn' : 'soft')}`;
+    ${block(`${icon('cross', { size: 14 })} Out of stock (hidden from buyers)`, out, out.length ? 'bad' : 'soft')}
+    ${block(`${icon('warn', { size: 14 })} Running low`, low, low.length ? 'warn' : 'soft')}
+    ${block(`${icon('calendar', { size: 14 })} Ageing perishables`, exp, exp.length ? 'warn' : 'soft')}`;
 }
 
 function shopMoney(s, orders) {

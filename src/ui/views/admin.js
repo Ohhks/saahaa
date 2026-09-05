@@ -16,6 +16,7 @@
    the owner sees, not a footnote. */
 
 import { esc, toast, timeAgo, clockTime } from '../dom.js';
+import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, dispatch, me } from '../../core/ctx.js';
 import { get, live, all as allOf, namespaces, count } from '../../core/registry.js';
 import * as adminauth from '../../core/adminauth.js';
@@ -88,11 +89,11 @@ const note = (auto, manual) => `<div class="glass rise" style="margin-bottom:var
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:var(--sp-6)">
     <div>
       <div class="eyebrow">System computes</div>
-      <p class="meta">${esc(auto)}</p>
+      <p class="tiny muted">${esc(auto)}</p>
     </div>
     <div>
       <div class="eyebrow">You do by hand</div>
-      <p class="meta">${esc(manual)}</p>
+      <p class="tiny muted">${esc(manual)}</p>
     </div>
   </div></div>`;
 
@@ -117,7 +118,7 @@ export function renderLogin() {
 
       ${g.blocked ? `<div class="glass glass--deep" style="border-color:var(--danger);margin-bottom:16px">
         <b style="color:var(--danger)">${g.reason === 'locked' ? 'Locked' : 'Too many attempts'}</b>
-        <p class="meta" style="margin-top:6px">Try again in ${Math.ceil(g.waitMs / 1000)}s.</p></div>` : ''}
+        <p class="tiny muted" style="margin-top:6px">Try again in ${Math.ceil(g.waitMs / 1000)}s.</p></div>` : ''}
 
       <div class="field"><input id="adUser" placeholder=" " value="admin" autocomplete="username"><label>Username</label></div>
       <div class="field"><input id="adPass" type="password" placeholder=" " autocomplete="current-password"><label>Password</label></div>
@@ -184,9 +185,9 @@ export function render() {
   </header>
   <main class="wrap">
     ${st.admin.isDemo ? `<div class="glass glass--gold rise" style="margin-top:var(--sp-6)">
-      <div class="eyebrow" style="color:var(--warn)">⚠ Prototype mode</div>
+      <div class="eyebrow" style="color:var(--warn);display:flex;align-items:center;gap:6px">${icon('warn', { size: 13 })} Prototype mode</div>
       <b class="tiny" style="color:var(--warn)">Simulated escrow, no real funds.</b>
-      <p class="meta" style="margin-top:6px;color:var(--warn)">
+      <p class="tiny muted" style="margin-top:6px;color:var(--warn)">
         You are on the shipped demo password. Change it in System &amp; audit before anyone else uses this.</p>
     </div>` : ''}
 
@@ -314,7 +315,7 @@ function moneyFlow(st) {
         <span class="state--pending">Pending payout · ${M.fmt(pendingOut)}</span>
         <span class="state--available">Available · ${M.fmt(availableOut)}</span>
       </div>
-      <p class="meta" style="margin-top:var(--sp-5)">
+      <p class="tiny muted" style="margin-top:var(--sp-5)">
         Held is escrow this second. Released is what has already left escrow to a pro or a shop.
         Pending is settled but not yet paid out by hand. Available is settled and paid out.
         Four different numbers — never one.</p>
@@ -376,7 +377,7 @@ function approvals(st) {
              `Reference ${esc(bg.refName || '—')} …${esc(bg.refPhone || '')}`,
              'Consent given',
            ])}
-           <p class="meta" style="margin-top:8px">Call the reference. Approve only after the call.</p>`
+           <p class="tiny muted" style="margin-top:8px">Call the reference. Approve only after the call.</p>`
         : `<div class="eyebrow" style="margin-top:12px">Qualifies for Certified</div>
            ${facts([
              `${e.completed} jobs`,
@@ -424,7 +425,7 @@ function escrow(st) {
         <b class="num num-xl">${M.fmt(st.agg.escrow)}</b></div>
       <span class="state--held">Held</span>
     </div>
-    <p class="meta" style="margin-top:8px">Customers' money, not revenue. Released only on confirmation or review.</p>
+    <p class="tiny muted" style="margin-top:8px">Customers' money, not revenue. Released only on confirmation or review.</p>
   </div>
 
   <div class="sec">${secHead(`Awaiting release · ${held.length}`)}
@@ -467,7 +468,7 @@ function stuckRetail(st) {
         title: `${esc(o.shopName || 'Shop')} <span class="num">${M.fmt(o.customerPays)}</span>`,
         sub: `${esc(o.customerName)} · ${esc(stage(o.stage).label)} · ${esc(timeAgo(o.stageTs))}`,
         right: stale ? pill('stalled', 'warn') : pill('moving', 'soft'),
-        facts: stale ? `<p class="meta" style="margin-top:8px;color:var(--warn)">Stalled — the shop has not moved this on.</p>` : '',
+        facts: stale ? `<p class="tiny muted" style="margin-top:8px;color:var(--warn)">Stalled — the shop has not moved this on.</p>` : '',
         actions: `<button class="btn btn--secondary btn--sm btn--block"
           data-act="admin.refundretail" data-id="${o.id}">Refund the customer in full</button>`,
       });
@@ -518,7 +519,7 @@ function people(st) {
         <div class="between">
           ${avatar(p.name)}
           <div class="grow"><b class="tiny">${esc(p.name)}</b>
-            <p class="meta">${esc(get('category', p.cat).name)} · ${p.completed} jobs · ${esc(p.area)}</p></div>
+            <p class="tiny muted">${esc(get('category', p.cat).name)} · ${p.completed} jobs · ${esc(p.area)}</p></div>
           <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end">
             ${pill(tier(p.tier).label, tier(p.tier).tone)}
             ${pill(`${t.score} · ${t.band.label}`, t.band.tone)}
@@ -550,14 +551,14 @@ function moderation(st) {
 
   <div class="sec">${secHead(`Off-platform payment attempts · ${flagged.length}`,
       `<span class="pill pill--${flagged.length ? 'bad' : 'ok'}">${flagged.length ? 'leaking' : 'clean'}</span>`)}
-    <p class="meta" style="margin-bottom:12px">
+    <p class="tiny muted" style="margin-bottom:12px">
       The single biggest revenue leak in a local marketplace: a pro asking to be paid in cash outside the app.
       Numbers and UPI handles are masked automatically; repeat offences cost trust points.</p>
     ${flagged.length ? flagged.map(m => `<div class="glass" style="padding:11px 14px;margin-bottom:7px">
       <div class="between">${avatar(m.name)}
         <span class="grow tiny">${esc(m.name)}</span>
         <span class="meta">${esc(clockTime(m.ts))}</span></div>
-      <p class="meta" style="margin-top:6px">${esc(m.text)}</p></div>`).join('')
+      <p class="tiny muted" style="margin-top:6px">${esc(m.text)}</p></div>`).join('')
       : empty('Nothing flagged.')}</div>
 
   <div class="sec">${secHead(`Reviews · ${st.reviews.length}`)}
@@ -582,10 +583,10 @@ function finance(st) {
   <div class="glass ${drift ? '' : 'glass--gold'} rise" style="${drift ? 'border-color:var(--danger)' : ''}">
     <div class="between">
       <div><div class="eyebrow">Reconciliation</div>
-        <b class="h-sec">${drift ? '⚠ DRIFT' : '✓ balanced'}</b></div>
+        <b class="h-sec">${drift ? 'Drift' : '✓ balanced'}</b></div>
       ${pill(drift ? 'do not trust this screen' : 'books agree', drift ? 'bad' : 'ok')}
     </div>
-    <p class="meta" style="margin:8px 0 12px">
+    <p class="tiny muted" style="margin:8px 0 12px">
       Escrow held, ledger replay and the aggregate must agree. If they ever don't, everything else on
       this screen is fiction — that is why this box sits at the top.</p>
     <div class="between" style="margin-bottom:6px"><span class="tiny">Aggregate escrow</span><b class="num tiny">${M.fmt(a.escrow)}</b></div>
@@ -687,7 +688,7 @@ function system(st) {
   <div class="glass glass--deep rise" style="margin-bottom:var(--sp-6)">
     <div class="between">
       <div><div class="eyebrow">Health</div>
-        <b class="h-sec">${h.ok ? '✓ all clear' : h.fatal ? '✗ fatal' : '⚠ degraded'}</b></div>
+        <b class="h-sec">${h.ok ? '✓ all clear' : h.fatal ? '✗ fatal' : 'Degraded'}</b></div>
       ${pill(`${h.checks.filter(c => c.ok).length}/${h.checks.length}`, h.ok ? 'ok' : h.fatal ? 'bad' : 'warn')}
     </div>
     <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:12px">
@@ -709,7 +710,7 @@ function system(st) {
       </div>
       ${testResult.failures.length ? testResult.failures.map(f => `<p class="micro" style="margin-top:8px;color:var(--danger)">
         ${esc(f.suite)} › ${esc(f.case)}<br>${esc(f.message)}</p>`).join('')
-        : '<p class="meta" style="margin-top:6px">Money math, state transitions, migration idempotence and referential integrity all hold.</p>'}
+        : '<p class="tiny muted" style="margin-top:6px">Money math, state transitions, migration idempotence and referential integrity all hold.</p>'}
       <div style="margin-top:12px">${testResult.suites.map(s => `<div class="between" style="margin-bottom:4px">
         <span class="micro">${esc(s.name)}</span>
         <span class="micro ${s.failed ? '' : 'muted'}" style="${s.failed ? 'color:var(--danger)' : ''}">${s.passed}/${s.passed + s.failed}</span>
@@ -718,11 +719,11 @@ function system(st) {
   </div>
 
   <div class="sec">${secHead('Feature flags')}
-    <p class="meta" style="margin-bottom:12px">
+    <p class="tiny muted" style="margin-bottom:12px">
       Every new feature ships default-off for one release. These are the kill-switch and the canary.</p>
     ${flags.all().map(f => `<div class="glass" style="padding:11px 14px;margin-bottom:7px">
       <div class="between"><div class="grow"><b class="tiny">${esc(f.name)}</b>
-        <p class="meta">default ${String(f.default)} · source ${esc(f.source)}</p></div>
+        <p class="tiny muted">default ${String(f.default)} · source ${esc(f.source)}</p></div>
         <button class="btn ${f.value ? 'btn--primary' : 'btn--ghost'} btn--sm" role="switch"
           aria-checked="${f.value ? 'true' : 'false'}"
           data-act="admin.flag" data-name="${esc(f.name)}">${f.value ? 'ON' : 'OFF'}</button></div></div>`).join('')}
@@ -733,7 +734,7 @@ function system(st) {
       <div class="glass">
         ${namespaces().map(ns => `<div class="between" style="margin-bottom:5px">
           <span class="tiny">${esc(ns)}</span><b class="num tiny">${count(ns)}</b></div>`).join('')}
-        <p class="meta" style="margin-top:10px">
+        <p class="tiny muted" style="margin-top:10px">
           Every one of these is an extension point. Adding a category, an order stage, a reducer or a
           migration means registering one more entry — no existing file changes.</p>
       </div>
@@ -741,7 +742,7 @@ function system(st) {
 
     <div class="sec">${secHead('Backups & migration')}
       <div class="glass">
-        <p class="meta" style="margin-bottom:10px">
+        <p class="tiny muted" style="margin-bottom:10px">
           A snapshot is written before any migration runs. If a migration throws, it rolls back to that snapshot.</p>
         ${backups.length ? backups.map(b => `<div class="between" style="margin-bottom:6px">
           <span class="micro">v${b.version} · ${esc(timeAgo(b.ts))} · ${(b.bytes / 1024).toFixed(0)} KB</span>
@@ -751,7 +752,7 @@ function system(st) {
           <button class="btn btn--secondary btn--sm grow" data-act="admin.snapshot">Take snapshot</button>
           <button class="btn btn--secondary btn--sm grow" data-act="admin.export">Export JSON</button>
         </div>
-        <p class="meta" style="margin-top:10px">
+        <p class="tiny muted" style="margin-top:10px">
           Storage used: ${(persist.usageBytes() / 1024).toFixed(0)} KB ·
           migrations registered: ${migrate.listMigrations().length}</p>
       </div>
@@ -762,7 +763,7 @@ function system(st) {
     <div class="glass">
       <div class="field"><input id="pwNew" type="password" placeholder=" "><label>New password</label></div>
       <button class="btn btn--primary btn--block" data-act="admin.changepw">Change password</button>
-      <p class="meta" style="margin-top:10px">
+      <p class="tiny muted" style="margin-top:10px">
         Stored as PBKDF2-SHA256, 250,000 iterations, with a random salt. Read docs/SECURITY.md for
         what client-side auth can and cannot protect.</p>
     </div>
@@ -777,7 +778,7 @@ function system(st) {
           <div class="timeline__body">
             <div class="between"><b class="micro">${esc(e.action)}</b>
               <span class="timeline__time meta">${esc(clockTime(e.ts))}</span></div>
-            <p class="meta">${esc(e.actor)} · ${esc(JSON.stringify(e.detail).slice(0, 90))}</p>
+            <p class="tiny muted">${esc(e.actor)} · ${esc(JSON.stringify(e.detail).slice(0, 90))}</p>
           </div></li>`).join('')}
       </ol>` : empty('Empty.')}
     </div>

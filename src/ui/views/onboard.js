@@ -17,6 +17,7 @@
    the only thing that looks tappable. */
 
 import { esc, toast, closeSheet } from '../dom.js';
+import { icon, hasIcon } from '../icons.js';
 import { ctx, getState } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
 import { header } from './shops.js';
@@ -111,7 +112,7 @@ function stepPanel(p, id, cat) {
       <div class="chiprow" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">
         ${Object.entries(V.ID_TYPES).map(([k, t]) => `<button class="chip chip--smart ${idType === k ? 'on' : ''}"
           aria-pressed="${idType === k ? 'true' : 'false'}"
-          data-act="ob.idtype" data-type="${k}"><span class="chip__ic" aria-hidden="true">🪪</span>${esc(t.label)}</button>`).join('')}
+          data-act="ob.idtype" data-type="${k}"><span class="chip__ic" aria-hidden="true">${icon('idcard', { size: 14 })}</span>${esc(t.label)}</button>`).join('')}
       </div>
       <input id="obId" placeholder="${esc(V.ID_TYPES[idType].hint)}" autocomplete="off"
         style="width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--r-pill);background:var(--surface-2);color:var(--ink-1);font-size:16px">
@@ -119,7 +120,7 @@ function stepPanel(p, id, cat) {
       <button class="btn btn--primary btn--block" data-act="ob.submitid">Save ID</button>`);
 
     case 'selfie': return F(`
-      <div style="width:96px;height:96px;border-radius:50%;margin:0 auto 10px;background:var(--accent-soft);display:grid;place-items:center;font-size:40px">📷</div>
+      <div style="width:96px;height:96px;border-radius:50%;margin:0 auto 10px;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent)">${icon('camera', { size: 44 })}</div>
       <p class="tiny muted" style="text-align:center;margin-bottom:10px">Face straight, good light, no cap or glasses. This is what the customer sees at the door.</p>
       <button class="btn btn--primary btn--block" data-act="ob.selfie">Take my photo</button>`);
 
