@@ -296,7 +296,22 @@ function actionPanel(o, r) {
       </div>
       <button class="btn btn--ghost btn--block btn--sm" style="margin-top:10px"
         data-act="rate.skip" data-id="${o.id}">Skip</button>`);
-    if (s === 'R_DELIVERED') return panel('Delivered — confirm', B('retail.settle', 'Confirm delivery'));
+    if (s === 'R_DELIVERED') return panel('Delivered — confirm', `${B('retail.settle', 'Confirm delivery')}
+      <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--danger)"
+        data-act="retail.return" data-id="${o.id}">Something was wrong — return this order</button>`);
+    if (s === 'R_PICKUP_READY') return panel('Ready at the shop — collect it', `
+      <p class="tiny muted" style="margin-bottom:10px">Show this code at the counter.</p>
+      <div style="text-align:center" class="num num-xl">${esc(o.otp)}</div>
+      ${B('retail.collected', 'I have collected it')}`);
+    if (s === 'R_SUB_PENDING') return panel('The shop needs your call', `
+      ${(o.lines || []).filter(l => l.status === 'asking').map(l => `<div class="card glass" style="padding:12px;margin-bottom:8px">
+        <b class="tiny">${esc(l.name)}</b><p class="micro muted">${esc(l.qty)} × ${M.fmt(l.unitPrice)} · not in stock right now</p>
+        <div class="row" style="gap:8px;margin-top:8px">
+          <button class="btn btn--secondary btn--sm grow" data-act="retail.sub" data-id="${o.id}" data-line="${l.lineId}" data-choice="similar">Similar brand is fine</button>
+          <button class="btn btn--ghost btn--sm grow" data-act="retail.sub" data-id="${o.id}" data-line="${l.lineId}" data-choice="refund">Just refund it</button>
+        </div></div>`).join('')}
+      <p class="micro muted">No reply in 90 seconds means that item is refunded automatically.</p>`);
+    if (s === 'R_RETURN') return panel('Return requested', '<p class="tiny muted">The shop or SAAHAA confirms the return; your money comes back in full.</p>');
     if (['MATCHING','ASSIGNED','EN_ROUTE'].includes(s))
       return panel('Need to cancel?', `<button class="btn btn--ghost btn--block" style="color:var(--danger)"
         data-act="cancel.open" data-id="${o.id}">Cancel this booking</button>`);
@@ -308,8 +323,19 @@ function actionPanel(o, r) {
     // that did not exist.
     if (s === 'R_PLACED')   return panel('New order', B('stage.accept', 'Accept order'));
     if (s === 'R_ACCEPTED') return panel('Pack this order', B('stage.picking', 'Start packing'));
-    if (s === 'R_PICKING')  return panel('Weigh and pack', B('stage.packed', 'Weighed & packed'));
-    if (s === 'R_PACKED')   return panel('Hand over', B('stage.out', 'Out for delivery'));
+    if (s === 'R_PICKING')  return panel('Weigh and pack', `
+      ${(o.lines || []).map(l => `<div class="between" style="padding:6px 0;border-bottom:1px solid var(--hairline)">
+        <span class="tiny">${esc(l.name)} <span class="micro muted">× ${esc(l.qty)}</span>
+          ${l.status === 'unavailable' ? '<span class="pill pill--bad">Refunded</span>' : l.status === 'substituted' ? '<span class="pill pill--info">Similar</span>' : ''}</span>
+        ${['unavailable', 'substituted'].includes(l.status) ? '' : `<button class="btn btn--ghost btn--sm" data-act="retail.out"
+          data-id="${o.id}" data-line="${l.lineId}">Not in stock</button>`}</div>`).join('')}
+      <div style="height:10px"></div>${B('stage.packed', 'Weighed & packed')}`);
+    if (s === 'R_SUB_PENDING') return panel('Waiting for the customer', '<p class="tiny muted">They are choosing a substitute or a refund. No reply in 90 seconds means a refund for that item.</p>');
+    if (s === 'R_PACKED')   return o.mode === 'pickup'
+      ? panel('Packed — customer collects', B('retail.ready', 'Ready for pickup'))
+      : panel('Hand over', B('stage.out', 'Out for delivery'));
+    if (s === 'R_PICKUP_READY') return panel('Waiting at the counter', `<p class="tiny muted">Ask for the code <b class="num">${esc(o.otp)}</b> when they collect.</p>`);
+    if (s === 'R_RETURN') return panel('Return requested', `<p class="tiny muted" style="margin-bottom:10px">${esc(o.returnReason || '')}</p>${B('retail.acceptreturn', 'Accept return — refund in full')}`);
     if (s === 'R_OUT')      return panel('Delivery code',
       `<div style="text-align:center" class="num num-xl">${esc(o.otp)}</div>${B('stage.delivered', 'Mark delivered')}`);
   }

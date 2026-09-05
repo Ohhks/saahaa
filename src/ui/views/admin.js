@@ -160,7 +160,7 @@ export function render() {
   const h = checkHealth(st);
   const liveOrders = st.orders.filter(o => !stage(o.stage).terminal).length;
   const queued = V.ownerQueue().length;
-  const openD = st.disputes.filter(d => d.status === 'OPEN').length;
+  const openD = st.disputes.filter(d => d.status === 'OPEN' && !d.resolvedAt).length;
   const healthy = h.checks.filter(c => c.ok).length;
 
   return `
@@ -213,7 +213,7 @@ export function render() {
 function dash(st) {
   const a = st.agg;
   const pending = st.users.filter(u => u.role !== 'customer' && u.tier <= 1).length;
-  const openD = st.disputes.filter(d => d.status === 'OPEN').length;
+  const openD = st.disputes.filter(d => d.status === 'OPEN' && !d.resolvedAt).length;
   const liveOrders = st.orders.filter(o => !stage(o.stage).terminal).length;
   return `
   ${note('every number on this screen, live from the ledger and the order registry',
@@ -477,7 +477,7 @@ function stuckRetail(st) {
 
 /* ── 4. DISPUTES ──────────────────────────────────────────── */
 function disputes(st) {
-  const open = st.disputes.filter(d => d.status === 'OPEN');
+  const open = st.disputes.filter(d => d.status === 'OPEN' && !d.resolvedAt);
   return `
   ${note('intake, SLA clock (red past 24h), auto-resolution rules, evidence bundling, auto-escalation at 72h',
          'read the evidence and pick one of three outcomes, with a written reason')}

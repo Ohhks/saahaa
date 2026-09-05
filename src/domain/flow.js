@@ -189,8 +189,10 @@ export async function confirmAndRelease(orderId, pct = 1) {
      dispute/resolve had ALREADY marked it resolved. Close it here, where the
      money actually moved. */
   const open = getState().disputes.find(d => d.orderId === o.id && !d.resolvedAt);
+  // status must flip too: the admin's Disputes list filters on status === 'OPEN',
+  // so a dispute closed by the money moving was still shown as open
   if (open) dispatch({ type: 'dispute/resolve', payload: { id: open.id,
-    patch: { outcome: pct >= 1 ? 'released' : pct <= 0 ? 'refund' : 'partial', resolvedBy: 'release' } } });
+    patch: { status: 'RESOLVED', outcome: pct >= 1 ? 'released' : pct <= 0 ? 'refund' : 'partial', resolvedBy: 'release' } } });
 
   audit.record(pct >= 1 ? audit.ACTIONS.ESCROW_RELEASE : audit.ACTIONS.ESCROW_PARTIAL,
                { id: o.id, amount: r.workerPayout, refund: r.refund, pct }, me() ? me().key : 'admin');
@@ -296,7 +298,8 @@ export async function placeRetailOrder(mode = 'rider') {
     toast(`${sh0.name} needs a minimum order of ${M.fmt(sh0.minOrder)}`, 'warn'); return null;
   }
   // a shop set to "pickup only" was still receiving rider orders
-  if (sh0 && sh0.deliveryMode === 'pickup' && mode !== 'pickup') { toast('This shop is pickup only', 'warn'); return null; }
+  // the shop's setting is 'pickup_only' — the console writes that key, not 'pickup'
+  if (sh0 && sh0.deliveryMode === 'pickup_only' && mode !== 'pickup') { toast('This shop is pickup only', 'warn'); return null; }
   if (sh0 && sh0.deliveryMode === 'self' && mode === 'rider') mode = 'self';
   const cart = getCart(); const q = cartQuote(mode);
   if (!cart || !q) return null;
@@ -322,29 +325,123 @@ export async function placeRetailOrder(mode = 'rider') {
   return order;
 }
 
+/* ── the retail processes the machine declared but nothing drove ──────
+   R_SUB_PENDING, R_PICKUP_READY, R_RETURN and R_REFUNDED all existed in the
+   state registry with no use-case behind them: a shop could not say "this
+   item is out", a pickup order still went out with a rider, and a customer
+   could never return anything. The cart's promise — "the shop follows your
+   choice; no reply means we refund that item" — is honoured here. */
+
+/** Shop: an item is not available. The line's own policy decides. */
+export function markLineUnavailable(orderId, lineId) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o || o.kind !== 'retail' || o.stage !== 'R_PICKING') return null;
+  const line = (o.lines || []).find(l => l.lineId === lineId);
+  if (!line || line.status === 'unavailable' || line.status === 'substituted') return null;
+  const policy = line.subPolicy || 'call';
+  const lines = o.lines.map(l => l.lineId !== lineId ? l
+    : policy === 'similar' ? { ...l, status: 'substituted', note: 'similar brand' }
+    : policy === 'refund'  ? { ...l, status: 'unavailable', refundPaise: l.qty * l.unitPrice }
+    :                        { ...l, status: 'asking' });
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { lines } } });
+  if (policy === 'call') {
+    advance(orderId, 'R_SUB_PENDING', { subAskedAt: Date.now() });
+    toast('Asked the customer. No reply in 90 seconds means that item is refunded.');
+  } else {
+    toast(policy === 'similar' ? 'Marked: send a similar brand' : `${M.fmt(line.qty * line.unitPrice)} will be refunded for that item`);
+  }
+  audit.record('retail.lineUnavailable', { id: orderId, lineId, policy }, me() ? me().key : 'system');
+  return policy;
+}
+
+/** Customer: answer the shop's substitution question. */
+export function decideSubstitution(orderId, lineId, choice) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o || o.stage !== 'R_SUB_PENDING') return null;
+  const lines = o.lines.map(l => l.lineId !== lineId ? l
+    : choice === 'similar' ? { ...l, status: 'substituted', note: 'similar brand' }
+    :                        { ...l, status: 'unavailable', refundPaise: l.qty * l.unitPrice });
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { lines } } });
+  if (!lines.some(l => l.status === 'asking')) advance(orderId, 'R_PICKING', {});
+  toast(choice === 'similar' ? 'Told the shop: a similar brand is fine' : 'Told the shop: refund that item');
+  return choice;
+}
+
+/** The 90-second promise: an unanswered ask becomes a refund, automatically. */
+export const SUB_REPLY_MS = 90e3;
+export function sweepSubstitutions(now = Date.now()) {
+  let n = 0;
+  getState().orders.filter(o => o.stage === 'R_SUB_PENDING' && o.subAskedAt && now - o.subAskedAt > SUB_REPLY_MS).forEach(o => {
+    const lines = o.lines.map(l => l.status === 'asking' ? { ...l, status: 'unavailable', refundPaise: l.qty * l.unitPrice, note: 'no reply — refunded' } : l);
+    dispatch({ type: 'order/patch', payload: { id: o.id, patch: { lines } } });
+    advance(o.id, 'R_PICKING', {}); n++;
+  });
+  return n;
+}
+
+/** Shop: a pickup order is packed and waiting; customer collects it. */
+export function readyForPickup(orderId) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o || o.mode !== 'pickup') return null;
+  return advance(orderId, 'R_PICKUP_READY', { readyAt: Date.now() });
+}
+export function collected(orderId) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o || o.stage !== 'R_PICKUP_READY') return null;
+  return advance(orderId, 'R_DELIVERED', { deliveredAt: Date.now(), otpVerified: true });
+}
+
+/** Customer: return an order after delivery; shop or admin accepts → refund. */
+export function requestReturn(orderId, reason) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o || o.stage !== 'R_DELIVERED') return null;
+  const moved = advance(orderId, 'R_RETURN', { returnReason: reason || 'not as expected', returnAt: Date.now() });
+  if (moved) { audit.record('retail.return', { id: orderId, reason }, me() ? me().key : 'system'); toast('Return requested. The shop will confirm.'); }
+  return moved;
+}
+export async function acceptReturn(orderId) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o || o.stage !== 'R_RETURN') return null;
+  if (!advance(orderId, 'R_REFUNDED', { refund: o.customerPays, refundedAt: Date.now() })) return null;
+  await ledger('REFUND', o.customerPays, acct.escrow(o.id), acct.customer(o.customerKey), { reason: 'return' });
+  const a = getState().agg;
+  bumpAgg({ refunds: a.refunds + o.customerPays, escrow: Math.max(0, a.escrow - (o.customerPays | 0)) });
+  advance(orderId, 'R_CLOSED', { closedAt: Date.now() });
+  audit.record('retail.refunded', { id: o.id, amount: o.customerPays, reason: 'return' }, me() ? me().key : 'admin');
+  toast(`${M.fmt(o.customerPays)} refunded for the return`);
+  return o;
+}
+
 export async function settleRetail(orderId) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return;
-  if (!advance(orderId, 'R_SETTLED', { settledAt: Date.now() })) return;
+  // items the shop could not supply come back to the customer, out of the
+  // shop's share — the fee, GST and rider are untouched, so the books still
+  // sum to exactly what the customer paid
+  const lineRefund = (o.lines || []).filter(l => l.status === 'unavailable').reduce((n, l) => n + (l.refundPaise || 0), 0);
+  if (!advance(orderId, 'R_SETTLED', { settledAt: Date.now(), lineRefund })) return;
   // The dispatch cut was posted NOWHERE, stranding Rs.5 in escrow on every
   // rider order; and GST sat inside the fee leg, so `revenue` mixed
   // gross-of-GST retail with net-of-GST service in the same total.
   const feeExGst = Math.max(0, o.platformFee - (o.gst | 0));
   const dispatchCut = Math.max(0, (o.deliveryFee | 0) - (o.riderPayout | 0));
-  await ledger('SHOP_PAYOUT', o.shopPayout, acct.escrow(o.id), acct.shop(o.shopId), {});
+  const shopPayout = Math.max(0, o.shopPayout - lineRefund);
+  await ledger('SHOP_PAYOUT', shopPayout, acct.escrow(o.id), acct.shop(o.shopId), {});
+  if (lineRefund) await ledger('REFUND', lineRefund, acct.escrow(o.id), acct.customer(o.customerKey), { reason: 'unavailable items' });
+  if (lineRefund) dispatch({ type: 'order/patch', payload: { id: orderId, patch: { shopPayout, refund: lineRefund } } });
   if (feeExGst)      await ledger('FEE', feeExGst, acct.escrow(o.id), acct.fee(), {});
   if (o.gst)         await ledger('GST', o.gst, acct.escrow(o.id), acct.gst(), {});
   if (o.riderPayout) await ledger('RIDER', o.riderPayout, acct.escrow(o.id), acct.rider(), {});
   if (dispatchCut)   await ledger('DISPATCH', dispatchCut, acct.escrow(o.id), acct.fee(), {});
   const a = getState().agg;
-  bumpAgg({ retailOrders: a.retailOrders + 1, gmv: a.gmv + o.itemsTotal,
-            revenue: a.revenue + feeExGst, gst: a.gst + (o.gst | 0),
+  bumpAgg({ retailOrders: a.retailOrders + 1, gmv: a.gmv + o.itemsTotal - lineRefund,
+            revenue: a.revenue + feeExGst, gst: a.gst + (o.gst | 0), refunds: a.refunds + lineRefund,
             escrow: Math.max(0, a.escrow - (o.customerPays | 0)) });
   // R_SETTLED was the end of the road: nothing advanced to R_CLOSED, so every
   // retail order sat in a non-terminal stage forever and two views had to
   // hard-code R_SETTLED into their "hide it" lists instead of using isTerminal.
   advance(orderId, 'R_CLOSED', { closedAt: Date.now() });
-  toast(`Settled — ${M.fmt(o.shopPayout)} to ${o.shopName}`);
+  toast(`Settled — ${M.fmt(shopPayout)} to ${o.shopName}`);
 }
 
 /* ── the admin's escape hatch for a stuck shop order ──────────

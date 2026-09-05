@@ -6,6 +6,49 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [6.7.0] — 2026-09-06 — "Production candidate"
+
+A professional test pass over every role, every flow, every process — scripted
+against the real UI on a fresh seed — plus the processes that were declared and
+never driven. See `docs/TEST-REPORT.md` for the matrix and `docs/LAUNCH.md`
+for the go-live checklist.
+
+### Added — the retail processes the machine declared but nothing drove
+- **"Not in stock" per line** at packing: the line's own policy decides —
+  *similar* marks a substitute, *refund* refunds the item out of the shop's
+  share at settlement, *ask me* moves the order to R_SUB_PENDING and the
+  customer chooses (similar / refund); **no reply in 90 seconds refunds the
+  item automatically** (`sweepSubstitutions`), as the cart always promised.
+- **Pickup orders** end at the counter: packed → *Ready for pickup* →
+  customer shows the code → *I have collected it* → delivered. They no longer
+  go out with a rider.
+- **Returns**: at delivered, *Something was wrong — return this order* →
+  R_RETURN → the shop (or SAAHAA) accepts → refunded in full → closed, with
+  the REFUND leg on the ledger.
+- Settlement refunds unavailable items to the customer out of the shop's
+  payout; fee, GST and rider are untouched, so escrow for every order still
+  empties to the paisa.
+
+### Fixed — found by the test pass
+- Changing your area updated the screen but was never saved; it reverted on
+  reload.
+- A dispute closed by money moving kept `status: OPEN` and lingered in the
+  admin's Disputes list.
+- "Pickup only" shops did not refuse rider orders: the console writes
+  `pickup_only`, the check read `pickup`.
+
+### Verified (fresh seed, real controls, zero console errors)
+Guest, customer, partner, shop owner and admin matrices — sign-up validation,
+wrong-OTP / duplicate-ID / three-strike quiz lock / conduct retry, booking at
+the 8% price, cancel with refund, dispute, ask-rates award and lost-bid
+coaching, provisional cap, HOLD tier for a new pro, pro page edit, background
+request → tier 3, certified → tier 4, suspend, partial resolution, mark paid,
+ledger replay ₹0, kill switch, snapshot, password change, in-app suite 102/102,
+v6 → v7 migration, guest deep links, light theme ground, auto-release sweep,
+icon-only buttons labelled, no horizontal overflow.
+
+---
+
 ## [6.6.0] — 2026-09-06 — "Eight on top"
 
 ### Changed — the company earns above the fair price, never out of the work

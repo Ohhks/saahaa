@@ -2,7 +2,7 @@
    about every other module, and it does nothing but wire them together. */
 
 import { VERSION, SCHEMA_VERSION, BUILD_ID } from './core/version.js';
-import { ctx, getState, dispatch, me, restoreSession, myArea } from './core/ctx.js';
+import { ctx, getState, dispatch, me, restoreSession, myArea, saveSession } from './core/ctx.js';
 import { createStore, combineFromRegistry } from './core/store.js';
 import * as persist from './core/persist.js';
 import * as registry from './core/registry.js';
@@ -233,7 +233,9 @@ function wireActions() {
     `<button class="tile" data-act="area.set" data-area="${esc(a)}"><span class="lbl">${esc(a)}</span></button>`).join('')}</div>`));
   A('area.set', d => {
     // persist.read JSON.parses; a raw setItem here made every guest Madhapur
-    if (ctx.session) ctx.session = { ...ctx.session, area: d.area };
+    // a signed-in user's area was updated in memory only, so it reverted on
+    // the next reload; saveSession is what makes a choice survive
+    if (ctx.session) saveSession({ ...ctx.session, area: d.area });
     else { ctx.session = null; persist.write(persist.KEYS.guestArea, d.area); }
     closeSheet(); toast(`Serving ${d.area}`); render();
   });
@@ -353,6 +355,19 @@ function wireActions() {
   });
   A('release.full',  d => flow.confirmAndRelease(d.id, 1).then(render));
   A('retail.settle', d => flow.settleRetail(d.id).then(render));
+  /* the retail processes the machine declared but nothing drove */
+  A('retail.out',       d => { flow.markLineUnavailable(d.id, d.line); render(); });
+  A('retail.sub',       d => { flow.decideSubstitution(d.id, d.line, d.choice); render(); });
+  A('retail.ready',     d => { flow.readyForPickup(d.id); render(); });
+  A('retail.collected', d => { flow.collected(d.id); render(); });
+  A('retail.return',    d => sheet('Return this order', `
+    <p class="tiny muted" style="margin-bottom:12px">Pick what went wrong. The shop or SAAHAA confirms, and your money comes back in full.</p>
+    <div class="chiprow" style="flex-wrap:wrap;gap:8px">
+      ${['Stale or spoiled', 'Wrong item', 'Short weight', 'Damaged / leaked', 'Not what I ordered'].map(r =>
+        `<button class="chip" data-act="retail.return.pick" data-id="${d.id}" data-reason="${esc(r)}">${esc(r)}</button>`).join('')}
+    </div>`));
+  A('retail.return.pick', d => { flow.requestReturn(d.id, d.reason); closeSheet(); render(); });
+  A('retail.acceptreturn', d => flow.acceptReturn(d.id).then(render));
   A('stage.picking', d => flow.advance(d.id, 'R_PICKING'));
   A('stage.packed',  d => flow.advance(d.id, 'R_PACKED'));
   A('stage.out',     d => flow.advance(d.id, 'R_OUT'));
@@ -545,6 +560,8 @@ async function boot() {
   if (shot) { import('./ui/deckscenes.js').then(m => m.run(shot)).catch(e => console.error('[shot]', e)); }
   // the WORK_DONE screen promises auto-release; this is what keeps it
   flow.sweepAutoRelease().then(n => { if (n) { console.info('[saahaa] auto-released', n); render(); } });
+  // the 90-second substitution promise, kept while the app is open
+  setInterval(() => { if (flow.sweepSubstitutions()) render(); }, 15000);
 
   if (new URLSearchParams(location.search).get('selftest') === '1') {
     const r = await selftest.runAll();
