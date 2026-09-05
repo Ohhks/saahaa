@@ -8,7 +8,13 @@
    reviews, price, availability — updates by itself as he works.
 
    It is public: a guest can open it from a shared link and book from it.
-   That is the growth loop — every pro sharing a card that says SAAHAA. */
+   That is the growth loop — every pro sharing a card that says SAAHAA.
+
+   OPEN CIRCLE · LIVING GLASS: this is the one screen a stranger judges him
+   on, so it opens like a card handed over in person — face, name, one line,
+   the badges that were earned, then the three numbers that matter. About
+   folds away instead of shouting; reviews sit on glass; the booking bar
+   never leaves the screen. */
 
 import { esc, ratingStars, timeAgo, sheet, toast } from '../dom.js';
 import { ctx, getState, me } from '../../core/ctx.js';
@@ -22,9 +28,24 @@ import { readiness } from '../../domain/verification.js';
 
 const avg = p => { const r = p.ratings || []; return r.length ? r.reduce((a, x) => a + x.stars, 0) / r.length : 0; };
 
+const proCSS = `<style>
+  .proabout{display:grid;gap:12px}
+  @media (min-width:1024px){
+    .prosplit{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--sp-8);align-items:start}
+    .prosplit .sec{margin-top:0}
+  }
+</style>`;
+
+const capsule = (k, v, d = '', tone = '') =>
+  `<div class="capsule${tone ? ` capsule--${tone}` : ''}">
+    <span class="capsule__k">${k}</span>
+    <span class="capsule__v num">${v}</span>
+    ${d ? `<span class="capsule__d">${d}</span>` : ''}
+  </div>`;
+
 export function render(id) {
   const p = getState().partners.find(x => x.id === id);
-  if (!p) return `${header('Pro', '')}<main class="wrap"><div class="empty"><h3>This page is not live</h3>
+  if (!p) return `${header('Pro', '')}<main class="wrap"><div class="empty empty--smart"><h3>This page is not live</h3>
     <p>The pro may have left SAAHAA.</p><button class="btn btn--primary" data-act="nav.home">Home</button></div></main>`;
   const cat = get('category', p.cat);
   const t = tier(p.tier);
@@ -38,55 +59,76 @@ export function render(id) {
   const r = readiness(p);
   const hidden = !r.complete && !mine;
 
-  if (hidden) return `${header(p.name, '')}<main class="wrap"><div class="empty"><h3>Not yet verified</h3>
+  if (hidden) return `${header(p.name, '')}<main class="wrap"><div class="empty empty--smart"><h3>Not yet verified</h3>
     <p>This pro is completing SAAHAA verification. Check back soon.</p></div></main>`;
 
   return `
   ${header(p.name, `${esc(cat.name)} · ${esc(p.area)}`)}
+  ${proCSS}
   <main class="wrap" style="padding-bottom:110px">
-    <div class="card on-plum" style="margin-top:var(--sp-6);border:0;text-align:center;padding:24px 16px">
-      <span style="width:84px;height:84px;border-radius:50%;margin:0 auto 10px;background:var(--accent-fill);color:var(--accent-on-fill);
+
+    <div class="hero glass glass--deep sheen rise" style="margin-top:var(--sp-6);text-align:center;
+         padding:24px 16px;border-radius:var(--r-lg)">
+      <span class="avatar avatar--lg" style="width:84px;height:84px;border-radius:50%;margin:0 auto 10px;
+        background:var(--accent-fill);color:var(--accent-on-fill);
         display:grid;place-items:center;font-weight:800;font-size:34px">${esc(p.name[0])}</span>
-      <h1 style="font-size:22px;margin:0">${esc(p.name)}</h1>
+      <h1 class="display" style="font-size:22px;margin:0">${esc(p.name)}</h1>
       <p class="tiny muted" style="margin-top:4px">${esc(prof.tagline || `${cat.name} in ${p.area}`)}</p>
       <div class="row" style="justify-content:center;gap:6px;margin-top:12px;flex-wrap:wrap">
-        ${t.badge ? `<span class="badge badge--ok">✓ ${esc(t.badge)}</span>` : ''}
-        <span class="badge badge--gold">${esc(ts.band.label)}</span>
-        ${p.online === false ? '<span class="badge badge--soft">Offline now</span>' : '<span class="badge badge--info">Available</span>'}
+        ${t.badge ? `<span class="pill pill--ok">✓ ${esc(t.badge)}</span>` : ''}
+        <span class="pill pill--gold">${esc(ts.band.label)}</span>
+        ${p.online === false ? '<span class="pill pill--soft">Offline now</span>'
+                             : '<span class="pill pill--live">Available</span>'}
       </div>
     </div>
 
-    <div class="saves" style="margin-top:var(--sp-6)">
-      <div><div class="k">Rating</div><div class="v num">${a ? a.toFixed(1) : 'New'}</div></div>
-      <div><div class="k">Jobs done</div><div class="v num">${p.completed || 0}</div></div>
-      <div class="good"><div class="k">From</div><div class="v num">${M.fmt(p.ask)}</div></div>
+    <div class="capsules metricrow" style="margin-top:var(--sp-6)">
+      ${capsule('Rating', a ? a.toFixed(1) : 'New', a ? ratingStars(a) : 'no ratings yet', 'gold')}
+      ${capsule('Jobs done', String(p.completed || 0), 'through SAAHAA', 'info')}
+      ${capsule('From', M.fmt(p.ask), 'his own rate', 'ok')}
     </div>
-    <p class="micro muted" style="margin:-4px 0 0">${a ? ratingStars(a) + ' ' : ''}${(p.ratings || []).length} ratings · ${km} km from you · ~${etaMins(km)} min</p>
+    <p class="micro muted">${a ? ratingStars(a) + ' ' : ''}${(p.ratings || []).length} ratings · ${km} km from you · ~${etaMins(km)} min</p>
 
-    <div class="sec"><div class="hd"><h2>About</h2>${mine ? '<button class="more" data-act="pro.edit">Edit</button>' : ''}</div>
-      <div class="card">
-        <div class="grid2">
-          <div><span class="micro muted">Experience</span><b class="tiny" style="display:block">${prof.years ? esc(String(prof.years)) + ' years' : 'Not stated'}</b></div>
-          <div><span class="micro muted">Languages</span><b class="tiny" style="display:block">${esc(prof.langs || 'Telugu, Hindi')}</b></div>
-          <div><span class="micro muted">Area</span><b class="tiny" style="display:block">${esc(p.area)}</b></div>
-          <div><span class="micro muted">Verified</span><b class="tiny" style="display:block">${p.verifiedAt ? timeAgo(p.verifiedAt) : t.badge ? 'Yes' : 'Pending'}</b></div>
-        </div>
-        ${(cat.subs || []).length ? `<div class="rule" style="margin:12px 0"></div>
-          <span class="micro muted">Does</span>
-          <div class="chiprow" style="flex-wrap:wrap;gap:6px;margin-top:6px">${cat.subs.slice(0, 8).map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : ''}
+    <div class="prosplit">
+      <div class="sec"><div class="hd"><div><span class="eyebrow">The pro</span><h2 class="h-sec">About</h2></div>
+        ${mine ? '<button class="more" data-act="pro.edit">Edit</button>' : ''}</div>
+        <details class="expand card glass" open>
+          <summary style="cursor:pointer;list-style:none">
+            <b class="tiny">${esc(prof.tagline || `${cat.name} in ${p.area}`)}</b>
+            <span class="micro muted" style="display:block;margin-top:2px">Experience, languages, area and what he does</span>
+          </summary>
+          <div class="proabout" style="margin-top:12px">
+            <div class="grid2">
+              <div><span class="meta">Experience</span><b class="tiny" style="display:block">${prof.years ? esc(String(prof.years)) + ' years' : 'Not stated'}</b></div>
+              <div><span class="meta">Languages</span><b class="tiny" style="display:block">${esc(prof.langs || 'Telugu, Hindi')}</b></div>
+              <div><span class="meta">Area</span><b class="tiny" style="display:block">${esc(p.area)}</b></div>
+              <div><span class="meta">Verified</span><b class="tiny" style="display:block">${p.verifiedAt ? timeAgo(p.verifiedAt) : t.badge ? 'Yes' : 'Pending'}</b></div>
+            </div>
+            ${(cat.subs || []).length ? `<div>
+              <span class="meta">Does</span>
+              <div class="chiprow" style="flex-wrap:wrap;gap:6px;margin-top:6px">${cat.subs.slice(0, 8).map(x =>
+                `<span class="chip chip--smart">${esc(x)}</span>`).join('')}</div></div>` : ''}
+          </div>
+        </details>
       </div>
-    </div>
 
-    <div class="sec"><div class="hd"><h2>What customers say</h2></div>
-      ${reviews.length ? reviews.map(rv => `<div class="card" style="margin-bottom:8px;padding:12px 14px">
-          <div class="between"><b class="tiny">${esc(rv.byName || 'Customer')}</b><span class="micro muted">${timeAgo(rv.ts)}</span></div>
-          <p class="micro">${ratingStars(rv.stars)}${rv.text ? ' ' + esc(rv.text) : ''}</p></div>`).join('')
-        : `<div class="card"><p class="tiny muted">${(p.ratings || []).length ? 'Ratings so far are from before reviews were written.' : 'No reviews yet — every pro starts here.'}</p></div>`}
+      <div class="sec"><div class="hd"><div><span class="eyebrow">In their words</span>
+        <h2 class="h-sec">What customers say</h2></div>
+        ${reviews.length ? `<span class="pill pill--soft">${reviews.length}</span>` : ''}</div>
+        ${reviews.length ? reviews.map((rv, i) => `<div class="card glass rise${i ? ` rise-${Math.min(5, i + 1)}` : ''}"
+            style="margin-bottom:8px;padding:12px 14px">
+            <div class="between"><div class="row" style="gap:8px">
+              <span class="avatar avatar--sm">${esc((rv.byName || 'Customer')[0])}</span>
+              <b class="tiny">${esc(rv.byName || 'Customer')}</b></div>
+              <span class="micro muted">${timeAgo(rv.ts)}</span></div>
+            <p class="micro" style="margin-top:6px">${ratingStars(rv.stars)}${rv.text ? ' ' + esc(rv.text) : ''}</p></div>`).join('')
+          : `<div class="card glass"><p class="tiny muted">${(p.ratings || []).length ? 'Ratings so far are from before reviews were written.' : 'No reviews yet — every pro starts here.'}</p></div>`}
+      </div>
     </div>
 
     <div class="sec">
-      <div class="card" style="border-color:var(--accent-border)">
-        <b class="tiny">Why book through SAAHAA</b>
+      <div class="card glass glass--gold sheen" style="border-color:var(--accent-border)">
+        <span class="eyebrow">Why book through SAAHAA</span>
         <p class="micro muted" style="margin-top:4px">Price locked before booking · a code at the door · money held until you confirm the work · ${esc(p.name.split(' ')[0])} keeps 100% of the quote.</p>
       </div>
     </div>

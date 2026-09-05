@@ -130,7 +130,7 @@ export function render(requestId) {
 }
 
 function shell(title, body) {
-  return `<header class="hdr on-plum" style="border-radius:0 0 var(--r-xl) var(--r-xl)">
+  return `<header class="hdr on-plum glass glass--deep" style="border-radius:0 0 var(--r-xl) var(--r-xl)">
       <div class="wrap inner">
         <button class="btn btn--ghost tap" data-act="nav.back" aria-label="Back">←</button>
         <div class="grow"><b style="font-size:17px;display:block">${esc(title)}</b></div>
@@ -174,16 +174,21 @@ function waiting(req) {
     <!-- persistent furniture: this strip and the line below it prevent the two
          panics — "did it take my money?" and "does 12 minutes mean he arrives
          in 12 minutes?" Neither may ever scroll off screen. -->
-    <div class="card" style="margin-top:12px;border-color:var(--ok);padding:12px 14px">
+    <div class="cmd glass glass--deep rise" style="margin-top:12px">
       <div class="between">
-        <div><span class="tiny muted">Your held price</span>
-          <div class="num" style="font-size:20px;font-weight:800">${M.fmt(pay(req.held ? req.held.amount : req.target))}</div></div>
-        <span class="badge badge--ok">Safe</span>
+        <div><span class="eyebrow">Your held price</span>
+          <div class="num num-xl">${M.fmt(pay(req.held ? req.held.amount : req.target))}</div></div>
+        <span class="pill pill--ok">Safe</span>
       </div>
-      <p class="micro muted" style="margin-top:6px">Not charged yet. Your worker comes as planned.</p>
+      <div class="capsules" style="margin-top:10px">
+        <span class="capsule capsule--ok"><span class="capsule__k">Charged</span>
+          <span class="capsule__v state--held">nothing yet</span></span>
+        <span class="capsule capsule--info"><span class="capsule__k">Your worker</span>
+          <span class="capsule__v">comes as planned</span></span>
+      </div>
     </div>
 
-    <h2 style="margin:20px 0 4px;font-size:20px">Asking ${invited} workers near you</h2>
+    <h2 class="h-display" style="margin:20px 0 4px">Asking ${invited} workers near you</h2>
     <p class="tiny muted" style="margin-bottom:14px">
       ${replies ? `${replies} ${replies === 1 ? 'reply' : 'replies'}` : 'Most people get 3 rates in about 4 minutes.'}
     </p>
@@ -215,14 +220,14 @@ function waiting(req) {
 
 function replyCard({ name, amount, held, held0 }) {
   const less = held0 && amount < held0 ? held0 - amount : 0;
-  return `<div class="card" style="margin-bottom:8px;padding:12px 14px;${held ? 'border-color:var(--ok)' : ''}">
+  return `<div class="cmd${held ? ' glass glass--gold' : ''}" style="margin-bottom:8px">
     <div class="row">
       ${avatar(name, 38)}
-      <div class="grow"><b>${esc(name)}</b>
+      <div class="grow"><b class="cmd__title">${esc(name)}</b>
         ${less ? `<p class="micro" style="color:var(--ok);margin-top:2px">${M.fmt(payGap(less))} less than held</p>` : ''}</div>
       <div style="text-align:right">
         <b class="num" style="font-size:18px">${M.fmt(pay(amount))}</b>
-        ${held ? `<p class="micro"><span class="badge badge--ok">Already yours</span></p>` : ''}
+        ${held ? `<p class="micro"><span class="pill pill--ok">Already yours</span></p>` : ''}
       </div>
     </div></div>`;
 }
@@ -257,7 +262,7 @@ function choosing(req) {
   r.others.forEach(b => cards.push(otherReply(req, b, r.hero, r.cheapest, held)));
 
   return shell('Rates are in', `
-    <h2 style="margin:16px 0 2px;font-size:21px">${r.all.length} workers replied</h2>
+    <h2 class="h-display" style="margin:16px 0 2px">${r.all.length} workers replied</h2>
     <p class="tiny muted">Your held price was ${M.fmt(pay(held || req.target))} ·
       <b style="color:var(--warn)">${mmss(msLeft)} to pick</b></p>
     <div style="margin-top:16px">${cards.join('')}</div>
@@ -275,20 +280,20 @@ function heroReply(req, b, held, showCounter) {
   const less = held && b.amount < held ? held - b.amount : 0;
   const c = showCounter ? A.counterFor(req.id, b.id) : { available: false };
   const pending = b.status === 'countered';
-  return `<div class="card" style="border-color:var(--ok);border-width:2px;padding:16px;margin-bottom:12px">
-    <span class="badge badge--gold">Best pick</span>
+  return `<div class="bestmatch glass glass--gold" style="margin-bottom:12px">
+    <span class="pill pill--gold">Best pick</span>
     <div class="row" style="margin-top:10px">
       ${avatar(b.partnerName, 44)}
       <div class="grow"><b style="font-size:16px">${esc(b.partnerName)}</b>
-        <p class="tiny muted">${ratingStars(avgOf(b.partnerId))} · ${b.km} km · ${esc((b.band && b.band.label) || 'Verified')}</p></div>
+        <p class="meta">${ratingStars(avgOf(b.partnerId))} · ${b.km} km · ${esc((b.band && b.band.label) || 'Verified')}</p></div>
     </div>
-    <div style="text-align:center;margin:14px 0 6px">
-      <div class="num" style="font-size:34px;font-weight:800;line-height:1">${M.fmt(pay(b.amount))}</div>
+    <div class="bestmatch__price" style="text-align:center;margin:14px 0 6px">
+      <div class="num num-xl">${M.fmt(pay(b.amount))}</div>
       ${less ? `<p class="tiny" style="color:var(--ok);margin-top:4px;font-weight:700">
         ${M.fmt(payGap(less))} less than held</p>` : `<p class="tiny muted" style="margin-top:4px">Fair price</p>`}
     </div>
-    <p class="tiny muted" style="text-align:center;margin-bottom:14px">${esc(whyLine(b))}</p>
-    <button class="btn btn--primary btn--lg btn--block" data-act="ask.accept"
+    <p class="bestmatch__why tiny muted" style="text-align:center;margin-bottom:14px">${esc(whyLine(b))}</p>
+    <button class="btn btn--primary btn--lg btn--block sheen" data-act="ask.accept"
             data-id="${req.id}" data-bid="${b.id}">Book ${M.fmt(pay(b.amount))}</button>
     ${pending ? `<p class="micro muted" style="text-align:center;margin-top:8px">
         Asked. If he says no, ${M.fmt(pay(b.amount))} is still yours.</p>`
@@ -301,13 +306,13 @@ function heroReply(req, b, held, showCounter) {
 function otherReply(req, b, hero, cheapest, held) {
   const isCheapest = cheapest && b.id === cheapest.id && cheapest.id !== hero.id;
   const gap = isCheapest ? hero.amount - b.amount : 0;
-  return `<div class="card" style="padding:14px;margin-bottom:10px">
+  return `<div class="cmd" style="margin-bottom:10px">
     <div class="row">
       ${avatar(b.partnerName, 38)}
-      <div class="grow"><b>${esc(b.partnerName)}</b>
-        <p class="micro muted">${b.km} km · ~${b.eta} min</p></div>
+      <div class="grow"><b class="cmd__title">${esc(b.partnerName)}</b>
+        <p class="cmd__sub">${b.km} km · ~${b.eta} min</p></div>
       <div style="text-align:right"><b class="num" style="font-size:19px">${M.fmt(pay(b.amount))}</b>
-        ${isCheapest ? `<p class="micro"><span class="badge badge--soft">Lowest price</span></p>` : ''}</div>
+        ${isCheapest ? `<p class="micro"><span class="pill pill--soft">Lowest price</span></p>` : ''}</div>
     </div>
     ${isCheapest && gap > 0 ? `<p class="micro muted" style="margin-top:8px">
       ${M.fmt(payGap(gap))} cheaper, but ${esc(tradeoff(b, hero))}.</p>` : ''}
@@ -344,9 +349,9 @@ const lowRated = (b, hero) => (hero.parts.rating - b.parts.rating) > 0.24;
 function noBids(req) {
   const held = req.held ? req.held.amount : null;
   return shell('Rates are in', `
-    <div class="card" style="margin-top:24px;text-align:center;padding:26px 18px">
+    <div class="cmd glass glass--gold" style="margin-top:24px;text-align:center;padding:26px 18px">
       <div style="font-size:34px">✓</div>
-      <h2 style="margin:10px 0 6px;font-size:21px">No one beat your price.</h2>
+      <h2 class="h-display" style="margin:10px 0 6px">No one beat your price.</h2>
       <p class="tiny muted">${held ? `Your ${M.fmt(pay(held))} with ${esc(req.held.partnerName)} is still ready. ` : ''}Nothing was charged.</p>
       ${held ? `<button class="btn btn--primary btn--lg btn--block" style="margin-top:18px"
         data-act="ask.held" data-id="${req.id}">Book ${M.fmt(pay(held))}</button>` : ''}
@@ -366,7 +371,7 @@ export function showReceipt(req, paid, workerName) {
     <p class="tiny muted">You asked ${Math.max(1, s.replies)} ${Math.max(1, s.replies) === 1 ? 'worker' : 'workers'}.</p>
     <div style="margin:18px 0">
       <p class="tiny muted">You paid</p>
-      <div class="num" style="font-size:36px;font-weight:800;line-height:1.1">${M.fmt(pay(paid))}</div>
+      <div class="num num-xl">${M.fmt(pay(paid))}</div>
     </div>
     ${zero
       // A zero shown AS zero kills the second use permanently. It is not a
@@ -398,16 +403,16 @@ export function bidSheet(requestId, partner) {
   sheet(cat.name, `
     <p class="tiny muted">${esc(req.area)} · ${esc(req.sub || cat.name)} · asked ${Math.round((Date.now() - req.openedAt) / 60000)} min ago</p>
 
-    <div class="card" style="margin-top:14px;padding:14px">
-      <div class="between"><span class="tiny muted">Fair price for this job</span>
+    <div class="cmd glass" style="margin-top:14px">
+      <div class="between"><span class="eyebrow">Fair price for this job</span>
         <b class="num" style="font-size:22px">${M.fmt(req.target)}</b></div>
       <p class="micro muted" style="margin-top:6px">Most jobs here go ${M.fmt(req.floor)} – ${M.fmt(req.ceiling)}</p>
       <p class="micro muted" style="margin-top:4px">${req.bidCount} workers asked so far.</p>
     </div>
 
-    <div class="card" style="margin-top:12px;padding:16px">
+    <div class="cmd glass glass--gold" style="margin-top:12px">
       <div class="between" style="margin-bottom:10px">
-        <span class="tiny muted">Your rate</span>
+        <span class="eyebrow">Your rate</span>
         <b class="num" id="bidAmt" style="font-size:24px">${M.fmt(req.target)}</b>
       </div>
       <input type="range" id="bidRange" min="${req.floor / 100}" max="${req.ceiling / 100}"

@@ -9,7 +9,12 @@
    most important one in the partner's life on SAAHAA: "You are verified" plus
    their own storefront, already built, already live. That is what "locally,
    professionally" means — they walked in with a phone number and walked out
-   with a professional page and a badge, having built nothing. */
+   with a professional page and a badge, having built nothing.
+
+   OPEN CIRCLE · LIVING GLASS: the ladder is unchanged — same seven steps,
+   same ids, same actions. What changed is the surface: the track is a
+   timeline, each open step is a glass panel, and the one thing to do next is
+   the only thing that looks tappable. */
 
 import { esc, toast, closeSheet } from '../dom.js';
 import { ctx, getState } from '../../core/ctx.js';
@@ -33,7 +38,7 @@ export const rememberCode = c => { shownCode = c; };
 export function render() {
   const p = V.myPartner();
   if (!p) return `${header('Become a partner', '')}<main class="wrap">
-    <div class="empty"><h3>Sign in as a partner first</h3>
+    <div class="empty empty--smart"><h3>Sign in as a partner first</h3>
       <button class="btn btn--primary" data-act="earn.start">Join as a partner</button></div></main>`;
   const r = V.readiness(p);
   const cat = get('category', p.cat);
@@ -43,10 +48,12 @@ export function render() {
   return `
   ${header('Getting you verified', `${esc(cat.name)} · ${r.pct}% done`)}
   <main class="wrap" style="padding-bottom:40px">
-    <div class="card on-plum" style="margin-top:var(--sp-6);border:0">
-      <div class="between"><b style="font-size:16px">Step ${r.next.n} of ${V.STEPS.length}</b>
-        <span class="badge badge--gold">${esc(r.tier.label)}</span></div>
-      <div style="height:6px;border-radius:99px;background:rgba(255,255,255,.18);margin-top:10px;overflow:hidden">
+    <div class="glass glass--deep sheen rise" style="margin-top:var(--sp-6);padding:16px;border-radius:var(--r-lg)">
+      <div class="between" style="align-items:flex-start">
+        <div class="grow"><span class="eyebrow">Verification</span>
+          <b class="h-display" style="display:block">Step ${r.next.n} of ${V.STEPS.length}</b></div>
+        <span class="pill pill--gold">${esc(r.tier.label)}</span></div>
+      <div style="height:6px;border-radius:99px;background:rgba(255,255,255,.18);margin-top:12px;overflow:hidden">
         <i style="display:block;height:100%;width:${r.pct}%;background:var(--gold-grad-soft)"></i></div>
       <p class="micro muted" style="margin-top:8px">About ${V.STEPS.filter(s => !r.done.includes(s.id)).reduce((n, s) => n + s.mins, 0)} minutes left. Jobs open the moment you finish.</p>
     </div>
@@ -54,14 +61,14 @@ export function render() {
     ${r.done.includes('phone') ? draftPage(p, cat) : ''}
 
     <div class="sec">
-      <ol class="track">
+      <ol class="track timeline">
         ${V.STEPS.map((s, i) => {
           const done = r.done.includes(s.id);
           const cur = r.next && r.next.id === s.id;
-          return `<li class="${done ? 'done' : cur ? 'cur' : 'pend'}">
-            <span class="node"><span class="dot">${done ? '✓' : s.n}</span>
-              ${i < V.STEPS.length - 1 ? '<span class="bar"></span>' : ''}</span>
-            <span class="body"><b>${esc(s.title)}</b>
+          return `<li class="timeline__item ${done ? 'done' : cur ? 'cur' : 'pend'}">
+            <span class="node timeline__node"><span class="dot timeline__dot">${done ? '✓' : s.n}</span>
+              ${i < V.STEPS.length - 1 ? '<span class="bar timeline__bar"></span>' : ''}</span>
+            <span class="body timeline__body"><b>${esc(s.title)}</b>
               ${cur ? `<span>${esc(s.sub)}</span>${stepPanel(p, s.id, cat)}` : done ? '' : `<span>${esc(s.sub)}</span>`}
             </span></li>`;
         }).join('')}
@@ -75,11 +82,12 @@ export function render() {
    onboarding funnel loses half its people, and a page they can already see
    is the reason to push through. */
 function draftPage(p, cat) {
-  return `<div class="sec"><div class="hd"><h2>Your page — draft</h2></div>
-    <div class="card" style="position:relative;overflow:hidden">
-      <span class="badge badge--soft" style="position:absolute;right:12px;top:12px">Goes live at step 7</span>
+  return `<div class="sec">
+    <div class="hd"><div><span class="eyebrow">The aha</span><h2 class="h-sec">Your page — draft</h2></div></div>
+    <div class="card glass glass--gold sheen" style="position:relative;overflow:hidden">
+      <span class="pill pill--soft" style="position:absolute;right:12px;top:12px">Goes live at step 7</span>
       <div class="row">
-        <span style="width:46px;height:46px;border-radius:50%;background:var(--accent-fill);color:var(--accent-on-fill);display:grid;place-items:center;font-weight:800;font-size:19px">${esc(p.name[0])}</span>
+        <span class="avatar avatar--md" style="width:46px;height:46px;border-radius:50%;background:var(--accent-fill);color:var(--accent-on-fill);display:grid;place-items:center;font-weight:800;font-size:19px">${esc(p.name[0])}</span>
         <div class="grow"><b>${esc(p.name)}</b>
           <p class="tiny muted">${esc(cat.name)} · ${esc(p.area)} · from ${M.fmt(p.ask)}</p></div>
       </div>
@@ -89,7 +97,7 @@ function draftPage(p, cat) {
 
 /* ── the step panels ───────────────────────────────────────── */
 function stepPanel(p, id, cat) {
-  const F = (inner) => `<div class="card" style="margin-top:10px;padding:14px">${inner}</div>`;
+  const F = (inner) => `<div class="card glass" style="margin-top:10px;padding:14px">${inner}</div>`;
   switch (id) {
     case 'phone': return F(`
       ${shownCode ? `<p class="tiny" style="margin-bottom:8px">Your code: <b class="num" style="font-size:20px;letter-spacing:.15em">${esc(shownCode)}</b>
@@ -101,8 +109,9 @@ function stepPanel(p, id, cat) {
 
     case 'identity': return F(`
       <div class="chiprow" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">
-        ${Object.entries(V.ID_TYPES).map(([k, t]) => `<button class="chip ${idType === k ? 'on' : ''}"
-          data-act="ob.idtype" data-type="${k}">${esc(t.label)}</button>`).join('')}
+        ${Object.entries(V.ID_TYPES).map(([k, t]) => `<button class="chip chip--smart ${idType === k ? 'on' : ''}"
+          aria-pressed="${idType === k ? 'true' : 'false'}"
+          data-act="ob.idtype" data-type="${k}"><span class="chip__ic" aria-hidden="true">🪪</span>${esc(t.label)}</button>`).join('')}
       </div>
       <input id="obId" placeholder="${esc(V.ID_TYPES[idType].hint)}" autocomplete="off"
         style="width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--r-pill);background:var(--surface-2);color:var(--ink-1);font-size:16px">
@@ -134,16 +143,16 @@ function quizPanel(p, kind, title) {
   const st = V.quizStateFor(p, kind);
   if (st.locked) {
     const mins = Math.ceil((st.lockedUntil - Date.now()) / 60000);
-    return `<div class="card" style="margin-top:10px;padding:14px;border-color:var(--warn)">
+    return `<div class="card glass" style="margin-top:10px;padding:14px;border-color:var(--warn)">
       <b>Three tries used.</b>
       <p class="tiny muted" style="margin-top:6px">Come back in ${mins > 60 ? Math.ceil(mins / 60) + ' hours' : mins + ' minutes'} and try again. Read the questions slowly — there is no trick.</p></div>`;
   }
   const bank = V.quizFor(p, kind);
   const mine = answers[kind] || [];
   const answered = bank.filter((_, i) => Number.isInteger(mine[i])).length;
-  return `<div class="card" style="margin-top:10px;padding:14px">
+  return `<div class="card glass" style="margin-top:10px;padding:14px">
     <div class="between" style="margin-bottom:8px"><b class="tiny">${title}</b>
-      <span class="micro muted">need ${PASS[kind]} of ${bank.length}${Number.isFinite(st.left) ? ` · ${st.left} ${st.left === 1 ? 'try' : 'tries'} left` : ''}</span></div>
+      <span class="pill pill--soft">need ${PASS[kind]} of ${bank.length}${Number.isFinite(st.left) ? ` · ${st.left} ${st.left === 1 ? 'try' : 'tries'} left` : ''}</span></div>
     ${kind === 'conduct' && lastWrong.length ? `<div class="card" style="padding:10px 12px;background:var(--surface-2);margin-bottom:6px">
       <b class="micro">The rules you missed:</b>
       ${lastWrong.map(w => `<p class="micro" style="margin-top:4px">• ${esc(w.right)}</p>`).join('')}</div>` : ''}
@@ -166,37 +175,37 @@ function verified(p, r, cat) {
   return `
   ${header('You are verified', `${esc(cat.name)} · ${esc(t.label)}`)}
   <main class="wrap" style="padding-bottom:40px">
-    <div class="card on-plum" style="margin-top:var(--sp-6);border:0;text-align:center;padding:26px 18px">
+    <div class="glass glass--deep sheen rise" style="margin-top:var(--sp-6);text-align:center;padding:26px 18px;border-radius:var(--r-lg)">
       <div style="font-size:44px">✓</div>
-      <h1 style="font-size:var(--fs-xl);margin:8px 0 6px">${esc(p.name.split(' ')[0])}, you are a SAAHAA pro.</h1>
+      <h1 class="display" style="font-size:var(--fs-xl);margin:8px 0 6px">${esc(p.name.split(' ')[0])}, you are a SAAHAA pro.</h1>
       <p class="tiny muted">Jobs near ${esc(p.area)} can reach you now.</p>
       <div class="row" style="justify-content:center;gap:8px;margin-top:14px;flex-wrap:wrap">
-        <span class="badge badge--ok">✓ ${esc(t.badge)}</span>
-        <span class="badge badge--gold">Locally, professionally</span>
+        <span class="pill pill--ok">✓ ${esc(t.badge)}</span>
+        <span class="pill pill--gold">Locally, professionally</span>
       </div>
     </div>
 
-    <div class="sec"><div class="hd"><h2>Your page is live</h2></div>
-      <button class="card card--tap" style="width:100%;text-align:left" data-act="pro.open" data-id="${p.id}">
+    <div class="sec"><div class="hd"><div><span class="eyebrow">Public</span><h2 class="h-sec">Your page is live</h2></div></div>
+      <button class="cmd" style="width:100%;text-align:left" data-act="pro.open" data-id="${p.id}">
         <div class="row">
-          <span style="width:46px;height:46px;border-radius:50%;background:var(--accent-fill);color:var(--accent-on-fill);display:grid;place-items:center;font-weight:800;font-size:19px">${esc(p.name[0])}</span>
-          <div class="grow"><b>${esc(p.name)}</b>
-            <p class="tiny muted">${esc(cat.name)} · ${esc(p.area)} · saahaa.app/pro/${esc(p.id.slice(-6))}</p></div>
-          <span class="tiny" style="color:var(--accent)">View →</span>
+          <span class="avatar avatar--md" style="width:46px;height:46px;border-radius:50%;background:var(--accent-fill);color:var(--accent-on-fill);display:grid;place-items:center;font-weight:800;font-size:19px">${esc(p.name[0])}</span>
+          <div class="grow"><span class="cmd__title">${esc(p.name)}</span>
+            <span class="cmd__sub">${esc(cat.name)} · ${esc(p.area)} · saahaa.app/pro/${esc(p.id.slice(-6))}</span></div>
+          <span class="cmd__action">View →</span>
         </div>
       </button>
       <p class="micro muted" style="margin-top:8px">Your ratings, badges and photos update on it by themselves. You never build or maintain anything. Share the link on WhatsApp — it is your professional card.</p>
     </div>
 
-    <div class="sec"><div class="hd"><h2>Your first ${PROVISIONAL_JOBS} jobs</h2></div>
-      <div class="card"><p class="tiny">Your first jobs are up to <b>${M.fmt(PROVISIONAL_CAP)}</b>. This is not about trusting you — every new pro starts here, and it is how we can pay you before anyone knows your name. Finish <b>${PROVISIONAL_JOBS} jobs with no complaint</b> and it becomes ${M.fmt(tier(2).capPaise)} by itself. Those first payouts are also looked at by SAAHAA before release, usually within a day.</p></div>
+    <div class="sec"><div class="hd"><div><span class="eyebrow">Starting out</span><h2 class="h-sec">Your first ${PROVISIONAL_JOBS} jobs</h2></div></div>
+      <div class="card glass"><p class="tiny">Your first jobs are up to <b>${M.fmt(PROVISIONAL_CAP)}</b>. This is not about trusting you — every new pro starts here, and it is how we can pay you before anyone knows your name. Finish <b>${PROVISIONAL_JOBS} jobs with no complaint</b> and it becomes ${M.fmt(tier(2).capPaise)} by itself. Those first payouts are also looked at by SAAHAA before release, usually within a day.</p></div>
     </div>
 
-    <div class="sec"><div class="hd"><h2>Go further</h2></div>
-      <div class="card">
+    <div class="sec"><div class="hd"><div><span class="eyebrow">Ladder</span><h2 class="h-sec">Go further</h2></div></div>
+      <div class="card glass">
         <b class="tiny">Next: ${esc(tier(Math.min(4, (p.tier | 0) + 1)).label)}</b>
         <p class="tiny muted" style="margin:4px 0 10px">${esc(tier(Math.min(4, (p.tier | 0) + 1)).unlocks)}</p>
-        ${bg === 'pending' ? `<span class="badge badge--info">Background check in progress</span>
+        ${bg === 'pending' ? `<span class="pill pill--info">Background check in progress</span>
             <p class="micro muted" style="margin-top:6px">SAAHAA is calling your reference. Usually 2 working days.</p>`
           : canBg ? `
             <input id="obRefName" placeholder="A reference (past customer or employer)" style="width:100%;height:44px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--r-pill);background:var(--surface-2);color:var(--ink-1);margin-bottom:8px">
@@ -254,13 +263,15 @@ export function act(name, d) {
 export function progressCard(p) {
   const r = V.readiness(p);
   if (r.complete) return '';
-  return `<button class="card card--tap on-plum" style="width:100%;text-align:left;margin-top:var(--sp-6);border:0"
+  return `<button class="cmd glass glass--deep sheen" style="width:100%;text-align:left"
       data-act="nav.onboard">
     <div class="between"><div class="grow">
-      <b style="font-size:16px">Finish verification to start earning</b>
-      <p class="tiny muted" style="margin-top:4px">Step ${r.next.n} of ${V.STEPS.length}: ${esc(r.next.title)} · ${r.pct}% done</p></div>
-      <span class="btn btn--primary btn--sm">Continue</span></div>
+      <span class="eyebrow">Not live yet</span>
+      <span class="cmd__title">Finish verification to start earning</span>
+      <span class="cmd__sub">Step ${r.next.n} of ${V.STEPS.length}: ${esc(r.next.title)} · ${r.pct}% done</span></div>
+      <span class="pill pill--gold">${r.pct}%</span></div>
     <div style="height:5px;border-radius:99px;background:rgba(255,255,255,.18);margin-top:10px;overflow:hidden">
       <i style="display:block;height:100%;width:${r.pct}%;background:var(--gold-grad-soft)"></i></div>
+    <span class="cmd__action">Continue</span>
   </button>`;
 }

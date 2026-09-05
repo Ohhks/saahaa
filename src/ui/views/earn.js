@@ -13,7 +13,11 @@
 
    This is also where "ask everyone to join as Partner" lives. The pitch leads
    with the only number that matters to a tradesperson: they keep 100% of what
-   they quote, against roughly 75% on a commission app. */
+   they quote, against roughly 75% on a commission app.
+
+   OPEN CIRCLE · LIVING GLASS: this screen is an invitation, not a console —
+   so it opens on deep plum and gold, keeps one promise per block, and ends
+   on a single sticky action. Every string's meaning is the one it had. */
 
 import { esc } from '../dom.js';
 import { me } from '../../core/ctx.js';
@@ -27,18 +31,30 @@ import { renderPartner, renderShopAdmin } from './partner.js';
 const EXAMPLE_DEAL = 100000;            // ₹1,000 quote
 const AGG_COMMISSION = 0.25;
 
+const earnCSS = `<style>
+  .earnwho{display:grid;gap:10px}
+  @media (min-width:1024px){
+    .earnwho{grid-template-columns:1fr 1fr}
+    .earnwhy{grid-template-columns:repeat(2,1fr)}
+  }
+</style>`;
+
+const capsule = (k, v, d = '', tone = '') =>
+  `<div class="capsule${tone ? ` capsule--${tone}` : ''}">
+    <span class="capsule__k">${k}</span>
+    <span class="capsule__v num">${v}</span>
+    ${d ? `<span class="capsule__d">${d}</span>` : ''}
+  </div>`;
+
 function earningsStrip() {
   const theirs = Math.round(EXAMPLE_DEAL * (1 - AGG_COMMISSION));
   return `
-  <div class="saves">
-    <div class="old"><div class="k">On a commission app</div>
-      <div class="v num">${M.fmt(theirs)}</div></div>
-    <div class="good"><div class="k">On SAAHAA</div>
-      <div class="v num">${M.fmt(EXAMPLE_DEAL)}</div></div>
-    <div><div class="k">You keep</div>
-      <div class="v num" style="color:var(--success)">+${M.fmt(EXAMPLE_DEAL - theirs)}</div></div>
+  <div class="capsules metricrow">
+    ${capsule('On a commission app', M.fmt(theirs), 'they keep the rest', 'bad')}
+    ${capsule('On SAAHAA', M.fmt(EXAMPLE_DEAL), 'your whole quote', 'gold')}
+    ${capsule('You keep', `+${M.fmt(EXAMPLE_DEAL - theirs)}`, 'every ₹1,000 job', 'ok')}
   </div>
-  <p class="micro muted" style="margin:-4px 0 0">
+  <p class="micro muted">
     On a ₹1,000 job. A 25%-commission app keeps ₹250 of it. SAAHAA keeps none of your
     quote — our fee is added on top and paid by the customer.
   </p>`;
@@ -59,6 +75,13 @@ const HOW = [
   { n: '4', t: 'Start getting jobs',     s: 'Jobs near you arrive on your phone. Money is locked before you start. You keep 100% of your quote.' },
 ];
 
+const WHY = [
+  { t: '🔒 Money locked before you start', s: `The customer's payment is held the moment they book. You never do a job hoping to be paid.` },
+  { t: '📱 A code at the door', s: 'The customer reads you a 4-digit code when you arrive. It proves you were there, so nobody can claim you never came.' },
+  { t: '⚖️ Fair when there is a dispute', s: 'Your arrival code and your finished-work photo settle most complaints in your favour, automatically.' },
+  { t: '📈 Your price, your call', s: 'Set your own rate. When several pros are free, you bid — and bidding fairly wins more often than bidding cheapest.' },
+];
+
 /* ── the invitation (guest and customer) ───────────────────── */
 function invite() {
   const s = me();
@@ -68,15 +91,17 @@ function invite() {
 
   return `
   ${header('Earn with SAAHAA', s ? `Hello ${esc(s.name.split(' ')[0])}` : 'Open to everyone')}
+  ${earnCSS}
   <main class="wrap">
 
-    <div class="card on-plum" style="margin-top:var(--sp-6);border:0;position:relative;overflow:hidden">
+    <div class="hero glass glass--deep sheen rise" style="margin-top:var(--sp-6);position:relative;overflow:hidden;
+         padding:22px 18px;border-radius:var(--r-lg)">
       <div style="position:absolute;right:-26px;top:-22px;opacity:.10;pointer-events:none">
         ${mark(150, { detail: true, glow: false })}
       </div>
       <div style="position:relative">
-        <span class="badge badge--gold">Locally, professionally</span>
-        <h1 style="font-size:var(--fs-xl);line-height:var(--lh-xl);margin:10px 0 6px;max-width:16ch">
+        <span class="pill pill--gold">Locally, professionally</span>
+        <h1 class="display" style="font-size:var(--fs-xl);line-height:var(--lh-xl);margin:10px 0 6px;max-width:16ch">
           Your trade. Your price. Your own page.</h1>
         <p class="tiny muted" style="max-width:34ch">
           SAAHAA never takes a cut of your quote — and it runs your professional presence for you:
@@ -84,50 +109,44 @@ function invite() {
       </div>
     </div>
 
-    ${earningsStrip()}
+    <div style="margin-top:var(--sp-6)">${earningsStrip()}</div>
 
     <div class="sec">
-      <div class="hd"><h2>Is this you?</h2></div>
-      ${WHO.map(w => `
-        <div class="card" style="padding:13px;margin-bottom:8px">
-          <div class="row">
-            <span class="med" style="width:42px;height:42px;border-radius:50%;background:var(--accent-soft);
-              display:grid;place-items:center;font-size:20px;flex:0 0 auto">${w.ico}</span>
-            <div class="grow"><b style="font-size:15px">${esc(w.t)}</b>
-              <p class="micro muted" style="margin-top:2px">${esc(w.s)}</p></div>
-          </div>
-        </div>`).join('')}
+      <div class="hd"><div><span class="eyebrow">Who joins</span><h2 class="h-sec">Is this you?</h2></div></div>
+      <div class="earnwho">
+        ${WHO.map((w, i) => `
+          <div class="tile--wide card glass rise${i ? ` rise-${Math.min(5, i + 1)}` : ''}" style="padding:13px">
+            <div class="row">
+              <span class="chip__ic med" style="width:42px;height:42px;border-radius:50%;background:var(--accent-soft);
+                display:grid;place-items:center;font-size:20px;flex:0 0 auto">${w.ico}</span>
+              <div class="grow"><b style="font-size:15px">${esc(w.t)}</b>
+                <p class="micro muted" style="margin-top:2px">${esc(w.s)}</p></div>
+            </div>
+          </div>`).join('')}
+      </div>
       <p class="tiny muted" style="margin-top:10px">
         ${services} kinds of service and ${shops} kinds of shop are open to partners right now.
       </p>
     </div>
 
     <div class="sec">
-      <div class="hd"><h2>How it works</h2></div>
-      <ol class="track" style="margin-top:4px">
-        ${HOW.map((h, i) => `<li class="done">
-          <span class="node"><span class="dot">${h.n}</span>
-            ${i < HOW.length - 1 ? '<span class="bar"></span>' : ''}</span>
-          <span class="body"><b>${esc(h.t)}</b><span>${esc(h.s)}</span></span>
+      <div class="hd"><div><span class="eyebrow">Four steps</span><h2 class="h-sec">How it works</h2></div>
+        <span class="pill pill--soft">about 15 min</span></div>
+      <ol class="track timeline" style="margin-top:4px">
+        ${HOW.map((h, i) => `<li class="done timeline__item">
+          <span class="node timeline__node"><span class="dot timeline__dot">${h.n}</span>
+            ${i < HOW.length - 1 ? '<span class="bar timeline__bar"></span>' : ''}</span>
+          <span class="body timeline__body"><b>${esc(h.t)}</b><span>${esc(h.s)}</span></span>
         </li>`).join('')}
       </ol>
     </div>
 
     <div class="sec">
-      <div class="hd"><h2>Why pros stay</h2></div>
-      <div class="grid2">
-        <div class="card"><h4 style="font-size:14px">🔒 Money locked before you start</h4>
-          <p class="micro muted">The customer's payment is held the moment they book. You never
-            do a job hoping to be paid.</p></div>
-        <div class="card"><h4 style="font-size:14px">📱 A code at the door</h4>
-          <p class="micro muted">The customer reads you a 4-digit code when you arrive. It proves
-            you were there, so nobody can claim you never came.</p></div>
-        <div class="card"><h4 style="font-size:14px">⚖️ Fair when there is a dispute</h4>
-          <p class="micro muted">Your arrival code and your finished-work photo settle most
-            complaints in your favour, automatically.</p></div>
-        <div class="card"><h4 style="font-size:14px">📈 Your price, your call</h4>
-          <p class="micro muted">Set your own rate. When several pros are free, you bid — and
-            bidding fairly wins more often than bidding cheapest.</p></div>
+      <div class="hd"><div><span class="eyebrow">The reason</span><h2 class="h-sec">Why pros stay</h2></div></div>
+      <div class="grid2 earnwhy">
+        ${WHY.map(w => `<div class="card glass">
+          <h4 style="font-size:14px">${esc(w.t)}</h4>
+          <p class="micro muted">${esc(w.s)}</p></div>`).join('')}
       </div>
     </div>
 

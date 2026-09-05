@@ -1,29 +1,65 @@
 /* ============================================================
-   SAAHAA DESIGN SYSTEM v2.0 — BRIGHT VIOLET + GOLD
+   SAAHAA DESIGN SYSTEM v3.0 — "OPEN CIRCLE · LIVING GLASS"
 
-   The brief: "Dashboard: bright purple. Make the theme & text
-   [opposite colour best visible]." So readability is the constraint, not a
-   nice-to-have, and every pair below has a measured WCAG ratio.
+   WHAT CHANGED FROM v2.0 (and what did NOT)
+   Nothing about the measured colour discipline changed. Every ratio
+   below is still the ratio that decided the palette. v3.0 adds a
+   SPATIAL layer on top of it: depth, atmosphere, and translucency —
+   used surgically, never decoratively.
 
-   THE ONE NUMBER THAT DECIDED THE PALETTE:
+   ── THE FOUR MATERIALS ──────────────────────────────────────
+   1. DEEP PLUM   (#1B0B3A → #3F1780) — the ground the app sits ON.
+      Sidenav, hero, workspace cockpit. Dark, atmospheric, quiet.
+      White on the darkest stop = 18.9, on the brightest blended
+      highlight = 10.2. This is where gold can finally be GOLD
+      (#F4D68E on #221041 = 12.24) instead of the pale #FBE8B8 that
+      bright violet forces on us.
+   2. BRIGHT VIOLET (#7C3AED) — CHROME. Still capped at ~20% of a
+      screen: the primary button, the active tab, the .on-plum band.
+      Never a large field. This is the rule that keeps a vivid
+      palette from reading as cheap.
+   3. IVORY (#FFFFFF → #F8F5FE) — where content actually lives.
+      Reading happens on ivory, always.
+   4. CHAMPAGNE GOLD — value, custody, and completion. One meaning
+      per surface, never ornament.
+
+   ── WHY GLASS IS RATIONED ───────────────────────────────────
+   Translucency is a HIERARCHY tool, not a texture. A .glass panel
+   says "this floats above the ground and the ground still matters".
+   If everything is glass, nothing floats, and body text lands on an
+   unpredictable ground — which is a contrast failure you cannot
+   measure. So glass is allowed on exactly four things:
+      · the sidenav / topbar chrome           (floats over deep plum)
+      · the hero search                        (floats over the hero)
+      · cards inside .workspace                (float over the cockpit)
+      · .glass / .glass--deep / .glass--gold   (opt-in, deliberate)
+   Everything else is an opaque surface. Long-form text NEVER sits
+   directly on a blurred backdrop.
+   Fallback: every glass rule ships an opaque background first and
+   only upgrades inside @supports (backdrop-filter). A browser
+   without backdrop-filter gets a solid, correct, still-beautiful UI.
+
+   ── THE ONE NUMBER THAT DECIDED THE PALETTE (unchanged) ─────
      white on violet-500 #8B5CF6 = 4.23  FAIL
      white on violet-550 #8551F2 = 4.71  pass (the exact ceiling)
      white on violet-600 #7C3AED = 5.70  pass  <- PRIMARY
-   #7C3AED is the brightest, most saturated violet that still carries white
-   body text at AA. Anything brighter and the text stops being readable in
-   Hyderabad sunlight on a ₹8k LCD, which is where these users actually are.
+   #7C3AED is the brightest, most saturated violet that still carries
+   white body text at AA. Anything brighter and the text stops being
+   readable in Hyderabad sunlight on a ₹8k LCD, which is where these
+   users actually are.
 
-   THE TRAP WE WALKED INTO: the old gold #EBC97C gives only 3.58 on bright
-   violet — it FAILS as text. So gold splits in two:
+   THE TRAP WE WALKED INTO: the old gold #EBC97C gives only 3.58 on
+   bright violet — it FAILS as text. So gold splits in two:
      · gold FILLS and the emblem keep the metallic ramp
-     · gold TEXT on violet uses the light stops (#FBE8B8 = 4.70)
+     · gold TEXT on BRIGHT violet uses the light stops (#FBE8B8=4.70)
+     · gold TEXT on DEEP plum may use #F4D68E (12.24) — this is the
+       whole point of introducing a dark ground
      · gold-600/700 (#B07F32 = 1.61) may NEVER sit on violet
 
-   Keeping a vivid colour from looking cheap: bright violet is CHROME, never
-   FIELD. Full-chroma violet is capped at roughly 20% of any screen — the
-   header band, the primary button, the active tab. Every large surface is
-   violet-TINTED NEUTRAL (#F8F5FE), never flat #8B5CF6, and never against
-   pure #FFF or #000.
+   ── LAYOUT ──────────────────────────────────────────────────
+   Mobile-first. 768px = tablet (icon rail + no bottom nav).
+   1024px = desktop (248px sidenav + topbar + 1180px content max,
+   composed in columns rather than stretched).
    ============================================================ */
 
 /* ---------- 1. RAMPS ---------- */
@@ -42,6 +78,9 @@
   --plum-300:#C4B5FD; --plum-200:#DDD6FE; --plum-100:#EDE9FE;
   --plum-50:#F5F3FF;  --plum-25:#F8F5FE;
 
+  /* v3.0 — the deep end of the plum ramp, the "ground" material */
+  --plum-abyss:#140629; --plum-deep:#1B0B3A; --plum-mid:#2E1065; --plum-lift:#3F1780;
+
   --gold-50:#FFF9EC;  --gold-100:#FFF4D8; --gold-200:#FBE8B8;
   --gold-300:#F4D68E; --gold-400:#E0B558; --gold-500:#D4A24A;
   --gold-600:#B07F32; --gold-700:#8A6124; --gold-800:#5E401A;
@@ -53,6 +92,7 @@
      and the bottom third of the letterforms simply vanished */
   --gold-grad-on-violet: linear-gradient(180deg,#FFF4D8 0%,#FBE8B8 55%,#F4D68E 100%);
   --gold-sheen: linear-gradient(105deg,transparent 35%,rgba(255,249,236,.55) 50%,transparent 65%);
+  --gold-hair: linear-gradient(180deg,transparent,rgba(244,214,142,.55) 22%,rgba(244,214,142,.55) 78%,transparent);
 
   /* The brand band. Lightest and darkest stops stay within two ramp steps, so
      no part of it climbs above the white-text ceiling. */
@@ -60,11 +100,24 @@
     linear-gradient(150deg, #5B21B6 0%, #6D28D9 45%, #7C3AED 100%);
   --plum-marble: var(--violet-band);
 
+  /* v3.0 — ATMOSPHERE. Deep plum with light that comes from somewhere.
+     Blended worst case (the violet bloom over #2E1065) resolves to about
+     #4F229E, which still carries white at 10.2 and gold-300 at 7.2. */
+  --plum-ground: linear-gradient(168deg,#1B0B3A 0%,#2E1065 55%,#3B1477 100%);
+  --plum-atmos:
+    radial-gradient(120% 82% at 12% -6%, rgba(124,58,237,.42), transparent 62%),
+    radial-gradient(86%  64% at 92%  4%, rgba(212,162,74,.15), transparent 62%),
+    radial-gradient(110% 96% at 46% 128%, rgba(167,139,250,.20), transparent 66%),
+    linear-gradient(168deg,#1B0B3A 0%,#2E1065 55%,#3B1477 100%);
+  --plum-rail: linear-gradient(180deg,#1B0B3A 0%,#2E1065 62%,#241052 100%);
+
   /* SPACING */
   --sp-1:2px; --sp-2:4px; --sp-3:6px; --sp-4:8px; --sp-5:12px;
   --sp-6:16px; --sp-7:20px; --sp-8:24px; --sp-9:32px; --sp-10:40px;
   --sp-11:48px; --sp-12:64px; --sp-13:80px;
   --gutter:16px; --page-max:560px; --nav-h:64px;
+  /* v3.0 shell metrics */
+  --sidenav-w:248px; --rail-w:72px; --topbar-h:64px;
 
   --r-xs:4px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px;
   --r-2xl:28px; --r-3xl:36px; --r-pill:999px;
@@ -96,9 +149,15 @@
   --ease-back:cubic-bezier(.34,1.56,.64,1);
 
   --z-sticky:100; --z-header:200; --z-nav:300; --z-sheet:400; --z-toast:500; --z-splash:900;
+  --z-side:250; --z-fab:280;
 
   /* the ONLY safe text colour on a bright-violet or gold fill */
   --ink-on-bright:#120428;
+
+  /* v3.0 — GLASS. Blur radii are shared across themes; the tints are not. */
+  --blur-sm:8px; --blur:14px; --blur-lg:22px;
+  /* every tile may set --tile-accent to colour its own glow */
+  --tile-accent:var(--brand);
 }
 
 /* ---------- 2. LIGHT THEME (default) ----------
@@ -148,6 +207,29 @@
   --sh-gold:0 4px 14px rgba(176,127,50,.30);
   --sh-inset-top:inset 0 1px 0 rgba(255,255,255,.9);
   --sh-focus:0 0 0 3px var(--focus-halo);
+
+  /* GLASS (light). --glass-solid is the no-backdrop-filter fallback and is
+     deliberately near-opaque: an unblurred 70% white over a busy ground is
+     the one combination that actually fails to carry 4.5:1 text. */
+  --glass-bg:rgba(255,255,255,.70);
+  --glass-bg-strong:rgba(255,255,255,.86);
+  --glass-solid:#FCFAFF;
+  --glass-border:rgba(255,255,255,.75);
+  --glass-edge:rgba(46,16,101,.10);
+  --glass-shadow:
+    inset 0 1px 0 rgba(255,255,255,.85),
+    0 10px 28px rgba(46,16,101,.10),
+    0 2px 6px rgba(46,16,101,.06);
+  /* .58 blended over the ivory ground gives white only 4.55 — technically AA
+     and visibly washed out. .74 measures 7.86 and still reads as glass. */
+  --glass-deep-bg:rgba(34,16,65,.74);
+  --glass-deep-solid:#2A1450;
+  --glass-deep-border:rgba(196,181,253,.24);
+  --glass-gold-bg:linear-gradient(150deg,rgba(255,249,236,.86),rgba(251,232,184,.62));
+  --glass-gold-solid:#FFF6E4;
+  --glass-gold-border:rgba(224,181,88,.46);
+  --sh-glow-gold:0 0 0 1px rgba(224,181,88,.42), 0 10px 30px rgba(212,162,74,.24), 0 0 46px rgba(244,214,142,.20);
+  --sh-glow-brand:0 0 0 1px rgba(124,58,237,.28), 0 10px 30px rgba(124,58,237,.18);
 }
 
 /* ---------- 3. DARK THEME ---------- */
@@ -188,6 +270,26 @@
   --sh-gold:0 0 0 1px rgba(244,214,142,.30), 0 6px 22px rgba(212,162,74,.26);
   --sh-inset-top:inset 0 1px 0 rgba(243,238,255,.08);
   --sh-focus:0 0 0 4px var(--focus-halo);
+
+  /* GLASS (dark) — the tint LIFTS instead of whitening; a white veil on a
+     dark ground reads as fog, not glass, and destroys the plum identity. */
+  --glass-bg:rgba(56,33,94,.62);
+  --glass-bg-strong:rgba(56,33,94,.84);
+  --glass-solid:#2A1450;
+  --glass-border:rgba(196,181,253,.22);
+  --glass-edge:rgba(0,0,0,.44);
+  --glass-shadow:
+    inset 0 1px 0 rgba(243,238,255,.08),
+    0 12px 32px rgba(0,0,0,.55),
+    0 2px 6px rgba(0,0,0,.40);
+  --glass-deep-bg:rgba(20,6,41,.62);
+  --glass-deep-solid:#1E0D3C;
+  --glass-deep-border:rgba(196,181,253,.20);
+  --glass-gold-bg:linear-gradient(150deg,rgba(244,214,142,.18),rgba(212,162,74,.10));
+  --glass-gold-solid:#3A2A10;
+  --glass-gold-border:rgba(244,214,142,.42);
+  --sh-glow-gold:0 0 0 1px rgba(244,214,142,.44), 0 12px 34px rgba(212,162,74,.26), 0 0 52px rgba(244,214,142,.16);
+  --sh-glow-brand:0 0 0 1px rgba(167,139,250,.38), 0 12px 34px rgba(124,58,237,.30);
 }
 
 @media (prefers-color-scheme: dark){
@@ -215,6 +317,23 @@
     --sh-gold:0 0 0 1px rgba(244,214,142,.30), 0 6px 22px rgba(212,162,74,.26);
     --sh-inset-top:inset 0 1px 0 rgba(243,238,255,.08);
     --sh-focus:0 0 0 4px var(--focus-halo);
+    --glass-bg:rgba(56,33,94,.62);
+    --glass-bg-strong:rgba(56,33,94,.84);
+    --glass-solid:#2A1450;
+    --glass-border:rgba(196,181,253,.22);
+    --glass-edge:rgba(0,0,0,.44);
+    --glass-shadow:
+      inset 0 1px 0 rgba(243,238,255,.08),
+      0 12px 32px rgba(0,0,0,.55),
+      0 2px 6px rgba(0,0,0,.40);
+    --glass-deep-bg:rgba(20,6,41,.62);
+    --glass-deep-solid:#1E0D3C;
+    --glass-deep-border:rgba(196,181,253,.20);
+    --glass-gold-bg:linear-gradient(150deg,rgba(244,214,142,.18),rgba(212,162,74,.10));
+    --glass-gold-solid:#3A2A10;
+    --glass-gold-border:rgba(244,214,142,.42);
+    --sh-glow-gold:0 0 0 1px rgba(244,214,142,.44), 0 12px 34px rgba(212,162,74,.26), 0 0 52px rgba(244,214,142,.16);
+    --sh-glow-brand:0 0 0 1px rgba(167,139,250,.38), 0 12px 34px rgba(124,58,237,.30);
   }
 }
 
@@ -240,6 +359,41 @@
    apparent contrast without changing a single colour value */
 .on-plum, .on-plum .tiny, .on-plum .micro{ font-weight:var(--fw-med); }
 .on-plum .muted{ color:var(--ink-3); }
+
+/* ---------- 4b. THE DEEP PLUM GROUND (v3.0) ----------
+   The counterpart to .on-plum. Where .on-plum is bright CHROME with a
+   4.70 gold ceiling, .on-deep is a dark FIELD — and because the ground
+   is dark, real gold works: #F4D68E on #221041 = 12.24, on the brightest
+   blended bloom (#4F229E) = 7.2. This is the surface the sidenav, hero
+   and partner cockpit are made of. */
+.on-deep,
+.hero,
+.sidenav,
+.workspace,
+.glass--deep{
+  --surface:var(--glass-deep-bg); --surface-2:rgba(255,255,255,.07); --surface-3:rgba(255,255,255,.12);
+  --surface-inv:#F8F5FE;
+  --ink-1:#FFFFFF;              /* 17.3 on #221041 */
+  --ink-2:#E4DBFB;              /* 14.3 */
+  --ink-3:#C4B5FD;              /*  9.27 — comfortable AA body */
+  --ink-4:#8E7BB6;              /* decorative only */
+  --border:rgba(255,255,255,.13); --border-strong:rgba(255,255,255,.30);
+  --hairline:rgba(255,255,255,.08);
+  --accent:#F4D68E;             /* 12.24 — the whole reason for a dark ground */
+  --accent-soft:rgba(244,214,142,.13); --accent-border:rgba(244,214,142,.42);
+  --brand:#A78BFA; --brand-text:#C4B5FD; --brand-soft:rgba(167,139,250,.18); --brand-on:#150A2E;
+  --success:#6FD9AE; --success-soft:rgba(47,183,132,.18);
+  --warn:#F0B573;   --warn-soft:rgba(240,181,115,.18);
+  --danger:#F27F98; --danger-soft:rgba(242,127,152,.18);
+  --info:#8FBEFF;   --info-soft:rgba(143,190,255,.18);
+  --focus:#FFF4D8;  --focus-halo:rgba(244,214,142,.38);
+  --tile-accent:#F4D68E;
+  color:var(--ink-1);
+}
+.on-deep{background:var(--plum-atmos)}
+.on-deep .muted,.hero .muted,.sidenav .muted,.workspace .muted{color:var(--ink-3)}
+.on-deep .wordmark,.hero .wordmark,.sidenav .wordmark{
+  background:var(--gold-grad);-webkit-background-clip:text;background-clip:text}
 
 /* ---------- 5. BASE ---------- */
 *,*::before,*::after{box-sizing:border-box}
@@ -277,6 +431,18 @@ a{color:var(--brand-text);text-underline-offset:3px}
 .wrap{width:100%;max-width:var(--page-max);margin:0 auto;padding:0 var(--gutter)}
 .hide{display:none !important}
 
+/* ---------- 5b. TYPOGRAPHY HELPERS (v3.0) ---------- */
+.display,.h-display{font-family:var(--font-display);font-weight:var(--fw-bold);letter-spacing:-.02em}
+.h-display{font-size:var(--fs-2xl);line-height:var(--lh-2xl)}
+.h-sec{font-size:var(--fs-lg);line-height:var(--lh-lg);font-weight:var(--fw-bold);letter-spacing:-.015em}
+.eyebrow{font-size:var(--fs-micro);line-height:var(--lh-micro);letter-spacing:var(--ls-wider);
+  text-transform:uppercase;font-weight:var(--fw-bold);color:var(--ink-3)}
+.meta{font-size:var(--fs-micro);line-height:var(--lh-micro);letter-spacing:var(--ls-wide);
+  text-transform:uppercase;font-weight:var(--fw-semi);color:var(--ink-3)}
+.num-xl{font-size:var(--fs-3xl);line-height:var(--lh-3xl);font-weight:var(--fw-black);
+  letter-spacing:-.028em;font-variant-numeric:tabular-nums lining-nums;font-feature-settings:"tnum" 1}
+.num-xl.display{font-weight:var(--fw-bold);letter-spacing:-.02em}
+
 /* ---------- 6. FOCUS ---------- */
 :where(a,button,input,select,textarea,[tabindex]):focus-visible{
   outline:2px solid var(--focus);outline-offset:2px;box-shadow:var(--sh-focus);border-radius:inherit;
@@ -300,6 +466,7 @@ a{color:var(--brand-text);text-underline-offset:3px}
 .btn[disabled]{cursor:not-allowed;transform:none;box-shadow:none;
   background:var(--surface-3);color:var(--ink-4);filter:none}
 .on-plum .btn[disabled]{background:rgba(255,255,255,.18);color:#DDD0FD}
+.on-deep .btn[disabled],.workspace .btn[disabled],.hero .btn[disabled]{background:rgba(255,255,255,.10);color:#9C8CC0}
 .btn--sm{height:36px;padding:0 14px;font-size:13px}
 .btn--lg{height:52px;font-size:16px}
 .btn--block{width:100%}
@@ -320,6 +487,14 @@ a{color:var(--brand-text);text-underline-offset:3px}
 .on-plum .btn--ghost:hover{background:rgba(255,255,255,.16)}
 .btn--danger{background:var(--danger);color:var(--danger-on)}
 :root[data-theme="dark"] .btn--danger{background:transparent;color:var(--danger);box-shadow:inset 0 0 0 1.5px currentColor}
+
+/* .sheen — an opt-in gold pass, for the ONE action that matters on a screen.
+   It is a loop, so it is rationed: on more than one element per view it stops
+   reading as "this one" and starts reading as a broken page. */
+.sheen{position:relative;overflow:hidden;isolation:isolate}
+.sheen::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+  background:var(--gold-sheen);transform:translateX(-140%);
+  animation:sheen 2600ms var(--ease-std) 900ms infinite}
 
 /* ---------- 8. FIELDS ---------- */
 .field{position:relative;margin-bottom:var(--sp-5)}
@@ -349,34 +524,127 @@ a{color:var(--brand-text);text-underline-offset:3px}
 .otp-row input{width:48px;height:56px;text-align:center;font-size:22px;font-weight:var(--fw-bold);padding:0;
   background:var(--surface-2);border:1.5px solid var(--border-strong);border-radius:var(--r-md);color:var(--ink-1)}
 
-/* ---------- 9. CARDS / TILES ---------- */
+/* ---------- 9. GLASS (v3.0) ----------
+   Opaque first, translucent only where the browser can actually blur. */
+.glass{
+  position:relative;
+  background:var(--glass-solid);
+  border:1px solid var(--glass-edge);
+  border-radius:var(--r-xl);
+  box-shadow:var(--glass-shadow);
+}
+/* the 1px inner highlight that makes an edge look like a lit bevel rather
+   than a drawn line — this is the whole trick */
+.glass::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  border:1px solid var(--glass-border);mix-blend-mode:overlay;opacity:.9}
+.glass--deep{background:var(--glass-deep-solid);border-color:var(--glass-deep-border)}
+.glass--deep::before{border-color:rgba(255,255,255,.16)}
+.glass--gold{background:var(--glass-gold-solid);border-color:var(--glass-gold-border);
+  box-shadow:var(--glass-shadow),0 0 34px -14px rgba(212,162,74,.55)}
+.glass--gold::before{border-color:rgba(255,249,236,.55)}
+@supports ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+  .glass{background:var(--glass-bg);
+    -webkit-backdrop-filter:blur(var(--blur)) saturate(150%);
+            backdrop-filter:blur(var(--blur)) saturate(150%)}
+  .glass--deep{background:var(--glass-deep-bg)}
+  .glass--gold{background:var(--glass-gold-bg)}
+}
+
+/* ---------- 10. CARDS / TILES ---------- */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
   padding:var(--sp-6);box-shadow:var(--sh-2)}
 .on-plum.card,.on-plum .card{border-color:var(--border)}
-.card--tap{cursor:pointer;transition:transform var(--dur-fast),box-shadow var(--dur-fast)}
+.card--tap{cursor:pointer;transition:transform var(--dur-fast),box-shadow var(--dur-fast),border-color var(--dur-fast)}
 .card--tap:hover{box-shadow:var(--sh-3)}
 .card--tap:active{transform:scale(.985)}
 .card--gold{border-color:var(--accent-border);background:linear-gradient(180deg,var(--accent-soft),var(--surface))}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.tile{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;
+
+/* .cmd — the COMMAND CARD. One card, one question, one action.
+   The action is a slot rather than a free-floating button so that every
+   command card on every screen puts its verb in the same place. */
+.cmd{position:relative;display:flex;flex-direction:column;gap:var(--sp-3);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);
+  padding:var(--sp-7);box-shadow:var(--sh-3);overflow:hidden}
+.cmd::after{content:"";position:absolute;left:0;right:0;top:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent-border),transparent);opacity:.8}
+.cmd__title{font-size:var(--fs-lg);line-height:var(--lh-lg);font-weight:var(--fw-bold);
+  letter-spacing:-.018em;color:var(--ink-1)}
+.cmd__sub{font-size:var(--fs-sm);line-height:var(--lh-sm);color:var(--ink-3);max-width:46ch}
+.cmd__action{display:flex;flex-direction:column;gap:var(--sp-4);margin-top:var(--sp-5)}
+.cmd__action > .btn{width:100%}
+
+/* .bestmatch — the ranked winner. It is allowed to be louder than anything
+   else on the screen, because deciding is the whole job of that screen. */
+.bestmatch{position:relative;border-radius:var(--r-2xl);padding:var(--sp-8) var(--sp-7);
+  background:linear-gradient(180deg,var(--accent-soft),var(--surface) 58%);
+  border:1.5px solid var(--accent-border);box-shadow:var(--sh-glow-gold),var(--sh-4);overflow:hidden}
+.bestmatch::before{content:"";position:absolute;inset:-40% -20% auto -20%;height:180px;pointer-events:none;
+  background:radial-gradient(50% 100% at 50% 0%,rgba(244,214,142,.42),transparent 70%)}
+.bestmatch > *{position:relative}
+.bestmatch__price{font-size:var(--fs-4xl);line-height:var(--lh-4xl);font-weight:var(--fw-black);
+  letter-spacing:-.03em;color:var(--ink-1);
+  font-variant-numeric:tabular-nums lining-nums;font-feature-settings:"tnum" 1}
+.bestmatch__why{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3) var(--sp-5);
+  margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--accent-border)}
+.bestmatch__why > *{display:inline-flex;align-items:center;gap:5px;
+  font-size:var(--fs-cap);line-height:var(--lh-cap);font-weight:var(--fw-semi);color:var(--ink-2)}
+
+/* .tile — evolved. The medallion carries the colour, --tile-accent carries
+   the context, and the label stays plain ink so the grid still scans. */
+.tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;
   padding:14px 8px;background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--r-lg);text-align:center;min-height:112px;
-  transition:transform var(--dur-fast),border-color var(--dur-fast),background var(--dur-fast)}
+  border-radius:var(--r-lg);text-align:center;min-height:112px;overflow:hidden;
+  transition:transform var(--dur-fast),border-color var(--dur-fast),background var(--dur-fast),
+             box-shadow var(--dur-fast)}
+/* the contextual accent: a soft bloom from the top edge, not a coloured card */
+.tile::before{content:"";position:absolute;left:0;right:0;top:0;height:44px;pointer-events:none;
+  background:radial-gradient(70% 100% at 50% 0%,var(--tile-accent),transparent 72%);
+  opacity:.10;transition:opacity var(--dur-fast)}
+.tile > *{position:relative}
 .tile:active{transform:scale(.96)}
-.tile:hover{border-color:var(--brand);background:var(--brand-soft)}
-.tile[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft)}
+.tile:hover{border-color:var(--tile-accent);background:var(--brand-soft);box-shadow:var(--sh-2)}
+.tile:hover::before{opacity:.20}
+.tile[aria-pressed="true"]{border-color:var(--tile-accent);background:var(--brand-soft)}
+.tile[aria-pressed="true"]::before{opacity:.24}
 .tile .med,.med{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto}
 .tile .lbl{font-size:12px;line-height:15px;font-weight:var(--fw-semi);color:var(--ink-1);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .tile .from{font-size:10px;color:var(--ink-3);font-weight:var(--fw-bold)}
+/* horizontal variant — icon left, text right, for lists rather than grids */
+.tile--wide{flex-direction:row;align-items:center;text-align:left;gap:var(--sp-5);
+  min-height:0;padding:var(--sp-5) var(--sp-6);width:100%}
+.tile--wide::before{inset:0 auto 0 0;width:60px;height:auto;
+  background:radial-gradient(100% 70% at 0% 50%,var(--tile-accent),transparent 74%)}
+.tile--wide .lbl{-webkit-line-clamp:1;font-size:14px;line-height:19px}
+.tile--wide .med{width:40px;height:40px}
 .rail{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;
   scrollbar-width:none;padding:2px var(--gutter) 6px;margin:0 calc(var(--gutter) * -1)}
 .rail::-webkit-scrollbar{display:none}
 .rail > *{scroll-snap-align:start;flex:0 0 auto}
 .rail .tile{width:106px}
+.rail .tile--wide{width:min(280px,78vw)}
 
-/* ---------- 10. BADGES / CHIPS ---------- */
+/* .expand — a details/summary that behaves like a card, so "more detail"
+   never costs a navigation. */
+.expand{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-1);overflow:hidden}
+.expand + .expand{margin-top:var(--sp-4)}
+.expand > summary{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-5);
+  padding:var(--sp-5) var(--sp-6);cursor:pointer;list-style:none;
+  font-size:var(--fs-base);font-weight:var(--fw-semi);color:var(--ink-1)}
+.expand > summary::-webkit-details-marker{display:none}
+.expand > summary::after{content:"";flex:0 0 auto;width:8px;height:8px;
+  border-right:2px solid var(--ink-3);border-bottom:2px solid var(--ink-3);
+  transform:rotate(45deg) translate(-2px,-2px);
+  transition:transform var(--dur-quick) var(--ease-emph)}
+.expand[open] > summary::after{transform:rotate(-135deg) translate(-2px,-2px)}
+.expand > summary:hover{background:var(--surface-2)}
+.expand[open] > summary{border-bottom:1px solid var(--border)}
+.expand .sbody{padding:var(--sp-6)}
+
+/* ---------- 11. BADGES / CHIPS / PILLS ---------- */
 .badge{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;
   border-radius:var(--r-pill);font:var(--fw-bold) 11px/1 var(--font-ui);
   letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}
@@ -387,24 +655,76 @@ a{color:var(--brand-text);text-underline-offset:3px}
 .badge--info{background:var(--info-soft);color:var(--info)}
 .badge--soft{background:var(--surface-2);color:var(--ink-2)}
 .on-plum .badge--soft{background:rgba(255,255,255,.20);color:#FFFFFF}
+.on-deep .badge--soft,.workspace .badge--soft{background:rgba(255,255,255,.14);color:#FFFFFF}
+
+/* .pill — a STATUS, not a filter. The leading dot is the point: colour alone
+   is not a signal, so every pill carries a shape too. Tones match .badge. */
+.pill{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 11px 0 9px;
+  border-radius:var(--r-pill);border:1px solid var(--border);background:var(--surface-2);
+  color:var(--ink-2);font:var(--fw-bold) var(--fs-micro)/1 var(--font-ui);
+  letter-spacing:var(--ls-wide);text-transform:uppercase;white-space:nowrap;
+  vertical-align:middle}
+.pill::before{content:"";flex:0 0 auto;width:7px;height:7px;border-radius:50%;
+  background:currentColor;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 22%,transparent)}
+.pill--ok{background:var(--success-soft);border-color:transparent;color:var(--success)}
+.pill--warn{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
+.pill--bad{background:var(--danger-soft);border-color:transparent;color:var(--danger)}
+.pill--info{background:var(--info-soft);border-color:transparent;color:var(--info)}
+.pill--soft{background:var(--surface-2);border-color:var(--border);color:var(--ink-2)}
+.pill--gold{background:var(--accent-soft);border-color:var(--accent-border);color:var(--accent)}
+/* light theme only: --accent (#8A6124) is the readable gold on ivory; the
+   .on-deep / dark scopes already swap it to #F4D68E */
+.pill--live{position:relative;animation:pillbeat 2.4s var(--ease-in-out) infinite}
+.pill--live::before{animation:dotbeat 2.4s var(--ease-in-out) infinite}
+@keyframes pillbeat{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 14px -2px currentColor}}
+@keyframes dotbeat{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.72);opacity:.65}}
+
 .chip{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;
   border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-2);
   border-radius:var(--r-pill);font-size:13px;font-weight:var(--fw-semi);white-space:nowrap;
-  transition:background var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast)}
+  transition:background var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast),
+             box-shadow var(--dur-fast)}
 .chip[aria-pressed="true"],.chip.on{background:var(--brand);border-color:var(--brand);color:#FFFFFF}
 .on-plum .chip{background:rgba(255,255,255,.14);border-color:var(--border);color:#FFFFFF}
 .on-plum .chip.on{background:#FFFFFF;color:var(--violet-700);border-color:#FFFFFF}
+.on-deep .chip,.workspace .chip{background:rgba(255,255,255,.08);border-color:var(--border-strong);color:#FFFFFF}
+.on-deep .chip.on,.workspace .chip.on,
+.on-deep .chip[aria-pressed="true"],.workspace .chip[aria-pressed="true"]{
+  background:var(--gold-grad-soft);color:var(--ink-on-bright);border-color:transparent}
+/* .chip--smart carries a leading glyph slot, which lets a filter row say what
+   it filters without spending a word on it */
+.chip--smart{padding-left:8px}
+.chip__ic{flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;
+  background:var(--brand-soft);color:var(--brand-text);line-height:0}
+.chip--smart[aria-pressed="true"] .chip__ic,.chip--smart.on .chip__ic{background:rgba(255,255,255,.24);color:#FFFFFF}
 .chiprow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
 .chiprow::-webkit-scrollbar{display:none}
 
-/* ---------- 11. SECTIONS ---------- */
+/* .seg — segmented control. One track, one lit segment; not five buttons. */
+.seg{display:inline-flex;padding:3px;gap:2px;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:var(--r-pill);max-width:100%;overflow-x:auto;
+  scrollbar-width:none}
+.seg::-webkit-scrollbar{display:none}
+.seg__btn{flex:1 1 auto;min-width:max-content;height:34px;padding:0 16px;border:0;border-radius:var(--r-pill);
+  background:transparent;color:var(--ink-3);font:var(--fw-semi) 13px/1 var(--font-ui);
+  white-space:nowrap;transition:background var(--dur-fast),color var(--dur-fast),box-shadow var(--dur-fast)}
+.seg__btn:hover{color:var(--ink-1)}
+.seg__btn[aria-pressed="true"],.seg__btn[aria-selected="true"]{
+  background:var(--surface);color:var(--ink-1);font-weight:var(--fw-bold);box-shadow:var(--sh-1)}
+.on-deep .seg,.workspace .seg,.on-plum .seg{background:rgba(255,255,255,.09);border-color:var(--border)}
+.on-deep .seg__btn[aria-pressed="true"],.workspace .seg__btn[aria-pressed="true"],
+.on-plum .seg__btn[aria-pressed="true"],
+.on-deep .seg__btn[aria-selected="true"],.workspace .seg__btn[aria-selected="true"],
+.on-plum .seg__btn[aria-selected="true"]{background:#FFFFFF;color:var(--violet-800)}
+
+/* ---------- 12. SECTIONS ---------- */
 .sec{margin:var(--sp-9) 0 0}
 .sec > .hd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:var(--sp-5)}
 .sec > .hd h2{font-size:var(--fs-lg);line-height:var(--lh-lg)}
 .sec > .hd .more{font-size:13px;font-weight:var(--fw-bold);color:var(--brand-text);background:none;border:0;padding:4px}
 .rule{height:1px;background:var(--border);margin:var(--sp-7) 0}
 
-/* ---------- 12. TRACKER ---------- */
+/* ---------- 13. TRACKER / TIMELINE / STEPBAR ---------- */
 .track{display:grid;grid-template-columns:24px 1fr;column-gap:12px;margin:0;padding:0;list-style:none}
 .track li{display:contents}
 .track .node{position:relative;display:grid;place-items:center;width:24px}
@@ -426,7 +746,56 @@ a{color:var(--brand-text);text-underline-offset:3px}
 .on-plum .mini-track i{background:rgba(255,255,255,.28)}
 .on-plum .mini-track i.on{background:var(--gold-grad-on-violet)}
 
-/* ---------- 13. SAVINGS STRIP ---------- */
+/* .timeline — the same idea as .track, but it turns: vertical on a phone
+   (where a list is the natural shape) and horizontal from 768 up (where a
+   journey reads left-to-right). Done is gold, current pulses, pending is
+   quiet but never invisible. */
+.timeline{display:flex;flex-direction:column;gap:0;margin:0;padding:0;list-style:none}
+.timeline__node{position:relative;display:grid;grid-template-columns:22px 1fr;
+  column-gap:var(--sp-5);align-items:start;padding-bottom:var(--sp-6)}
+.timeline__node:last-child{padding-bottom:0}
+.timeline__dot{grid-row:1;grid-column:1;width:22px;height:22px;border-radius:50%;
+  display:grid;place-items:center;font-size:10px;font-weight:var(--fw-bold);
+  background:var(--surface-2);border:2px solid var(--border-strong);color:var(--ink-3);
+  z-index:1;transition:background var(--dur-base),border-color var(--dur-base)}
+.timeline__label{grid-row:1;grid-column:2;font-size:var(--fs-sm);line-height:var(--lh-sm);
+  font-weight:var(--fw-semi);color:var(--ink-2);padding-top:2px}
+.timeline__label small{display:block;font-size:var(--fs-micro);line-height:var(--lh-micro);
+  color:var(--ink-3);font-weight:var(--fw-med);margin-top:2px}
+.timeline__bar{position:absolute;left:10px;top:22px;bottom:0;width:2px;
+  background:var(--border);border-radius:var(--r-pill)}
+.timeline__node.done .timeline__dot{background:var(--accent-fill);border-color:transparent;color:var(--accent-on-fill)}
+.timeline__node.done .timeline__bar{background:var(--gold-grad-soft)}
+.timeline__node.done .timeline__label{color:var(--ink-1)}
+.timeline__node.cur .timeline__dot{background:transparent;border:2.5px solid var(--brand);color:var(--brand);
+  animation:pulse 1.8s var(--ease-in-out) infinite}
+.timeline__node.cur .timeline__label{color:var(--ink-1);font-weight:var(--fw-bold)}
+.timeline__node.pend .timeline__label{color:var(--ink-4);font-weight:var(--fw-med)}
+
+/* .stepbar — the booking chronology: NEED → SERVICE → DETAILS → MATCH →
+   PRICE → CONFIRM. It is deliberately thin: it reports where you are, it does
+   not compete with the question being asked. */
+.stepbar{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;
+  gap:0;margin:0;padding:var(--sp-4) 0 var(--sp-2);list-style:none}
+.stepbar__step{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;
+  font-size:9px;line-height:12px;letter-spacing:var(--ls-wider);text-transform:uppercase;
+  font-weight:var(--fw-bold);color:var(--ink-4);text-align:center;min-width:0}
+.stepbar__step > span{display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stepbar__step::before{content:"";width:9px;height:9px;border-radius:50%;
+  background:var(--border-strong);z-index:1;
+  transition:background var(--dur-base),box-shadow var(--dur-base),transform var(--dur-base)}
+/* the connecting line lives on the step, so it can be coloured per-segment */
+.stepbar__step::after{content:"";position:absolute;top:4px;left:-50%;width:100%;height:1.5px;
+  background:var(--border);z-index:0}
+.stepbar__step:first-child::after{display:none}
+.stepbar__step.done{color:var(--accent)}
+.stepbar__step.done::before{background:var(--gold-grad-soft);box-shadow:0 0 0 2px var(--accent-soft)}
+.stepbar__step.done::after,.stepbar__step.cur::after{background:var(--gold-grad-soft)}
+.stepbar__step.cur{color:var(--ink-1)}
+.stepbar__step.cur::before{background:var(--gold-400);transform:scale(1.34);
+  box-shadow:0 0 0 3px var(--accent-soft),0 0 12px rgba(212,162,74,.55)}
+
+/* ---------- 14. SAVINGS STRIP / CAPSULES ---------- */
 .saves{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);
   border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:var(--sp-5) 0}
 .saves > div{background:var(--surface);padding:10px 8px;text-align:center}
@@ -435,10 +804,44 @@ a{color:var(--brand-text);text-underline-offset:3px}
 .saves .good .v{color:var(--success)}
 .saves .old .v{color:var(--ink-4);text-decoration:line-through}
 
-/* ---------- 14. SHEET / TOAST ---------- */
+/* .capsule — one number, named, with its movement. auto-fit keeps a row of
+   two on a phone and a row of five on a desktop without a single media query. */
+.capsules{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.capsule{position:relative;display:flex;flex-direction:column;gap:2px;overflow:hidden;
+  padding:var(--sp-5) var(--sp-6);background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-lg);box-shadow:var(--sh-1);min-width:0}
+.capsule::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--border-strong);border-radius:var(--r-pill)}
+.capsule__k{font-size:10px;line-height:13px;letter-spacing:var(--ls-wider);text-transform:uppercase;
+  font-weight:var(--fw-bold);color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.capsule__v{font-size:var(--fs-xl);line-height:var(--lh-xl);font-weight:var(--fw-black);
+  letter-spacing:-.026em;color:var(--ink-1);
+  font-variant-numeric:tabular-nums lining-nums;font-feature-settings:"tnum" 1}
+.capsule__v.display{font-family:var(--font-display);font-weight:var(--fw-bold);letter-spacing:-.018em}
+.capsule__d{font-size:var(--fs-micro);line-height:var(--lh-micro);font-weight:var(--fw-semi);color:var(--ink-3)}
+.capsule--gold::before{background:var(--gold-grad-soft)}
+.capsule--gold{background:linear-gradient(180deg,var(--accent-soft),var(--surface) 70%);border-color:var(--accent-border)}
+.capsule--gold .capsule__d{color:var(--accent)}
+.capsule--ok::before{background:var(--success)}   .capsule--ok .capsule__d{color:var(--success)}
+.capsule--warn::before{background:var(--warn)}    .capsule--warn .capsule__d{color:var(--warn)}
+.capsule--bad::before{background:var(--danger)}   .capsule--bad .capsule__d{color:var(--danger)}
+.capsule--info::before{background:var(--info)}    .capsule--info .capsule__d{color:var(--info)}
+.capsule--soft{background:var(--surface-2);box-shadow:none}
+.capsule--soft::before{background:var(--border)}
+/* .metricrow — the same capsules, but as a cockpit strip that scrolls */
+.metricrow{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;
+  padding:2px var(--gutter) 6px;margin:0 calc(var(--gutter) * -1);scroll-snap-type:x proximity}
+.metricrow::-webkit-scrollbar{display:none}
+.metricrow > *{flex:0 0 auto;scroll-snap-align:start}
+.metricrow .capsule{min-width:148px}
+
+/* ---------- 15. SHEET / TOAST ---------- */
 .scrim{position:fixed;inset:0;background:var(--scrim);z-index:var(--z-sheet);
   opacity:0;pointer-events:none;transition:opacity var(--dur-quick)}
 .scrim.on{opacity:1;pointer-events:auto}
+@supports ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+  .scrim{-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+}
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:calc(var(--z-sheet) + 1);
   background:var(--surface);border-radius:var(--r-2xl) var(--r-2xl) 0 0;box-shadow:var(--sh-5);
   max-height:88svh;overflow-y:auto;padding:8px var(--gutter) calc(20px + env(safe-area-inset-bottom));
@@ -456,26 +859,172 @@ a{color:var(--brand-text);text-underline-offset:3px}
   opacity:0;pointer-events:none;transition:opacity var(--dur-quick),transform var(--dur-quick) var(--ease-emph)}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* ---------- 15. EMPTY / SKELETON ---------- */
+/* ---------- 16. EMPTY / SKELETON ---------- */
 .empty{display:flex;flex-direction:column;align-items:center;text-align:center;
   padding:48px 24px;max-width:320px;margin:0 auto;gap:8px}
 .empty .em-ico{opacity:.18;margin-bottom:12px}
 .empty h3{font-size:var(--fs-md)}
 .empty p{font-size:var(--fs-base);color:var(--ink-3)}
 .empty .btn{margin-top:12px}
+/* .empty--smart — an empty state that is a doorway, not an apology. The icon
+   gets a medallion instead of 18% opacity, and there is exactly one verb. */
+.empty--smart{max-width:380px;padding:40px 24px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);box-shadow:var(--sh-1)}
+.empty--smart .em-ico{opacity:1;width:64px;height:64px;border-radius:50%;display:grid;place-items:center;
+  background:var(--brand-soft);color:var(--brand-text);
+  box-shadow:inset 0 0 0 1px var(--border);margin-bottom:16px}
+.empty--smart .btn{margin-top:18px;min-width:200px}
 .skel{background:var(--surface-2);border-radius:var(--r-sm);position:relative;overflow:hidden}
 .skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);
   background:linear-gradient(90deg,transparent,var(--surface-3),transparent);
   animation:skelmv 1.25s var(--ease-in-out) infinite}
 @keyframes skelmv{to{transform:translateX(100%)}}
 
-/* ---------- 16. STARS ---------- */
+/* ---------- 17. STARS / AVATARS ---------- */
 .stars{position:relative;display:inline-block;line-height:1;font-size:13px;letter-spacing:1px;color:var(--ink-4)}
 .stars i{position:absolute;inset:0;overflow:hidden;white-space:nowrap;color:var(--gold-600);width:var(--pct,0%)}
 :root[data-theme="dark"] .stars i{color:var(--gold-300)}
 .on-plum .stars i{color:var(--gold-200)}
+.on-deep .stars i,.workspace .stars i,.hero .stars i{color:var(--gold-300)}
 
-/* ---------- 17. SHELL ---------- */
+.avatar{flex:0 0 auto;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
+  background:var(--brand-soft);color:var(--brand-text);overflow:hidden;
+  font:var(--fw-bold) 14px/1 var(--font-ui);text-transform:uppercase;
+  box-shadow:0 0 0 2px var(--surface)}
+.avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.avatar--sm{width:26px;height:26px;font-size:11px}
+.avatar--md{width:36px;height:36px;font-size:14px}
+.avatar--lg{width:54px;height:54px;font-size:21px}
+.avatar--gold{background:var(--accent-fill);color:var(--accent-on-fill)}
+/* the stack overlaps by a third, which is enough to read as "a group" and
+   still enough to count them */
+.avatars{display:inline-flex;align-items:center}
+.avatars > .avatar + .avatar{margin-left:-12px}
+.avatars > .avatar--sm + .avatar--sm{margin-left:-9px}
+.avatars > .avatar--lg + .avatar--lg{margin-left:-18px}
+.avatars > .avatar{position:relative}
+.avatars > .avatar:nth-child(1){z-index:5}
+.avatars > .avatar:nth-child(2){z-index:4}
+.avatars > .avatar:nth-child(3){z-index:3}
+.avatars > .avatar:nth-child(4){z-index:2}
+.avatars > .avatar:nth-child(5){z-index:1}
+
+/* ---------- 18. HERO ---------- */
+.hero{position:relative;overflow:hidden;
+  background:var(--plum-atmos);
+  padding:var(--sp-9) var(--gutter) var(--sp-10);
+  border-radius:0 0 var(--r-3xl) var(--r-3xl)}
+/* a faint circular contour — the open circle, implied rather than drawn */
+.hero::after{content:"";position:absolute;right:-90px;top:-110px;width:320px;height:320px;
+  border-radius:50%;pointer-events:none;
+  border:1px solid rgba(244,214,142,.16);
+  box-shadow:0 0 0 40px rgba(244,214,142,.04)}
+.hero > *{position:relative;z-index:1}
+.hero__title{font-family:var(--font-display);font-weight:var(--fw-bold);
+  font-size:var(--fs-2xl);line-height:var(--lh-2xl);letter-spacing:-.02em;color:#FFFFFF;
+  max-width:18ch;text-wrap:balance}
+.hero__title em{font-style:normal;color:var(--gold-300)}   /* 12.24 on this ground */
+.hero p{color:var(--ink-3);font-size:var(--fs-sm);line-height:var(--lh-sm);max-width:38ch}
+/* .hero__search — the one place a large glass surface is unambiguously right:
+   it floats over the hero, and it holds a single line of input, not prose. */
+.hero__search{display:flex;align-items:center;gap:12px;height:56px;padding:0 8px 0 18px;
+  margin-top:var(--sp-7);border-radius:var(--r-pill);
+  background:rgba(255,255,255,.94);border:1px solid rgba(255,255,255,.55);
+  box-shadow:0 14px 34px rgba(12,4,30,.34),inset 0 1px 0 rgba(255,255,255,.9);
+  color:#6B5A87;
+  transition:box-shadow var(--dur-quick),background var(--dur-quick)}
+.hero__search input{flex:1;min-width:0;height:52px;border:0;background:transparent;outline:none;
+  font-size:16px;font-weight:var(--fw-med);color:#1E1033}
+.hero__search input::placeholder{color:#6B5A87}
+.hero__search:focus-within{box-shadow:0 14px 34px rgba(12,4,30,.40),0 0 0 3px rgba(244,214,142,.55)}
+.hero__search .btn{flex:0 0 auto;height:44px}
+@supports ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+  .hero__search{background:rgba(255,255,255,.82);
+    -webkit-backdrop-filter:blur(var(--blur-lg)) saturate(160%);
+            backdrop-filter:blur(var(--blur-lg)) saturate(160%)}
+}
+.hero .eyebrow{color:var(--gold-300);letter-spacing:var(--ls-widest)}
+
+/* ---------- 19. WORKSPACE (the partner / shop cockpit) ----------
+   A whole main area on deep plum. Because --surface is a translucent plum,
+   every plain .card inside becomes glass automatically — the views do not
+   have to know. */
+.workspace{position:relative;background:var(--plum-atmos);
+  padding:var(--sp-7) 0 var(--sp-10);min-height:100%}
+.workspace .card,
+.workspace .cmd,
+.workspace .capsule,
+.workspace .expand{
+  background:var(--glass-deep-solid);border-color:var(--border);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 10px 26px rgba(6,2,16,.34)}
+.workspace .card--gold{background:linear-gradient(180deg,rgba(244,214,142,.16),rgba(34,16,65,.72));
+  border-color:var(--accent-border)}
+.workspace .capsule::before{background:rgba(255,255,255,.22)}
+.workspace .capsule--gold::before{background:var(--gold-grad-soft)}
+.workspace .capsule--gold{background:linear-gradient(180deg,rgba(244,214,142,.14),rgba(34,16,65,.72))}
+.workspace .empty--smart{background:var(--glass-deep-solid);border-color:var(--border)}
+.workspace .skel{background:rgba(255,255,255,.07)}
+.workspace .rule,.on-deep .rule{background:var(--border)}
+@supports ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+  .workspace .card,.workspace .cmd,.workspace .capsule,.workspace .expand,.workspace .empty--smart{
+    background:var(--surface);
+    -webkit-backdrop-filter:blur(var(--blur)) saturate(150%);
+            backdrop-filter:blur(var(--blur)) saturate(150%)}
+}
+
+/* ---------- 20. MONEY FLOW ----------
+   CUSTOMER → ESCROW → PARTNER. The four money STATES are the most important
+   colours in the app: a user must never mistake "held" for "released". They
+   are therefore four different HUES, never four shades of one, and each also
+   carries a distinct word. Do not reuse these colours for anything else.
+     available = green   (it is yours, now)
+     held      = violet  (SAAHAA is holding it — brand custody)
+     pending   = blue    (a clock is running)
+     released  = gold    (it has been paid out — the celebratory one) */
+.moneyflow{display:flex;flex-direction:column;gap:var(--sp-4);
+  padding:var(--sp-6);border-radius:var(--r-xl);
+  background:var(--surface-2);border:1px solid var(--border)}
+.moneyflow__node{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-5);
+  padding:var(--sp-5) var(--sp-6);border-radius:var(--r-lg);
+  background:var(--surface);border:1px solid var(--border);box-shadow:var(--sh-1)}
+.moneyflow__node b{display:block;font-size:var(--fs-cap);line-height:var(--lh-cap);
+  letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--ink-3);font-weight:var(--fw-bold)}
+.moneyflow__node span{font-size:var(--fs-md);line-height:var(--lh-md);font-weight:var(--fw-black);
+  color:var(--ink-1);font-variant-numeric:tabular-nums lining-nums;font-feature-settings:"tnum" 1}
+/* the arrow: a dashed gold line that travels in the direction the money goes */
+.moneyflow__arrow{position:relative;height:32px;margin:-2px 0;flex:0 0 auto}
+.moneyflow__arrow::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;
+  transform:translateX(-50%);
+  background:repeating-linear-gradient(180deg,var(--gold-400) 0 6px,transparent 6px 12px);
+  background-size:2px 12px;animation:flowdown 900ms linear infinite}
+.moneyflow__arrow::after{content:"";position:absolute;left:50%;bottom:-1px;width:7px;height:7px;
+  transform:translateX(-50%) rotate(45deg);
+  border-right:2px solid var(--gold-400);border-bottom:2px solid var(--gold-400)}
+@keyframes flowdown{to{background-position:0 12px}}
+/* the escrow fan-out: partner/shop, fee, GST, rider */
+.moneyflow__split{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px;
+  padding:var(--sp-5);border-radius:var(--r-lg);
+  background:var(--surface);border:1px dashed var(--accent-border)}
+.moneyflow__split > *{display:flex;flex-direction:column;gap:1px;min-width:0}
+.moneyflow__split b{font-size:10px;line-height:13px;letter-spacing:var(--ls-wide);
+  text-transform:uppercase;color:var(--ink-3);font-weight:var(--fw-bold)}
+.moneyflow__split span{font-size:var(--fs-base);font-weight:var(--fw-bold);color:var(--ink-1);
+  font-variant-numeric:tabular-nums lining-nums;font-feature-settings:"tnum" 1}
+
+.state{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 8px;
+  border-radius:var(--r-pill);font:var(--fw-bold) var(--fs-micro)/1 var(--font-ui);
+  letter-spacing:var(--ls-wide);text-transform:uppercase;white-space:nowrap;
+  border:1px solid transparent}
+.state::before{content:"";width:6px;height:6px;border-radius:2px;background:currentColor;
+  transform:rotate(45deg)}
+.state--available{background:var(--success-soft);color:var(--success);border-color:var(--success-soft)}
+.state--held{background:var(--brand-soft);color:var(--brand-text);border-color:var(--brand-soft)}
+.state--pending{background:var(--info-soft);color:var(--info);border-color:var(--info-soft)}
+.state--released{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-border)}
+/* the held state is the one people worry about, so it gets the only motion */
+.state--held::before{animation:dotbeat 2.4s var(--ease-in-out) infinite}
+
+/* ---------- 21. SHELL ---------- */
 .app{min-height:100dvh;display:flex;flex-direction:column;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom))}
 .hdr{position:sticky;top:0;z-index:var(--z-header);padding:calc(env(safe-area-inset-top) + 10px) 0 12px}
 .hdr .inner{display:flex;align-items:center;gap:12px}
@@ -484,18 +1033,67 @@ a{color:var(--brand-text);text-underline-offset:3px}
 .hdr .loc b{font-size:14px;font-weight:var(--fw-bold);color:var(--ink-1)}
 .brandline{display:flex;align-items:center;gap:9px}
 .brandline .wm{font-size:17px}
+
+/* .shell — one column on a phone; a persistent sidenav + a scrolling main
+   from 768 up. The sidenav is STICKY, not fixed: sticky keeps it inside the
+   grid (so the main column is never overlapped and never needs a manual
+   offset) while still pinning it to the viewport. A fixed sidenav plus a
+   nested scroll container would also break every position:fixed sheet, toast
+   and FAB in this file. */
+.shell{display:block;min-height:100dvh;width:100%}
+.shell__main{min-width:0;position:relative}
+.sidenav{display:none}
+
+/* mobile bottom nav — evolved: glass over deep plum, gold indicator, and the
+   active label gains weight as well as colour (hue alone is not a signal in
+   sunlight) */
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:var(--z-nav);
   height:calc(var(--nav-h) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);
   display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--border)}
 .nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
   background:none;border:0;color:var(--ink-3);font-size:10px;font-weight:var(--fw-bold);
-  letter-spacing:.03em;height:var(--nav-h);position:relative}
-.nav button .ic{display:grid;place-items:center;line-height:1}
+  letter-spacing:.03em;height:var(--nav-h);position:relative;
+  transition:color var(--dur-fast)}
+.nav button .ic{display:grid;place-items:center;line-height:1;
+  transition:transform var(--dur-base) var(--ease-back)}
 /* an active tab on a saturated ground cannot be signalled by hue alone in
    sunlight — so it changes colour AND weight AND gains a 3px indicator */
 .nav button[aria-selected="true"]{color:var(--accent);font-weight:var(--fw-black)}
+.nav button[aria-selected="true"] .ic{transform:translateY(-1px) scale(1.06)}
 .nav button[aria-selected="true"]::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
   width:28px;height:3px;border-radius:0 0 3px 3px;background:var(--gold-grad-on-violet)}
+/* the glow sits BEHIND the icon and is clipped by the button, so it reads as
+   light coming through the bar rather than a badge stuck on it */
+.nav button[aria-selected="true"]::after{content:"";position:absolute;top:-2px;left:50%;
+  width:64px;height:34px;transform:translateX(-50%);pointer-events:none;
+  background:radial-gradient(50% 100% at 50% 0%,rgba(244,214,142,.34),transparent 72%)}
+@supports ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+  .nav.on-plum{background:linear-gradient(180deg,rgba(91,33,182,.86),rgba(46,16,101,.92));
+    -webkit-backdrop-filter:blur(var(--blur)) saturate(160%);
+            backdrop-filter:blur(var(--blur)) saturate(160%)}
+}
+
+/* .topbar — desktop chrome. Hidden below 1024; see §23. */
+.topbar{display:none}
+
+/* .fab — the standing offer. Gold, because it is always the money action. */
+.fab{position:fixed;right:16px;z-index:var(--z-fab);
+  bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 16px);
+  display:inline-flex;align-items:center;gap:9px;height:56px;min-width:56px;
+  padding:0 20px;border:0;border-radius:var(--r-pill);
+  background:var(--accent-fill);color:var(--accent-on-fill);
+  font:var(--fw-bold) 15px/1 var(--font-ui);
+  box-shadow:0 10px 28px rgba(176,127,50,.42),inset 0 1px 0 rgba(255,255,255,.7);
+  transition:transform var(--dur-fast) var(--ease-back),box-shadow var(--dur-fast),filter var(--dur-fast)}
+.fab:hover{filter:brightness(1.05);box-shadow:0 14px 34px rgba(176,127,50,.5),inset 0 1px 0 rgba(255,255,255,.7)}
+.fab:active{transform:scale(.95)}
+.fab__count{position:absolute;top:-4px;right:-4px;min-width:22px;height:22px;padding:0 6px;
+  border-radius:var(--r-pill);display:grid;place-items:center;
+  background:var(--violet-600);color:#FFFFFF;   /* 5.70 */
+  font:var(--fw-black) 11px/1 var(--font-ui);
+  box-shadow:0 0 0 2px var(--bg);
+  font-variant-numeric:tabular-nums lining-nums}
+
 .trustbar{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;
   padding:12px var(--gutter);margin:var(--sp-8) calc(var(--gutter) * -1) 0;font-size:11px;font-weight:var(--fw-semi)}
 .trustbar span{display:inline-flex;align-items:center;gap:5px;color:var(--ink-1)}
@@ -504,14 +1102,182 @@ a{color:var(--brand-text);text-underline-offset:3px}
   text-transform:uppercase;color:var(--ink-3);font-weight:var(--fw-bold)}
 .credo .cmark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:.07;pointer-events:none}
 
-/* ---------- 18. RESPONSIVE ---------- */
-@media (min-width:900px){
-  :root{--page-max:1080px}
-  .grid3{grid-template-columns:repeat(6,1fr)}
-  .grid2{grid-template-columns:repeat(3,1fr)}
+/* ---------- 22. MOTION UTILITIES ----------
+   Motion here communicates ARRIVAL and STATE, never decoration. .rise is the
+   only enter animation; the stagger tops out at five because a sixth delayed
+   item is a page that feels slow, not a page that feels crafted. */
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.rise{animation:rise var(--dur-base) var(--ease-emph) both}
+.rise-2{animation:rise var(--dur-base) var(--ease-emph) 60ms both}
+.rise-3{animation:rise var(--dur-base) var(--ease-emph) 120ms both}
+.rise-4{animation:rise var(--dur-base) var(--ease-emph) 180ms both}
+.rise-5{animation:rise var(--dur-base) var(--ease-emph) 240ms both}
+
+/* ---------- 23. RESPONSIVE ----------
+   768 = the bottom nav goes away and a persistent rail takes over.
+   1024 = the rail becomes a labelled sidenav and a topbar appears. */
+@media (min-width:768px){
+  :root{--gutter:24px; --page-max:720px}
+
+  /* the bottom bar and the sidenav are never both present */
+  .nav{display:none}
+  .app{padding-bottom:0}
+  .toast{bottom:24px}
+  .fab{bottom:24px;right:24px}
+
+  .shell{display:grid;grid-template-columns:var(--rail-w) 1fr;align-items:start}
+  .shell__main{grid-column:2}
+
+  .sidenav{display:flex;flex-direction:column;grid-column:1;
+    position:sticky;top:0;height:100dvh;z-index:var(--z-side);
+    padding:calc(env(safe-area-inset-top) + 14px) 10px 14px;gap:var(--sp-4);
+    background:var(--plum-rail);
+    border-right:1px solid rgba(244,214,142,.14);
+    box-shadow:1px 0 0 rgba(12,4,30,.5),8px 0 34px -18px rgba(12,4,30,.7)}
+  /* a single hairline of gold down the seam — the only ornament the rail gets */
+  .sidenav::after{content:"";position:absolute;top:12%;bottom:12%;right:-1px;width:1px;
+    background:var(--gold-hair);opacity:.55;pointer-events:none}
+
+  .sidenav__brand{display:flex;align-items:center;justify-content:center;gap:9px;
+    padding:6px 4px 12px;min-height:44px;background:none;border:0;color:inherit;width:100%}
+  .sidenav__brand .wordmark,.sidenav__brand .wm{font-size:16px;white-space:nowrap}
+
+  .sidenav__item{position:relative;display:flex;align-items:center;gap:12px;
+    width:100%;min-height:46px;padding:0 12px;border:0;border-radius:var(--r-md);
+    background:transparent;color:var(--ink-3);text-align:left;
+    font:var(--fw-semi) 14px/1.2 var(--font-ui);
+    transition:background var(--dur-fast),color var(--dur-fast)}
+  .sidenav__item .ic{flex:0 0 auto;display:grid;place-items:center;width:24px;line-height:0}
+  .sidenav__item:hover{background:rgba(255,255,255,.09);color:#FFFFFF}
+  .sidenav__item[aria-current="page"]{color:#FFFFFF;font-weight:var(--fw-bold);
+    background:rgba(255,255,255,.11)}
+  /* the gold indicator bar — the same language as the mobile nav's top bar */
+  .sidenav__item[aria-current="page"]::before{content:"";position:absolute;left:0;top:9px;bottom:9px;
+    width:3px;border-radius:0 3px 3px 0;background:var(--gold-grad-soft);
+    box-shadow:0 0 12px rgba(212,162,74,.6)}
+  .sidenav__item[aria-current="page"] .ic{color:var(--gold-300)}
+  .sidenav__foot{margin-top:auto;display:flex;flex-direction:column;gap:var(--sp-3);
+    padding-top:var(--sp-5);border-top:1px solid rgba(255,255,255,.12)}
+
+  /* RAIL MODE — icons only. The label is still in the DOM for screen readers;
+     it is clipped, not display:none, because display:none removes it from the
+     accessibility tree too. */
+  .sidenav,.sidenav--rail{align-items:center}
+  .sidenav .sidenav__item,.sidenav--rail .sidenav__item{justify-content:center;padding:0;width:52px}
+  .sidenav .sidenav__label,.sidenav--rail .sidenav__label{
+    position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+    clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+  .sidenav__brand .wordmark,.sidenav--rail .sidenav__brand .wordmark{display:none}
+  .sidenav__foot{width:100%;align-items:center}
+
+  @supports ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+    .sidenav__item[aria-current="page"]{background:rgba(255,255,255,.10);
+      -webkit-backdrop-filter:blur(var(--blur-sm));backdrop-filter:blur(var(--blur-sm))}
+  }
+
+  .grid3{grid-template-columns:repeat(4,1fr)}
+  .grid2{grid-template-columns:repeat(2,1fr)}
+  .capsules{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .cmd{flex-direction:row;align-items:center;gap:var(--sp-8);padding:var(--sp-8)}
+  .cmd__action{margin-top:0;flex:0 0 auto;margin-left:auto;align-items:flex-end}
+  .cmd__action > .btn{width:auto;min-width:180px}
+  .cmd > .grow,.cmd__body{min-width:0}
+  .hero{border-radius:var(--r-3xl);margin:var(--sp-6) 0;padding:var(--sp-10) var(--sp-9)}
+  .hero__title{font-size:var(--fs-3xl);line-height:var(--lh-3xl)}
+  .workspace{border-radius:var(--r-2xl);padding:var(--sp-8) 0 var(--sp-11)}
+
+  /* the timeline turns horizontal — a journey reads left to right here */
+  .timeline{flex-direction:row;align-items:flex-start}
+  .timeline__node{flex:1 1 0;min-width:0;grid-template-columns:1fr;justify-items:center;
+    text-align:center;padding-bottom:0;row-gap:8px}
+  .timeline__dot{grid-row:1;grid-column:1}
+  .timeline__label{grid-row:2;grid-column:1;padding-top:0}
+  /* left AND right, width auto: the segment then spans exactly from the
+     previous dot's edge to this one's, whatever the column width turns out
+     to be — no magic number, no overshoot on the last node */
+  .timeline__bar{left:calc(-50% + 15px);right:calc(50% + 15px);width:auto;
+    top:10px;bottom:auto;height:2px}
+  .timeline__node:first-child .timeline__bar{display:none}
+  /* on the horizontal axis the bar belongs to the segment BEFORE the node, so
+     a completed node paints the line reaching it */
+  .timeline__node.done .timeline__bar,.timeline__node.cur .timeline__bar{background:var(--gold-grad-soft)}
 }
 
-/* ---------- 19. REDUCED MOTION / CONTRAST ---------- */
+@media (min-width:1024px){
+  :root{--page-max:1180px}
+  .shell{grid-template-columns:var(--sidenav-w) 1fr}
+
+  /* full sidenav — labels come back, unless .sidenav--rail is asked for */
+  .sidenav:not(.sidenav--rail){align-items:stretch;padding-left:14px;padding-right:14px}
+  .sidenav:not(.sidenav--rail) .sidenav__item{justify-content:flex-start;padding:0 12px;width:100%}
+  .sidenav:not(.sidenav--rail) .sidenav__label{
+    position:static;width:auto;height:auto;margin:0;overflow:visible;
+    clip:auto;clip-path:none;white-space:nowrap}
+  .sidenav:not(.sidenav--rail) .sidenav__brand{justify-content:flex-start;padding-left:8px}
+  .sidenav:not(.sidenav--rail) .sidenav__brand .wordmark{display:block}
+  .sidenav:not(.sidenav--rail) .sidenav__foot{align-items:stretch}
+
+  /* .topbar — location, search, notifications, you. It is chrome, so it is
+     glass over the page ground rather than another opaque band. */
+  .topbar{display:flex;align-items:center;gap:var(--sp-5);
+    position:sticky;top:0;z-index:var(--z-sticky);
+    height:var(--topbar-h);padding:0 var(--sp-8);
+    background:var(--surface);border-bottom:1px solid var(--border)}
+  .topbar .loc{display:flex;flex-direction:column;line-height:1.15;background:none;border:0;
+    color:inherit;text-align:left;padding:4px 8px;border-radius:var(--r-sm)}
+  .topbar .loc:hover{background:var(--surface-2)}
+  .topbar .loc small{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  .topbar .loc b{font-size:14px;font-weight:var(--fw-bold);color:var(--ink-1)}
+  /* the compact hero search: same shape, ivory instead of glass-on-plum,
+     because up here the ground is the page and not the hero */
+  .topbar .hero__search{height:40px;margin-top:0;flex:1 1 420px;max-width:520px;
+    padding:0 6px 0 14px;
+    background:var(--surface-2);border:1px solid var(--border);
+    box-shadow:none;color:var(--ink-3)}
+  .topbar .hero__search input{height:38px;font-size:14px;color:var(--ink-1)}
+  .topbar .hero__search input::placeholder{color:var(--ink-3)}
+  .topbar .hero__search:focus-within{border-color:var(--brand);box-shadow:var(--sh-focus)}
+  .topbar__spacer,.topbar .grow{flex:1;min-width:0}
+  .topbar__act{flex:0 0 auto;position:relative;display:grid;place-items:center;
+    width:40px;height:40px;border:0;border-radius:50%;background:transparent;color:var(--ink-2);
+    transition:background var(--dur-fast),color var(--dur-fast)}
+  .topbar__act:hover{background:var(--surface-2);color:var(--ink-1)}
+  .topbar__act .fab__count,.topbar__act .dot{position:absolute;top:6px;right:6px}
+  @supports ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+    .topbar{background:var(--glass-bg-strong);
+      -webkit-backdrop-filter:blur(var(--blur)) saturate(150%);
+              backdrop-filter:blur(var(--blur)) saturate(150%)}
+  }
+
+  /* content is COMPOSED at this width, not stretched: three columns of tiles,
+     six of the small grid, and capsules that stay capsule-sized */
+  .grid3{grid-template-columns:repeat(6,1fr)}
+  .grid2{grid-template-columns:repeat(3,1fr)}
+  .capsules{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+  .hero{padding:var(--sp-11) var(--sp-11)}
+  .hero__title{font-size:var(--fs-4xl);line-height:var(--lh-4xl);max-width:16ch}
+  .hero__search{max-width:620px}
+  .moneyflow{flex-direction:row;align-items:center;padding:var(--sp-7)}
+  .moneyflow > .moneyflow__node{flex:1 1 0}
+  /* the arrow turns with the row */
+  .moneyflow__arrow{height:auto;width:38px;align-self:stretch;min-height:26px}
+  .moneyflow__arrow::before{left:0;right:0;top:50%;bottom:auto;width:auto;height:2px;
+    transform:translateY(-50%);
+    background:repeating-linear-gradient(90deg,var(--gold-400) 0 6px,transparent 6px 12px);
+    background-size:12px 2px;animation:flowright 900ms linear infinite}
+  .moneyflow__arrow::after{left:auto;right:-1px;bottom:auto;top:50%;
+    transform:translateY(-50%) rotate(-45deg)}
+  @keyframes flowright{to{background-position:12px 0}}
+  .moneyflow__split{flex:1.4 1 0}
+  .bestmatch{padding:var(--sp-10) var(--sp-9)}
+}
+
+/* legacy breakpoint kept so anything still written against 900px behaves */
+@media (min-width:900px) and (max-width:1023.98px){
+  .grid3{grid-template-columns:repeat(5,1fr)}
+}
+
+/* ---------- 24. REDUCED MOTION / CONTRAST ---------- */
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{
     animation-duration:.01ms !important;animation-iteration-count:1 !important;
@@ -520,9 +1286,50 @@ a{color:var(--brand-text);text-underline-offset:3px}
   .mk-band{stroke-dashoffset:0 !important}
   .skel::after{animation:none;background:none}
   .btn--primary::after{display:none}
+  .sheen::after{display:none}
   .track .cur .dot{animation:none;box-shadow:0 0 0 3px var(--brand-soft)}
+  .timeline__node.cur .timeline__dot{animation:none;box-shadow:0 0 0 3px var(--brand-soft)}
+  /* the dashed line still has to READ as a direction, so it stops moving but
+     keeps its dashes and its arrowhead */
+  .moneyflow__arrow::before{animation:none}
+  .pill--live,.pill--live::before,.state--held::before{animation:none}
+  .rise,.rise-2,.rise-3,.rise-4,.rise-5{animation:none;opacity:1;transform:none}
 }
 @media (prefers-contrast: more){
   :root{--border:var(--border-strong);--ink-3:var(--ink-2)}
   .on-plum{--border:rgba(255,255,255,.55);--ink-3:#FFFFFF}
+  .on-deep,.hero,.sidenav,.workspace,.glass--deep{--border:rgba(255,255,255,.55);--ink-3:#FFFFFF}
+  /* translucency is the first thing to go: at this setting the user has told
+     us they cannot afford an unpredictable ground */
+  .glass,.glass--deep,.glass--gold,.hero__search,.topbar,.nav.on-plum,
+  .workspace .card,.workspace .cmd,.workspace .capsule,.workspace .expand{
+    -webkit-backdrop-filter:none !important;backdrop-filter:none !important}
+  .glass{background:var(--glass-solid)}
+  .glass--deep,.workspace .card,.workspace .cmd,.workspace .capsule,.workspace .expand{
+    background:var(--glass-deep-solid)}
+  .glass--gold{background:var(--glass-gold-solid)}
+  .hero__search{background:#FFFFFF}
+  .topbar{background:var(--surface)}
+  .nav.on-plum{background:var(--violet-900)}
+  .capsule::before,.stepbar__step::before{outline:1px solid var(--ink-1)}
 }
+
+/* ---------- SHELL FIX-UPS ----------
+   On desktop the topbar already carries location, search, notifications and
+   profile; Home's own header would repeat all four one line below it. And a
+   bleed-margin trust bar inside a side column overflows the column. */
+@media (min-width:1024px){
+  .shell__main > .topbar + .hdr--home{display:none}
+  .home-lay .trustbar{margin-left:0;margin-right:0;border-radius:var(--r-md)}
+}
+/* admin and auth render without the shell navigation: one column, no ghost rail */
+.shell--bare{grid-template-columns:1fr !important}
+.shell--bare > .shell__main{max-width:none}
+
+/* `--ok` is used by the ask-rates and onboarding screens (chance meter, saving
+   highlights) but was never a token — only `--success` was — so those fills
+   painted transparent. Alias, in every theme. */
+:root{--ok:var(--success);--ok-soft:var(--success-soft);--ok-on:var(--success-on)}
+/* admin/auth render with no side navigation: the ≥768 rule pins .shell__main to
+   grid column 2, which conjures an empty implicit first column. Put it back. */
+.shell--bare > .shell__main{grid-column:1}

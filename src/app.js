@@ -2,7 +2,7 @@
    about every other module, and it does nothing but wire them together. */
 
 import { VERSION, SCHEMA_VERSION, BUILD_ID } from './core/version.js';
-import { ctx, getState, dispatch, me, restoreSession } from './core/ctx.js';
+import { ctx, getState, dispatch, me, restoreSession, myArea } from './core/ctx.js';
 import { createStore, combineFromRegistry } from './core/store.js';
 import * as persist from './core/persist.js';
 import * as registry from './core/registry.js';
@@ -23,6 +23,7 @@ import { defaultState } from './domain/state.js';
 import { buildSeed } from './domain/seed.js';
 import * as flow from './domain/flow.js';
 import * as auction from './domain/auction.js';
+import * as bidding from './domain/bidding.js';
 import { AREA_NAMES } from './domain/match.js';
 import './core/selftests.js';
 import './core/selftests.money.js';
@@ -42,6 +43,7 @@ import * as earn from './ui/views/earn.js';
 import * as ask from './ui/views/ask.js';
 import * as onboard from './ui/views/onboard.js';
 import * as pro from './ui/views/pro.js';
+import * as account from './ui/views/account.js';
 
 /* ══════════════ ROUTES ══════════════ */
 const ROUTES = {
@@ -59,7 +61,7 @@ const ROUTES = {
   ask:       p => ask.render(p),
   onboard:   () => onboard.render(),
   pro:       p => pro.render(p),
-  account:   () => accountView(),
+  account:   () => account.render(),
 };
 
 const NAV = [
@@ -119,13 +121,58 @@ function render() {
       </div></main>`;
   }
   const showNav = ctx.view !== 'admin' && ctx.view !== 'auth';
-  mount('app', body + (showNav ? navBar() : ''));
+  /* THE SHELL. One visually connected ecosystem instead of a stack of screens:
+     on desktop a persistent side navigation + a top bar, on tablet an icon
+     rail, on mobile the bottom bar. All three are the same NAV array — the CSS
+     decides which is visible, so no view knows or cares which device it is on. */
+  mount('app', `<div class="shell${showNav ? '' : ' shell--bare'}">
+    ${showNav ? sideNav() : ''}
+    <div class="shell__main">${showNav ? topBar() : ''}${body}</div>
+  </div>${showNav ? navBar() : ''}`);
+}
+
+function currentTab() {
+  return ctx.view === 'shop' || ctx.view === 'cart' ? 'shops' : ctx.view === 'order' || ctx.view === 'ask' ? 'orders'
+       : ctx.view === 'partner' || ctx.view === 'shopadmin' || ctx.view === 'onboard' || ctx.view === 'pro' ? 'earn'
+       : ctx.view;
+}
+
+/* desktop ≥1024px persistent · tablet 768–1023 icon rail · hidden on mobile */
+function sideNav() {
+  const s = me();
+  const cur = currentTab();
+  return `<aside class="sidenav" aria-label="Main">
+    <div class="sidenav__brand">${mark(30, { glow: false })}<span class="wordmark wm">SAAHAA</span></div>
+    ${NAV.map(([id, ic, label]) => `<button class="sidenav__item" data-act="nav.tab" data-tab="${id}"
+        ${cur === id ? 'aria-current="page"' : ''}>
+        <span class="ic">${icon(ic, { size: 22 })}</span><span class="lbl">${label}</span></button>`).join('')}
+    ${s && s.role === 'partner' ? `<button class="sidenav__item" data-act="pro.open" data-id="${esc(s.partnerId || '')}">
+        <span class="ic">${icon('navYou', { size: 22 })}</span><span class="lbl">My page</span></button>` : ''}
+    <div class="sidenav__foot">
+      <button class="sidenav__item" data-act="theme.toggle"><span class="ic">◐</span><span class="lbl">Light / dark</span></button>
+      ${s ? `<button class="sidenav__item" data-act="auth.logout"><span class="ic">↪</span><span class="lbl">Sign out</span></button>`
+          : `<button class="sidenav__item" data-act="auth.open"><span class="ic">→</span><span class="lbl">Sign in</span></button>`}
+    </div>
+  </aside>`;
+}
+
+/* desktop-only top strip: where am I, what can I do */
+function topBar() {
+  const s = me();
+  const cart = flow.getCart();
+  const n = cart ? cart.lines.reduce((a, l) => a + l.qty, 0) : 0;
+  return `<div class="topbar">
+    <button class="topbar__loc tap" data-act="area.pick"><span class="eyebrow">Serving</span><b>${esc(myArea())} ▾</b></button>
+    <button class="topbar__search" data-act="nav.home" aria-label="Search">${icon('search', { size: 18 })}<span>What do you need today?</span></button>
+    ${n ? `<button class="btn btn--secondary btn--sm" data-act="nav.cart">🧺 ${n}</button>` : ''}
+    <button class="btn btn--ghost tap" data-act="nav.orders" aria-label="Notifications">🔔</button>
+    ${s ? `<button class="avatar avatar--sm tap" data-act="nav.account" aria-label="Account">${esc(s.name[0])}</button>`
+        : `<button class="btn btn--primary btn--sm" data-act="auth.open">Sign in</button>`}
+  </div>`;
 }
 
 function navBar() {
-  const s = me();
-  const cur = ctx.view === 'shop' ? 'shops' : ctx.view === 'order' ? 'orders'
-            : ctx.view === 'partner' || ctx.view === 'shopadmin' ? 'earn' : ctx.view;
+  const cur = currentTab();
   return `<nav class="nav on-plum" role="tablist">
     ${NAV.map(([id, ic, label]) => `<button role="tab" aria-selected="${cur === id}"
       data-act="nav.tab" data-tab="${id}" aria-label="${label}">
@@ -133,34 +180,6 @@ function navBar() {
   </nav>`;
 }
 
-function accountView() {
-  const s = me();
-  if (!s) return auth.render();
-  return `${shops.header('Your account', esc(s.mobile))}
-  <main class="wrap">
-    <div class="card on-plum" style="margin-top:var(--sp-6);border:0">
-      <div class="row">
-        <span style="width:54px;height:54px;border-radius:50%;background:var(--accent-fill);
-          color:var(--accent-on-fill);display:grid;place-items:center;font-weight:800;font-size:21px">
-          ${esc((s.name || '?')[0])}</span>
-        <div class="grow"><b style="font-size:18px">${esc(s.name)}</b>
-          <p class="tiny muted">${esc(s.role)} · ${esc(s.area)}</p></div>
-      </div>
-    </div>
-    <div class="sec">
-      ${[['nav.orders','🧾 Your orders'],['area.pick','📍 Change area'],
-         ['splash.replay','✨ Replay the welcome screen'],['theme.toggle','◐ Light / dark'],
-         ['nav.admin','🛡 Admin console'],['selftest.run','🧪 Run self-test']]
-        .map(([a, l]) => `<button class="card card--tap" style="width:100%;text-align:left;margin-bottom:8px;padding:14px"
-          data-act="${a}">${l}</button>`).join('')}
-      <button class="btn btn--ghost btn--block" style="margin-top:12px;color:var(--danger)"
-        data-act="auth.logout">Sign out</button>
-    </div>
-    <div class="credo"><div class="cmark">${mark(150, { detail: true, glow: false })}</div>
-      <div class="cw">One circle. One purpose.</div>
-      <p class="micro muted" style="margin-top:8px">v${VERSION} · schema v${SCHEMA_VERSION} · ${BUILD_ID}</p></div>
-  </main>`;
-}
 
 /* ══════════════ ACTIONS ══════════════ */
 function wireActions() {
@@ -268,6 +287,20 @@ function wireActions() {
     const p = getState().partners.find(x => x.id === d.pid);
     if (!p) return;
     if (auction.placeBid({ requestId: d.id, partner: p, amount: Number(d.amt) })) { closeSheet(); render(); }
+  });
+  /* The post-auction coaching loop. The button existed in the console with no
+     handler behind it — the one screen that stops undercutting was unreachable. */
+  A('bid.result', d => {
+    const bid = getState().bids.find(b => b.id === d.id); if (!bid) return;
+    const req = auction.requestById(bid.requestId); if (!req) return;
+    const win = getState().bids.find(b => b.requestId === req.id && b.status === 'accepted');
+    if (!win) { toast('This job was not awarded to anyone.'); return; }
+    const byId = Object.fromEntries(getState().partners.map(p => [p.id, p]));
+    if (!byId[bid.partnerId] || !byId[win.partnerId]) return;
+    const band = { beff: req.beff, floor: req.floor, target: req.target, ceiling: req.ceiling, quoteOnly: false };
+    const mine   = bidding.scoreBid(bid, byId[bid.partnerId], band, { area: req.area });
+    const theirs = bidding.scoreBid(win, byId[win.partnerId], band, { area: req.area });
+    ask.showLoserFeedback(bidding.loserFeedback(mine, theirs));
   });
   A('bid.open', d => {
     const p = getState().partners.find(x => x.id === d.pid);
@@ -505,6 +538,11 @@ async function boot() {
   });
 
   ctx.ready = true;
+  /* ?shot=<scene> — the presentation capture switch. A dev-only module that
+     seeds a real state and walks to a real screen so headless Chrome can
+     photograph it. Never loaded otherwise; it is UI tooling, not product. */
+  const shot = new URLSearchParams(location.search).get('shot');
+  if (shot) { import('./ui/deckscenes.js').then(m => m.run(shot)).catch(e => console.error('[shot]', e)); }
   // the WORK_DONE screen promises auto-release; this is what keeps it
   flow.sweepAutoRelease().then(n => { if (n) { console.info('[saahaa] auto-released', n); render(); } });
 

@@ -1,6 +1,20 @@
-/* SAAHAA · ui/brand.css — the welcome splash, the emblem's motion, pillars.
+/* SAAHAA · ui/brand.css — the welcome splash, the emblem's motion, pillars,
+   and the home hero band. Companion to tokens.css v3.0 "OPEN CIRCLE ·
+   LIVING GLASS"; every colour here comes from a token defined there.
+
    Timeline follows the design ballot exactly: the screen is INTERACTIVE from
-   900ms even though it keeps settling until ~2050ms. */
+   900ms even though it keeps settling until ~2050ms.
+
+   ONE NAME COLLISION, HANDLED HERE
+   The splash trust markers have been `.pillars > .pill` since v1. v3.0's
+   class contract also needs a global `.pill` status chip. `.pillars .pill`
+   (0,2,0) wins on every property it declares, but a status pill also brings
+   height, padding, background, border, radius, uppercase, and a ::before
+   dot — none of which `.pillars .pill` used to declare, so all seven would
+   have leaked into the splash. §"pillars" below therefore resets them
+   explicitly. Renaming was the other option and was rejected: four agents
+   are writing views against the contract right now, and `.pill` is the name
+   in the contract. */
 
 /* ── emblem ─────────────────────────────────────────────────── */
 .mk{overflow:visible}
@@ -98,8 +112,13 @@
 
 /* ── pillars ────────────────────────────────────────────────── */
 .pillars{display:flex;align-items:flex-start;justify-content:center;gap:6px;width:100%}
+/* the reset described in the header: everything a status .pill would bring */
 .pillars .pill{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;
+  height:auto;min-height:0;padding:0;background:none;border:0;border-radius:0;
+  color:inherit;font:inherit;letter-spacing:normal;text-transform:none;
+  white-space:normal;vertical-align:baseline;box-shadow:none;
   opacity:0;animation:sprise 240ms var(--ease-emph) forwards}
+.pillars .pill::before{content:none;display:none}
 .splash .pillars .pill:nth-child(1){animation-delay:1360ms}
 .splash .pillars .pill:nth-child(2){animation-delay:1440ms}
 .splash .pillars .pill:nth-child(3){animation-delay:1520ms}
@@ -118,9 +137,39 @@
   flex:0 0 auto;background:transparent;scroll-snap-align:start}
 .pillars--c .plbl{font-size:10px}
 
-/* ── plum hero band used on the home screen ─────────────────── */
+/* ── plum hero band used on the home screen ──────────────────
+   Kept under its original name so any view still emitting `.herostrip
+   .on-plum` renders correctly. New work should use `.hero` (tokens.css §18),
+   which is the deep-plum atmospheric surface; .herostrip is the bright-violet
+   band and is now the compact variant of the same idea. */
 .herostrip{margin:0 calc(var(--gutter) * -1);padding:var(--sp-7) var(--gutter) var(--sp-8);
   border-radius:0 0 var(--r-2xl) var(--r-2xl);position:relative;overflow:hidden}
-.herostrip .hs-mark{position:absolute;right:-30px;top:-24px;opacity:.10;pointer-events:none}
+/* the same implied open circle the .hero draws, at band scale */
+.herostrip::after{content:"";position:absolute;right:-70px;top:-80px;width:220px;height:220px;
+  border-radius:50%;pointer-events:none;border:1px solid rgba(255,244,216,.18)}
+.herostrip > *{position:relative;z-index:1}
+.herostrip .hs-mark{position:absolute;right:-30px;top:-24px;opacity:.10;pointer-events:none;z-index:0}
 .herostrip h1{font-size:var(--fs-xl);line-height:var(--lh-xl);margin-bottom:6px}
 .herostrip p{font-size:var(--fs-sm);color:var(--ink-2);max-width:30ch}
+@media (min-width:768px){
+  .herostrip{margin:0;border-radius:var(--r-2xl);padding:var(--sp-8) var(--sp-9)}
+  .herostrip h1{font-size:var(--fs-2xl);line-height:var(--lh-2xl)}
+}
+
+/* ── splash on the deep ground ───────────────────────────────
+   The splash element already carries .on-plum, so it keeps that scope's
+   white/#FBE8B8 token set; only the GROUND changes, from the bright violet
+   band to the deep atmospheric plum. That is not cosmetic — it retires a
+   real contrast bug. `.sp-wm` paints the full metallic --gold-grad, whose
+   darkest stop is #B07F32. On violet-600 that stop measures 1.61 and the
+   bottom third of the letterforms genuinely vanished; on this ground it
+   measures 4.84, so the whole sweep is finally legible as drawn.
+   Everything else re-measured on the darkest stop #1B0B3A and on the
+   brightest bloom (#4F229E): white 18.9 → 10.2, #FBE8B8 14.3 → 8.4,
+   #C4B5FD 9.27 → 5.30. All AA. */
+.splash{background:var(--plum-atmos)}
+.splash .sp-tag{color:var(--gold-200)}
+/* --plum-400 measured only 3.62 against the bottom bloom, so the two quiet
+   lines at the foot of the screen step up one stop to --plum-300 */
+.splash .sp-guest,.splash .sp-credo{color:var(--plum-300)}
+.splash .pillars--c .pill{border-color:rgba(244,214,142,.34)}

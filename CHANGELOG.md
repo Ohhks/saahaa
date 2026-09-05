@@ -6,6 +6,73 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [6.5.0] — 2026-09-05 — "Open Circle — Living Glass"
+
+A UI-only release. **Keep the engine, rebuild the experience.** Every file under
+`src/domain`, `src/core`, `src/net`, `supabase`, `.github` and `tools` is
+byte-identical to 6.4.0 — enforced by `tools/guard-ui.mjs` against the frozen
+snapshot at `../saahaa02`, together with the rule that no `data-act`,
+`data-role`, element id or export may disappear from a view.
+
+### The visual language
+- Deep plum grounds, champagne-gold accents, ivory content surfaces; glass only
+  where it improves hierarchy, always opaque-first with translucency as a
+  progressive upgrade. Every new pairing carries a measured contrast ratio.
+- A fourth material — deep plum (#1B0B3A→#3F1780) — lets gold be real gold:
+  `#F4D68E` measures 12.24 on `#221041`. Moving the splash ground to it took
+  the wordmark's darkest stop from 1.61 to 4.84; the bottom third of the
+  letterforms was genuinely vanishing before.
+- Component system: glass cards, command cards (one primary action), metric
+  capsules, status pills, smart chips, segmented controls, timelines, the
+  cinematic booking step bar, the Best Match card, floating cart action,
+  avatar stacks, money-flow visualisation with four distinct money states,
+  expandable cards, smart empty states, staggered rise motion — all honouring
+  `prefers-reduced-motion` and `prefers-contrast`.
+
+### One connected ecosystem
+- **Shell**: persistent side navigation + top bar on desktop, icon rail on
+  tablet, an expressive glass bottom bar on mobile — the same `NAV` array,
+  the CSS decides. Admin and auth render bare.
+- **Home** is a command surface: "Everything your neighbourhood needs", a large
+  contextual search that is the front door (services, sub-services, shops,
+  products, your own orders, recent searches), discovery rendered live from
+  the registry by group with a per-group accent.
+- **Booking**: NEED → SERVICE → DETAILS → MATCH → PRICE → CONFIRM as a step
+  bar inside one sheet; one dominant Best Match card that says *why* (nearest,
+  most trusted, fair price); alternatives exposed; ask-rates row unchanged.
+- **Tracker**: the current stage is the hero; a live timeline from the machine's
+  own stages; the next action right under it.
+- **Shops**: compact information-rich cards, responsive product grid, delivery
+  / pickup as a segmented control, a cart that floats in only when it has lines.
+- **My SAAHAA** replaces the settings list: bookings, needs-you, saved,
+  wallet legs from the ledger, chats, reviews, settings.
+- **Partner work cockpit**: shift control first, new requests, today's jobs,
+  earnings split into released · held · sent to UPI (never blended), your
+  rates with lost-bid coaching, standing, ladder, your page.
+- **Merchant command center**: orders, products with inline price/stock,
+  pricing, sales, customers, payouts, setup, analytics — all from existing
+  data; the ready-list picker surfaced, not hidden.
+- **Admin command center**: the same eight sections as a segmented control;
+  twelve metrics as capsules; Money Flow CUSTOMER → ESCROW → PARTNER / SHOP
+  fanning to fee, GST, rider, holdback, goodwill, refunds — read-only from the
+  ledger; the "system computes / you do by hand" note kept on every section.
+
+### Fixed while redesigning
+- `bid.result` (lost-bid coaching) was rendered with no handler; registered.
+- `--ok` was used by the chance meter and saving highlights but never defined;
+  the fills painted transparent. Aliased to `--success`.
+- Admin/auth pages sat beside an empty ghost column on desktop (`grid-column:2`
+  with no first column). Home's own header duplicated the desktop top bar.
+- Shop console header rendered `&amp;`.
+
+### Presentation
+- `?shot=<scene>` (`src/ui/deckscenes.js`) seeds real state through the real
+  domain functions; `tools/shots.py` photographs it with headless Chrome;
+  `tools/deck.py` builds `docs/presentation.html` — 32 screenshots of the
+  product itself, customer / partner / admin.
+
+---
+
 ## [6.4.0] — 2026-09-05 — "Locally, Professionally"
 
 The partner side now closes the loop. Two audit agents and a five-specialist
