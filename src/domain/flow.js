@@ -9,7 +9,8 @@ import * as audit from '../core/audit.js';
 import * as M from '../core/money.js';
 import { find } from '../core/registry.js';
 import { applyTransition, canTransition } from './orders.js';
-import { acct } from './ledger.js';
+import { acct, holdbackFor } from './ledger.js';
+import * as W from './wallet.js';
 import { quoteService, quoteRetail, compareWithApps, releaseService, cancelSplit } from './pricing.js';
 import { lockedMatch, rankShops, kmBetween, etaMins } from './match.js';
 import { escrowTier, markupFor, trustScore } from './trust.js';
@@ -69,6 +70,8 @@ export async function bookService({ catId, partner, sub, deal, slot }) {
     otp: makeOtp(), otpVerified: false, evidence: [], escrowed: q.customerPays,
   };
   dispatch({ type: 'order/add', payload: order });
+  // the customer's payment arrives from the world first; only then is it locked
+  await ledger('PAYMENT_IN', q.customerPays, acct.world(), 'CUSTOMER:' + s.key, { via: 'upi-sim' });
   await ledger('ESCROW_IN', q.customerPays, 'CUSTOMER:' + s.key, 'ESCROW:' + order.id,
                { catId, deal: q.deal, fee: q.platformFee, gst: q.gst });
   bumpAgg({ escrow: getState().agg.escrow + q.customerPays });
@@ -104,6 +107,7 @@ export function verifyOtp(orderId, entered) {
   }
   audit.record('otp.verified', { id: orderId });
   advance(orderId, 'IN_PROGRESS', { otpVerified: true, startedAt: Date.now() });
+  lockStake(orderId);
   toast('Verified — work started');
   return true;
 }
@@ -131,6 +135,65 @@ export function markDone(orderId) {
 }
 
 /** Customer taps Confirm — the second factor without typing a second OTP. */
+/* ── the commitment stake ──────────────────────────────────────
+   Locked the moment the customer's code is entered, returned in full the
+   moment the customer confirms the work. See domain/wallet.js. */
+export function lockStake(orderId) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o || o.kind !== 'service' || o.stake) return null;
+  const p = getState().partners.find(x => x.id === o.partnerId);
+  if (!p) return null;
+  const need = W.stakeFor(o.deal);
+  const w = W.walletOf(getState().ledger, p.id, p);
+  const f = W.fundStake(need, w.available);
+  if (f.funded) ledger('STAKE_LOCK', f.funded, acct.partner(p.id), W.stakeAcct(p.id), { orderId });
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { stake: { need, funded: f.funded, onCredit: f.onCredit, lockedAt: Date.now() } } } });
+  audit.record('stake.locked', { id: orderId, need, funded: f.funded, onCredit: f.onCredit }, p.userKey);
+  return f;
+}
+/** Finished and confirmed: the whole locked amount goes back. */
+async function returnStake(o) {
+  if (!o.stake || o.stake.returned || o.stake.forfeited) return 0;
+  if (o.stake.funded) await ledger('STAKE_RELEASE', o.stake.funded, W.stakeAcct(o.partnerId), acct.partner(o.partnerId), { orderId: o.id });
+  dispatch({ type: 'order/patch', payload: { id: o.id, patch: { stake: { ...o.stake, returned: true, returnedAt: Date.now() } } } });
+  return o.stake.funded;
+}
+/** Walked out after starting: the stake goes to the customer as goodwill
+    credit; the part that was on credit becomes a debt against the next payout. */
+async function forfeitStake(o, reason) {
+  if (!o.stake || o.stake.returned || o.stake.forfeited) return 0;
+  if (o.stake.funded) await ledger('STAKE_FORFEIT', o.stake.funded, W.stakeAcct(o.partnerId), acct.customer(o.customerKey), { orderId: o.id, reason });
+  const p = getState().partners.find(x => x.id === o.partnerId);
+  if (p && o.stake.onCredit) dispatch({ type: 'partner/patch', payload: { id: p.id, patch: { walletDebt: (p.walletDebt | 0) + o.stake.onCredit } } });
+  dispatch({ type: 'order/patch', payload: { id: o.id, patch: { stake: { ...o.stake, forfeited: true, forfeitedAt: Date.now(), reason } } } });
+  audit.record('stake.forfeited', { id: o.id, funded: o.stake.funded, onCredit: o.stake.onCredit, reason }, 'system');
+  return o.stake.need;
+}
+/** Wallet: top up (UPI in production; simulated here) and withdraw to UPI. */
+export async function walletTopUp(partnerId, paise) {
+  const amt = M.int(paise);
+  if (amt < 1000) { toast('Minimum top-up is ₹10', 'warn'); return null; }
+  await ledger('TOPUP', amt, acct.world(), acct.partner(partnerId), { via: 'upi-sim' });
+  audit.record('wallet.topup', { partnerId, amt }, me() ? me().key : 'system');
+  toast(`${M.fmt(amt)} added to your wallet`);
+  return amt;
+}
+export async function walletWithdraw(partnerId, paise) {
+  const amt = M.int(paise);
+  const w = W.walletOf(getState().ledger, partnerId, getState().partners.find(x => x.id === partnerId) || {});
+  if (amt < 1000 || amt > w.available) { toast(`You can withdraw up to ${M.fmt(w.available)}`, 'warn'); return null; }
+  await ledger('WITHDRAW', amt, acct.partner(partnerId), acct.world(), { via: 'upi-sim' });
+  audit.record('wallet.withdraw', { partnerId, amt }, me() ? me().key : 'system');
+  toast(`${M.fmt(amt)} sent to your UPI`);
+  return amt;
+}
+/** The 7-day holdback comes back by itself. Runs at boot and on the order screen. */
+export async function sweepHoldbacks(now = Date.now()) {
+  const due = W.holdbackDue(getState().ledger, now);
+  for (const e of due) await ledger('HOLDBACK_RELEASE', e.amountPaise, e.partyB, e.partyA, { of: e.id });
+  return due.length;
+}
+
 export async function confirmAndRelease(orderId, pct = 1) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return;
@@ -155,6 +218,21 @@ export async function confirmAndRelease(orderId, pct = 1) {
   if (!moved) return;
 
   if (r.workerPayout) await ledger('ESCROW_RELEASE', r.workerPayout, acct.escrow(o.id), acct.partner(o.partnerId), { pct });
+  /* THE PROMISE: on a finished job the worker receives the whole locked stake
+     back and the whole of their quote; on a fully upheld dispute (nothing
+     released) the stake goes to the customer instead. */
+  if (pct > 0) await returnStake(getState().orders.find(x => x.id === orderId));
+  else await forfeitStake(getState().orders.find(x => x.id === orderId), 'dispute upheld');
+  if (r.workerPayout) {
+    const p0 = getState().partners.find(x => x.id === o.partnerId) || {};
+    // a debt from a walked-out job is recovered from the next payout, once
+    const debt = Math.min(p0.walletDebt | 0, r.workerPayout);
+    if (debt) { await ledger('DEBT_RECOVERY', debt, acct.partner(o.partnerId), acct.goodwill(), { orderId }); dispatch({ type: 'partner/patch', payload: { id: o.partnerId, patch: { walletDebt: (p0.walletDebt | 0) - debt } } }); }
+    // the ledger's holdback policy, posted for real: 10% of a payout, capped at Rs.500 cumulative, back after 7 days
+    const held = W.walletOf(getState().ledger, o.partnerId, p0).pending;
+    const hb = holdbackFor(r.workerPayout - debt, held);
+    if (hb) await ledger('HOLDBACK', hb, acct.partner(o.partnerId), acct.holdback(o.partnerId), { orderId });
+  }
   if (r.platformFee) await ledger('FEE', r.platformFee, acct.escrow(o.id), acct.fee(), {});
   if (r.gst)         await ledger('GST', r.gst, acct.escrow(o.id), acct.gst(), {});
   if (r.refund)      await ledger('REFUND', r.refund, acct.escrow(o.id), acct.customer(o.customerKey), {});
@@ -205,6 +283,8 @@ export async function cancelOrder(orderId, ruleId) {
   const pc = getState().partners.find(p => p.id === o.partnerId) || {};
   const split = cancelSplit(o.deal, ruleId, { markup: markupFor(pc) });
   if (!advance(orderId, 'CANCELLED', { cancelRule: ruleId, refund: split.refund, cancelledAt: Date.now() })) return;
+  if ((ruleId === 'WORKER_CANCEL' || ruleId === 'WORKER_NO_SHOW') && o.stake) await forfeitStake(o, ruleId);
+  else if (o.stake) await returnStake(o);          // the customer cancelled after work began — not the worker's fault
   if (split.refund) await ledger('REFUND', split.refund, acct.escrow(o.id), acct.customer(o.customerKey), { ruleId });
   if (split.worker) await ledger('COMPENSATION', split.worker, acct.escrow(o.id), acct.partner(o.partnerId), { ruleId });
   // The rule promised "full refund + Rs.100 credit" and the toast said so, but
@@ -317,6 +397,8 @@ export async function placeRetailOrder(mode = 'rider') {
     otp: makeOtp(), evidence: [],
   };
   dispatch({ type: 'order/add', payload: order });
+  // the customer's payment arrives from the world first; only then is it locked
+  await ledger('PAYMENT_IN', q.customerPays, acct.world(), 'CUSTOMER:' + s.key, { via: 'upi-sim' });
   await ledger('ESCROW_IN', q.customerPays, 'CUSTOMER:' + s.key, 'ESCROW:' + order.id, { shopId: q.shop.id });
   bumpAgg({ escrow: getState().agg.escrow + q.customerPays });
   clearCart();

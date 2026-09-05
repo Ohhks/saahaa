@@ -32,6 +32,7 @@ import { quoteRetail } from '../../domain/pricing.js';
 import * as auction from '../../domain/auction.js';
 import { progressCard } from './onboard.js';
 import { readiness, blocker } from '../../domain/verification.js';
+import * as W from '../../domain/wallet.js';
 
 let pickerQuery = '', catalogQuery = '', shopTab = 'orders';
 export const setPickerQuery = v => { pickerQuery = v; };
@@ -102,6 +103,30 @@ function rateAsks(p) {
       </button>`;
     }).join('')}
     <p class="micro muted">Sending less than the fair price lowers your chance. It does not raise it.</p>
+  </div>`;
+}
+
+/* The worker's wallet: four states, never blended. AVAILABLE is theirs to
+   take; LOCKED is committed to a job in progress and returns in full when it
+   is finished; PENDING is the 7-day holdback; RELEASED is everything ever
+   paid. The stake is what makes a check-in a commitment. */
+function walletCard(p) {
+  const w = W.walletOf(getState().ledger, p.id, p);
+  const live = getState().orders.filter(o => o.partnerId === p.id && o.stake && !o.stake.returned && !o.stake.forfeited);
+  return `<div class="sec"><div class="hd"><div><span class="eyebrow">Wallet</span><h2 class="h-sec">Your money</h2></div>
+      <span class="pill pill--soft">min stake ${M.fmt(W.MIN_STAKE)}</span></div>
+    <div class="capsules">
+      <div class="capsule capsule--ok"><span class="capsule__k">Available</span><span class="capsule__v num">${M.fmt(w.available)}</span><span class="state state--available">yours to withdraw</span></div>
+      <div class="capsule capsule--info"><span class="capsule__k">Locked</span><span class="capsule__v num">${M.fmt(w.locked)}</span><span class="state state--held">${live.length ? `${live.length} job${live.length > 1 ? 's' : ''} in progress` : 'returns when work is done'}</span></div>
+      <div class="capsule capsule--warn"><span class="capsule__k">Pending</span><span class="capsule__v num">${M.fmt(w.pending)}</span><span class="state state--pending">7-day holdback</span></div>
+      <div class="capsule capsule--gold"><span class="capsule__k">Released</span><span class="capsule__v num">${M.fmt(w.released)}</span><span class="state state--released">lifetime</span></div>
+    </div>
+    ${w.debt ? `<p class="tiny" style="margin-top:8px;color:var(--warn)">${M.fmt(w.debt)} owed from a job you left — recovered from your next payout.</p>` : ''}
+    <p class="micro muted" style="margin-top:8px">When a job starts, ${M.fmt(W.MIN_STAKE)} (or 5% of the job, up to ${M.fmt(W.MAX_STAKE)}) locks from Available. Finish the job and every rupee of it comes back with your full payout. Walk out and it goes to the customer.</p>
+    <div class="row" style="gap:8px;margin-top:10px">
+      <button class="btn btn--secondary btn--sm grow" data-act="wallet.topup" data-id="${p.id}">Add money</button>
+      <button class="btn btn--ghost btn--sm grow" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${w.available < 1000 ? 'disabled' : ''}>Withdraw ${w.available >= 1000 ? M.fmt(w.available) : ''}</button>
+    </div>
   </div>`;
 }
 
@@ -208,6 +233,7 @@ export function renderPartner() {
           ${inbox.length ? '<p class="micro muted">Chat with the customer, the arrival code and the finished-work photo all live inside the job.</p>' : ''}
         </div>
 
+        ${walletCard(p)}
         ${myRates(p)}
       </div>
 

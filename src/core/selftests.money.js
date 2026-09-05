@@ -241,3 +241,52 @@ describe('verification gate', () => {
     expect(Q.tradeBank('nonsense').length).toBe(5);
   });
 });
+
+/* ── the worker wallet and the commitment stake ─────────────── */
+import * as WL from '../domain/wallet.js';
+import { post as LP } from '../domain/ledger.js';
+describe('worker wallet · the stake locks at start and returns in full', () => {
+  it('stake is at least the minimum, 5% of the deal, capped', () => {
+    expect(WL.stakeFor(50000)).toBe(WL.MIN_STAKE);          // Rs.500 job -> Rs.100 minimum
+    expect(WL.stakeFor(400000)).toBe(20000);                // Rs.4,000 job -> 5% = Rs.200
+    expect(WL.stakeFor(5000000)).toBe(WL.MAX_STAKE);        // Rs.50,000 job -> capped Rs.500
+  });
+  it('a stake is funded from the wallet first, the rest on credit', () => {
+    expect(WL.fundStake(10000, 25000)).toEqual({ need: 10000, funded: 10000, onCredit: 0 });
+    expect(WL.fundStake(10000, 4000)).toEqual({ need: 10000, funded: 4000, onCredit: 6000 });
+    expect(WL.fundStake(10000, 0)).toEqual({ need: 10000, funded: 0, onCredit: 10000 });
+  });
+  it('lock then return leaves the wallet exactly where it started; the ledger balances', () => {
+    const P = 'p1';
+    const legs = [
+      { kind: 'TOPUP',          amountPaise: 30000, partyA: 'WORLD:funding', partyB: 'PARTNER:' + P, ts: 1 },
+      { kind: 'STAKE_LOCK',     amountPaise: 10000, partyA: 'PARTNER:' + P,  partyB: 'STAKE:' + P,   ts: 2 },
+    ];
+    let w = WL.walletOf(legs, P);
+    expect(w.available).toBe(20000); expect(w.locked).toBe(10000);
+    legs.push({ kind: 'STAKE_RELEASE', amountPaise: 10000, partyA: 'STAKE:' + P, partyB: 'PARTNER:' + P, ts: 3 });
+    legs.push({ kind: 'ESCROW_RELEASE', amountPaise: 60000, partyA: 'ESCROW:o1', partyB: 'PARTNER:' + P, ts: 4 });
+    w = WL.walletOf(legs, P);
+    expect(w.available).toBe(90000); expect(w.locked).toBe(0); expect(w.released).toBe(60000);
+  });
+  it('a forfeit moves the funded stake to the customer, never to the platform', () => {
+    const P = 'p2';
+    const legs = [
+      { kind: 'TOPUP',         amountPaise: 10000, partyA: 'WORLD:funding', partyB: 'PARTNER:' + P, ts: 1 },
+      { kind: 'STAKE_LOCK',    amountPaise: 10000, partyA: 'PARTNER:' + P,  partyB: 'STAKE:' + P,   ts: 2 },
+      { kind: 'STAKE_FORFEIT', amountPaise: 10000, partyA: 'STAKE:' + P,    partyB: 'CUSTOMER:c1',  ts: 3 },
+    ];
+    const w = WL.walletOf(legs, P);
+    expect(w.available).toBe(0); expect(w.locked).toBe(0);
+  });
+  it('a holdback is due only after seven days and only once', () => {
+    const now = Date.now(); const P = 'p3';
+    const legs = [
+      { id: 'h1', kind: 'HOLDBACK', amountPaise: 5000, partyA: 'PARTNER:' + P, partyB: 'HOLDBACK:' + P, ts: now - 8 * 86400000 },
+      { id: 'h2', kind: 'HOLDBACK', amountPaise: 5000, partyA: 'PARTNER:' + P, partyB: 'HOLDBACK:' + P, ts: now - 2 * 86400000 },
+    ];
+    expect(WL.holdbackDue(legs, now).map(e => e.id)).toEqual(['h1']);
+    legs.push({ id: 'r1', kind: 'HOLDBACK_RELEASE', amountPaise: 5000, partyA: 'HOLDBACK:' + P, partyB: 'PARTNER:' + P, ts: now, meta: { of: 'h1' } });
+    expect(WL.holdbackDue(legs, now)).toHaveLength(0);
+  });
+});

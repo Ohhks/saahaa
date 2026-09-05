@@ -253,6 +253,8 @@ function actionPanel(o, r) {
         ${[0,1,2,3].map(i => `<input id="otp${i}" inputmode="numeric" maxlength="1" data-role="otp">`).join('')}
       </div>${B('otp.submit', 'Verify & start work')}`);
     if (s === 'IN_PROGRESS') return panel('Photo evidence is required before payout', `
+      ${o.stake ? `<p class="tiny" style="margin-bottom:10px"><span class="state state--held">${M.fmt(o.stake.need)} locked</span>
+        <span class="muted">from your wallet for this job${o.stake.onCredit ? ` (${M.fmt(o.stake.onCredit)} on credit against this payout)` : ''} — it comes back in full when the customer confirms.</span></p>` : ''}
       <div class="row" style="gap:8px;margin-bottom:12px">
         <button class="btn btn--secondary grow" data-act="ev.add" data-id="${o.id}" data-label="Before">${icon('camera', { size: 16 })} Before</button>
         <button class="btn btn--secondary grow" data-act="ev.add" data-id="${o.id}" data-label="After">${icon('camera', { size: 16 })} After</button>

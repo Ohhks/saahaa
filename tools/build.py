@@ -17,6 +17,7 @@ migrate.js, and flat concatenation is a SyntaxError.
 No npm, no bundler, no config. Run it before every release — step 9 of the
 safe-update checklist in docs/ARCHITECTURE.md.
 """
+import json
 import io, os, re, sys, datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -221,6 +222,9 @@ def build():
     os.makedirs(DIST, exist_ok=True)
     out = os.path.join(DIST, 'saahaa.html')
     io.open(out, 'w', encoding='utf-8').write(html)
+    # the update watch (core/update.js) polls this; a different build means "an update is waiting"
+    io.open(os.path.join(DIST, 'version.json'), 'w', encoding='utf-8').write(
+        json.dumps({'version': version, 'build': build_id, 'at': datetime.datetime.now().isoformat(timespec='seconds')}))
 
     if '--site' in sys.argv:
         # GitHub Pages payload. index.html IS the bundle, so there is nothing
@@ -234,7 +238,10 @@ def build():
         for asset in ('manifest.json', 'icon.svg', 'sw.js'):
             src_p = os.path.join(ROOT, asset)
             if os.path.exists(src_p):
-                io.open(os.path.join(DIST, asset), 'w', encoding='utf-8').write(read(src_p))
+                body = read(src_p)
+                if asset == 'sw.js':   # the cache is named by the build, so an old shell can never pair with new modules
+                    body = re.sub(r"const BUILD = '[^']*';", f"const BUILD = '{build_id}';", body)
+                io.open(os.path.join(DIST, asset), 'w', encoding='utf-8').write(body)
     return out, len(mods), len(html)
 
 

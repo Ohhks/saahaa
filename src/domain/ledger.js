@@ -25,7 +25,7 @@
 
 import * as M from '../core/money.js';
 
-export const ACCOUNT_TYPES = ['WORLD', 'CUSTOMER', 'ESCROW', 'PARTNER', 'HOLDBACK',
+export const ACCOUNT_TYPES = ['WORLD', 'CUSTOMER', 'ESCROW', 'PARTNER', 'HOLDBACK', 'STAKE',
                               'SHOP', 'RIDER', 'PLATFORM'];
 
 export const acct = {

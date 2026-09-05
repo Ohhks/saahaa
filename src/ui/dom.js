@@ -92,6 +92,21 @@ export function toast(msg, tone = '') {
   toastTimer = setTimeout(() => toastEl.classList.remove('on'), 3600);
 }
 
+/* A toast that STAYS until tapped — for "an update is ready". Built with
+   createElement so nothing here is a string of markup. */
+export function stickyToast(title, body, onTap) {
+  const el = document.createElement('button');
+  el.className = 'toast on';
+  el.setAttribute('role', 'status');
+  el.style.cssText = 'pointer-events:auto;cursor:pointer;text-align:left;border-left-color:var(--accent)';
+  const b = document.createElement('b'); b.textContent = title;
+  const s = document.createElement('span'); s.style.cssText = 'display:block;opacity:.85'; s.textContent = body;
+  el.append(b, s);
+  el.addEventListener('click', () => { el.remove(); if (onTap) onTap(); });
+  document.body.appendChild(el);
+  return el;
+}
+
 /* ── bottom sheet ──────────────────────────────────────────── */
 let scrimEl = null, sheetEl = null, onClose = null, openRaf = 0;
 export function sheet(title, bodyHtml, opts = {}) {

@@ -13,6 +13,7 @@ import { runMigrations } from './core/migrate.js';
 import { checkHealth } from './core/health.js';
 import * as selftest from './core/selftest.js';
 import { deviceId } from './core/id.js';
+import { startUpdateWatch } from './core/update.js';
 
 /* domain — importing a catalog file IS registering it (open/closed) */
 import './domain/catalog.services.js';
@@ -29,7 +30,7 @@ import './core/selftests.js';
 import './core/selftests.money.js';
 
 /* ui */
-import { mount, action, initActions, toast, sheet, closeSheet, esc } from './ui/dom.js';
+import { mount, action, initActions, toast, sheet, closeSheet, esc, stickyToast } from './ui/dom.js';
 import { defs, mark } from './ui/logo.js';
 import { icon } from './ui/icons.js';
 import { showSplash, replaySplash } from './ui/splash.js';
@@ -304,6 +305,13 @@ function wireActions() {
     const theirs = bidding.scoreBid(win, byId[win.partnerId], band, { area: req.area });
     ask.showLoserFeedback(bidding.loserFeedback(mine, theirs));
   });
+  /* ── worker wallet ─────────────────────────────────────────── */
+  A('wallet.topup', d => sheet('Add money to your wallet', `
+    <p class="tiny muted" style="margin-bottom:12px">This is the money that gets locked when a job starts and comes back when it is finished. In production this is a UPI payment; here it is simulated.</p>
+    <div class="chiprow" style="flex-wrap:wrap;gap:8px">${[100, 200, 500, 1000].map(r =>
+      `<button class="chip" data-act="wallet.topup.do" data-id="${d.id}" data-amt="${r * 100}">₹${r}</button>`).join('')}</div>`));
+  A('wallet.topup.do',  d => flow.walletTopUp(d.id, Number(d.amt)).then(() => { closeSheet(); render(); }));
+  A('wallet.withdraw',  d => flow.walletWithdraw(d.id, Number(d.amt)).then(render));
   A('bid.open', d => {
     const p = getState().partners.find(x => x.id === d.pid);
     if (p) ask.bidSheet(d.id, p);
@@ -560,6 +568,8 @@ async function boot() {
   if (shot) { import('./ui/deckscenes.js').then(m => m.run(shot)).catch(e => console.error('[shot]', e)); }
   // the WORK_DONE screen promises auto-release; this is what keeps it
   flow.sweepAutoRelease().then(n => { if (n) { console.info('[saahaa] auto-released', n); render(); } });
+  flow.sweepHoldbacks().then(n => { if (n) { console.info('[saahaa] holdbacks released', n); render(); } });
+  startUpdateWatch((v, apply) => stickyToast(`SAAHAA ${v.version || ''} is ready.`, 'Tap to update — takes a second, nothing is lost.', apply));
   // the 90-second substitution promise, kept while the app is open
   setInterval(() => { if (flow.sweepSubstitutions()) render(); }, 15000);
 

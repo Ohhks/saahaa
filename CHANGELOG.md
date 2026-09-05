@@ -6,6 +6,38 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [6.8.0] — 2026-09-06 — "Skin in the game"
+
+### Added — the worker wallet and the commitment stake
+- **When work starts, a minimum of the worker's own money locks; when the
+  customer confirms the work, every rupee of it comes back — with the whole
+  of the quote. SAAHAA receives the whole of its 8%.** `domain/wallet.js`:
+  stake = max(₹100, 5% of the deal) capped at ₹500, locked at the customer's
+  code (`lockStake`), returned at settlement (`returnStake`). Nothing is
+  taken from anyone else's money; every move is a ledger leg
+  (`STAKE_LOCK` / `STAKE_RELEASE` / `STAKE_FORFEIT`).
+- **Four wallet states, never blended**: available (yours to withdraw),
+  locked (committed to a job), pending (the ledger's 7-day holdback — now
+  posted for real and released by a sweep), released (lifetime). Top-up and
+  withdraw (UPI, simulated in the prototype). The order screen shows the lock
+  on the job.
+- **Cold start**: an empty wallet funds the stake on credit against the job's
+  own payout, so a first job is never blocked; if the pro walks out, the
+  credit part becomes a debt recovered once from the next payout.
+- **Walking out**: a started job cannot simply be cancelled (the machine
+  forbids it); the customer reports it, and an upheld dispute forfeits the
+  stake **to the customer**, never to the platform.
+- 5 new tests (107).
+
+### Added — continuous delivery without a maintenance window
+- `core/update.js` polls `version.json` (written by the build) and offers a
+  *"SAAHAA x.y is ready — tap to update"* toast that stays until tapped; it
+  never forces a reload. The service-worker cache is now stamped with the
+  build id by the build itself. `docs/DEVOPS.md` explains the model;
+  `docs/PRODUCTION-PROCESS.md` is the start-to-finish order for one operator.
+
+---
+
 ## [6.7.0] — 2026-09-06 — "Production candidate"
 
 A professional test pass over every role, every flow, every process — scripted
