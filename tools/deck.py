@@ -94,3 +94,13 @@ outp = os.path.join(ROOT, 'docs', 'presentation.html')
 os.makedirs(os.path.dirname(outp), exist_ok=True)
 io.open(outp, 'w', encoding='utf-8').write(out)
 print(f'built {outp} · {len(slides)} slides · {sum(len(s["slides"]) for s in m["sections"])} screenshots')
+
+if '--artifact' in sys.argv:
+    # the Artifact host supplies doctype/html/head/body; hand it title + style + content only
+    head_end = out.index('</head>'); body_start = out.index('<body>') + len('<body>'); body_end = out.rindex('</body>')
+    head = out[out.index('<title>'):head_end]
+    frag = head.replace(f'<title>{E(m.get("title", "SAAHAA presentation"))}</title>', f'<title>{E(m.get("name", "How SAAHAA Works"))}</title>') + out[body_start:body_end]
+    frag = frag.replace('html{scroll-snap-type:y mandatory;scroll-behavior:smooth}', 'html{scroll-behavior:smooth}')
+    ap = os.path.join(ROOT, 'docs', 'deck', 'presentation-artifact.html')
+    io.open(ap, 'w', encoding='utf-8').write(frag)
+    print(f'artifact fragment {ap} · {len(frag)//1024} KB')
