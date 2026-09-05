@@ -4,18 +4,9 @@ You are one person. This list is ordered so that nothing needs you twice.
 
 ## Today — get it on the internet (30 minutes)
 
-1. **Create the repository.** github.com/new → owner `Ohhks`, name `saahaa`,
-   **public** (GitHub Pages is free only on public repos), no README.
-   Then, from `C:\Users\siidhu\saahaa`:
-   ```bash
-   git push -u origin main --tags
-   ```
-2. **Turn on Pages via Actions.** Repo → Settings → Pages → Source: *GitHub
-   Actions*. The workflow in `.github/workflows/deploy.yml` builds `dist/` and
-   publishes it; a rollback is re-running an older deploy.
-3. **Branch protection.** Settings → Branches → `main`: require the CI check
-   (`.github/workflows/ci.yml`) to pass. CI runs the same 102 tests, the
-   preflight and the engine guard.
+1. ✅ Repository https://github.com/Ohhks/saahaa exists (public) with every commit and tag pushed.
+2. ✅ Pages via Actions is on: **https://ohhks.github.io/saahaa/**. A rollback is re-running an older deploy.
+3. ✅ `main` requires the CI check (107 tests, preflight, migration lint).
 4. **Change the admin password on the live site** the first time you open
    `/#/admin` (System & audit → change password). The demo password is
    `saahaa123` and the console tells you so until you change it.

@@ -7,12 +7,9 @@ Steps 1–5 are today. Steps 6–12 are the first two weeks. Step 13 is forever.
 
 ## Phase A — the site is live (today, ~1 hour)
 
-1. **Create the repository.** github.com/new → `Ohhks/saahaa`, public, empty.
-   Then `git push -u origin main --tags`. *Unblocks: CI, Pages, releases.*
-2. **Pages via Actions.** Settings → Pages → Source: GitHub Actions.
-   `deploy.yml` publishes `dist/`. *Produces: a public URL.*
-3. **Protect `main`.** Settings → Branches → require the CI check.
-   *Produces: nothing broken can land.*
+1. ✅ **Repository created and pushed** — https://github.com/Ohhks/saahaa (public), every commit and tag. *Unblocks: CI, Pages, releases.*
+2. ✅ **Pages via Actions is on.** `deploy.yml` publishes `dist/` to **https://ohhks.github.io/saahaa/** on every push to `main`.
+3. ✅ **`main` is protected** — the CI check "Lint, build, test" must pass. *Nothing broken can land.*
 4. **First open on the live URL.** Admin → System & audit → change the demo
    password. Run the in-app self-test (107). Verify chain → ₹0.
 5. **Hand-check on your phone and a laptop**: sign up as a customer, open a
