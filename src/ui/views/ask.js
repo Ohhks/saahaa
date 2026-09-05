@@ -46,6 +46,13 @@ function beat(on) {
   if (!on && tick) { clearInterval(tick); tick = null; }
 }
 
+/* real stars from real ratings — never a rescaled score component dressed up
+   as a rating on the most trust-loaded card in the feature */
+function avgOf(partnerId) {
+  const p = getState().partners.find(x => x.id === partnerId);
+  const r = (p && p.ratings) || [];
+  return r.length ? r.reduce((a, x) => a + x.stars, 0) / r.length : 4.2;
+}
 const mmss = ms => {
   const t = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
@@ -273,7 +280,7 @@ function heroReply(req, b, held, showCounter) {
     <div class="row" style="margin-top:10px">
       ${avatar(b.partnerName, 44)}
       <div class="grow"><b style="font-size:16px">${esc(b.partnerName)}</b>
-        <p class="tiny muted">${ratingStars(3 + b.parts.rating * 2)} · ${b.km} km · ${esc((b.band && b.band.label) || 'Verified')}</p></div>
+        <p class="tiny muted">${ratingStars(avgOf(b.partnerId))} · ${b.km} km · ${esc((b.band && b.band.label) || 'Verified')}</p></div>
     </div>
     <div style="text-align:center;margin:14px 0 6px">
       <div class="num" style="font-size:34px;font-weight:800;line-height:1">${M.fmt(pay(b.amount))}</div>
@@ -340,8 +347,7 @@ function noBids(req) {
     <div class="card" style="margin-top:24px;text-align:center;padding:26px 18px">
       <div style="font-size:34px">✓</div>
       <h2 style="margin:10px 0 6px;font-size:21px">No one beat your price.</h2>
-      <p class="tiny muted">${held ? `Your ${M.fmt(pay(held))} with ${esc(req.held.partnerName)} is still ready.` : 'Nothing was charged.'}
-        Nothing was charged.</p>
+      <p class="tiny muted">${held ? `Your ${M.fmt(pay(held))} with ${esc(req.held.partnerName)} is still ready. ` : ''}Nothing was charged.</p>
       ${held ? `<button class="btn btn--primary btn--lg btn--block" style="margin-top:18px"
         data-act="ask.held" data-id="${req.id}">Book ${M.fmt(pay(held))}</button>` : ''}
       <button class="btn btn--ghost btn--block" style="margin-top:8px"
@@ -357,7 +363,7 @@ export function showReceipt(req, paid, workerName) {
   const s = A.savings(req, paid);
   const zero = s.amount <= 0;
   sheet('', `<div style="text-align:center;padding:14px 4px 4px">
-    <p class="tiny muted">You asked ${s.replies || 1} ${s.replies === 1 ? 'worker' : 'workers'}.</p>
+    <p class="tiny muted">You asked ${Math.max(1, s.replies)} ${Math.max(1, s.replies) === 1 ? 'worker' : 'workers'}.</p>
     <div style="margin:18px 0">
       <p class="tiny muted">You paid</p>
       <div class="num" style="font-size:36px;font-weight:800;line-height:1.1">${M.fmt(pay(paid))}</div>

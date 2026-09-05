@@ -210,3 +210,34 @@ describe('auction mechanism', () => {
     expect(Object.values(BID.WEIGHTS).reduce((a, b) => a + b, 0)).toBe(100);
   });
 });
+
+/* ── the professional gate ──────────────────────────────────── */
+import * as Q from '../domain/quiz.js';
+describe('verification gate', () => {
+  it('every service category has a five-question trade bank', () => {
+    ['plumbing','electrical','appliance','cleaning','repair','pest','salon','tutor','pet','moving','laundry',
+     'vehicle','help','wellness','health','events'].forEach(c => expect(Q.tradeBank(c).length).toBe(5));
+  });
+  it('every question has four options and one correct index inside them', () => {
+    const all = Object.values(Q.TRADE).flat().concat(Q.CONDUCT, Q.GENERIC);
+    all.forEach(q => { expect(q.o.length).toBe(4); expect(q.a >= 0 && q.a < 4).toBeTrue(); });
+  });
+  it('shuffling keeps the answer attached to its option', () => {
+    const bank = Q.shuffled(Q.CONDUCT, 3);
+    bank.forEach((item, i) => expect(item.o[item.a]).toBe(Q.CONDUCT[i].o[Q.CONDUCT[i].a]));
+  });
+  it('the same attempt always shows the same order', () => {
+    expect(JSON.stringify(Q.shuffled(Q.CONDUCT, 5))).toBe(JSON.stringify(Q.shuffled(Q.CONDUCT, 5)));
+  });
+  it('pass marks are 4 of 5 and 5 of 6', () => {
+    expect(Q.PASS.trade).toBe(4); expect(Q.PASS.conduct).toBe(5);
+    const bank = Q.shuffled(Q.tradeBank('plumbing'), 1);
+    const perfect = bank.map(b => b.a);
+    expect(Q.score(bank, perfect).right).toBe(5);
+    const four = perfect.slice(); four[0] = (four[0] + 1) % 4;
+    expect(Q.score(bank, four).right).toBe(4);
+  });
+  it('an unknown category still gets a bank, so no trade is ever ungated', () => {
+    expect(Q.tradeBank('nonsense').length).toBe(5);
+  });
+});

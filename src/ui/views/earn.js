@@ -53,9 +53,10 @@ const WHO = [
 ];
 
 const HOW = [
-  { n: '1', t: 'Tell us what you do',  s: 'Your trade or your shop, your area, and your usual price. Two minutes.' },
-  { n: '2', t: 'Get verified',         s: 'We check who you are once. In-home work needs a background check — that is what makes customers trust you.' },
-  { n: '3', t: 'Start getting jobs',   s: 'Jobs near you arrive on your phone. Accept the ones you want. Your money is locked before you start work.' },
+  { n: '1', t: 'Tell us what you do',    s: 'Your trade, your area, your usual price. Two minutes.' },
+  { n: '2', t: 'Verify yourself — 10 min', s: 'Phone code, your ID (we keep only the last 4 digits), one photo, five trade questions, six rules. No waiting for anyone.' },
+  { n: '3', t: 'Your page goes live',    s: 'A professional page with your badge, ratings and reviews — built and kept current by SAAHAA. Share it on WhatsApp.' },
+  { n: '4', t: 'Start getting jobs',     s: 'Jobs near you arrive on your phone. Money is locked before you start. You keep 100% of your quote.' },
 ];
 
 /* ── the invitation (guest and customer) ───────────────────── */
@@ -74,12 +75,12 @@ function invite() {
         ${mark(150, { detail: true, glow: false })}
       </div>
       <div style="position:relative">
-        <span class="badge badge--gold">You keep 100%</span>
+        <span class="badge badge--gold">Locally, professionally</span>
         <h1 style="font-size:var(--fs-xl);line-height:var(--lh-xl);margin:10px 0 6px;max-width:16ch">
-          Work for yourself, not for a commission.</h1>
+          Your trade. Your price. Your own page.</h1>
         <p class="tiny muted" style="max-width:34ch">
-          SAAHAA never takes a cut of your price. You say what the job is worth, and that is
-          exactly what you are paid.</p>
+          SAAHAA never takes a cut of your quote — and it runs your professional presence for you:
+          a page, a badge, ratings, bookings. You do the work; we do the rest.</p>
       </div>
     </div>
 

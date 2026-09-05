@@ -19,6 +19,8 @@ import { searchStarter, aislesOf } from '../../domain/starter-catalog.js';
 import { header, emptyBlock } from './shops.js';
 import { quoteRetail } from '../../domain/pricing.js';
 import * as auction from '../../domain/auction.js';
+import { progressCard } from './onboard.js';
+import { readiness, blocker } from '../../domain/verification.js';
 
 let pickerQuery = '', catalogQuery = '', shopTab = 'orders';
 export const setPickerQuery = v => { pickerQuery = v; };
@@ -52,6 +54,26 @@ function rateAsks(p) {
   </div>`;
 }
 
+/* The post-auction coaching loop. A pro who loses is told WHY — "your price
+   was not the problem" is the line that stops undercutting, and it was built
+   and never shown to anyone. */
+function myRates(p) {
+  const mine = getState().bids.filter(b => b.partnerId === p.id).slice(-6).reverse();
+  if (!mine.length) return '';
+  const label = { submitted: ['Waiting', 'badge--info'], accepted: ['Won', 'badge--ok'], rejected: ['Lost', 'badge--soft'],
+                  countered: ['Counter asked', 'badge--warn'], shortlisted: ['Shortlisted', 'badge--info'] };
+  return `<div class="sec"><div class="hd"><h2>Your rates</h2></div>
+    ${mine.map(b => { const r = getState().requests.find(x => x.id === b.requestId) || {};
+      const c = r.catId ? get('category', r.catId) : { name: 'Job' };
+      const [txt, cls] = label[b.status] || [b.status, 'badge--soft'];
+      return `<button class="card card--tap" style="width:100%;text-align:left;margin-bottom:8px;padding:11px 14px"
+        data-act="bid.result" data-id="${b.id}" ${b.status === 'rejected' ? '' : 'disabled'}>
+        <div class="between"><div class="grow"><b class="tiny">${esc(c.name)} · ${esc(r.area || '')}</b>
+          <p class="micro muted">You sent ${M.fmt(b.amount)} · ${timeAgo(b.submittedAt)}${b.status === 'rejected' ? ' · tap to see why' : ''}</p></div>
+          <span class="badge ${cls}">${txt}</span></div></button>`; }).join('')}
+  </div>`;
+}
+
 export function renderPartner() {
   const p = myPartner();
   if (!p) return `${header('Partner', '')}<main class="wrap">
@@ -60,20 +82,27 @@ export function renderPartner() {
   const t = trustScore(p);
   const orders = myOrders();
   const inbox = orders.filter(o => ['MATCHING','ASSIGNED','EN_ROUTE','ARRIVED','IN_PROGRESS','WORK_DONE'].includes(o.stage));
-  const paid = orders.filter(o => o.stage === 'SETTLED' || o.stage === 'PARTIAL');
-  const earned = paid.reduce((n, o) => n + (o.workerPayout || o.deal || 0), 0);
+  // by SETTLEMENT, never by stage: a rated job moves on to CLOSED, and
+  // filtering on SETTLED made a pro's lifetime earnings snap to Rs.0 the
+  // moment a customer said thank you
+  const paid = orders.filter(o => o.settledAt && (o.workerPayout || 0) > 0);
+  const earned = paid.reduce((n, o) => n + (o.workerPayout || 0), 0);
+  const paidOut = paid.filter(o => o.paidOut).reduce((n, o) => n + (o.workerPayout || 0), 0);
   const held = orders.filter(o => o.stage === 'WORK_DONE').reduce((n, o) => n + o.deal, 0);
   const nextTier = TIERS[Math.min(4, (p.tier | 0) + 1)];
 
+  const gate = blocker(p);
   return `
   ${header(p.name, `${cat.ico} ${cat.name} · ${p.area}`)}
   <main class="wrap">
+    ${progressCard(p)}
+    ${gate && readiness(p).complete ? `<div class="card" style="margin-top:var(--sp-6);border-color:var(--warn)"><b class="tiny">${esc(gate)}</b></div>` : ''}
 
     <div class="card on-plum" style="margin-top:var(--sp-6);border:0">
       <div class="between">
         <div><span class="tiny muted">Paid out</span>
           <b class="num" style="display:block;font-size:26px">${M.fmt(earned)}</b>
-          <p class="micro muted">${M.fmt(held)} in escrow</p></div>
+          <p class="micro muted">${M.fmt(held)} in escrow · ${M.fmt(paidOut)} sent to UPI</p></div>
         <div style="text-align:right">
           <span class="badge badge--gold">${t.band.label}</span>
           <p class="tiny" style="margin-top:6px">Trust ${t.score}/100</p>
@@ -81,8 +110,9 @@ export function renderPartner() {
       </div>
       <div class="between" style="margin-top:14px">
         <span class="tiny">${p.online === false ? 'You are offline' : 'You are online'}</span>
-        <button class="btn ${p.online === false ? 'btn--secondary' : 'btn--primary'} btn--sm"
-          data-act="partner.online">${p.online === false ? 'Go online' : 'Go offline'}</button>
+        ${readiness(p).canWork ? `<button class="btn ${p.online === false ? 'btn--secondary' : 'btn--primary'} btn--sm"
+          data-act="partner.online">${p.online === false ? 'Go online' : 'Go offline'}</button>`
+          : '<span class="badge badge--soft">Verify to go online</span>'}
       </div>
     </div>
 
@@ -96,6 +126,7 @@ export function renderPartner() {
       ${M.fmt(Math.round(p.ask * 0.75))} for the same job.</p>
 
     ${rateAsks(p)}
+    ${myRates(p)}
 
     <div class="sec"><div class="hd"><h2>Your jobs</h2><span class="tiny muted">${inbox.length} active</span></div>
       ${inbox.length ? inbox.map(jobCard).join('') : emptyBlock('No live jobs', 'Stay online — requests land here.')}
@@ -109,8 +140,16 @@ export function renderPartner() {
           <b class="tiny">Next: ${esc(nextTier.label)}</b>
           <p class="tiny muted" style="margin-top:4px">${esc(nextTier.unlocks)}</p>
           <button class="btn btn--secondary btn--block" style="margin-top:12px"
-            data-act="partner.upgrade">Start verification</button>` : ''}
+            data-act="partner.upgrade">${readiness(p).complete ? 'Go further' : 'Continue verification'}</button>` : ''}
       </div>
+    </div>
+
+    <div class="sec"><div class="hd"><h2>Your page</h2></div>
+      <button class="card card--tap" style="width:100%;text-align:left" data-act="pro.open" data-id="${p.id}">
+        <div class="between"><div class="grow"><b>saahaa.app/pro/${esc(p.id.slice(-6))}</b>
+          <p class="tiny muted">Your professional card — ratings, badges and reviews kept current by SAAHAA. Share it.</p></div>
+          <span class="tiny" style="color:var(--accent)">Open →</span></div>
+      </button>
     </div>
     <div style="height:40px"></div>
   </main>`;
@@ -167,7 +206,7 @@ export function renderShopAdmin() {
 }
 
 function shopOrders(orders) {
-  const live = orders.filter(o => !['R_SETTLED','R_CLOSED','R_CANCELLED'].includes(o.stage));
+  const live = orders.filter(o => !o.settledAt && !['R_CLOSED','R_CANCELLED'].includes(o.stage));
   if (!live.length) return emptyBlock('No orders right now', 'New orders appear here with a 60-second accept timer.');
   return live.map(o => {
     const st = stage(o.stage);
@@ -280,7 +319,7 @@ function shopStock(s, items) {
 }
 
 function shopMoney(s, orders) {
-  const done = orders.filter(o => o.stage === 'R_SETTLED');
+  const done = orders.filter(o => o.settledAt && o.shopPayout);   // by settlement, not by stage
   const gross = done.reduce((n, o) => n + o.itemsTotal, 0);
   const fee = done.reduce((n, o) => n + o.platformFee, 0);
   const rider = done.reduce((n, o) => n + (o.riderPayout || 0), 0);

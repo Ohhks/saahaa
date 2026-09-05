@@ -11,7 +11,7 @@ import * as flow from '../../domain/flow.js';
 import * as M from '../../core/money.js';
 import { tier } from '../../domain/trust.js';
 import * as flags from '../../core/flags.js';
-import { trackerFor, trackerIndex, stage } from '../../domain/orders.js';
+import { trackerFor, trackerIndex, stage, isTerminal } from '../../domain/orders.js';
 import * as ask from './ask.js';
 
 let search = '';
@@ -48,7 +48,8 @@ function tileHtml(c) {
 }
 
 function activeOrderStrip() {
-  const live = myOrders().filter(o => !['CLOSED','CANCELLED','EXPIRED','R_CLOSED','R_CANCELLED','SETTLED','R_SETTLED','RATED']
+  // the machine knows which stages are terminal; a hand-kept list missed PARTIAL and REFUNDED
+  const live = myOrders().filter(o => !isTerminal(o.stage) && !['SETTLED','R_SETTLED','RATED','PARTIAL','REFUNDED','R_REFUNDED']
     .includes(o.stage));
   if (!live.length) return '';
   const o = live[0];
@@ -226,7 +227,8 @@ export function heroCard(catId, p, sub = null) {
         color:var(--accent-on-fill);display:grid;place-items:center;font-weight:800;font-size:19px;flex:0 0 auto">
         ${esc(p.name[0])}</span>
       <div class="grow">
-        <div class="between"><b style="font-size:16px">${esc(p.name)}</b>
+        <div class="between"><button class="btn btn--ghost btn--sm" style="padding:0;height:auto;font-size:16px;font-weight:700"
+            data-act="pro.open" data-id="${p.id}">${esc(p.name)} ›</button>
           <span class="badge badge--gold">Accepted</span></div>
         <div class="row" style="gap:6px;margin-top:5px;flex-wrap:wrap">
           ${t.badge ? `<span class="badge badge--ok">✓ ${esc(t.badge)}</span>` : ''}

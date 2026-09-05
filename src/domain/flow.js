@@ -172,8 +172,14 @@ export async function confirmAndRelease(orderId, pct = 1) {
   // Losing a dispute used to RAISE the pro's trust score, because this ran
   // unconditionally — including on the admin's full-refund path.
   const p = getState().partners.find(x => x.id === o.partnerId);
+  /* `completed` is what the profile shows; `countedJobs` is what the ladder
+     and the provisional cap use, and it only moves for a job with an OTP
+     check-in AND a work photo. A friend booking and releasing without ever
+     opening the door is a display number, not a credential. */
+  const real = !!o.otpVerified && (o.evidence || []).length > 0;
   if (p && pct > 0) dispatch({ type: 'partner/patch', payload: { id: p.id, patch: {
     completed: (p.completed || 0) + 1, starts: (p.starts || 0) + 1,
+    countedJobs: (p.countedJobs || 0) + (real ? 1 : 0),
     onTimeStarts: (p.onTimeStarts || 0) + 1, lastActiveTs: Date.now() } } });
   else if (p) dispatch({ type: 'partner/patch', payload: { id: p.id, patch: {
     disputesUpheld: (p.disputesUpheld || 0) + 1 } } });
@@ -284,6 +290,14 @@ export async function placeRetailOrder(mode = 'rider') {
   const c0 = getCart();
   const sh0 = c0 && getState().shops.find(x => x.id === c0.shopId);
   if (sh0 && sh0.isOpen === false) { toast(`${sh0.name} closed before you checked out`, 'warn'); return null; }
+  // the "Min Rs.149" printed on every shop card was never enforced
+  const q0 = cartQuote(mode);
+  if (q0 && sh0 && sh0.minOrder && q0.itemsTotal < sh0.minOrder) {
+    toast(`${sh0.name} needs a minimum order of ${M.fmt(sh0.minOrder)}`, 'warn'); return null;
+  }
+  // a shop set to "pickup only" was still receiving rider orders
+  if (sh0 && sh0.deliveryMode === 'pickup' && mode !== 'pickup') { toast('This shop is pickup only', 'warn'); return null; }
+  if (sh0 && sh0.deliveryMode === 'self' && mode === 'rider') mode = 'self';
   const cart = getCart(); const q = cartQuote(mode);
   if (!cart || !q) return null;
   const now = Date.now();
@@ -383,7 +397,7 @@ export function rateOrder(orderId, starsRaw, text = '') {
   dispatch({ type: 'order/patch', payload: { id: orderId, patch: { rated: stars, ratedAt: now } } });
   // SETTLED -> RATED -> CLOSED, and PARTIAL -> CLOSED. All three existed in
   // the machine with no caller.
-  if (advance(orderId, 'RATED', {})) advance(orderId, 'CLOSED', {});
+  if (canTransition(o.stage, 'RATED')) { advance(orderId, 'RATED', {}); advance(orderId, 'CLOSED', {}); }
   else advance(orderId, 'CLOSED', {});
   audit.record('order.rated', { id: orderId, stars }, s.key);
   toast('Thanks — that decides who gets recommended next.');
@@ -392,8 +406,24 @@ export function rateOrder(orderId, starsRaw, text = '') {
 
 /** Declining to rate still has to close the order, or it sits open forever. */
 export function skipRating(orderId) {
-  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { rated: 0, ratedAt: Date.now() } } });
+  const o = getState().orders.find(x => x.id === orderId); if (!o) return;
+  // SETTLED has no edge to CLOSED; Skip has to walk through RATED like a rating does
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { rated: -1, ratedAt: Date.now() } } });
+  if (canTransition(o.stage, 'RATED')) advance(orderId, 'RATED', {});
   advance(orderId, 'CLOSED', {});
+}
+
+/* ── the promise on the WORK_DONE screen ──────────────────────
+   "Auto-releases if the customer does not respond" was printed to the pro
+   and implemented nowhere: releaseAt was written and never read, so a
+   customer who simply never tapped Confirm left the pro unpaid forever. This
+   runs at boot and whenever an order screen renders. HOLD-tier orders are
+   deliberately excluded — those need a human. */
+export async function sweepAutoRelease(now = Date.now()) {
+  const due = getState().orders.filter(o => o.kind === 'service' && o.stage === 'WORK_DONE'
+    && o.releaseAt && o.releaseAt <= now && o.escrowTier !== 'HOLD' && o.escrowTier !== 'FREEZE');
+  for (const o of due) await confirmAndRelease(o.id, 1);
+  return due.length;
 }
 
 /* ── shop owner: self-listing ──────────────────────────────── */
@@ -419,6 +449,7 @@ export function addCustomProduct(shopId, catId, fields) {
 }
 /** MRP lock: selling above MRP is illegal under Legal Metrology. Refuse it. */
 export function setProductPrice(productId, pricePaise) {
+  if (!Number.isFinite(pricePaise) || pricePaise <= 0) { toast('Price must be above zero', 'danger'); return { ok: false }; }
   const p = getState().products.find(x => x.id === productId);
   if (!p) return { ok: false };
   if (p.mrp && pricePaise > p.mrp)

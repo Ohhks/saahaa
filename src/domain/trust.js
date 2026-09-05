@@ -124,5 +124,15 @@ export const TAGS = {
   customerBad:  ['Rude', 'Unclear scope', 'Haggled hard', 'Unsafe premises'],
 };
 
-export const capOk = (partner, dealPaise) => dealPaise <= tier(partner.tier).capPaise;
+/* PROVISIONAL. A newly verified pro is tier 2 by document and quiz, but by
+   track record they are nobody yet. Rather than lock them out of their own
+   trade (which is what a category gate does, and what makes real plumbers walk
+   away), bound the damage: Rs.1,500 a job until three jobs have settled
+   without a complaint. Then the full tier-2 cap opens by itself. */
+export const PROVISIONAL_CAP = 150000;
+export const PROVISIONAL_JOBS = 3;
+export const isProvisional = p => !!p && (p.tier | 0) >= 2 && (p.countedJobs ?? p.completed ?? 0) < PROVISIONAL_JOBS
+                                  && !!p.verification;      // legacy seeds are not provisional
+export const effectiveCap = p => isProvisional(p) ? PROVISIONAL_CAP : tier(p && p.tier).capPaise;
+export const capOk = (partner, dealPaise) => dealPaise <= effectiveCap(partner);
 export { M as money };

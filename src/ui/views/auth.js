@@ -139,10 +139,16 @@ export async function doSignup() {
   if (role === 'partner') {
     const pid = nid('p');
     user.partnerId = pid;
+    /* Tier 0, offline. Signing up used to create a tier-1 pro who was online
+       and bookable with no check of any kind between "typed a name" and
+       "inside a customer's home". The ladder (domain/verification.js) is
+       what moves them to tier 2 — automatically, in about ten minutes. */
+    user.tier = 0;
     dispatch({ type: 'partner/add', payload: {
-      id: pid, userKey: key, name, cat: val('suCat') || 'repair',
-      ask: toPaise(Number(val('suAsk')) || 500), area, tier: 1, online: true,
-      completed: 0, starts: 0, onTimeStarts: 0, ratings: [], lastActiveTs: Date.now() } });
+      id: pid, userKey: key, name, mobile, cat: val('suCat') || 'repair',
+      ask: toPaise(Number(val('suAsk')) || 500), area, tier: 0, online: false,
+      completed: 0, starts: 0, onTimeStarts: 0, ratings: [], lastActiveTs: Date.now(),
+      verification: { steps: {}, attempts: {} } } });
   }
   if (role === 'shop') {
     const sid = nid('s');
@@ -157,9 +163,14 @@ export async function doSignup() {
 
   dispatch({ type: 'user/add', payload: user });
   audit.record('user.signup', { key, role }, key);
-  toast('Account created — now sign in');
+  /* "Account created — now sign in" was a second form standing between a new
+     partner and their first step. Sign them in and put them on the ladder. */
+  saveSession({ ...user });
+  audit.record('user.login', { key, role }, key);
   tab = 'login';
-  ctx.render();
+  if (role === 'partner') { toast(`Welcome, ${name.split(' ')[0]}. Ten minutes and you are earning.`); ctx.go('onboard'); }
+  else if (role === 'shop') { toast('Your shop is live — add products'); ctx.go('shopadmin'); }
+  else { toast(`Welcome, ${name.split(' ')[0]}`); ctx.go('home'); }
 }
 
 export function logout() {

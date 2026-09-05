@@ -21,6 +21,7 @@ import * as M from '../../core/money.js';
 import { trustScore, tier } from '../../domain/trust.js';
 import { stage } from '../../domain/orders.js';
 import * as flow from '../../domain/flow.js';
+import * as V from '../../domain/verification.js';
 import { mark } from '../logo.js';
 
 let section = 'dash';
@@ -179,7 +180,11 @@ function ratingStats(st) {
 
 /* ── 2. APPROVALS ─────────────────────────────────────────── */
 function approvals(st) {
-  const queue = st.partners.filter(p => (p.tier | 0) <= 2);
+  /* The owner sees ONLY what a machine cannot decide: a background check to
+     confirm (tier 3) or a Certified badge to award (tier 4). Everything below
+     tier 2 is the partner's own ladder and never lands here. */
+  const queue = V.ownerQueue();
+  const inProgress = st.partners.filter(p => !V.readiness(p).complete && !p.suspended);
   const shops = st.shops.filter(s => s.status === 'pending');
   return `
   ${note('queue ordering by risk, duplicate detection, price-outlier flags, ban-list prefilter',
@@ -187,16 +192,32 @@ function approvals(st) {
   <div class="sec"><div class="hd"><h2>Partner applications · ${queue.length}</h2></div>
     ${queue.length ? queue.map(p => {
       const t = trustScore(p);
+      const v = p.verification || {};
+      const bg = v.background || {};
+      const next = Math.min(4, (p.tier | 0) + 1);
+      const e = V.certifiedEligible(p);
       return `<div class="card" style="margin-bottom:10px">
         <div class="between"><div class="grow"><b>${esc(p.name)}</b>
           <p class="tiny muted">${esc(get('category', p.cat).name)} · ${esc(p.area)} ·
             ${esc(tier(p.tier).label)} · trust ${t.score}</p></div>
           <span class="badge badge--${t.band.tone === 'gold' ? 'gold' : t.band.tone === 'ok' ? 'ok' : 'warn'}">${t.band.label}</span></div>
+        <div class="card" style="margin-top:10px;padding:10px 12px;background:var(--surface-2)">
+          ${next === 3 ? `<b class="tiny">Background check requested ${timeAgo(bg.at)}</b>
+            <p class="micro muted">ID ${esc((v.idType || '').toUpperCase())} …${esc(v.idLast4 || '????')} · reference: ${esc(bg.refName || '—')} (…${esc(bg.refPhone || '')}) · consent given</p>
+            <p class="micro muted">Call the reference. Approve only after the call.</p>`
+          : `<b class="tiny">Qualifies for Certified</b>
+            <p class="micro muted">${e.completed} jobs · rating ${e.avg.toFixed(1)} · ${p.disputesUpheld || 0} upheld disputes</p>`}
+        </div>
         <div class="row" style="margin-top:12px;gap:8px">
-          <button class="btn btn--primary btn--sm grow" data-act="admin.approve" data-id="${p.id}">Approve → tier ${Math.min(4, (p.tier | 0) + 1)}</button>
+          <button class="btn btn--primary btn--sm grow" data-act="admin.approve" data-id="${p.id}" data-tier="${next}">Approve → ${esc(tier(next).label)}</button>
           <button class="btn btn--ghost btn--sm" data-act="admin.suspend" data-id="${p.id}">Suspend</button>
         </div></div>`;
-    }).join('') : '<p class="tiny muted">Queue is clear.</p>'}</div>
+    }).join('') : '<p class="tiny muted">Nothing needs you. Partners verify themselves.</p>'}</div>
+  <div class="sec"><div class="hd"><h2>Self-verifying now · ${inProgress.length}</h2></div>
+    ${inProgress.length ? inProgress.map(p => { const r = V.readiness(p); return `<div class="card" style="margin-bottom:8px;padding:11px 14px">
+      <div class="between"><span class="tiny">${esc(p.name)} <span class="micro muted">· ${esc(get('category', p.cat).name)}</span></span>
+        <span class="micro muted">${r.pct}% · next: ${esc(r.next ? r.next.title : '—')}</span></div></div>`; }).join('')
+      : '<p class="tiny muted">Nobody mid-way.</p>'}</div>
   <div class="sec"><div class="hd"><h2>Shop applications · ${shops.length}</h2></div>
     ${shops.length ? shops.map(s => `<div class="card" style="margin-bottom:10px">
       <b>${esc(s.name)}</b><p class="tiny muted">${esc(s.area)}</p></div>`).join('')
@@ -326,7 +347,7 @@ function moderation(st) {
       : '<p class="tiny muted">Nothing flagged.</p>'}</div>
   <div class="sec"><div class="hd"><h2>Reviews · ${st.reviews.length}</h2></div>
     ${st.reviews.length ? st.reviews.slice(0, 20).map(r => `<div class="card" style="padding:11px;margin-bottom:7px">
-      <div class="between"><span class="tiny">${r.stars}★ ${esc(r.by || '')}</span>
+      <div class="between"><span class="tiny">${r.stars}★ ${esc(r.byName || r.by || '')}</span>
         <button class="btn btn--ghost btn--sm" data-act="admin.hidereview" data-id="${r.id}">Hide</button></div></div>`).join('')
       : '<p class="tiny muted">No reviews yet.</p>'}</div>`;
 }
@@ -502,11 +523,12 @@ function system(st) {
 export async function runTests() { testResult = await selftest.runAll(); toast(testResult.failed ? `${testResult.failed} test(s) failed` : 'All tests passed'); ctx.render(); }
 export async function doVerifyChain() { chainResult = await verifyChain(getState().ledger); toast(chainResult.ok ? 'Ledger intact' : `Broken at block ${chainResult.at}`); ctx.render(); }
 export function toggleFlag(name) { flags.set(name, !flags.get(name)); audit.record(audit.ACTIONS.FLAG_TOGGLE, { name, value: flags.get(name) }, 'admin'); ctx.render(); }
-export function approve(id) {
+export function approve(id, target) {
   const p = getState().partners.find(x => x.id === id); if (!p) return;
-  dispatch({ type: 'partner/patch', payload: { id, patch: { tier: Math.min(4, (p.tier | 0) + 1) } } });
-  audit.record(audit.ACTIONS.PARTNER_APPROVE, { id, tier: Math.min(4, (p.tier | 0) + 1) }, 'admin');
-  toast(`${p.name} → ${tier(Math.min(4, (p.tier | 0) + 1)).label}`); ctx.render();
+  const t = target ? Number(target) : Math.min(4, (p.tier | 0) + 1);
+  // goes through the gate: an admin cannot lift a partner past self-verification
+  if (V.approveTier(p, t, 'admin')) toast(`${p.name} → ${tier(t).label}`);
+  ctx.render();
 }
 export function suspend(id) {
   const p = getState().partners.find(x => x.id === id); if (!p) return;
@@ -518,8 +540,9 @@ export async function release(id, pct) { await flow.confirmAndRelease(id, Number
 export async function refundRetail(id) { await flow.refundRetail(id); ctx.render(); }
 export async function resolve(id, outcome) {
   const d = getState().disputes.find(x => x.id === id); if (!d) return;
-  dispatch({ type: 'dispute/resolve', payload: { id, patch: { status: 'RESOLVED', outcome } } });
   const ord = getState().orders.find(x => x.id === d.orderId);
+  // the money moves first; the dispute is marked resolved by the release
+  // itself (confirmAndRelease / refundRetail both close the linked dispute)
   // confirmAndRelease bails on a retail order AFTER the dispute has already
   // been flipped to RESOLVED, which is how a shop order ended up marked
   // settled with its money still locked.

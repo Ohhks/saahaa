@@ -24,6 +24,8 @@ import * as audit from '../core/audit.js';
 import { toast } from '../ui/dom.js';
 import { bookService } from './flow.js';
 import { rankPartners, kmBetween } from './match.js';
+import { blocker, categoryAllowed } from './verification.js';
+import { capOk } from './trust.js';
 import {
   priceBand, validateBid, biddingAllowed, rankBids, counterOffer,
   auctionState, loserFeedback, WINDOW, MAX_BIDS, WAVE_SIZE, MAX_INVITES,
@@ -40,9 +42,10 @@ export function myRequests() {
 export function openRequestsForPartner(partner) {
   if (!partner) return [];
   const now = Date.now();
+  if (blocker(partner)) return [];
   return getState().requests.filter(r =>
     r.status === 'bidding' && r.closesAt > now &&
-    r.catId === partner.cat &&
+    r.catId === partner.cat && capOk(partner, r.target) &&
     !getState().bids.some(b => b.requestId === r.id && b.partnerId === partner.id));
 }
 export const myBid = (requestId, partnerId) =>
@@ -188,6 +191,13 @@ export function placeBid({ requestId, partner, amount, note, quiet }) {
     if (!quiet) toast('You cannot bid on your own request', 'danger');
     return null;
   }
+  // the gate holds here too: a tier-0 partner who reaches this function by
+  // any path is refused, with the reason
+  const why = blocker(partner);
+  if (why) { if (!quiet) toast(why, 'warn'); return null; }
+  // the auction was a complete bypass of minTier and of the tier cap
+  if (!categoryAllowed(partner, req.catId)) { if (!quiet) toast('Your tier does not cover this job yet', 'warn'); return null; }
+  if (!capOk(partner, amount)) { if (!quiet) toast('Above your tier\'s job cap', 'warn'); return null; }
   if (myBid(requestId, partner.id)) {
     if (!quiet) toast('You have already bid on this job — one bid each', 'warn');
     return null;
@@ -226,6 +236,14 @@ export function closeIfDue(requestId) {
       ? { status: 'awaiting_choice', holdUntil: Date.now() + HOLD_MS }
       : { status: 'no_bids' };
     dispatch({ type: 'request/patch', payload: { id: requestId, patch } });
+  }
+  /* A request left in awaiting_choice used to sit there forever, and because
+     askOffer refuses while one is open, a single backgrounded ask removed the
+     feature for that customer permanently. The abandonment rule is: the held
+     price stands. Book it, and close the request. */
+  if (req.status === 'awaiting_choice' && req.holdUntil && Date.now() > req.holdUntil) {
+    if (req.held) return bookHeld(requestId).then(() => auctionState({ ...req, bids: bidsFor(requestId) })), st;
+    dispatch({ type: 'request/patch', payload: { id: requestId, patch: { status: 'expired' } } });
   }
   return st;
 }

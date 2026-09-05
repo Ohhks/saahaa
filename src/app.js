@@ -40,6 +40,8 @@ import * as partner from './ui/views/partner.js';
 import * as admin from './ui/views/admin.js';
 import * as earn from './ui/views/earn.js';
 import * as ask from './ui/views/ask.js';
+import * as onboard from './ui/views/onboard.js';
+import * as pro from './ui/views/pro.js';
 
 /* ══════════════ ROUTES ══════════════ */
 const ROUTES = {
@@ -55,6 +57,8 @@ const ROUTES = {
   admin:     () => admin.render(),
   earn:      () => earn.render(),
   ask:       p => ask.render(p),
+  onboard:   () => onboard.render(),
+  pro:       p => pro.render(p),
   account:   () => accountView(),
 };
 
@@ -83,9 +87,11 @@ function go(view, param) {
   // go() has already done the work; the hashchange it is about to fire is an
   // echo, not a navigation. Without this the handler below re-closed any sheet
   // opened immediately after a go() — which silently ate the ask-rates receipt.
-  selfNav = true;
-  if (view !== 'admin') location.hash = param ? `#/${view}/${param}` : `#/${view}`;
-  else location.hash = '#/admin';
+  const nextHash = view === 'admin' ? '#/admin' : param ? `#/${view}/${param}` : `#/${view}`;
+  // only an ACTUAL hash change echoes; re-tapping the current tab must not
+  // leave the flag armed to swallow the user's next Back
+  selfNav = nextHash !== location.hash;
+  location.hash = nextHash;
   window.scrollTo(0, 0);
   render();
 }
@@ -181,6 +187,17 @@ function wireActions() {
     else go(d.tab);
   });
   A('earn.start', () => { auth.setAuthTab('signup'); auth.setAuthRole('partner'); go('auth'); });
+  A('nav.onboard', () => go('onboard'));
+
+  /* ── partner verification (the chronology) ─────────────────── */
+  ['ob.sendcode','ob.confirmphone','ob.idtype','ob.submitid','ob.selfie','ob.pick','ob.quiz','ob.payout','ob.agree','ob.bg']
+    .forEach(n => A(n, d => onboard.act(n, d)));
+
+  /* ── the pro's public page ─────────────────────────────────── */
+  A('pro.open',  d => go('pro', d.id));
+  A('pro.edit',  () => pro.openEdit());
+  A('pro.save',  () => { pro.saveEdit(); closeSheet(); render(); });
+  A('pro.share', d => pro.share(d.id));
   A('sheet.close', () => closeSheet());
 
   /* theme + brand */
@@ -196,8 +213,9 @@ function wireActions() {
   A('area.pick', () => sheet('Where are you?', `<div class="grid2">${AREA_NAMES.map(a =>
     `<button class="tile" data-act="area.set" data-area="${esc(a)}"><span class="lbl">${esc(a)}</span></button>`).join('')}</div>`));
   A('area.set', d => {
+    // persist.read JSON.parses; a raw setItem here made every guest Madhapur
     if (ctx.session) ctx.session = { ...ctx.session, area: d.area };
-    else ctx.session = null, localStorage.setItem('SAAHAA_GUEST_AREA', d.area);
+    else { ctx.session = null; persist.write(persist.KEYS.guestArea, d.area); }
     closeSheet(); toast(`Serving ${d.area}`); render();
   });
 
@@ -228,6 +246,7 @@ function wireActions() {
     // The one guard rail: a materially lower-rated pick gets ONE lightweight
     // sheet stating the fact. Not a warning, not "not recommended" — a fact.
     const bid = getState().bids.find(b => b.id === d.bid);
+    if (!bid) { toast('That rate is no longer available', 'warn'); render(); return; }
     if (d.warn === '1' && !confirmedLowRated.has(d.bid)) {
       confirmedLowRated.add(d.bid);
       sheet('Before you book', `<p class="tiny muted">${esc(bid.partnerName)} is rated lower than the recommended worker.</p>
@@ -319,11 +338,8 @@ function wireActions() {
     const p = getState().partners.find(x => x.userKey === me().key);
     if (p) { ctx.store.dispatch({ type:'partner/patch', payload:{ id:p.id, patch:{ online: p.online === false } } }); render(); }
   });
-  A('partner.upgrade', () => sheet('Get verified', `
-    <p>Verification unlocks bigger jobs, the Verified badge and faster payouts.</p>
-    <p class="tiny muted" style="margin-top:12px">
-      In the prototype an admin promotes you from the Approvals queue. In production this is
-      Aadhaar name-match, a selfie check and — for in-home work — police verification.</p>`));
+  // was an explanatory sheet with nothing behind it; it is the ladder now
+  A('partner.upgrade', () => go('onboard'));
   A('shop.tab',    d => { partner.setShopTab(d.tab); render(); });
   A('shop.toggle', () => {
     const s = getState().shops.find(x => x.ownerKey === me().key);
@@ -342,7 +358,7 @@ function wireActions() {
   A('admin.login',   () => admin.doLogin());
   A('admin.logout',  () => { adminauth.logout(); go('home'); });
   A('admin.sec',     d => { admin.setSection(d.sec); render(); });
-  A('admin.approve', d => admin.approve(d.id));
+  A('admin.approve', d => admin.approve(d.id, d.tier));
   A('admin.suspend', d => admin.suspend(d.id));
   A('admin.release', d => admin.release(d.id, d.pct));
   A('admin.resolve', d => admin.resolve(d.id, d.out));
@@ -489,6 +505,8 @@ async function boot() {
   });
 
   ctx.ready = true;
+  // the WORK_DONE screen promises auto-release; this is what keeps it
+  flow.sweepAutoRelease().then(n => { if (n) { console.info('[saahaa] auto-released', n); render(); } });
 
   if (new URLSearchParams(location.search).get('selftest') === '1') {
     const r = await selftest.runAll();

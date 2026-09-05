@@ -6,6 +6,86 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [6.4.0] — 2026-09-05 — "Locally, Professionally"
+
+The partner side now closes the loop. Two audit agents and a five-specialist
+design panel shaped this release; a new partner who starts at 9am is taking
+jobs by 9:20 with the owner touching nothing.
+
+### Added — the professional gate (`domain/verification.js`, `domain/quiz.js`)
+- **Seven self-serve steps, all machine-checked, in a fixed chronology:** phone
+  code → ID → selfie → five trade questions → six rules → UPI → agree. All
+  seven ⇒ **tier 2, online, bookable**. The owner is not in the loop.
+- **We keep a hash and the last four digits of an ID document, never the
+  number.** The same document on two accounts is refused — the most reliable
+  fraud signal there is.
+- **The trade quiz is the competence filter, not the certificate.** Five
+  questions any real tradesperson in Hyderabad knows and no impostor does,
+  4 of 5 to pass, three tries then a day's wait. Banks for all 16 service
+  categories plus a generic fallback so no trade is ever ungated.
+- **The conduct quiz teaches; it cannot reject.** A wrong answer shows the rule
+  and the pro tries again. OTP at the door, never cash outside, photo before
+  payout, cancel early, what "you keep 100%" means, how disputes are decided.
+- **Provisional cap.** A newly verified pro is bounded to ₹1,500 a job until
+  three real jobs (OTP check-in AND a work photo — `countedJobs`, not
+  `completed`) have settled cleanly. The money cap does the risk work, not a
+  category lock-out that makes real plumbers walk away.
+- **Tier 3 and 4 are the owner's only two decisions:** a background check
+  (reference + consent, approve after the call) and the Certified badge
+  (25 jobs · rating ≥ 4.6 · no upheld disputes — earned by numbers, confirmed
+  by a human). `approveTier` refuses to lift anyone past self-verification.
+- The admin Approvals screen is now that queue and nothing else. It used to
+  list every partner at tier ≤ 2 forever.
+
+### Added — the chronology (`ui/views/onboard.js`)
+- One screen per step, one action per screen. Progress as a seven-dot track.
+- **The aha comes before the ask:** a draft of the pro's own page appears after
+  the phone step, before the ID and quiz steps where funnels lose half their
+  people.
+- Signup signs the partner in and lands them on step 1. "Account created — now
+  sign in" was a second form between a new pro and their first step.
+- The "You are verified" screen: badge, live page, the ₹1,500 rule stated
+  honestly, and the next rung.
+
+### Added — the storefront (`ui/views/pro.js`, `#/pro/<id>`)
+- Every verified pro gets a public page: badge, rating, jobs done, price from,
+  what they do, reviews, "Book". Generated from their work, maintained by
+  SAAHAA, shareable on WhatsApp. They edit three fields. That is "locally,
+  professionally": a professional presence they never build or maintain.
+- The locked-match hero card and the partner console both link to it.
+
+### Fixed — from the audit
+- A partner who signed up was created at tier 1, online and bookable with no
+  check of any kind — and simultaneously invisible to 15 of 16 categories.
+  Both halves are gone.
+- The auction bypassed `minTier` and the tier cap entirely; `placeBid` and
+  `openRequestsForPartner` now go through the same gate as everything else.
+- **Auto-release was a promise printed on the WORK_DONE screen and implemented
+  nowhere**: `releaseAt` was written and never read. `sweepAutoRelease` runs
+  at boot.
+- A request parked in `awaiting_choice` never expired and blocked every future
+  ask for that customer. The abandonment rule now holds: the held price is
+  booked and the request closes.
+- Rating a job made the pro's lifetime earnings snap to ₹0 — the console
+  filtered on stage instead of on settlement.
+- `rate.skip` targeted an edge that does not exist; the star panel never left.
+- A guest's chosen area was written raw where the reader JSON-parses it, so
+  every guest was Madhapur.
+- `selfNav` stayed armed when the hash did not change, swallowing the next
+  Back.
+- Minimum order and "pickup only" were printed on every shop card and enforced
+  nowhere. A price of ₹0 or less passed the upper-bound-only check.
+- Star ratings on the ask-rates hero card were a rescaled score component,
+  not the pro's actual average.
+- The post-auction coaching loop ("your price was not the problem") was built
+  and shown to nobody. The partner console now lists their rates; a lost one
+  opens the reason.
+- `null` bid on accept; "You asked 1 workers."; "Nothing was charged" twice;
+  review author blank in moderation; disputes marked resolved before the money
+  moved.
+
+---
+
 ## [6.3.0] — 2026-09-05 — "Ask Rates"
 
 The bidding mechanism has existed since 6.1 and nothing outside the test suite
