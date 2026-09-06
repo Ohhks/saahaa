@@ -12,7 +12,7 @@
    what came back as a refund and what was a goodwill credit are four separate
    things, chipped as four separate states. */
 
-import { esc, ratingStars, timeAgo, clockTime } from '../dom.js';
+import { esc, ratingStars, timeAgo, clockTime, delegate } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
 import { getState, me, myArea, myOrders } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
@@ -20,6 +20,9 @@ import * as M from '../../core/money.js';
 import { mark } from '../logo.js';
 import { VERSION, SCHEMA_VERSION, BUILD_ID } from '../../core/version.js';
 import { stage, isTerminal, trackerFor, trackerIndex } from '../../domain/orders.js';
+import * as flow from '../../domain/flow.js';
+import { acct } from '../../domain/ledger.js';
+import * as gateway from '../../core/gateway.js';
 import { header, emptyBlock } from './shops.js';
 import * as auth from './auth.js';
 import { myPlace } from './home.js';
@@ -48,51 +51,84 @@ const smartEmpty = (line, cta) =>
   `<div class="empty empty--smart" style="padding:18px 6px">
      <p class="sentence">${esc(line)}</p>${cta || ''}</div>`;
 
-/* ── money: four separate states, never one blur ───────────── */
-function walletCard(key) {
-  const legs = getState().ledger.filter(e => e.partyA === 'CUSTOMER:' + key || e.partyB === 'CUSTOMER:' + key);
-  if (!legs.length) return card('Wallet & payments', 'Money', smartEmpty(
-    'Nothing has moved yet. SAAHAA never charges before the work is done — the money you commit sits in escrow and is released by you.',
-    '<button class="btn btn--secondary btn--sm" style="margin-top:10px" data-act="nav.orders">See your orders</button>'));
+/* ── money: the customer's wallet ───────────────────────────────
+   EVERYONE PAYS SAAHAA. Money lands in CUSTOMER:<key> first and only then
+   moves into an order's escrow; a refund comes back to the same account.
+   The balance is read off the ledger (flow.customerWallet), never stored.
+   The history is the ledger legs that touch this account, newest first —
+   each with a plain label, because "ESCROW_IN" means nothing at a bus stop. */
 
-  /* out = you paid it into escrow · in = it came back to you.
-     Escrow, refunds and goodwill are DIFFERENT money and are never summed. */
-  const paid     = legs.filter(e => e.partyA === 'CUSTOMER:' + key)
-                       .reduce((n, e) => n + (e.amountPaise || 0), 0);
-  const refunded = legs.filter(e => e.partyB === 'CUSTOMER:' + key && e.kind === 'REFUND')
-                       .reduce((n, e) => n + (e.amountPaise || 0), 0);
-  const goodwill = legs.filter(e => e.partyB === 'CUSTOMER:' + key && e.kind === 'GOODWILL')
-                       .reduce((n, e) => n + (e.amountPaise || 0), 0);
+const LEG_LABEL = {
+  PAYMENT_IN: 'Paid in', TOPUP: 'Paid in', ESCROW_IN: 'Held for order', ESCROW_LOCK: 'Held for order',
+  REFUND: 'Refund', CANCEL: 'Refund', RELEASE: 'Refund', WITHDRAW: 'Taken out', GOODWILL: 'Goodwill credit',
+};
+
+/** Signed movement of `account` in one ledger entry — both shapes the book has used. */
+function deltaFor(e, account) {
+  if (Array.isArray(e.legs)) return e.legs.filter(l => l.account === account).reduce((n, l) => n + (l.delta | 0), 0);
+  if (e.partyA === account) return -(e.amountPaise | 0);
+  if (e.partyB === account) return e.amountPaise | 0;
+  return 0;
+}
+
+/* The typed rupees are mirrored, in paise, onto the two wallet buttons:
+   app.js reads data-amt first and the field second, and the engine counts
+   in paise. One delegated listener, registered once. */
+delegate('input', '#cwAmt', (e, el) => {
+  const paise = Math.round((Number(el.value) || 0) * 100);
+  ['cwAdd', 'cwOut'].forEach(id => { const b = document.getElementById(id); if (b) b.dataset.amt = paise > 0 ? String(paise) : ''; });
+});
+
+function walletCard(key) {
+  const account = acct.customer(key);
+  const w = flow.customerWallet(key);
+  const legs = getState().ledger
+    .map(e => ({ e, d: deltaFor(e, account) }))
+    .filter(x => x.d !== 0)
+    .reverse()
+    .slice(0, 10);
   const inEscrow = myOrders().filter(o => !isTerminal(o.stage) &&
     !['SETTLED','R_SETTLED','RATED','PARTIAL','REFUNDED','R_REFUNDED'].includes(o.stage))
     .reduce((n, o) => n + (o.customerPays || 0), 0);
+  const field = 'height:44px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--r-pill);background:var(--surface-2);color:var(--ink-1);font-size:15px;min-width:0';
 
-  const row = (label, amount, state, note) => `<div class="between moneyflow__row" style="margin-bottom:8px">
-    <span class="tiny muted">${esc(label)}${state ? ` <span class="${state}">${esc(note)}</span>` : ''}</span>
-    <b class="num">${M.fmt(amount)}</b></div>`;
-
-  return card('Wallet & payments', 'Money', `
-    <div class="moneyflow" style="margin-top:12px">
-      ${row('Paid in, all time', paid, '', '')}
-      ${inEscrow ? row('Sitting in escrow', inEscrow, 'state--held', 'you release it') : ''}
-      ${refunded ? row('Refunded to you', refunded, 'state--available', 'back with you') : ''}
-      ${goodwill ? row('Goodwill credit', goodwill, 'state--available', 'from SAAHAA') : ''}
+  return card('Your wallet', 'Money', `
+    <div class="capsules" style="margin-top:12px">
+      <span class="capsule capsule--gold"><span class="capsule__k">Balance</span>
+        <span class="capsule__v num">${M.fmt(w.balance)}</span>
+        <span class="capsule__d">yours to spend or take out</span></span>
+      ${inEscrow ? `<span class="capsule capsule--info"><span class="capsule__k">Held for orders</span>
+        <span class="capsule__v num">${M.fmt(inEscrow)}</span>
+        <span class="capsule__d">released by you</span></span>` : ''}
     </div>
-    <details class="expand" style="margin-top:10px">
-      <summary class="tiny" style="cursor:pointer;color:var(--accent);font-weight:700">
-        ${legs.length} entr${legs.length === 1 ? 'y' : 'ies'} on your ledger ▾</summary>
-      <div style="margin-top:10px;max-height:220px;overflow-y:auto">
-        ${legs.slice().reverse().slice(0, 25).map(e => {
-          const out = e.partyA === 'CUSTOMER:' + key;
-          return `<div class="between" style="margin-bottom:7px">
-            <span class="micro muted">${esc(e.kind)} · ${timeAgo(e.ts)}
-              <span class="${out ? 'state--held' : 'state--available'}">${out ? 'into escrow' : 'back to you'}</span></span>
-            <b class="num" style="font-size:13px">${out ? '−' : '+'}${M.fmt(e.amountPaise)}</b></div>`;
-        }).join('')}
+    <p class="micro muted" style="margin-top:8px">${esc(gateway.label())}</p>
+
+    <div class="cw-form" style="margin-top:12px">
+      <div class="row" style="gap:8px">
+        <span class="tiny muted" aria-hidden="true">₹</span>
+        <input id="cwAmt" class="grow" type="number" inputmode="numeric" min="10" step="1"
+          placeholder="Amount in rupees" aria-label="Amount in rupees" style="${field}">
       </div>
-      <p class="micro muted" style="margin-top:8px">
-        Read-only. Every line is hash-chained — it can be verified, never edited.</p>
-    </details>`, { gold: true });
+      <div class="chiprow" style="flex-wrap:wrap;gap:6px;margin-top:8px">
+        ${[100, 200, 500, 1000].map(r => `<button class="chip chip--smart" data-act="cwallet.topup" data-amt="${r * 100}">+ ₹${r}</button>`).join('')}
+      </div>
+      <div class="row" style="gap:8px;margin-top:10px">
+        <button id="cwAdd" class="btn btn--secondary btn--sm grow" data-act="cwallet.topup">Add money</button>
+        <button id="cwOut" class="btn btn--ghost btn--sm grow" data-act="cwallet.withdraw" ${w.balance < 1000 ? 'disabled' : ''}>Take out</button>
+      </div>
+      <p class="micro muted" style="margin-top:8px">Minimum ₹10 either way. Taking out sends it to your UPI.</p>
+    </div>
+
+    ${legs.length ? `<div class="rule" style="margin:12px 0"></div>
+      <p class="eyebrow">Recent</p>
+      <div style="margin-top:6px">
+        ${legs.map(({ e, d }) => `<div class="between" style="margin-bottom:7px;gap:8px">
+            <span class="micro muted" style="min-width:0">${esc(LEG_LABEL[e.kind] || e.kind)} · ${timeAgo(e.ts)}</span>
+            <b class="num" style="font-size:13px;flex:0 0 auto;color:${d < 0 ? 'var(--ink-2)' : 'var(--success)'}">${d < 0 ? '−' : '+'}${M.fmt(Math.abs(d))}</b></div>`).join('')}
+      </div>
+      <p class="micro muted" style="margin-top:4px">Read-only. Every line is hash-chained — it can be verified, never edited.</p>`
+    : `<p class="micro muted" style="margin-top:10px">Nothing has moved yet. SAAHAA never charges before the work is done — money you commit sits in escrow and is released by you.
+       <button class="btn btn--ghost btn--sm" style="margin-top:6px" data-act="nav.orders">See your orders</button></p>`}`, { gold: true });
 }
 
 /* ── the screen ────────────────────────────────────────────── */

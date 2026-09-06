@@ -9,7 +9,8 @@ import * as audit from '../core/audit.js';
 import * as M from '../core/money.js';
 import { find } from '../core/registry.js';
 import { applyTransition, canTransition } from './orders.js';
-import { acct, holdbackFor } from './ledger.js';
+import { acct, holdbackFor, balanceOf } from './ledger.js';
+import * as gateway from '../core/gateway.js';
 import * as W from './wallet.js';
 import { quoteService, quoteRetail, compareWithApps, releaseService, cancelSplit } from './pricing.js';
 import { lockedMatch, rankShops, kmBetween, etaMins } from './match.js';
@@ -30,6 +31,51 @@ function ledger(kind, amountPaise, partyA, partyB, meta = {}) {
     return block;
   }).catch(err => { console.error('[ledger]', err); });
   return ledgerQ;
+}
+/** The same posting queue, for modules that own money moves of their own (treasury). */
+export const postLedger = ledger;
+
+/* ── the customer's wallet ──────────────────────────────────────
+   EVERYONE PAYS SAAHAA. A customer's money lands in CUSTOMER:<key> first —
+   through the gateway — and only then moves into an order's escrow. A refund
+   comes back to the same account, so it is money the customer can spend on
+   the next order or take out. Nothing is ever paid to a worker directly. */
+export function customerWallet(key = me() && me().key) {
+  if (!key) return { balance: 0, key: null };
+  return { balance: Math.max(0, balanceOf(getState().ledger, acct.customer(key))), key };
+}
+/** Fund a payment: wallet first, the shortfall collected through the gateway. */
+async function fund(key, paise, purpose, meta = {}) {
+  const have = customerWallet(key).balance;
+  const short = Math.max(0, paise - have);
+  if (short) {
+    const r = await gateway.collect({ paise: short, purpose, key });
+    if (!r.ok) throw new Error('payment failed: ' + (r.reason || 'gateway'));
+    await ledger('PAYMENT_IN', short, acct.world(), acct.customer(key), { via: r.via, ref: r.ref, ...meta });
+  }
+  return { fromWallet: paise - short, collected: short };
+}
+export async function customerTopUp(paise) {
+  const s = me(); if (!s) return null;
+  const amt = M.int(paise);
+  if (amt < 1000) { toast('Minimum top-up is ₹10', 'warn'); return null; }
+  const r = await gateway.collect({ paise: amt, purpose: 'topup', key: s.key });
+  if (!r.ok) { toast('Payment did not go through', 'danger'); return null; }
+  await ledger('TOPUP', amt, acct.world(), acct.customer(s.key), { via: r.via, ref: r.ref });
+  audit.record('cwallet.topup', { amt }, s.key);
+  toast(`${M.fmt(amt)} added to your wallet`);
+  return amt;
+}
+export async function customerWithdraw(paise) {
+  const s = me(); if (!s) return null;
+  const amt = M.int(paise), w = customerWallet(s.key);
+  if (amt < 1000 || amt > w.balance) { toast(`You can take out up to ${M.fmt(w.balance)}`, 'warn'); return null; }
+  const r = await gateway.payout({ paise: amt, purpose: 'refund-out', key: s.key });
+  if (!r.ok) { toast('Could not send that right now', 'danger'); return null; }
+  await ledger('WITHDRAW', amt, acct.customer(s.key), acct.world(), { via: r.via, ref: r.ref });
+  audit.record('cwallet.withdraw', { amt }, s.key);
+  toast(`${M.fmt(amt)} sent to your UPI`);
+  return amt;
 }
 
 /* ── SERVICE: the 3-tap booking ────────────────────────────── */
@@ -70,8 +116,9 @@ export async function bookService({ catId, partner, sub, deal, slot }) {
     otp: makeOtp(), otpVerified: false, evidence: [], escrowed: q.customerPays,
   };
   dispatch({ type: 'order/add', payload: order });
-  // the customer's payment arrives from the world first; only then is it locked
-  await ledger('PAYMENT_IN', q.customerPays, acct.world(), 'CUSTOMER:' + s.key, { via: 'upi-sim' });
+  // the customer's money is in their SAAHAA wallet first (wallet balance, then the gateway for the rest); only then is it locked
+  const paid = await fund(s.key, q.customerPays, 'service', { orderId: order.id });
+  dispatch({ type: 'order/patch', payload: { id: order.id, patch: { paidFromWallet: paid.fromWallet, collected: paid.collected } } });
   await ledger('ESCROW_IN', q.customerPays, 'CUSTOMER:' + s.key, 'ESCROW:' + order.id,
                { catId, deal: q.deal, fee: q.platformFee, gst: q.gst });
   bumpAgg({ escrow: getState().agg.escrow + q.customerPays });
@@ -173,7 +220,9 @@ async function forfeitStake(o, reason) {
 export async function walletTopUp(partnerId, paise) {
   const amt = M.int(paise);
   if (amt < 1000) { toast('Minimum top-up is ₹10', 'warn'); return null; }
-  await ledger('TOPUP', amt, acct.world(), acct.partner(partnerId), { via: 'upi-sim' });
+  const r = await gateway.collect({ paise: amt, purpose: 'stake-topup', key: partnerId });
+  if (!r.ok) { toast('Payment did not go through', 'danger'); return null; }
+  await ledger('TOPUP', amt, acct.world(), acct.partner(partnerId), { via: r.via, ref: r.ref });
   audit.record('wallet.topup', { partnerId, amt }, me() ? me().key : 'system');
   toast(`${M.fmt(amt)} added to your wallet`);
   return amt;
@@ -182,7 +231,9 @@ export async function walletWithdraw(partnerId, paise) {
   const amt = M.int(paise);
   const w = W.walletOf(getState().ledger, partnerId, getState().partners.find(x => x.id === partnerId) || {});
   if (amt < 1000 || amt > w.available) { toast(`You can withdraw up to ${M.fmt(w.available)}`, 'warn'); return null; }
-  await ledger('WITHDRAW', amt, acct.partner(partnerId), acct.world(), { via: 'upi-sim' });
+  const r = await gateway.payout({ paise: amt, purpose: 'earnings', key: partnerId });
+  if (!r.ok) { toast('Could not send that right now', 'danger'); return null; }
+  await ledger('WITHDRAW', amt, acct.partner(partnerId), acct.world(), { via: r.via, ref: r.ref });
   audit.record('wallet.withdraw', { partnerId, amt }, me() ? me().key : 'system');
   toast(`${M.fmt(amt)} sent to your UPI`);
   return amt;
@@ -398,7 +449,8 @@ export async function placeRetailOrder(mode = 'rider') {
   };
   dispatch({ type: 'order/add', payload: order });
   // the customer's payment arrives from the world first; only then is it locked
-  await ledger('PAYMENT_IN', q.customerPays, acct.world(), 'CUSTOMER:' + s.key, { via: 'upi-sim' });
+  const paid = await fund(s.key, q.customerPays, 'retail', { orderId: order.id });
+  dispatch({ type: 'order/patch', payload: { id: order.id, patch: { paidFromWallet: paid.fromWallet, collected: paid.collected } } });
   await ledger('ESCROW_IN', q.customerPays, 'CUSTOMER:' + s.key, 'ESCROW:' + order.id, { shopId: q.shop.id });
   bumpAgg({ escrow: getState().agg.escrow + q.customerPays });
   clearCart();

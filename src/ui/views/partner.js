@@ -31,8 +31,11 @@ import { header, emptyBlock } from './shops.js';
 import { quoteRetail } from '../../domain/pricing.js';
 import * as auction from '../../domain/auction.js';
 import { progressCard } from './onboard.js';
-import { readiness, blocker } from '../../domain/verification.js';
+import { readiness, blocker, backgroundRecord } from '../../domain/verification.js';
 import * as W from '../../domain/wallet.js';
+import * as autoverify from '../../domain/autoverify.js';
+import { acct, balanceOf } from '../../domain/ledger.js';
+import * as gateway from '../../core/gateway.js';
 
 let pickerQuery = '', catalogQuery = '', shopTab = 'orders';
 export const setPickerQuery = v => { pickerQuery = v; };
@@ -46,7 +49,8 @@ export const setShopTab = v => { shopTab = v; };
 
 const cockpitCSS = `<style>
   .cockpit{display:grid;gap:var(--sp-8)}
-  .cockpit .sec{margin:0}
+  .cockpit .sec{margin:0;min-width:0}   /* a .metricrow strip must scroll inside its column, not widen the page */
+  .cockpit .metricrow{margin-left:0;margin-right:0;padding-left:0;padding-right:0}   /* the wrap has no gutter here, so the strip's edge-bleed only cut the first capsule and pushed the page 16px wide */
   .cockpit__col{min-width:0;display:grid;gap:var(--sp-8);align-content:start}
   .cockpit__lead{min-width:0}
   .prodgrid{display:grid;gap:10px}
@@ -122,10 +126,113 @@ function walletCard(p) {
       <div class="capsule capsule--gold"><span class="capsule__k">Released</span><span class="capsule__v num">${M.fmt(w.released)}</span><span class="state state--released">lifetime</span></div>
     </div>
     ${w.debt ? `<p class="tiny" style="margin-top:8px;color:var(--warn)">${M.fmt(w.debt)} owed from a job you left — recovered from your next payout.</p>` : ''}
+    <p class="micro muted" style="margin-top:8px">${esc(gateway.label())}</p>
     <p class="micro muted" style="margin-top:8px">When a job starts, ${M.fmt(W.MIN_STAKE)} (or 5% of the job, up to ${M.fmt(W.MAX_STAKE)}) locks from Available. Finish the job and every rupee of it comes back with your full payout. Walk out and it goes to the customer.</p>
     <div class="row" style="gap:8px;margin-top:10px">
       <button class="btn btn--secondary btn--sm grow" data-act="wallet.topup" data-id="${p.id}">Add money</button>
       <button class="btn btn--ghost btn--sm grow" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${w.available < 1000 ? 'disabled' : ''}>Withdraw ${w.available >= 1000 ? M.fmt(w.available) : ''}</button>
+    </div>
+  </div>`;
+}
+
+/* ══════════════ STANDING — approvals that happen by themselves ══════════
+   Tier 3 (Background Checked) and tier 4 (Certified) are earned mechanically:
+   jobs + rating + vouches + a reference who confirms by code. Every line is
+   have/need with a check or a cross, and nobody has to approve anything.
+   The reference's code goes by SMS in production; until that rail is wired
+   it is shown on screen, the same honest sandbox the phone step uses. */
+
+let shownRefCode = '';
+/** Called by app.js after autoverify.sendReferenceCode — shows the code. */
+export function showReferenceCode(code) {
+  shownRefCode = code ? String(code) : '';
+  if (!code) { toast('Name a reference first', 'warn'); return; }
+  toast(`Reference code ${code} — sandbox: shown here because SMS is not wired yet`);
+}
+
+const okIcon  = ok => `<span aria-hidden="true" style="display:inline-flex;color:${ok ? 'var(--success)' : 'var(--danger)'}">${icon(ok ? 'check' : 'cross', { size: 14 })}</span>`;
+
+const standingLine = (l, right = '') => `<div class="between" style="gap:8px;padding:7px 0;border-bottom:1px solid var(--hairline)">
+    <span class="row" style="gap:8px;min-width:0">${okIcon(l.ok)}<span class="tiny ${l.ok ? '' : 'muted'}">${esc(l.label)}</span></span>
+    <span class="micro num" style="flex:0 0 auto;color:${l.ok ? 'var(--success)' : 'var(--ink-2)'}">${right || `${l.have} / ${l.need}`}</span>
+  </div>`;
+
+const fieldCSS = 'width:100%;height:44px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--r-pill);background:var(--surface-2);color:var(--ink-1);margin-bottom:8px;font-size:15px';
+
+/* the reference line has three states: not named → the form; named, no code
+   → send it; code sent → type it back. Confirmed is just a green line. */
+function referenceBlock(p, line) {
+  const bg = backgroundRecord(p) || {};
+  if (bg.refConfirmed) return standingLine(line, `confirmed${bg.refName ? ` · ${esc(bg.refName)}` : ''}`);
+  if (!bg.refName) return `${standingLine(line, 'not yet')}
+    <div style="margin-top:10px">
+      <p class="micro muted" style="margin-bottom:8px">Someone who has seen your work — a past customer or an employer. They get a 4-digit code; you type it back here.</p>
+      <input id="obRefName" placeholder="A reference (past customer or employer)" style="${fieldCSS}">
+      <input id="obRefPhone" placeholder="Their 10-digit number" inputmode="numeric" maxlength="10" style="${fieldCSS}">
+      <label class="tiny" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px">
+        <input type="checkbox" id="obConsent" style="margin-top:3px"> I consent to SAAHAA verifying my background, including police verification where required for in-home work.</label>
+      <button class="btn btn--secondary btn--block" data-act="ob.bg">Save my reference</button>
+    </div>`;
+  if (!bg.refCode) return `${standingLine(line, `${esc(bg.refName)} · no code yet`)}
+    <button class="btn btn--secondary btn--block" style="margin-top:10px" data-act="ref.send">Send your reference their code</button>`;
+  return `${standingLine(line, `${esc(bg.refName)} · code sent`)}
+    <div style="margin-top:10px">
+      ${shownRefCode ? `<p class="tiny" style="margin-bottom:8px">Their code: <b class="num" style="font-size:20px;letter-spacing:.15em">${esc(shownRefCode)}</b>
+        <span class="micro muted" style="display:block">Sandbox: shown here because the SMS rail is not wired yet. In production only your reference sees it.</span></p>` : ''}
+      <div class="row" style="flex-wrap:wrap;gap:8px">
+        <input id="refCode" class="grow" inputmode="numeric" maxlength="4" placeholder="4-digit code from your reference" style="${fieldCSS};margin-bottom:0;min-width:140px">
+        <button class="btn btn--primary" data-act="ref.confirm">Confirm</button>
+      </div>
+      <button class="btn btn--ghost btn--sm" style="margin-top:6px" data-act="ref.send">Send a new code</button>
+    </div>`;
+}
+
+function vouchList(p) {
+  const vs = (p.vouches || []).slice().sort((a, b) => b.at - a.at);
+  if (!vs.length) return '<p class="micro muted" style="margin-top:8px">No vouches yet. A customer whose job with you settled, or a Background-Checked pro in your trade, can vouch from your public page.</p>';
+  return `<div style="margin-top:8px">
+    ${vs.slice(0, 8).map(v => `<div class="row" style="gap:8px;padding:5px 0">
+      <span class="avatar avatar--sm">${esc((v.byName || '?')[0])}</span>
+      <span class="grow tiny" style="min-width:0">${esc(v.byName || 'Someone')}
+        <span class="micro muted">· ${v.role === 'pro' ? 'same-trade pro' : 'customer'} · ${timeAgo(v.at)}</span></span>
+    </div>`).join('')}
+  </div>`;
+}
+
+function standingBlock(p) {
+  const t = p.tier | 0;
+  if (t !== 2 && t !== 3) return '';
+  const pr = t === 2 ? autoverify.progress(p) : autoverify.certifiedProgress(p);
+  const lines = pr.lines;
+  const green = Object.values(lines).filter(l => l.ok).length, total = Object.keys(lines).length;
+  const next = t === 2 ? 'Background Checked' : 'SAAHAA Certified';
+  const bg = backgroundRecord(p) || {};
+  if (bg.refConfirmed && shownRefCode) shownRefCode = '';
+  return `<div class="sec">
+    ${sectionHead('Standing', `Next: ${next}`,
+      `<span class="pill ${green === total ? 'pill--ok' : 'pill--soft'}">${green} / ${total} green</span>`)}
+    <div class="card glass">
+      ${t === 2 ? `
+        ${standingLine(lines.ladder)}
+        ${standingLine(lines.jobs)}
+        ${standingLine(lines.rating, `${lines.rating.have.toFixed(1)} / ${lines.rating.need}${lines.jobs.ok ? '' : ` after ${lines.jobs.need} jobs`}`)}
+        ${standingLine(lines.disputes)}
+        ${standingLine(lines.vouches)}
+        ${referenceBlock(p, lines.reference)}`
+      : `
+        ${standingLine(lines.jobs)}
+        ${standingLine(lines.rating, `${lines.rating.have.toFixed(1)} / ${lines.rating.need}`)}
+        ${standingLine(lines.disputes)}
+        ${standingLine(lines.tenure, `${lines.tenure.have} / ${lines.tenure.need} days`)}
+        ${standingLine(lines.open)}`}
+      <p class="micro muted" style="margin-top:10px">${t === 2
+        ? 'Background Checked is granted automatically when every line is green — no one has to approve you.'
+        : 'SAAHAA Certified is granted automatically when every line is green — no one has to approve you.'}
+        ${pr.automation === false ? ' Automatic promotion is paused by SAAHAA right now.' : ''}
+        ${pr.suspended ? ' Your account is paused, so nothing moves until that is lifted.' : ''}</p>
+      <div class="rule" style="margin:12px 0"></div>
+      <div class="between"><b class="tiny">Vouches</b><span class="pill pill--soft">${(p.vouches || []).length}</span></div>
+      ${vouchList(p)}
     </div>
   </div>`;
 }
@@ -254,6 +361,8 @@ export function renderPartner() {
             ${M.fmt(Math.round(p.ask * 0.75))} for the same job.</p>
         </div>
 
+        ${standingBlock(p)}
+
         <div class="sec">
           ${sectionHead('Ladder', 'Verification')}
           <div class="card glass">
@@ -372,6 +481,8 @@ export function renderShopAdmin() {
       </div>
     </div>
 
+    ${shopWalletLine(s)}
+
     <div class="seg" role="tablist" aria-label="Shop sections"
          style="margin:var(--sp-6) 0;overflow-x:auto;scrollbar-width:none">
       ${SHOP_TABS.map(([k, l]) => `<button class="seg__btn" type="button" role="tab"
@@ -383,6 +494,35 @@ export function renderShopAdmin() {
     ${body}
     <div style="height:60px"></div>
   </main>`;
+}
+
+/* EVERYONE PAYS SAAHAA, SAAHAA PAYS EVERYONE. The shop's balance is the
+   ledger account SHOP:<id> — settlements land in it, payouts leave it. Read
+   off the book every render, never stored, so it cannot drift. */
+const SHOP_LEG = { SETTLE_RETAIL: 'Order settled', ESCROW_RELEASE: 'Order settled', WITHDRAW: 'Sent to your UPI',
+                   TOPUP: 'Paid in', PAYOUT: 'Sent to your UPI', COMPENSATION: 'Compensation' };
+function shopDelta(e, account) {
+  if (Array.isArray(e.legs)) return e.legs.filter(l => l.account === account).reduce((n, l) => n + (l.delta | 0), 0);
+  if (e.partyA === account) return -(e.amountPaise | 0);
+  if (e.partyB === account) return e.amountPaise | 0;
+  return 0;
+}
+function shopWalletLine(s) {
+  const account = acct.shop(s.id);
+  const bal = balanceOf(getState().ledger, account);
+  const legs = getState().ledger.map(e => ({ e, d: shopDelta(e, account) })).filter(x => x.d !== 0).reverse().slice(0, 5);
+  return `<div class="card glass" style="margin-top:var(--sp-6);padding:12px 14px">
+    <div class="between" style="gap:8px">
+      <div class="grow" style="min-width:0"><span class="eyebrow">Shop wallet</span>
+        <b class="num" style="display:block;font-size:19px">${M.fmt(Math.max(0, bal))}</b>
+        <span class="micro muted">${esc(gateway.label())}</span></div>
+      <span class="pill state--available">yours after settlement</span>
+    </div>
+    ${legs.length ? `<div style="margin-top:8px">${legs.map(({ e, d }) => `<div class="between" style="gap:8px;margin-top:4px">
+        <span class="micro muted" style="min-width:0">${esc(SHOP_LEG[e.kind] || e.kind)} · ${timeAgo(e.ts)}</span>
+        <b class="num" style="font-size:13px;flex:0 0 auto;color:${d < 0 ? 'var(--ink-2)' : 'var(--success)'}">${d < 0 ? '−' : '+'}${M.fmt(Math.abs(d))}</b></div>`).join('')}</div>`
+      : '<p class="micro muted" style="margin-top:6px">Nothing has landed yet. Every settled order posts here.</p>'}
+  </div>`;
 }
 
 function shopOrders(orders) {

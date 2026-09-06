@@ -87,3 +87,28 @@ Rules that held for 6.9.0 and hold for every release after it:
   `python tools/build.py --site` (0 lint problems) → `bash tools/preflight.sh`.
 - The deck is re-shot after the guardian, never before, because it photographs
   the real product.
+
+## The roster used for 7.0.0 "Self-running"
+
+The release changed the engine on purpose — a clean slate, peer-to-peer
+verification, the gateway door, the customer wallet, the treasury, schema
+v9 — so the lead's foundations wave was the largest of the release and landed
+first, with `core/selftests.auto.js` green, before any builder started. Three
+agents then built in parallel; the guardian ran last and alone.
+
+| Role | Owns | Never touches | Reports |
+|---|---|---|---|
+| **Lead** (the AI's own session) | `domain/fresh.js`, `domain/autoverify.js`, `domain/treasury.js`, `core/gateway.js`, the wallet and `fund()` in `domain/flow.js`, `settings.automation` in `domain/settings.js`, the v8 → v9 migration, `core/version.js`, `app.js` action registrations and the boot sweep, `core/selftests.auto.js`, credentials, git | — | the release itself |
+| **Admin builder** | `ui/views/admin.js`: Approvals → Automation (dials, kill switch, pipeline), Finance → Treasury (position, Withdraw fees, Remit GST behind step-up), System & audit → Fresh start (type FRESH, step-up) | `app.js`, engine, other builders' files | ids and `data-act`s added, snippets for `app.js`, what was left undone |
+| **Customer / partner builder** | `ui/views/account.js` (the wallet: balance, top-up, take-out, sandbox label), `ui/views/partner.js` (Standing: the tier-3 checklist, the reference code, the Certified countdown), `ui/views/pro.js` (Vouch) | `app.js`, engine, admin files | the same |
+| **Docs** | `CHANGELOG.md`, `README.md`, `docs/AUTOMATION.md`, `docs/PRODUCTION.md`, `docs/LAUNCH.md`, `docs/PRODUCTION-PROCESS.md`, `docs/SECURITY.md`, `docs/WORKFLOW.md`, `docs/deck/manifest.json` | `src/`, `tools/`, `.github/`, `docs/TEST-REPORT.md`, `docs/presentation.html` | files changed, the `tools/check-version.py` result, anything unsure |
+| **Guardian** | `src/ui/**` fixes, `docs/TEST-REPORT.md` | `app.js`, engine, `index.html`, tools, git | the matrix: PASS / FIXED (file:line) / BLOCKED (file:line + snippet) |
+
+What was different from 6.9.0: no separate security or cleanup agent. The
+security rules of the release (step-up on the two treasury actions and on
+Fresh start, one vouch per person, the reference code) were designed into the
+engine by the lead and documented by the docs agent; the cleanup that 6.9.0
+needed had already been done. The docs agent wrote the deck captions for the
+four new scenes (`c15-wallet`, `p14-standing`, `a11-treasury`,
+`a12-automation`) before the screenshots existed; the lead captured them after
+the guardian, as always.

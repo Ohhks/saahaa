@@ -27,6 +27,26 @@ import { myArea, dispatch } from '../../core/ctx.js';
 import { myPlace } from './home.js';
 import { header } from './shops.js';
 import { readiness } from '../../domain/verification.js';
+import { canVouch } from '../../domain/autoverify.js';
+
+/* Peer-to-peer verification. A customer whose job with this pro settled, or
+   a Background-Checked pro in the same trade, can vouch once. Everyone else
+   sees the one-line reason, not a dead button. */
+function vouchBlock(p, s) {
+  const n = (p.vouches || []).length;
+  const c = canVouch(s, p);
+  const count = `<span class="pill pill--soft">${n} vouch${n === 1 ? '' : 'es'}</span>`;
+  return `<div class="card glass" style="margin-top:12px;padding:12px 14px">
+    <div class="between" style="gap:8px;flex-wrap:wrap">
+      <div class="grow" style="min-width:0"><b class="tiny">Vouched for</b>
+        <p class="micro muted">People who have seen the work say so here. It counts toward Background Checked.</p></div>
+      ${count}
+    </div>
+    ${c.ok
+      ? `<button class="btn btn--secondary btn--block" style="margin-top:10px" data-act="vouch.give" data-id="${esc(p.id)}">Vouch for ${esc(p.name.split(' ')[0])}</button>`
+      : `<p class="micro muted" style="margin-top:8px">${esc(s ? c.reason : 'Sign in to vouch')}</p>`}
+  </div>`;
+}
 
 const avg = p => { const r = p.ratings || []; return r.length ? r.reduce((a, x) => a + x.stars, 0) / r.length : 0; };
 
@@ -92,7 +112,8 @@ export function render(id) {
       ${capsule('Jobs done', String(p.completed || 0), 'through SAAHAA', 'info')}
       ${capsule('From', M.fmt(p.ask), 'his own rate', 'ok')}
     </div>
-    <p class="micro muted">${a ? ratingStars(a) + ' ' : ''}${(p.ratings || []).length} ratings · ${km} km from you · ~${etaMins(km)} min</p>
+    <p class="micro muted">${a ? ratingStars(a) + ' ' : ''}${(p.ratings || []).length} ratings · ${(p.vouches || []).length} vouches · ${km} km from you · ~${etaMins(km)} min</p>
+    ${vouchBlock(p, s)}
 
     <div class="prosplit">
       <div class="sec"><div class="hd"><div><span class="eyebrow">The pro</span><h2 class="h-sec">About</h2></div>

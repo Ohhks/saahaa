@@ -2,7 +2,7 @@
   "title": "SAAHAA — how it works",
   "name": "How SAAHAA Works",
   "subtitle": "One circle for every service and every shop in your neighbourhood. Locally, professionally.",
-  "date": "v6.9.0 · Nothing borrowed · September 2026",
+  "date": "v7.0.0 · Self-running · September 2026",
   "sections": [
     {
       "id": "customer",
@@ -68,6 +68,11 @@
           "title": "Cart and checkout",
           "caption": "One bill, substitution choices per item, minimum order enforced, one primary action.",
           "image": "docs/deck/c10-cart.png"
+        },
+        {
+          "title": "Your wallet",
+          "caption": "Everyone pays SAAHAA, and SAAHAA pays everyone. A booking is funded from your wallet first and only the shortfall is collected; a refund lands back in the wallet; top up or take out to UPI whenever you like. Until the gateway is wired every screen says so: Sandbox UPI, no real money moves yet.",
+          "image": "docs/deck/c15-wallet.png"
         },
         {
           "title": "Live tracker",
@@ -152,6 +157,11 @@
           "image": "docs/deck/p11-job.png"
         },
         {
+          "title": "Standing — approvals that happen by themselves",
+          "caption": "The Background-Checked checklist, line by line: ladder complete, 3 real jobs settled cleanly, rating 4.3, no upheld dispute, 2 vouches from customers who had a job settle or from same-trade pros, and the reference you named confirmed by a 4-digit code. When every line holds the tier is granted by the system and audited; 14 clean days later, Certified follows the same way. Nobody has to call anybody.",
+          "image": "docs/deck/p14-standing.png"
+        },
+        {
           "title": "Shop owner — merchant command center",
           "caption": "Orders, products with inline price and stock, pricing, sales, customers, payouts, setup, analytics — all from the shop's own data.",
           "image": "docs/deck/p12-shop.png"
@@ -161,7 +171,7 @@
     {
       "id": "admin",
       "title": "Admin — one owner, one console",
-      "intro": "The system computes; you decide. The only two decisions that reach you: a background check to confirm and a Certified badge to award.",
+      "intro": "The system computes; you decide. Since 7.0 the two decisions that used to reach you every day — a background check and a Certified badge — are earned by the network itself. What is left for you: the disputes that need judgement, the kill switches, and the treasury.",
       "slides": [
         {
           "title": "Dashboard",
@@ -170,7 +180,7 @@
         },
         {
           "title": "Approvals",
-          "caption": "A background request with its evidence first; Certified candidates after. Nothing below tier 2 ever lands here.",
+          "caption": "A background request with its evidence first; Certified candidates after. Nothing below tier 2 ever lands here — and since 7.0 both tiers are granted by the system when the evidence holds, so this queue is for what you choose to do by hand.",
           "image": "docs/deck/a02-approvals.png"
         },
         {
@@ -212,6 +222,16 @@
           "title": "The Flow tracker",
           "caption": "Everyone on SAAHAA, most recently active first: where they are, which step they are on, what they have spent or earned. Tap a row to unroll that person's whole journey; filter by role or stage.",
           "image": "docs/deck/a10-flow.png"
+        },
+        {
+          "title": "Treasury — the company’s wallet",
+          "caption": "Read from the hash-chained ledger, never computed: fees earned, GST held, and every liability — escrow in flight, customer, worker and shop wallets, stakes, holdbacks, the rider pool. Money in equals liabilities plus ours plus the government’s plus what has already left, and the screen says whether it reconciles. Withdraw fees and Remit GST ask for the password again and are audited.",
+          "image": "docs/deck/a11-treasury.png"
+        },
+        {
+          "title": "Automation — the dials and the pipeline",
+          "caption": "The kill switch and the thresholds — jobs, rating, vouches, reference, days at tier 3 — with validated ranges and a Push, beside the pipeline of every pro at tier 2 or 3: who is close, and exactly which line they are waiting on. Approve and suspend by hand still work; suspension always wins.",
+          "image": "docs/deck/a12-automation.png"
         }
       ]
     },

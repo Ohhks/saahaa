@@ -48,6 +48,10 @@ purely local). Turning that on is the single change that moves SAAHAA from
 | Ledger entries hash-chained (SHA-256, `prev → hash`) | `core/crypto.js`, verified in Admin → Finance | Detects **accidental** corruption and a naive edit instantly. An attacker recomputes the whole chain in about a minute, because the chain is verified by the same client that writes it. See §7. |
 | Chat scanned for phone numbers and UPI handles | `domain/*` | Protects both sides: off-platform payment is where the customer loses recourse and the worker loses the dispute trail. |
 | **No photo, no auto-release** | `domain/flow.js` | The single highest-value anti-fraud rule in the product. |
+| **Fresh start**: the owner types FRESH, re-enters the password (step-up), a snapshot is taken first, the wipe is audited with counts | `domain/fresh.js`, Admin → System & audit | A wipe cannot be a slip of the finger or a quiet one. The credential and the dials survive it, so the device is still the owner's afterwards. Same caveat as everything else here: the operator's own DevTools can clear storage without any of it. |
+| **Treasury actions** — Withdraw fees (`PLATFORM:fee → WORLD:bank`) and Remit GST (`PLATFORM:gst → WORLD:tax`): step-up re-auth, never more than earned / held, audited (`treasury.withdraw`, `treasury.remitGst`) | `domain/treasury.js`, Admin → Finance | The two actions that move the company's own money need the password again, and the ledger refuses an amount the books do not support. Every figure on the treasury screen is a replay of the ledger, so it cannot disagree with the books it is read from. |
+| **Vouches: one per person, per pro, ever.** Only a customer who has had a job with that pro settle, or a Background-Checked pro in the same trade; never yourself; never while suspended | `domain/autoverify.js` → `canVouch()` | Stops one account from vouching a friend up to tier 3 alone. What it does **not** stop is a ring of accounts — see §7. |
+| **Auto-promotion** to tier 3 / 4 is audited as actor `auto` with every line of evidence (`have/need`); the owner's kill switch (`autoApprove`) and dials are validated and pushed like the Charges | `domain/autoverify.js`, `domain/settings.js` | A promotion is reconstructible, and switching the whole thing off is one toggle. |
 
 ---
 
@@ -253,6 +257,10 @@ credential back in, CI goes red.
 | The hash chain is verified by the same client that writes it | An attacker recomputes the whole chain in about a minute. Tamper-evidence needs a signature the client cannot forge. |
 | Names, mobiles and areas sit in localStorage | Under the DPDP Act 2023 there is no consent record, no erasure path and no breach-notification route in local mode. |
 | The CSP protects the app | It removes whole classes of attack, and it cannot protect a user from their own DevTools. It is defence in depth, not a boundary. |
+| Vouches, ratings and settled jobs are evidence | In local mode they are rows in localStorage; a user can write themselves three settled jobs and two vouches in DevTools. In Supabase mode the same rules must be `SECURITY DEFINER` RPCs (settled-job check, one-vouch uniqueness, same-trade tier check) or they are decoration. A ring of real accounts can also vouch each other up; the owner's suspend and kill switch are the answer, not the code. |
+| The reference "confirmed by code" | The 4-digit code is generated in the browser and shown on the pro's screen until the SMS rail exists. It proves the pro typed the code, not that a reference read it to them. `bgReference` can be turned off and `bgVouches` raised instead. |
+| The gateway is a payment rail | `core/gateway.js` in `MODE 'sim'` moves no money at all. A `collect()` is a receipt the app wrote to itself; it is labelled sandbox everywhere precisely so nobody mistakes it for a payment. |
+| The treasury's *Reconciles* line proves the money is there | It proves the ledger sums to the identity it was built to sum to. Against a bank balance it proves nothing until the settlement webhook posts the legs (`docs/PRODUCTION.md` §3). |
 
 ---
 
@@ -312,6 +320,14 @@ pros, no shops, no products. The example roster exists only behind `?demo=1`
 for that one page load. Nothing seeds a real device, so there is no shipped
 account with a known password to find.
 
+Since 7.0 the guard runs the other way too: `domain/fresh.js` inspects the
+store at every boot, and a state carrying demo-origin records (the
+`origin: 'demo'` mark, or the example mobile ranges `90/91/92 000000xx`) on a
+boot **without** `?demo=1` is replaced by a fresh one — credential and dials
+kept, audited as `data.demoPurged` with counts. The owner's own wipe, Fresh
+start, is the same operation on demand, behind FRESH + step-up, snapshot
+first, audited as `data.freshStart`.
+
 ---
 
 ## 10. India-specific, before you go live
@@ -364,6 +380,8 @@ Nothing on this list is optional, and the order is the order.
 - [ ] Nodal/escrow account live with a PA-PG-licensed partner.
 - [ ] GST registration, TCS §52 and TDS §194-O wired into payouts.
 - [ ] Penny-drop beneficiary verification before the first transfer.
+- [ ] `core/gateway.js` switched off `MODE 'sim'`; ledger legs for money in and out posted from webhooks, never from the browser.
+- [ ] The vouch rules (settled job, same-trade tier, one per person) and the auto-promotion sweep re-implemented as `SECURITY DEFINER` RPCs.
 - [ ] The ledger hash chain anchored outside the browser (see below).
 
 **Process**

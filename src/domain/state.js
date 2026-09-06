@@ -166,7 +166,7 @@ register('reducer', { id:'agg', slice:'agg', reduce(s = {}, a) {
   return a.type === 'agg/bump' ? { ...s, ...a.payload } : s;
 }});
 
-register('reducer', { id:'settings', slice:'settings', reduce(s = { pricing: null }, a) {
+register('reducer', { id:'settings', slice:'settings', reduce(s = { pricing: null, automation: null }, a) {
   return a.type === 'settings/set' ? { ...s, ...a.payload } : s;
 }});
 

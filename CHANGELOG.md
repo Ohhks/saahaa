@@ -6,6 +6,89 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [7.0.0] — 2026-09-07 — "Self-running"
+
+The release that takes the owner out of the daily loop. A device starts clean
+and stays clean; the two approvals that used to reach the owner every day are
+now earned by the network itself; every rupee enters and leaves through one
+door, into wallets the books can name, and the company's own position is read
+straight from the ledger. The owner keeps a kill switch, the dials and the
+right to suspend, and gets two new buttons — both step-up protected.
+
+### Added
+- **Peer-to-peer verification** (`domain/autoverify.js`). Tier 3 *Background
+  Checked* is granted by the system when all of these hold: the seven-step
+  ladder is complete; at least 3 real jobs (the customer's code + a photo)
+  settled cleanly; average rating ≥ 4.3 over them; zero upheld disputes; at
+  least 2 vouches — from a customer who has had a job with this pro settle, or
+  a Background-Checked pro in the same trade; one vouch per person, ever — and
+  the reference the pro named has confirmed by a 4-digit code. Tier 4 *SAAHAA
+  Certified* follows when the numbers hold (25 jobs, rating ≥ 4.6, 0 upheld),
+  tier 3 has been held for 14 days and no dispute is open. Every promotion is
+  audited as `verify.auto` by actor `auto`, with the evidence it was granted
+  on. The sweep runs at boot and after every state change; a suspended pro is
+  never touched.
+- **Admin → Approvals → Automation.** The kill switch (`autoApprove`) and the
+  dials (`bgJobs`, `bgRating`, `bgVouches`, `bgReference`, `certDays`) with
+  validated ranges and a Push, beside a pipeline of every tier-2 and tier-3
+  pro: who is close, and which line they are waiting on. Approving and
+  suspending by hand still work; suspension always wins.
+- **Vouch** on a pro's page, and **Standing** in the work cockpit: the tier-3
+  checklist line by line (have / need), the reference code step, and the
+  Certified countdown.
+- **The customer's wallet** (`CUSTOMER:<key>`, My SAAHAA → Wallet). A booking
+  is funded from the wallet first and only the shortfall is collected; a
+  refund lands in the wallet; top-up (minimum ₹10) and take-out to UPI.
+  Workers and shops had wallets already; now everyone does.
+- **`core/gateway.js` — the one door.** `collect()` for money in, `payout()`
+  for money out; nothing else in the product touches a payment rail.
+  `MODE = 'sim'` is a sandbox UPI: it says *Sandbox UPI — no real money moves
+  yet* on every screen that uses it and stamps `via: 'upi-sim'` on every
+  ledger leg it produces. Razorpay replaces this one file
+  (`docs/PRODUCTION.md` §3) and nothing else changes.
+- **Treasury** (`domain/treasury.js`, Admin → Finance). The company's
+  position replayed from the hash-chained ledger, never computed: fees
+  earned, GST held, the liabilities (escrow, customer / worker / shop wallets,
+  stakes, holdbacks, the rider pool), money in, withdrawn, remitted — and
+  whether it reconciles, which it does by construction and the screen says
+  so. Two owner actions: **Withdraw fees** (`PLATFORM:fee → WORLD:bank`, never
+  more than earned) and **Remit GST** (`PLATFORM:gst → WORLD:tax`, never more
+  than held). Both step-up protected and audited (`treasury.withdraw`,
+  `treasury.remitGst`).
+- **Fresh start** (`domain/fresh.js`, Admin → System & audit). The owner
+  types FRESH and re-enters the password; every account, order and ledger
+  entry goes. A snapshot is taken first and is restorable from the same
+  screen; the credential and the dials are kept; the wipe is audited as
+  `data.freshStart` with the counts it removed.
+- **Demo never leaks.** A device that was walked with `?demo=1` drops the
+  example roster at its next normal boot — recognised by the `origin: 'demo'`
+  mark and by the example mobile ranges — keeping the credential and the
+  dials, and audited as `data.demoPurged` with counts.
+- `core/selftests.auto.js`: the clean slate, the treasury identity, the
+  gateway door, the automation dials, the v9 migration. **169 tests.**
+
+### Changed
+- **Schema v9.** `settings.automation` beside `settings.pricing`; a pro
+  carries `vouches[]` and `tier3At`.
+- Money a customer pays is posted `WORLD → CUSTOMER:<key>` (`PAYMENT_IN`)
+  before it moves into the order's escrow, so a refund has a place to land
+  and the treasury can name every liability it holds.
+- The owner's daily routine loses the two approvals and gains one look at
+  the treasury. `docs/AUTOMATION.md` carries the rules, `docs/LAUNCH.md` and
+  `docs/PRODUCTION-PROCESS.md` the fresh-start step and the treasury check,
+  `docs/SECURITY.md` the step-up and one-vouch rules, `docs/PRODUCTION.md`
+  how the gateway and the treasury map onto Razorpay and the GST portal.
+- Built by agents under `docs/WORKFLOW.md`: lead foundations → admin builder,
+  customer/partner builder and docs in parallel → guardian → lead ships. The
+  7.0.0 roster is appended there.
+
+### Fixed
+- A pro who was already Background Checked before this release had no date
+  for it, so the 14-day Certified clock would have restarted on upgrade. The
+  v8 → v9 migration back-fills `tier3At` from `verifiedAt`.
+
+---
+
 ## [6.9.1] — 2026-09-07 — "Seen by a browser"
 
 ### Fixed

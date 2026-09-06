@@ -67,3 +67,44 @@ export function pushPricing(input, actor = 'admin') {
   catch (e) { local = next; }
   return { ok: true, errors: [], clean: next };
 }
+
+/* ── automation · approvals that happen by themselves (domain/autoverify.js) ──
+   The owner's kill switch and thresholds. Same rules as pricing: validated
+   ranges, a Push, audited, complete defaults when nothing was ever pushed. */
+export const DEFAULT_AUTOMATION = {
+  autoApprove: true,   // the kill switch: false = tiers 3 and 4 wait for the owner again
+  bgJobs: 3,           // real jobs (code + photo) settled cleanly before Background Checked
+  bgRating: 4.3,       // average rating over those jobs
+  bgVouches: 2,        // vouches from customers who had a job settle, or same-trade tier-3 pros
+  bgReference: true,   // the named reference must confirm by code
+  certDays: 14,        // days as Background Checked before Certified can be granted
+  pushedAt: 0, pushedBy: '',
+};
+const AUTO_LIMITS = { bgJobs: [1, 50], bgRating: [3, 5], bgVouches: [0, 10], certDays: [0, 365] };
+let localAuto = null;
+export function getAutomation() {
+  const st = (typeof getState === 'function' && safeState()) || {};
+  const a = (st.settings && st.settings.automation) || localAuto || {};
+  return { ...DEFAULT_AUTOMATION, ...a };
+}
+export function validateAutomation(input) {
+  const errors = [], clean = {};
+  for (const [k, [lo, hi]] of Object.entries(AUTO_LIMITS)) {
+    if (input[k] == null || input[k] === '') continue;
+    const v = Number(input[k]);
+    if (!Number.isFinite(v)) { errors.push(`${k}: not a number`); continue; }
+    if (v < lo || v > hi) { errors.push(`${k}: must be between ${lo} and ${hi}`); continue; }
+    clean[k] = k === 'bgRating' ? +v.toFixed(2) : Math.round(v);
+  }
+  if (input.autoApprove != null) clean.autoApprove = input.autoApprove === true || input.autoApprove === 'true' || input.autoApprove === 1;
+  if (input.bgReference != null) clean.bgReference = input.bgReference === true || input.bgReference === 'true' || input.bgReference === 1;
+  return { ok: !errors.length, errors, clean };
+}
+export function pushAutomation(input, actor = 'admin') {
+  const v = validateAutomation(input);
+  if (!v.ok) return v;
+  const next = { ...getAutomation(), ...v.clean, pushedAt: Date.now(), pushedBy: actor };
+  try { dispatch({ type: 'settings/set', payload: { automation: next } }); }
+  catch (e) { localAuto = next; }
+  return { ok: true, errors: [], clean: next };
+}

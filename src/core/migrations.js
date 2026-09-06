@@ -161,3 +161,19 @@ const STAGE_MAP = {
 const mapStage = s => STAGE_MAP[s] || (s ? 'DISPUTED' : 'MATCHING');
 
 export { mapCat, mapStage, CAT_MAP, STAGE_MAP };
+
+/* v8 -> v9 · automation dials live beside the pricing dials; a pro's vouches
+   and tier-3 date exist as fields. Demo residue is NOT handled here: that is
+   a boot-time guard (domain/fresh.js) because it must run on every boot, not
+   once per schema step. */
+registerMigration({
+  from: 8, to: 9, label: 'v8 -> v9 (automation dials, vouches)',
+  up(old) {
+    const next = { ...old, schemaVersion: 9 };
+    const st = old.settings && typeof old.settings === 'object' ? old.settings : { pricing: null };
+    next.settings = { ...st, automation: st.automation && typeof st.automation === 'object' ? st.automation : null };
+    next.partners = (old.partners || []).map(p => ({ ...p, vouches: Array.isArray(p.vouches) ? p.vouches : [],
+                                                     tier3At: p.tier3At || ((p.tier | 0) >= 3 ? (p.verifiedAt || old.createdAt || 0) : 0) }));
+    return next;
+  },
+});

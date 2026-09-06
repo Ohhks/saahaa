@@ -18,7 +18,19 @@ import { kmBetween, etaMins, geoOf, nameOf } from '../../domain/match.js';
 import * as gmap from '../map.js';
 import * as flow from '../../domain/flow.js';
 import * as M from '../../core/money.js';
+import * as gateway from '../../core/gateway.js';
 import { header, emptyBlock } from './shops.js';
+
+/* How the order was paid. EVERYONE PAYS SAAHAA: the wallet is drawn first
+   and only the shortfall is collected through the gateway. Orders written
+   before 7.0 carry neither field — they were collected in one go. */
+function paidWith(o) {
+  if (o.paidFromWallet == null && o.collected == null) return 'Paid via UPI';
+  const parts = [];
+  if (o.paidFromWallet > 0) parts.push(`${M.fmt(o.paidFromWallet)} from wallet`);
+  if (o.collected > 0) parts.push(`${M.fmt(o.collected)} via ${gateway.label()}`);
+  return parts.length ? parts.join(' · ') : 'Nothing collected yet';
+}
 
 /* ══════════════ THE MAP ON A LIVE ORDER ════════════════════════
    "3 km away" is a number. A customer waiting at their door wants to know
@@ -253,6 +265,7 @@ export function renderDetail(orderId) {
         ${o.otp && running && isCustomer ? `<span class="capsule capsule--info"><span class="capsule__k">Your code</span>
           <span class="capsule__v num">${esc(o.otp)}</span></span>` : ''}
       </div>
+      <p class="micro muted" style="margin-top:8px">${esc(paidWith(o))}</p>
       ${o.saved ? `<p class="tiny" style="margin-top:12px;color:var(--accent)">
         ✦ You saved ${M.fmt(o.saved)} versus a commission app — and your pro was paid more.</p>` : ''}
     </div>

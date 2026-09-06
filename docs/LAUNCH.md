@@ -6,7 +6,7 @@ You are one person. This list is ordered so that nothing needs you twice.
 
 1. ✅ Repository https://github.com/Ohhks/saahaa exists (public) with every commit and tag pushed.
 2. ✅ Pages via Actions is on: **https://ohhks.github.io/saahaa/**. A rollback is re-running an older deploy.
-3. ✅ `main` requires the CI check (111 tests, preflight, migration lint).
+3. ✅ `main` requires the CI check (169 tests, preflight, migration lint).
 4. **Sign in as the owner** the first time you open `/#/admin`: username
    `siidhartha12`, your own password. It is not written down anywhere in this
    repository — `ADMIN_BOOTSTRAP` in `src/core/config.js` holds only a
@@ -17,36 +17,49 @@ You are one person. This list is ordered so that nothing needs you twice.
 5. **Confirm the live site starts empty.** No customers, no pros, no shops —
    that is correct. `?demo=1` loads the example roster locally when you want
    something on screen to click through; it never loads without that query
-   string.
-6. **Set your charges before the first booking.** Admin → Charges: the
+   string. A device that was once opened with it drops the roster by itself
+   at the next normal boot (audited as `data.demoPurged`).
+6. **Fresh start, before the first real account.** Admin → System & audit →
+   **Fresh start**: type FRESH, enter your password again. A snapshot is
+   taken first (restorable from the same screen), every account, order and
+   ledger entry goes, your credential and your dials stay, and the wipe is
+   audited with the counts it removed. Do it once on the device you will run
+   the business from, even if it looks empty, so the first ledger entry on
+   record is a real one.
+7. **Set your charges before the first booking.** Admin → Charges: the
    service percentage laid on top of a worker's quote, the platform's retail
    percentage, and the delivery bands by distance. **Push** applies them to
    every quote made from then on; anything already booked keeps the fees it
    was booked with.
-7. Open the live URL on your phone and on a laptop; run through
+8. Open the live URL on your phone and on a laptop; run through
    `docs/TEST-REPORT.md` §1–2 by hand once. It takes ten minutes.
 
 ## This week — real money and real people
 
-8. **Supabase project** (free tier): run `supabase/migrations/0001…0003` in
+9. **Supabase project** (free tier): run `supabase/migrations/0001…0003` in
    order; paste the anon key into `src/core/config.js`; `docs/SETUP.md`.
    Money mutations are SECURITY DEFINER RPCs; RLS is deny-by-default.
-9. **Payment gateway**: `docs/PRODUCTION.md` §2 — start with UPI-only
-   collection (0% MDR) via Razorpay or Cashfree; webhooks land in the
-   Cloudflare Worker (§4). Do not accept cards until UPI works end to end.
-10. **SMS OTP** for partner verification step 1 (any DLT-registered sender).
-    Until that sender is live the code is generated and shown on the
-    partner's own screen — the ladder is real, but nothing is texted. This is
-    the shortest of the three rails still to wire (see *Three rails* below).
-11. **First ten pros** — walk them through the seven steps in person. The
-    ladder needs nothing from you until a background check lands in Approvals.
+10. **Payment gateway**: `docs/PRODUCTION.md` §2–§3 — start with UPI-only
+    collection (0% MDR) via Razorpay; webhooks land in the Cloudflare Worker
+    (§4). In the code this is one file, `src/core/gateway.js`: `collect()`
+    becomes an Order + Checkout, `payout()` a Route transfer or a Payout.
+    Until then it runs as a sandbox UPI and every screen that moves money says
+    so. Do not accept cards until UPI works end to end.
+11. **SMS OTP** for partner verification step 1 and for the reference's
+    4-digit code (any DLT-registered sender). Until that sender is live both
+    codes are generated and shown on the partner's own screen — the ladder is
+    real, but nothing is texted. This is the shortest of the rails still to
+    wire (see *Rails still to wire* below).
+12. **First ten pros** — walk them through the seven steps in person. The
+    ladder needs nothing from you at all: Background Checked and Certified are
+    earned from real jobs, ratings, vouches and the reference's code.
     Enrolment is not limited to Hyderabad or to India: a pro sets their place
     by search, by dropping a pin, or from the device's own location, anywhere
     in the world.
-12. **First three shops** — the ready-list picker fills a catalogue in
+13. **First three shops** — the ready-list picker fills a catalogue in
     minutes; set minimum order and delivery mode in Shop profile.
 
-## Three rails still to wire
+## Rails still to wire
 
 These are the only places where a step completes inside the app instead of
 against an outside system. Everything they gate is real; the outside call is
@@ -54,20 +67,28 @@ what is missing.
 
 | Step | What happens today | What wires it |
 |---|---|---|
-| Phone verification | The code is generated and shown on the partner's screen | A DLT-registered SMS sender (step 10) |
-| UPI payout id | The id is format-checked and saved | Penny-drop beneficiary verification at the gateway (step 9) |
-| Wallet top-up | The stake balance is credited directly; the Add money sheet says UPI is what does this in production | UPI collection at the gateway (step 9) |
+| Phone verification | The code is generated and shown on the partner's screen | A DLT-registered SMS sender (step 11) |
+| The reference's code | The 4-digit code is generated and shown on the pro's screen, for the pro to pass to the reference | The same SMS sender (step 11) |
+| UPI payout id | The id is format-checked and saved | Penny-drop beneficiary verification at the gateway (step 10) |
+| Money in and out | `src/core/gateway.js` in `MODE 'sim'`: a collect or a payout succeeds at once, moves no real money, and is labelled *Sandbox UPI* on the screen and `upi-sim` on the ledger leg — customer top-ups, booking shortfalls, worker stake top-ups, every take-out | Razorpay in that one file (step 10) |
+| Withdraw fees / Remit GST | The treasury posts the leg and audits it; nothing reaches a bank or the GST portal | The settlement webhook and the GSTR-3B challan (`docs/PRODUCTION.md` §3) |
 
 ## Every day — four minutes
 
-- Admin → Approvals: background checks (call the reference first), Certified
-  awards.
+- Admin → Approvals: nothing to approve by hand any more — Background
+  Checked and Certified are granted by the network's own evidence
+  (`docs/AUTOMATION.md`, *Peer-to-peer verification*) and audited as actor
+  `auto`. Glance at the Automation pipeline; suspend if something looks
+  wrong; the kill switch is on the same screen.
 - Admin → Bookings & escrow: anything on HOLD older than a day; a stalled shop
   order → refund in full. When one does not make sense, open it in the **Flow
   tracker** — stage, holder, money held, and what the system is waiting for,
   on one screen.
-- Admin → Finance: Mark paid after each UPI batch; Verify chain — difference
-  must read ₹0.
+- Admin → Finance: Verify chain — difference must read ₹0. Then Treasury:
+  fees earned, GST held, the liabilities you are holding for other people,
+  and *Reconciles* — it must say yes. Withdraw fees and Remit GST when you
+  choose to (they ask for your password again and are audited); in sandbox
+  mode nothing leaves for a bank, and the screen says so.
 - If anything looks wrong: System & audit → flags — every feature is a kill
   switch — then Snapshot before touching data.
 

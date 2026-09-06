@@ -17,7 +17,7 @@
    Flow panel on the dashboard exists so that separation is the first thing
    the owner sees, not a footnote. */
 
-import { mount, esc, toast, timeAgo, clockTime } from '../dom.js';
+import { mount, esc, toast, timeAgo, clockTime, sheet, closeSheet, $ } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, dispatch, me } from '../../core/ctx.js';
 import { get, live, all as allOf, namespaces, count } from '../../core/registry.js';
@@ -36,6 +36,10 @@ import { stage } from '../../domain/orders.js';
 import * as flow from '../../domain/flow.js';
 import * as V from '../../domain/verification.js';
 import * as settings from '../../domain/settings.js';
+import * as treasury from '../../domain/treasury.js';
+import * as autoverify from '../../domain/autoverify.js';
+import * as fresh from '../../domain/fresh.js';
+import * as gateway from '../../core/gateway.js';
 import { quoteService, quoteRetail } from '../../domain/pricing.js';
 import { geoOf } from '../../domain/match.js';
 import * as gmap from '../map.js';
@@ -172,6 +176,7 @@ export function render() {
   const queued = V.ownerQueue().length;
   const openD = st.disputes.filter(d => d.status === 'OPEN' && !d.resolvedAt).length;
   const healthy = h.checks.filter(c => c.ok).length;
+  const ours = treasury.treasury(st.ledger).feeEarned;
 
   /* The map is the only thing on this console that needs a live DOM node, so
      it is built one frame AFTER this string has been mounted. Never inside the
@@ -195,6 +200,7 @@ export function render() {
         ${pill(`${queued} awaiting you`, queued ? 'warn' : 'soft')}
         ${pill(openD ? `${openD} open disputes` : 'no open disputes', openD ? 'bad' : 'soft')}
         ${pill(`Health ${healthy}/${h.checks.length}`, h.ok ? 'ok' : h.fatal ? 'bad' : 'warn')}
+        ${pill(`Ours ${M.fmt(ours)} (fees earned)`, ours > 0 ? 'gold' : 'soft')}
       </div>
     </div>
   </header>
@@ -231,6 +237,7 @@ function dash(st) {
   const pending = st.users.filter(u => u.role !== 'customer' && u.tier <= 1).length;
   const openD = st.disputes.filter(d => d.status === 'OPEN' && !d.resolvedAt).length;
   const liveOrders = st.orders.filter(o => !stage(o.stage).terminal).length;
+  const t = treasury.treasury(st.ledger);
   return `
   ${note('every number on this screen, live from the ledger and the order registry',
          'nothing — this screen is read-only by design')}
@@ -238,6 +245,7 @@ function dash(st) {
   ${liveMap(st)}
 
   <div class="capsules">
+    ${capsule('Ours (fees earned)', M.fmt(t.feeEarned), `${M.fmt(t.withdrawn)} withdrawn so far`, 'gold', 1)}
     ${capsule('Users', st.users.length, `${st.users.filter(u => u.role === 'customer').length} customers`, 'soft', 1)}
     ${capsule('Partners', st.partners.length, `${st.shops.length} shops`, 'soft', 2)}
     ${capsule('Orders', st.orders.length, `${liveOrders} live`, 'info', 3)}
@@ -473,10 +481,12 @@ function approvals(st) {
   const inProgress = st.partners.filter(p => !V.readiness(p).complete && !p.suspended);
   const shops = st.shops.filter(s => s.status === 'pending');
   return `
-  ${note('queue ordering by risk, duplicate detection, price-outlier flags, ban-list prefilter',
-         'approve or reject each partner, each shop, each tier upgrade — and every listing you choose to spot-check')}
+  ${note('tier 3 and tier 4 promotions from the pipeline below, queue ordering by risk, duplicate detection, price-outlier flags, ban-list prefilter',
+         'turn automation off, move the dials, suspend — and approve by hand when you want to override the machine')}
 
-  <div class="sec">${secHead(`Partner applications · ${queue.length}`)}
+  ${automation(st)}
+
+  <div class="sec">${secHead(`Partner applications · ${queue.length}`, pill('your override', 'soft'))}
     ${queue.length ? queue.map((p, ix) => {
       const t = trustScore(p);
       const v = p.verification || {};
@@ -520,6 +530,85 @@ function approvals(st) {
       <div class="between"><span class="tiny">${avatar(s.name)} <b>${esc(s.name)}</b></span>
         ${pill(s.area, 'soft')}</div></div>`).join('')
       : empty('No shops waiting.')}</div>`;
+}
+
+/* ── AUTOMATION — approvals that happen by themselves ─────────
+   Tier 3 (Background Checked) and tier 4 (Certified) are earned by the
+   network: settled jobs, ratings, vouches from people who can know, a
+   reference confirmed by code, then tenure. domain/autoverify.js decides;
+   this panel shows the dials, the pipeline and what the machine has done.
+   Same shape as Charges: a dial, its live value, its launch default, one Push. */
+const checkRow = (id, label, on, hint) => `
+  <label class="between" style="gap:12px;margin-bottom:12px;cursor:pointer">
+    <span><b class="tiny">${esc(label)}</b><p class="micro muted" style="margin:2px 0 0">${hint}</p></span>
+    <input id="${id}" type="checkbox" ${on ? 'checked' : ''} style="width:20px;height:20px;flex:none;accent-color:var(--accent)">
+  </label>`;
+
+function automation(st) {
+  const A = settings.getAutomation();
+  const D = settings.DEFAULT_AUTOMATION;
+  const pipe = autoverify.pipeline();
+  const recent = audit.entries({ action: 'verify.auto', limit: 20 });
+  const nameOf = id => (st.partners.find(p => p.id === id) || {}).name || id;
+  const onOff = v => v ? 'on' : 'off';
+  return `
+  <div class="sec">${secHead('Automation — approvals that happen by themselves',
+      A.autoApprove ? pill('running', 'ok', 'pill--live') : pill('switched off', 'warn'))}
+    <p class="tiny muted" style="margin-bottom:12px">
+      Background Checked and Certified are earned by the network itself — real jobs, ratings, vouches
+      from people who can know, a reference who confirms by code, then time. Nobody waits for you.
+      The switch below stops it; the dials say how much is enough.</p>
+
+    ${dialGroup('The switch', 'Off means tiers 3 and 4 wait for you again. Suspension always wins either way.', `
+      ${checkRow('atAuto', 'Promote by itself', A.autoApprove, dialHint(onOff(A.autoApprove), onOff(D.autoApprove)))}
+    `)}
+
+    ${dialGroup('Background Checked (tier 3)', 'Every line must hold before the network promotes a pro. Upheld disputes must be zero — that is not a dial.', `
+      ${dial('atJobs', 'Real jobs settled cleanly (code + photo)', A.bgJobs, dialHint(`${A.bgJobs} jobs`, `${D.bgJobs} jobs`))}
+      ${dial('atRating', 'Average rating over those jobs', A.bgRating, dialHint(`${A.bgRating}`, `${D.bgRating}`))}
+      ${dial('atVouches', 'Vouches from customers or same-trade pros', A.bgVouches, dialHint(`${A.bgVouches}`, `${D.bgVouches}`))}
+      ${checkRow('atReference', 'The named reference must confirm by code', A.bgReference, dialHint(onOff(A.bgReference), onOff(D.bgReference)))}
+    `)}
+
+    ${dialGroup('Certified (tier 4)', 'The 25-job / 4.6-rating / zero-dispute rule is fixed. This dial is how long a pro must have been Background Checked first.', `
+      ${dial('atCertDays', 'Days as Background Checked', A.certDays, dialHint(`${A.certDays} days`, `${D.certDays} days`))}
+    `)}
+
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn--primary grow" data-act="admin.automation.push">Push</button>
+      <button class="btn btn--ghost" data-act="admin.automation.reset">Reset to defaults</button>
+    </div>
+    <p class="tiny muted" style="margin-top:10px">
+      Last pushed: ${A.pushedAt
+        ? `<b>${esc(clockTime(A.pushedAt))}, ${esc(timeAgo(A.pushedAt))}</b> by <b>${esc(A.pushedBy || 'admin')}</b>`
+        : '<b>never</b> — these are the launch defaults'}</p>
+  </div>
+
+  <div class="sec">${secHead(`Pipeline · ${pipe.length}`, pill(`${pipe.filter(r => r.ready).length} ready`, pipe.some(r => r.ready) ? 'ok' : 'soft'))}
+    <p class="tiny muted" style="margin-bottom:12px">
+      Every tier-2 and tier-3 pro, closest to promotion first, with what they are still missing.
+      A ready row is promoted on the next sweep while the switch is on.</p>
+    ${pipe.length ? pipe.map((r, ix) => `<div class="glass ${r.ready ? 'glass--gold' : ''} ${riseOf(ix + 1)}" style="padding:11px 14px;margin-bottom:8px">
+      <div class="between">
+        ${avatar(r.name)}
+        <div class="grow"><b class="tiny">${esc(r.name)}</b>
+          <p class="tiny muted">${esc(get('category', r.cat).name || r.cat)} · ${esc(tier(r.tier).label)} → ${esc(tier(r.next).label)}</p>
+          <p class="micro ${r.ready ? '' : 'muted'}" style="margin-top:4px">${r.ready
+            ? `${icon('check', { size: 12 })} everything holds — promoted on the next sweep`
+            : `missing: ${esc(r.missing.join(' · '))}`}</p></div>
+        ${r.ready ? pill('ready', 'ok') : pill(`${r.missing.length} to go`, 'soft')}
+      </div></div>`).join('') : empty('Nobody in the pipeline — no tier-2 or tier-3 pro yet.')}
+  </div>
+
+  <div class="sec">${secHead(`Promoted by the network · ${recent.length}`)}
+    ${recent.length ? `<ol class="timeline">${recent.map(e => `<li class="timeline__item">
+      <span class="timeline__dot" aria-hidden="true"></span>
+      <div class="timeline__body">
+        <div class="between"><b class="micro">${esc(nameOf((e.detail || {}).partner))} → ${esc(tier((e.detail || {}).tier | 0).label)}</b>
+          <span class="timeline__time meta">${esc(clockTime(e.ts))}</span></div>
+        <p class="tiny muted">${esc(timeAgo(e.ts))} · ${esc(Object.entries((e.detail || {}).evidence || {}).map(([k, v]) => `${k} ${v}`).join(' · '))}</p>
+      </div></li>`).join('')}</ol>` : empty('No automatic promotion yet.')}
+  </div>`;
 }
 
 /* ── 3. ESCROW ────────────────────────────────────────────── */
@@ -634,7 +723,9 @@ function people(st) {
         <div class="between">
           ${avatar(p.name)}
           <div class="grow"><b class="tiny">${esc(p.name)}</b>
-            <p class="tiny muted">${esc(get('category', p.cat).name)} · ${p.completed} jobs · ${esc(p.area)}</p></div>
+            <p class="tiny muted">${esc(get('category', p.cat).name)} · ${p.completed} jobs · ${esc(p.area)}
+              · ${(p.vouches || []).length} vouch(es)${(p.tier | 0) >= 3 && p.tier3At
+                ? ` · background checked ${esc(new Date(p.tier3At).toLocaleDateString('en-IN'))}` : ''}</p></div>
           <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end">
             ${pill(tier(p.tier).label, tier(p.tier).tone)}
             ${pill(`${t.score} · ${t.band.label}`, t.band.tone)}
@@ -723,7 +814,8 @@ function flowRows(st) {
       const place = (u.loc && u.loc.label) || (p && p.area) || (sh && sh.area) || u.area || '—';
 
       const counts = u.role === 'partner'
-        ? `${(p && p.completed) || 0} jobs · earned ${M.fmt(earned)}`
+        ? `${(p && p.completed) || 0} jobs · ${((p && p.vouches) || []).length} vouch(es) · earned ${M.fmt(earned)}${
+            p && (p.tier | 0) >= 3 && p.tier3At ? ` · checked ${new Date(p.tier3At).toLocaleDateString('en-IN')}` : ''}`
         : u.role === 'shop'
         ? `${orders.length} order(s) · earned ${M.fmt(earned)}`
         : `${orders.length} order(s) · spent ${M.fmt(spend)}`;
@@ -839,6 +931,8 @@ function finance(st) {
   ${note('revenue split per order, GST liability (18% of the fee), payout queue, unit economics',
          'mark a payout batch paid with its UTR, record a manual adjustment with a reason, export the GST report')}
 
+  ${treasuryBlock(st)}
+
   ${charges()}
 
   <div class="glass ${drift ? '' : 'glass--gold'} rise" style="${drift ? 'border-color:var(--danger)' : ''}">
@@ -894,6 +988,106 @@ function finance(st) {
       </div>
     </details>
     <button class="btn btn--ghost btn--block" style="margin-top:10px" data-act="admin.exportledger">Export ledger CSV</button>
+  </div>`;
+}
+
+/* ── TREASURY — the company's wallet ──────────────────────────
+   Everyone pays SAAHAA; SAAHAA pays everyone. What is OURS is the platform
+   fee, and only that. Everything else the books hold — escrow, wallets,
+   stakes, holdbacks, the rider pool — is other people's money, and the
+   liabilities table says so in those words. domain/treasury.js replays the
+   hash-chained ledger for every figure here; nothing is typed in. */
+const trRow = (k, v, strong = false) => `<div class="between" style="margin-bottom:6px">
+  <span class="tiny${strong ? '' : ' muted'}">${esc(k)}</span><b class="num tiny">${M.fmt(v)}</b></div>`;
+
+function treasuryBlock(st) {
+  const t = treasury.treasury(st.ledger);
+  const settled = st.orders.filter(o => o.settledAt)
+    .sort((a, b) => (b.settledAt | 0) - (a.settledAt | 0)).slice(0, 20);
+  const bigWithdraw = M.fmt(adminauth.STEPUP_THRESHOLD);
+  return `
+  <div class="sec">${secHead('Treasury — the company’s wallet',
+      t.reconciles ? pill('Books reconcile', 'ok') : pill('DO NOT RECONCILE', 'bad'))}
+    <div class="glass glass--gold rise" style="margin-bottom:10px">
+      <div class="between">
+        <div><div class="eyebrow">Our earnings held</div>
+          <b class="num num-xl">${M.fmt(t.feeEarned)}</b>
+          <div class="meta">platform fee, net of GST, still in the system</div></div>
+        <span class="state--available">Withdrawable · ${M.fmt(t.withdrawable)}</span>
+      </div>
+      <div class="capsules" style="margin-top:var(--sp-5)">
+        ${capsule('GST held for the government', M.fmt(t.gstPayable), `${M.fmt(t.gstDue)} due`, 'info', 1)}
+        ${capsule('Money in', M.fmt(t.moneyIn), 'everything that ever entered', 'soft', 2)}
+        ${capsule('Withdrawn so far', M.fmt(t.withdrawn), 'to the company bank', 'gold', 3)}
+        ${capsule('GST remitted so far', M.fmt(t.remitted), 'paid to the government', 'ok', 4)}
+        ${capsule('Goodwill', M.fmt(t.goodwill), 'credits we fund ourselves', t.goodwill < 0 ? 'warn' : 'soft', 5)}
+      </div>
+      <p class="micro muted" style="margin-top:10px;display:flex;align-items:center;gap:6px">
+        ${icon('coin', { size: 12 })} ${esc(gateway.label())}</p>
+    </div>
+
+    <div class="glass" style="margin-bottom:10px">
+      <div class="eyebrow">Liabilities — other people’s money</div>
+      <p class="tiny muted" style="margin:4px 0 12px">
+        These are held by SAAHAA but are never ours: they belong to customers, pros, shops and riders,
+        and they leave the books only to those people.</p>
+      ${trRow('Escrow in flight', t.escrow)}
+      ${trRow('Customer wallets', t.customerWallets)}
+      ${trRow('Worker wallets', t.partnerWallets)}
+      ${trRow('Shop wallets', t.shopWallets)}
+      ${trRow('Stakes', t.stakes)}
+      ${trRow('Holdbacks', t.holdbacks)}
+      ${trRow('Rider pool', t.riderPool)}
+      <div style="border-top:1px solid var(--hairline);margin:8px 0"></div>
+      ${trRow('Total held for others', t.liabilities, true)}
+      <p class="micro muted" style="margin-top:8px">
+        Money in must equal liabilities + ours + GST + goodwill + withdrawn + remitted.
+        ${t.reconciles ? 'It does.' : 'It does not — stop and check the ledger before moving anything.'}</p>
+    </div>
+
+    <div class="workspace">
+      <div class="glass">
+        <div class="eyebrow">Withdraw our earnings</div>
+        <p class="tiny muted" style="margin:4px 0 12px">PLATFORM:fee to the company bank. Never more than earned; above ${esc(bigWithdraw)} you re-type your password.</p>
+        <div class="field" style="margin-bottom:8px">
+          <input id="trAmt" type="number" step="any" inputmode="decimal" min="1" placeholder=" " value="${esc(rupStr(t.withdrawable))}">
+          <label>Amount ₹</label></div>
+        <button class="btn btn--primary btn--block" data-act="admin.treasury.withdraw" ${t.withdrawable >= 100 ? '' : 'disabled'}>Withdraw</button>
+      </div>
+      <div class="glass">
+        <div class="eyebrow">Remit GST</div>
+        <p class="tiny muted" style="margin:4px 0 12px">PLATFORM:gst to the GST portal. Never more than held; above ${esc(bigWithdraw)} you re-type your password.</p>
+        <div class="field" style="margin-bottom:8px">
+          <input id="trGst" type="number" step="any" inputmode="decimal" min="1" placeholder=" " value="${esc(rupStr(t.gstDue))}">
+          <label>Amount ₹</label></div>
+        <button class="btn btn--secondary btn--block" data-act="admin.treasury.remit" ${t.gstDue >= 100 ? '' : 'disabled'}>Remit</button>
+      </div>
+    </div>
+
+    <div class="glass" style="margin-top:10px">
+      <div class="eyebrow">Our part, per order</div>
+      <p class="tiny muted" style="margin:4px 0 10px">The last ${settled.length} settled orders, as booked — an order keeps the fee it was priced at.</p>
+      ${settled.length ? `<div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:var(--fs-micro)">
+          <thead><tr>
+            <th style="text-align:left;padding:6px 8px" class="eyebrow">Order</th>
+            <th style="text-align:right;padding:6px 8px" class="eyebrow">Customer paid</th>
+            <th style="text-align:right;padding:6px 8px" class="eyebrow">Fee</th>
+            <th style="text-align:right;padding:6px 8px" class="eyebrow">GST</th>
+            <th style="text-align:right;padding:6px 8px" class="eyebrow">Dispatch</th>
+            <th style="text-align:right;padding:6px 8px" class="eyebrow">Ours</th>
+          </tr></thead>
+          <tbody>${settled.map(o => { const p = treasury.ourPartOf(o); return `<tr style="border-top:1px solid var(--hairline)">
+            <td style="padding:6px 8px">${esc(o.kind === 'retail' ? (o.shopName || 'Shop') : (o.partnerName || 'Pro'))}
+              <span class="muted">· ${esc(o.customerName || '')} · ${esc(timeAgo(o.settledAt))}</span></td>
+            <td class="num" style="padding:6px 8px;text-align:right">${M.fmt(p.customerPays)}</td>
+            <td class="num" style="padding:6px 8px;text-align:right">${M.fmt(p.fee)}</td>
+            <td class="num muted" style="padding:6px 8px;text-align:right">${M.fmt(p.gst)}</td>
+            <td class="num muted" style="padding:6px 8px;text-align:right">${M.fmt(p.dispatchCut)}</td>
+            <td class="num" style="padding:6px 8px;text-align:right"><b>${M.fmt(p.ours)}</b></td>
+          </tr>`; }).join('')}</tbody>
+        </table></div>` : empty('No settled order yet — our part appears the moment a job or a basket settles.')}
+    </div>
   </div>`;
 }
 
@@ -1131,6 +1325,8 @@ function system(st) {
     </div>
   </div>
 
+  ${freshCard(st)}
+
   <div class="sec">${secHead('Change admin password')}
     <div class="glass">
       <div class="field"><input id="pwNew" type="password" placeholder=" "><label>New password</label></div>
@@ -1157,6 +1353,37 @@ function system(st) {
   </div>`;
 }
 
+/* ── FRESH START — a clean slate, on purpose and on record ────
+   Wipes every account, order and ledger entry. Keeps the owner's credential
+   and the dials. Takes a snapshot first (restorable above), is audited with
+   the counts, and needs the word FRESH plus the owner's password. */
+function freshCard(st) {
+  const c = fresh.counts(st);
+  const residue = fresh.demoResidue(st).total;
+  return `
+  <div class="sec">${secHead('Fresh start', pill('irreversible without the snapshot', 'warn'))}
+    <div class="glass" style="border-color:var(--danger)">
+      <div class="eyebrow" style="color:var(--danger);display:flex;align-items:center;gap:6px">${icon('trash', { size: 13 })} Wipe to a clean slate</div>
+      <p class="tiny muted" style="margin:6px 0 10px">
+        Removes every account, every order and every ledger entry on this device. Keeps your
+        credential and every dial on this console. A snapshot is taken first and the wipe is written
+        to the audit log with the counts.</p>
+      ${facts([
+        `${c.users} users`, `${c.partners} pros`, `${c.shops} shops`,
+        `${c.products} listings`, `${c.orders} orders`, `${c.ledger} ledger entries`,
+      ])}
+      ${residue > 0 ? `<p class="tiny" style="margin-top:10px;color:var(--warn)">
+        ${residue} example record(s) from the demo roster are on this device. They will be removed on the
+        next boot without <span class="num">?demo=1</span> whether or not you press this.</p>` : ''}
+      <div class="field" style="margin:14px 0 8px">
+        <input id="freshWord" type="text" autocomplete="off" autocapitalize="characters" placeholder=" ">
+        <label>Type FRESH to confirm</label></div>
+      <button class="btn btn--ghost btn--block" style="border-color:var(--danger);color:var(--danger)" data-act="admin.fresh">Fresh start</button>
+      <p class="micro muted" style="margin-top:8px">You will be asked for your password. Your session stays open afterwards.</p>
+    </div>
+  </div>`;
+}
+
 /* ── handlers ──────────────────────────────────────────────── */
 export async function runTests() { testResult = await selftest.runAll(); toast(testResult.failed ? `${testResult.failed} test(s) failed` : 'All tests passed'); ctx.render(); }
 export async function doVerifyChain() { chainResult = await verifyChain(getState().ledger); toast(chainResult.ok ? 'Ledger intact' : `Broken at block ${chainResult.at}`); ctx.render(); }
@@ -1174,8 +1401,16 @@ export function suspend(id) {
   audit.record(audit.ACTIONS.PARTNER_SUSPEND, { id, suspended: !p.suspended }, 'admin');
   toast(p.suspended ? 'Unsuspended' : 'Suspended'); ctx.render();
 }
-export async function release(id, pct) { await flow.confirmAndRelease(id, Number(pct)); ctx.render(); }
-export async function refundRetail(id) { await flow.refundRetail(id); ctx.render(); }
+/* Money the owner moves by hand above STEPUP_THRESHOLD (₹5,000) re-asks for
+   the owner password first — the promise in core/adminauth.js, kept here. */
+const orderAmount = id => { const o = getState().orders.find(x => x.id === id) || {}; return o.escrowed || o.customerPays || 0; };
+const guardMoney = (id, why, fn) => (orderAmount(id) > adminauth.STEPUP_THRESHOLD ? stepUpThen(why, fn) : fn());
+export async function release(id, pct) {
+  return guardMoney(id, `Releasing ${M.fmt(orderAmount(id))} from escrow.`, async () => { await flow.confirmAndRelease(id, Number(pct)); ctx.render(); });
+}
+export async function refundRetail(id) {
+  return guardMoney(id, `Refunding ${M.fmt(orderAmount(id))} to the customer.`, async () => { await flow.refundRetail(id); ctx.render(); });
+}
 export async function resolve(id, outcome) {
   const d = getState().disputes.find(x => x.id === id); if (!d) return;
   const ord = getState().orders.find(x => x.id === d.orderId);
@@ -1255,6 +1490,104 @@ export function resetPricing() {
   audit.record('pricing.reset', r.clean, 'admin');
   toast('Back to the launch defaults');
   ctx.render();
+}
+
+/* ── step-up: re-type the password before real money or a wipe ──
+   adminauth.stepUp does the PBKDF2 compare; this is only the sheet around
+   it. The button is wired directly (no new data-act — app.js is the one
+   file that registers actions), the password never leaves the input. */
+function stepUpThen(why, fn) {
+  const el = sheet('Confirm it is you', `
+    <p class="tiny muted" style="margin-bottom:12px">${esc(why)} Re-type the owner password to continue.</p>
+    <div class="field"><input id="suPass" type="password" placeholder=" " autocomplete="current-password"><label>Owner password</label></div>
+    <button class="btn btn--primary btn--block" id="suGo">Confirm</button>
+    <p class="micro muted" style="margin-top:10px">Every step-up, right or wrong, is written to the audit log.</p>`);
+  const input = $('#suPass', el), go = $('#suGo', el);
+  let busy = false;
+  const attempt = async () => {
+    if (busy) return; busy = true;
+    const pw = input ? input.value : '';
+    const ok = pw && await adminauth.stepUp(pw, getState().admin);
+    busy = false;
+    if (!ok) { toast('That password is not right', 'danger'); if (input) input.value = ''; return; }
+    closeSheet();
+    await fn();
+  };
+  if (go) go.addEventListener('click', attempt);
+  if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); attempt(); } });
+}
+
+/* ── the treasury ──────────────────────────────────────────── */
+function paiseIn(id) {
+  const v = fieldVal(id);
+  const n = Number(v);
+  return v === '' || !Number.isFinite(n) ? NaN : M.toPaise(n);
+}
+
+export async function treasuryWithdraw(d) {
+  const amt = paiseIn('trAmt');
+  if (!Number.isFinite(amt) || amt <= 0) { toast('Enter an amount in rupees', 'danger'); return; }
+  const run = async () => {
+    const r = await treasury.withdrawFees(amt, 'admin');
+    toast(r.ok ? `Withdrew ${M.fmt(r.amt)} to the company bank` : (r.reason || 'Could not withdraw'), r.ok ? '' : 'danger');
+    ctx.render();
+  };
+  if (amt > adminauth.STEPUP_THRESHOLD) stepUpThen(`You are moving ${M.fmt(amt)} of our earnings to the bank.`, run);
+  else await run();
+}
+
+export async function treasuryRemit(d) {
+  const amt = paiseIn('trGst');
+  if (!Number.isFinite(amt) || amt <= 0) { toast('Enter an amount in rupees', 'danger'); return; }
+  const run = async () => {
+    const r = await treasury.remitGst(amt, 'admin');
+    toast(r.ok ? `Remitted ${M.fmt(r.amt)} of GST` : (r.reason || 'Could not remit'), r.ok ? '' : 'danger');
+    ctx.render();
+  };
+  if (amt > adminauth.STEPUP_THRESHOLD) stepUpThen(`You are remitting ${M.fmt(amt)} of GST to the government.`, run);
+  else await run();
+}
+
+/* ── the automation dials ──────────────────────────────────── */
+const fieldOn = id => { const el = typeof document !== 'undefined' ? document.getElementById(id) : null; return el ? !!el.checked : null; };
+
+export function pushAutomation() {
+  const input = {
+    autoApprove: fieldOn('atAuto'),
+    bgJobs:      fieldVal('atJobs'),
+    bgRating:    fieldVal('atRating'),
+    bgVouches:   fieldVal('atVouches'),
+    bgReference: fieldOn('atReference'),
+    certDays:    fieldVal('atCertDays'),
+  };
+  const r = settings.pushAutomation(input, 'admin');
+  if (!r.ok) { toast(r.errors.join(' · ') || 'Those numbers do not add up', 'danger'); ctx.render(); return; }
+  audit.record('automation.push', r.clean, 'admin');
+  toast(r.clean.autoApprove ? 'Pushed — the network promotes by itself' : 'Pushed — automation is off, tiers 3 and 4 wait for you');
+  ctx.render();
+}
+
+export function resetAutomation() {
+  const D = settings.DEFAULT_AUTOMATION;
+  const r = settings.pushAutomation({
+    autoApprove: D.autoApprove, bgJobs: D.bgJobs, bgRating: D.bgRating,
+    bgVouches: D.bgVouches, bgReference: D.bgReference, certDays: D.certDays,
+  }, 'admin');
+  if (!r.ok) { toast(r.errors.join(' · ') || 'Could not reset', 'danger'); return; }
+  audit.record('automation.reset', r.clean, 'admin');
+  toast('Back to the launch defaults');
+  ctx.render();
+}
+
+/* ── fresh start ───────────────────────────────────────────── */
+export function freshStart() {
+  if (fieldVal('freshWord').toUpperCase() !== 'FRESH') { toast('Type FRESH in the box to confirm', 'danger'); return; }
+  stepUpThen('This wipes every account, order and ledger entry on this device.', () => {
+    const b = fresh.freshStart('admin');
+    toast(`Fresh start — removed ${b.users} users, ${b.partners} pros, ${b.shops} shops, ${b.orders} orders, ${b.ledger} ledger entries. Snapshot kept.`);
+    section = 'system';
+    ctx.render();
+  });
 }
 
 /* ── the flow ──────────────────────────────────────────────── */

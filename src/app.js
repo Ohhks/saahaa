@@ -2,7 +2,7 @@
    about every other module, and it does nothing but wire them together. */
 
 import { VERSION, SCHEMA_VERSION, BUILD_ID } from './core/version.js';
-import { ctx, getState, dispatch, me, restoreSession, myArea, saveSession } from './core/ctx.js';
+import { ctx, getState, dispatch, me, restoreSession, myArea, saveSession, myPartner } from './core/ctx.js';
 import { createStore, combineFromRegistry } from './core/store.js';
 import * as persist from './core/persist.js';
 import * as registry from './core/registry.js';
@@ -25,9 +25,14 @@ import { buildSeed } from './domain/seed.js';
 import * as flow from './domain/flow.js';
 import * as auction from './domain/auction.js';
 import * as bidding from './domain/bidding.js';
+import * as fresh from './domain/fresh.js';
+import * as autoverify from './domain/autoverify.js';
+import * as treasury from './domain/treasury.js';
+import * as gateway from './core/gateway.js';
 import './core/selftests.js';
 import './core/selftests.money.js';
 import './core/selftests.security.js';
+import './core/selftests.auto.js';
 
 /* ui */
 import { mount, action, initActions, toast, sheet, closeSheet, esc, stickyToast } from './ui/dom.js';
@@ -439,6 +444,18 @@ function wireActions() {
   A('admin.verifychain', () => admin.doVerifyChain());
   A('admin.snapshot',() => admin.snapshot());
   A('admin.restore', d => admin.restore(d.key));
+  A('admin.fresh',   () => admin.freshStart && admin.freshStart());
+  A('admin.automation.push',  () => admin.pushAutomation && admin.pushAutomation());
+  A('admin.automation.reset', () => admin.resetAutomation && admin.resetAutomation());
+  A('admin.treasury.withdraw', d => admin.treasuryWithdraw && admin.treasuryWithdraw(d));
+  A('admin.treasury.remit',    d => admin.treasuryRemit && admin.treasuryRemit(d));
+  /* peer verification + the customer's wallet (views: pro.js, partner.js, account.js) */
+  A('vouch.give',   d => { const r = autoverify.vouch(d.id); toast(r.ok ? 'Thank you — your vouch counts.' : r.reason, r.ok ? '' : 'warn'); render(); });
+  A('ref.send',     () => { const p = myPartner(); const code = p && autoverify.sendReferenceCode(p); partner.showReferenceCode && partner.showReferenceCode(code); render(); });
+  A('ref.confirm',  d => { const p = myPartner(); const ok = p && autoverify.confirmReference(p, d.code || (document.getElementById('refCode') || {}).value); toast(ok ? 'Reference confirmed.' : 'That code is not right', ok ? '' : 'danger'); render(); });
+  const cwAmt = d => Number(d.amt) || Math.round(Number((document.getElementById('cwAmt') || {}).value || 0) * 100);   // chips carry paise; the field is rupees
+  A('cwallet.topup',    d => flow.customerTopUp(cwAmt(d)).then(() => { closeSheet(); render(); }));
+  A('cwallet.withdraw', d => flow.customerWithdraw(cwAmt(d)).then(render));
   A('admin.export',  () => admin.exportJSON());
   A('admin.exportaudit',  () => admin.exportAudit());
   A('admin.exportledger', () => admin.exportLedger());
@@ -534,6 +551,13 @@ async function boot() {
 
   if (!mig.state.createdAt) store.dispatch({ type: 'meta/born', payload: Date.now() });
 
+  /* DEMO NEVER LEAKS. A device that was walked with ?demo=1 and now opens the
+     app without it drops the example roster before anything else happens —
+     the owner's credential and dials stay (domain/fresh.js). */
+  const demoMode = new URLSearchParams(location.search).get('demo') === '1' || !!new URLSearchParams(location.search).get('shot');
+  { const cleaned = fresh.purgeIfDemoResidue(store.getState(), demoMode);
+    if (cleaned !== store.getState()) { store.replaceState(cleaned, 'demo-purge'); persist.flush(persist.KEYS.state); console.info('[saahaa] demo roster removed — production starts empty'); } }
+
   if (!store.getState().seeded) {
     /* Production starts EMPTY. The demo seed (example customers, pros, shops,
        products) loads only when explicitly asked for: ?demo=1 — used by the
@@ -588,6 +612,15 @@ async function boot() {
   // the WORK_DONE screen promises auto-release; this is what keeps it
   flow.sweepAutoRelease().then(n => { if (n) { console.info('[saahaa] auto-released', n); render(); } });
   flow.sweepHoldbacks().then(n => { if (n) { console.info('[saahaa] holdbacks released', n); render(); } });
+  /* APPROVALS HAPPEN BY THEMSELVES. After any state change settles, the sweep
+     promotes whoever has earned the next tier (domain/autoverify.js). A
+     promotion changes state, which schedules one more sweep, which finds
+     nothing — so it always comes to rest. */
+  let sweepT = null;
+  const scheduleSweep = () => { clearTimeout(sweepT); sweepT = setTimeout(() => {
+    try { const made = autoverify.sweepAutoApprovals(); if (made.length) { made.forEach(m => console.info('[saahaa] auto-approved', m.name, '→ tier', m.tier)); render(); } }
+    catch (e) { console.error('[autoverify]', e); } }, 250); };
+  store.subscribe(scheduleSweep); scheduleSweep();
   startUpdateWatch((v, apply) => stickyToast(`SAAHAA ${v.version || ''} is ready.`, 'Tap to update — takes a second, nothing is lost.', apply));
   // the 90-second substitution promise, kept while the app is open
   setInterval(() => { if (flow.sweepSubstitutions()) render(); }, 15000);

@@ -9,9 +9,12 @@ take more than her whole margin. Customers pay padded prices to strangers
 with no way to verify them. **SAAHAA gives local professionals and shops a
 professional digital presence they never build or maintain, lets them keep
 100% of their quote (the platform's 8% is laid on top and paid by the
-customer), verifies every pro mechanically, holds the money until the work is
-confirmed, and runs itself for a single owner.** Full write-up:
-[docs/PROBLEM.md](docs/PROBLEM.md).
+customer), verifies every pro mechanically — and promotes them on the
+network's own evidence, not the owner's phone calls — holds the money until
+the work is confirmed, and runs itself for a single owner.** Everyone pays
+SAAHAA and SAAHAA pays everyone: every rupee enters and leaves through one
+door, everyone has a wallet, and the company's own position is read from the
+books. Full write-up: [docs/PROBLEM.md](docs/PROBLEM.md).
 
 ## Run it
 
@@ -35,7 +38,12 @@ the first accounts on a device are the ones somebody signs up. `?demo=1` loads
 an example roster and turns the market simulation on **for that page load
 only**, for local walkthroughs and for the deck capture
 (`python tools/shots.py`, which opens `?shot=<scene>&demo=1`). Nothing about
-it reaches a real device without that query string.
+it reaches a real device without that query string — and a device that was
+once opened with it drops the example roster at its next normal boot
+(`src/domain/fresh.js`, audited as `data.demoPurged`). The owner can also
+wipe a device on purpose: **Admin → System & audit → Fresh start** — type
+FRESH, re-enter the password; a snapshot is taken first, the credential and
+the dials are kept, and the counts are audited.
 
 ## Signing in as the owner
 
@@ -83,6 +91,34 @@ what client-side auth can and cannot do.
 - **Money is integer paise**, double-entry, hash-chained, and reconciles to
   zero; `src/core/money.js` is the only module allowed to do currency
   arithmetic and the build lints for float maths outside it.
+
+## What runs itself
+
+- **Approvals.** Tier 2 was always the seven-step ladder. Since 7.0, tier 3
+  *Background Checked* is granted by the system when the evidence holds — 3
+  real jobs settled cleanly, rating ≥ 4.3, no upheld dispute, 2 vouches from
+  customers who had a job settle or from same-trade Background-Checked pros
+  (one per person, ever), and the named reference confirmed by a 4-digit
+  code — and tier 4 *Certified* follows after 14 clean days at tier 3. Every
+  promotion is audited as actor `auto` with its evidence. The owner keeps a
+  kill switch and the dials (Admin → Approvals → Automation) and can still
+  approve or suspend by hand. Rules in full: [docs/AUTOMATION.md](docs/AUTOMATION.md).
+- **Wallets, for everyone.** Customers, workers and shops each have a wallet
+  on the ledger. A booking is funded from the customer's wallet first and only
+  the shortfall is collected; refunds land in the wallet; top-up and take-out
+  are one tap.
+- **One door for money.** `src/core/gateway.js` is the only module that
+  touches a payment rail: `collect()` in, `payout()` out. Today it runs in
+  `MODE = 'sim'` — a **sandbox UPI** that moves no real money and says so on
+  every screen and on every ledger leg (`via: 'upi-sim'`). Wiring Razorpay
+  means replacing that one file ([docs/PRODUCTION.md](docs/PRODUCTION.md) §3).
+- **The treasury.** Admin → Finance shows the company's position replayed
+  from the ledger, never computed: fees earned, GST held, every liability
+  (escrow, wallets, stakes, holdbacks, rider pool), money in, withdrawn,
+  remitted, and whether it reconciles. Two owner actions — Withdraw fees and
+  Remit GST — ask for the password again and are audited.
+- **A clean slate.** Production boots empty, demo residue purges itself, and
+  Fresh start is one audited, snapshot-first action away.
 
 ## Documentation
 

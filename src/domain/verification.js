@@ -70,7 +70,9 @@ const stepDone = (p, id) => !!(rec(p).steps[id] && rec(p).steps[id].done);
  */
 export function readiness(p) {
   if (!p) return { legacy: false, done: [], next: STEPS[0], complete: false, canWork: false, pct: 0 };
-  const legacy = !p.verification && (p.tier | 0) >= VERIFIED_TIER;
+  // a record that holds only a background/reference entry (no ladder steps) does not make a pro un-legacy
+  const hasSteps = !!(p.verification && p.verification.steps && Object.keys(p.verification.steps).length);
+  const legacy = !hasSteps && (p.tier | 0) >= VERIFIED_TIER;
   const done = legacy ? CORE_IDS.slice() : CORE_IDS.filter(id => stepDone(p, id));
   const next = STEPS.find(s => !done.includes(s.id)) || null;
   const complete = done.length === CORE_IDS.length;
@@ -230,10 +232,12 @@ export function requestBackground(p, { refName, refPhone, consent }) {
   if (!refName || !/^\d{10}$/.test(String(refPhone || ''))) { toast('A reference name and 10-digit number, please', 'danger'); return false; }
   patchVerification(p, v => { v.background = { refName, refPhone: String(refPhone).slice(-4), status: 'pending', at: Date.now() }; return v; });
   audit.record('verify.bgRequested', { partner: p.id }, p.userKey);
-  toast('Sent. SAAHAA will call your reference and confirm within 2 working days.');
+  toast('Saved. Send your reference their code from the Standing screen — the check completes by itself.');
   return true;
 }
 export function backgroundStatus(p) { return (rec(p).background || {}).status || null; }
+export function backgroundRecord(p) { return rec(p).background || null; }
+export function patchBackground(p, fn) { return patchVerification(p, v => { v.background = fn({ ...(v.background || {}) }); return v; }); }
 
 /** Tier 4 is earned by numbers, then confirmed by a human. */
 export function certifiedEligible(p) {

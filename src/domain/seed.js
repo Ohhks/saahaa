@@ -130,6 +130,8 @@ export async function buildSeed(opts = {}) {
   });
 
   const admin = bootstrapCredential() || await makeCredential(DEMO_PASSWORD);   // demo data, real credential
+  // stamped so a device that later boots WITHOUT ?demo=1 can recognise and drop the roster (domain/fresh.js)
+  [users, partners, shops, products].forEach(list => list.forEach(r => { r.origin = 'demo'; }));
   return { users, partners, shops, products, admin };
 }
 

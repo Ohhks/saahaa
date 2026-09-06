@@ -35,6 +35,18 @@ freeze mid-festival-week, with 200 workers unpaid.
 Note also: **Stripe India does not offer Connect's marketplace payouts** to
 Indian businesses paying Indian recipients. Do not plan around it.
 
+### What the code already does about it
+
+`src/core/gateway.js` is the **one door** money uses. Every rupee a customer
+pays enters through `collect()`; every rupee that leaves for a worker's, a
+shop's or a customer's UPI leaves through `payout()`. Nothing else in the
+product talks to a rail. Today it runs in `MODE = 'sim'`: a `collect()`
+succeeds instantly, moves no real money, and is labelled *Sandbox UPI — no
+real money moves yet* on every screen and `via: 'upi-sim'` on every ledger
+leg. The ledger, the escrow, the wallets and the treasury move exactly as
+they will with a real rail, because they never knew which rail it was. Going
+to production means changing that one file (§3), not the product.
+
 ## 2. Which gateway
 
 | | Razorpay **Route** | Cashfree **Easy Split** | Direct UPI to your own VPA |
@@ -101,6 +113,30 @@ WEBHOOK transfer.processed -> ledger entries written
 WEBHOOK settlement.processed -> your commission reaches your bank T+2
 ```
 
+### How `gateway.js` maps onto Razorpay
+
+| In the app today (`MODE 'sim'`) | With Razorpay (`MODE 'razorpay'`) |
+|---|---|
+| `collect({paise, purpose, key})` returns a receipt at once | `POST /orders` on the Worker creates a Razorpay **Order** for `paise`; Checkout opens with `key_id`; the receipt is **not** posted until the `payment.captured` webhook lands (§4). The `PAYMENT_IN` / `TOPUP` leg into `CUSTOMER:<key>` is written by the webhook handler, not the browser |
+| `payout({paise, upi, purpose, key})` returns a receipt at once | For a worker's or shop's share of an order: a **Route transfer** created at capture with `on_hold: true`, released with `PATCH /transfers/:id {on_hold:false}` when the customer confirms. For a wallet take-out (a customer's refund balance, a worker's available balance): **Razorpay Payouts** to the penny-drop-verified UPI id. The `WITHDRAW` / `PAYOUT` leg is written on `transfer.processed` / `payout.processed` |
+| `label()` says *Sandbox UPI* | *UPI · cards · net banking via Razorpay* |
+| `isSandbox()` is `true` and every screen that moves money says so | `false`; the label disappears |
+
+The purpose strings `collect()` and `payout()` already carry — `service`,
+`retail`, `topup`, `refund-out`, `payout` — are what the Worker uses to
+decide Route versus Payouts. Keep them.
+
+**The treasury's two actions become real, too.** `Withdraw fees`
+(`PLATFORM:fee → WORLD:bank`) is the settlement Razorpay makes to your current
+account, T+2 after capture: post the `FEE_WITHDRAW` leg from the
+`settlement.processed` webhook, with the settlement id in `meta`, rather than
+by hand. `Remit GST` (`PLATFORM:gst → WORLD:tax`) is the monthly GSTR-3B
+payment on the GST portal; post the `GST_REMIT` leg with the challan (CPIN)
+number when it clears. Both stay step-up protected and audited; what changes
+is that the number on the treasury screen is then the same number your bank
+and the portal show, and the *Reconciles* line is a check against the outside
+world, not only against the books.
+
 **On a ₹1,100 booking with a 15% take:**
 
 | | |
@@ -148,6 +184,13 @@ from 1% in October 2024), with no deduction for a resident individual under
 
 GitHub Pages serves static bytes; it cannot receive a webhook. You need exactly
 one piece of server-side compute.
+
+This is also the real difference between the sandbox and the rail. In `MODE
+'sim'` a `collect()` resolves the moment it is called; with Razorpay the app
+must treat a checkout as **pending** until `payment.captured` arrives here,
+and the ledger leg is posted by this handler. A customer who closes the tab
+after paying still gets their wallet credited, because the webhook does not
+need the tab.
 
 **Use Cloudflare Workers**, not Supabase Edge Functions, for this:
 

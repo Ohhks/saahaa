@@ -131,6 +131,7 @@ const SCENES = {
   async 'c00-login'()  { auth.setAuthTab('login'); auth.setAuthRole('customer'); ctx.go('auth'); },
   async 'c13-track-map'(){ const { o } = await bookWithHero('plumbing'); flow.advance(o.id, 'EN_ROUTE'); ctx.go('order', o.id);
     await sleep(300); orders.toggleMap(o.id); await sleep(2500); scrollTo('#orderMap'); },
+  async 'c15-wallet'() { login(CUSTOMER); await flow.customerTopUp(50000); ctx.go('account'); await sleep(400); scrollTo('[data-act="cwallet.topup"]'); },
   async 'c14-place'()  { login(CUSTOMER); ctx.go('home'); await sleep(300); home.openPlacePicker(); await sleep(2500); },
 
   /* ── partner ──────────────────────────────────────────────── */
@@ -152,6 +153,8 @@ const SCENES = {
   async 'p11-job'()    { const { o, partner: pr } = await bookWithHero('plumbing'); flow.advance(o.id, 'EN_ROUTE'); flow.advance(o.id, 'ARRIVED');
     loginPartner(pr.id); ctx.go('order', o.id); },
   async 'p12-shop'()   { login(SHOP_OWNER); partner.setShopTab('catalog'); ctx.go('shopadmin'); },
+  async 'p14-standing'() { const { o, partner: pr } = await bookWithHero('plumbing'); flow.advance(o.id, 'EN_ROUTE'); flow.advance(o.id, 'ARRIVED');
+    loginPartner(pr.id); ctx.go('partner'); await sleep(400); scrollTo('#refCode, #refName, #atJobs'); },
   async 'p13-place'()  { auth.setAuthTab('signup'); auth.setAuthRole('partner'); ctx.go('auth'); await sleep(2500); scrollTo('#suMap'); },
 
   /* ── admin ────────────────────────────────────────────────── */
@@ -171,6 +174,10 @@ const SCENES = {
     dispatch({ type: 'order/patch', payload: { id: o.id, patch: { otpVerified: true } } }); flow.advance(o.id, 'IN_PROGRESS');
     flow.addEvidence(o.id, 'After'); flow.markDone(o.id); await flow.confirmAndRelease(o.id, 1); await adminAt('finance'); },
   async 'a08-system'()    { await adminAt('system'); },
+  async 'a11-treasury'()   { const { o } = await bookWithHero('electrical'); flow.advance(o.id, 'EN_ROUTE'); flow.advance(o.id, 'ARRIVED');
+    flow.verifyOtp(o.id, o.otp); flow.addEvidence(o.id, 'after'); flow.markDone(o.id); await flow.confirmAndRelease(o.id, 1);
+    await adminAt('finance'); await sleep(400); scrollTo('#trAmt'); },
+  async 'a12-automation'() { await bookWithHero('plumbing'); await adminAt('approvals'); await sleep(400); scrollTo('#atJobs'); },
   async 'a09-charges'()   { await adminAt('finance'); await sleep(400); scrollTo('#pxService'); },
   async 'a10-flow'()      { await bookWithHero('plumbing'); await adminAt('people'); await sleep(400); scrollTo('[data-act="admin.flow.pick"]'); },
 };
