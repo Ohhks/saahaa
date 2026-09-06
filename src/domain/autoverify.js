@@ -82,7 +82,13 @@ export function confirmReference(p, entered) {
 }
 
 /* ── where a pro stands ─────────────────────────────────────── */
-function avgRating(p) { const rs = p.ratings || []; return rs.length ? rs.reduce((a, r) => a + r.stars, 0) / rs.length : 0; }
+/* "over those jobs": only ratings tied to a REAL job (code verified) count —
+   a seeded or imported rating with no order behind it never lifts a pro. */
+function realRatings(p) {
+  const orders = getState().orders;
+  return (p.ratings || []).filter(r => r.orderId && orders.some(o => o.id === r.orderId && o.otpVerified));
+}
+function avgRating(p) { const rs = realRatings(p); return rs.length ? rs.reduce((a, r) => a + r.stars, 0) / rs.length : 0; }
 function openDisputes(p) { return getState().disputes.filter(d => d.partnerId === p.id && d.status !== 'RESOLVED').length; }
 
 /** The tier-3 checklist, each line with have / need / ok. */
@@ -94,7 +100,7 @@ export function progress(p) {
   const lines = {
     ladder:    { ok: r.complete, have: r.done.length, need: V.CORE_IDS.length, label: 'Verification ladder complete' },
     jobs:      { ok: jobs >= A.bgJobs, have: jobs, need: A.bgJobs, label: 'Real jobs settled cleanly (code + photo)' },
-    rating:    { ok: jobs >= A.bgJobs && avg >= A.bgRating, have: +avg.toFixed(2), need: A.bgRating, label: 'Average rating' },
+    rating:    { ok: realRatings(p).length > 0 && avg >= A.bgRating, have: +avg.toFixed(2), need: A.bgRating, label: 'Average rating on those jobs' },
     disputes:  { ok: (p.disputesUpheld | 0) === 0, have: p.disputesUpheld | 0, need: 0, label: 'Upheld disputes' },
     vouches:   { ok: vouches >= A.bgVouches, have: vouches, need: A.bgVouches, label: 'Vouches from customers or same-trade pros' },
     reference: { ok: !A.bgReference || !!bg.refConfirmed, have: bg.refConfirmed ? 1 : 0, need: A.bgReference ? 1 : 0,

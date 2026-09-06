@@ -107,7 +107,21 @@ async function startAsk(catId) {
   return auction.myRequests()[0];
 }
 
-const scrollTo = sel => { const el = document.querySelector(sel); if (el) el.scrollIntoView({ block: 'center' }); };
+/* Bring a deep target into the frame WITHOUT scrolling: headless Chrome's
+   --screenshot paints a blank frame when the window is scrolled more than
+   about one viewport under virtual time. Translating the app root paints the
+   same pixels a scrolled viewport would show, reliably. Capture-only. */
+const scrollTo = sel => { const el = document.querySelector(sel); if (!el) return;
+  const y = el.getBoundingClientRect().top + window.scrollY - Math.max(0, (window.innerHeight - el.offsetHeight) / 2);
+  const app = document.getElementById('app');
+  if (app) { app.style.transform = `translateY(-${Math.max(0, Math.round(y))}px)`; app.style.willChange = 'transform'; } };
+/* Frame a block by its heading text (h2/h3/.eyebrow), heading ~90px from the top. */
+const scrollToHeading = txt => {
+  const el = [...document.querySelectorAll('h2, h3, .eyebrow, b, .cmd__title')].find(e => e.textContent.trim().toLowerCase().startsWith(txt.toLowerCase()));
+  if (!el) return;
+  const y = el.getBoundingClientRect().top + window.scrollY - 90;
+  const app = document.getElementById('app');
+  if (app) { app.style.transform = `translateY(-${Math.max(0, Math.round(y))}px)`; app.style.willChange = 'transform'; } };
 
 const SCENES = {
   /* ── customer ─────────────────────────────────────────────── */
@@ -176,9 +190,9 @@ const SCENES = {
   async 'a08-system'()    { await adminAt('system'); },
   async 'a11-treasury'()   { const { o } = await bookWithHero('electrical'); flow.advance(o.id, 'EN_ROUTE'); flow.advance(o.id, 'ARRIVED');
     flow.verifyOtp(o.id, o.otp); flow.addEvidence(o.id, 'after'); flow.markDone(o.id); await flow.confirmAndRelease(o.id, 1);
-    await adminAt('finance'); await sleep(400); scrollTo('#trAmt'); },
-  async 'a12-automation'() { await bookWithHero('plumbing'); await adminAt('approvals'); await sleep(400); scrollTo('#atJobs'); },
-  async 'a09-charges'()   { await adminAt('finance'); await sleep(400); scrollTo('#pxService'); },
+    await adminAt('finance'); await sleep(400); scrollToHeading('Treasury'); },
+  async 'a12-automation'() { await bookWithHero('plumbing'); await adminAt('approvals'); await sleep(400); scrollToHeading('Automation'); },
+  async 'a09-charges'()   { await adminAt('finance'); await sleep(400); scrollToHeading('Charges'); },
   async 'a10-flow'()      { await bookWithHero('plumbing'); await adminAt('people'); await sleep(400); scrollTo('[data-act="admin.flow.pick"]'); },
 };
 

@@ -601,7 +601,7 @@ function automation(st) {
   </div>
 
   <div class="sec">${secHead(`Promoted by the network · ${recent.length}`)}
-    ${recent.length ? `<ol class="timeline">${recent.map(e => `<li class="timeline__item">
+    ${recent.length ? `<ol class="timeline timeline--list">${recent.map(e => `<li class="timeline__item">
       <span class="timeline__dot" aria-hidden="true"></span>
       <div class="timeline__body">
         <div class="between"><b class="micro">${esc(nameOf((e.detail || {}).partner))} → ${esc(tier((e.detail || {}).tier | 0).label)}</b>
@@ -840,7 +840,7 @@ function flowTimeline(row) {
   evs.sort((a, b) => b.ts - a.ts);
   const list = evs.slice(0, FLOW_EVENTS);
   if (!list.length) return empty('Nothing recorded for this person yet.');
-  return `<ol class="timeline">${list.map(e => `<li class="timeline__item">
+  return `<ol class="timeline timeline--list">${list.map(e => `<li class="timeline__item">
     <span class="timeline__dot" aria-hidden="true"></span>
     <div class="timeline__body">
       <div class="between"><b class="micro">${esc(e.title)}</b>
@@ -1340,7 +1340,7 @@ function system(st) {
   <div class="sec">${secHead(`Audit log · ${audit.count()}`,
       `<button class="more" data-act="admin.exportaudit">Export CSV</button>`)}
     <div class="glass" style="max-height:320px;overflow-y:auto">
-      ${audit.entries({ limit: 60 }).length ? `<ol class="timeline">
+      ${audit.entries({ limit: 60 }).length ? `<ol class="timeline timeline--list">
         ${audit.entries({ limit: 60 }).map(e => `<li class="timeline__item">
           <span class="timeline__dot" aria-hidden="true"></span>
           <div class="timeline__body">

@@ -56,7 +56,9 @@ of the report (diffs, snippets for the lead, what was left undone and why).
 
 ## Test data
 
-Production starts empty. `?demo=1` loads the example roster and switches the
+Production starts empty. `?demo=1` loads the example roster into an UNSEEDED
+store only — a browser that already holds real accounts keeps them (clear the
+site data first, or use a private window). It loads the example roster and switches the
 simulated market on for that page load only; nothing about it is ever
 shipped to a real device without that query string.
 

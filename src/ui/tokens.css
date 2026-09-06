@@ -835,6 +835,9 @@ a{color:var(--brand-text);text-underline-offset:3px}
 .metricrow::-webkit-scrollbar{display:none}
 .metricrow > *{flex:0 0 auto;scroll-snap-align:start}
 .metricrow .capsule{min-width:148px}
+/* the shop cockpit's .workspace has no horizontal gutter, so the strip's edge-bleed
+   margin pushed the page 16px wide at 375 (customers, payouts, analytics tabs) */
+.workspace .metricrow{margin-left:0;margin-right:0;padding-left:0;padding-right:0}
 
 /* ---------- 15. SHEET / TOAST ---------- */
 .scrim{position:fixed;inset:0;background:var(--scrim);z-index:var(--z-sheet);
@@ -992,6 +995,11 @@ a{color:var(--brand-text);text-underline-offset:3px}
   letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--ink-3);font-weight:var(--fw-bold)}
 .moneyflow__node span{font-size:var(--fs-md);line-height:var(--lh-md);font-weight:var(--fw-black);
   color:var(--ink-1);font-variant-numeric:tabular-nums lining-nums;font-feature-settings:"tnum" 1}
+/* a pill inside a node is a label, not a figure: the span rule above made
+   "Yours after settlement" a 278px nowrap figure that widened the page at 375 */
+.moneyflow__node > *{min-width:0}
+.moneyflow__node .pill{font:var(--fw-bold) var(--fs-micro)/1.25 var(--font-ui);white-space:normal;
+  height:auto;min-height:26px;padding-top:3px;padding-bottom:3px;flex:0 1 auto;text-align:left}
 /* the arrow: a dashed gold line that travels in the direction the money goes */
 .moneyflow__arrow{position:relative;height:32px;margin:-2px 0;flex:0 0 auto}
 .moneyflow__arrow::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;
@@ -1189,6 +1197,10 @@ a{color:var(--brand-text);text-underline-offset:3px}
 
   /* the timeline turns horizontal — a journey reads left to right here */
   .timeline{flex-direction:row;align-items:flex-start}
+  /* the admin's lists (promotions, a flow journey, the audit log) borrow the
+     timeline for its dots but are lists of 20-60 entries — they must stay a
+     column here, or 20 rows lay out left-to-right and the page runs 1900px wide */
+  .timeline--list{flex-direction:column;align-items:stretch}
   .timeline__node{flex:1 1 0;min-width:0;grid-template-columns:1fr;justify-items:center;
     text-align:center;padding-bottom:0;row-gap:8px}
   .timeline__dot{grid-row:1;grid-column:1}

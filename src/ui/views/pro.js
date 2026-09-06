@@ -112,7 +112,7 @@ export function render(id) {
       ${capsule('Jobs done', String(p.completed || 0), 'through SAAHAA', 'info')}
       ${capsule('From', M.fmt(p.ask), 'his own rate', 'ok')}
     </div>
-    <p class="micro muted">${a ? ratingStars(a) + ' ' : ''}${(p.ratings || []).length} ratings · ${(p.vouches || []).length} vouches · ${km} km from you · ~${etaMins(km)} min</p>
+    <p class="micro muted">${a ? ratingStars(a) + ' ' : ''}${(p.ratings || []).length} ratings · ${(p.vouches || []).length} vouch${(p.vouches || []).length === 1 ? '' : 'es'} · ${km} km from you · ~${etaMins(km)} min</p>
     ${vouchBlock(p, s)}
 
     <div class="prosplit">

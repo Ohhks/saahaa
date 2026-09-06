@@ -499,7 +499,7 @@ export function renderShopAdmin() {
 /* EVERYONE PAYS SAAHAA, SAAHAA PAYS EVERYONE. The shop's balance is the
    ledger account SHOP:<id> — settlements land in it, payouts leave it. Read
    off the book every render, never stored, so it cannot drift. */
-const SHOP_LEG = { SETTLE_RETAIL: 'Order settled', ESCROW_RELEASE: 'Order settled', WITHDRAW: 'Sent to your UPI',
+const SHOP_LEG = { SETTLE_RETAIL: 'Order settled', ESCROW_RELEASE: 'Order settled', SHOP_PAYOUT: 'Order settled', WITHDRAW: 'Sent to your UPI',
                    TOPUP: 'Paid in', PAYOUT: 'Sent to your UPI', COMPENSATION: 'Compensation' };
 function shopDelta(e, account) {
   if (Array.isArray(e.legs)) return e.legs.filter(l => l.account === account).reduce((n, l) => n + (l.delta | 0), 0);
@@ -627,11 +627,11 @@ function priceRow(p) {
       <label class="tiny muted" style="width:38px">Price</label>
       <input class="grow" type="number" value="${(p.price / 100).toFixed(0)}" data-role="price" data-id="${p.id}"
         style="height:38px;padding:0 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);
-               background:var(--surface-2);color:var(--ink-1);font-size:15px">
+               background:var(--surface-2);color:var(--ink-1);font-size:15px;min-width:0;width:0">
       <label class="tiny muted" style="width:38px">Stock</label>
       <input class="grow" type="number" value="${p.stockQty}" data-role="stock" data-id="${p.id}"
         style="height:38px;padding:0 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);
-               background:var(--surface-2);color:var(--ink-1);font-size:15px">
+               background:var(--surface-2);color:var(--ink-1);font-size:15px;min-width:0;width:0">
     </div>
   </div>`;
 }
@@ -652,11 +652,11 @@ function catalogRow(p) {
       <label class="tiny muted" style="width:38px">Price</label>
       <input class="grow" type="number" value="${(p.price / 100).toFixed(0)}" data-role="price" data-id="${p.id}"
         style="height:38px;padding:0 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);
-               background:var(--surface-2);color:var(--ink-1);font-size:15px">
+               background:var(--surface-2);color:var(--ink-1);font-size:15px;min-width:0;width:0">
       <label class="tiny muted" style="width:38px">Stock</label>
       <input class="grow" type="number" value="${p.stockQty}" data-role="stock" data-id="${p.id}"
         style="height:38px;padding:0 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);
-               background:var(--surface-2);color:var(--ink-1);font-size:15px">
+               background:var(--surface-2);color:var(--ink-1);font-size:15px;min-width:0;width:0">
     </div>
     ${out ? '<p class="micro" style="color:var(--danger);margin-top:8px">Hidden from customers — set stock above 0.</p>' : ''}
   </div>`;
