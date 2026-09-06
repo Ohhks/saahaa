@@ -48,6 +48,11 @@ ok "no dev leftovers"
 cmp -s dist/saahaa.html dist/404.html || fail "404.html must be identical to the app"
 ok "SPA deep links will survive a hard refresh"
 
+# THE ONE A BROWSER HAS TO SEE: the built bundle boots and paints as an app, not as text.
+python tools/smoke-dist.py; SM=$?
+[ $SM -eq 1 ] && fail "the built bundle does not render as an app (tools/smoke-dist.py)"
+[ $SM -eq 2 ] && echo "  warn: no browser here - CI proves the bundle renders"
+[ $SM -eq 0 ] && ok "the built bundle boots and paints in a real browser"
 python tools/check-version.py    || fail "version / CHANGELOG mismatch"
 python tools/lint-migrations.py  || fail "migration lint failed"
 node   tools/test-node.mjs       || fail "domain tests failed at the gate"

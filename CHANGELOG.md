@@ -6,6 +6,20 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [6.9.1] — 2026-09-07 — "Seen by a browser"
+
+### Fixed
+- **The live site rendered its own JavaScript as page text.** The single-file
+  bundle is one inline `<script>`; a security test carried the literal string
+  `</script>`, the HTML parser ended the script there, and everything after it
+  was painted as text — floating `${…}` chips over every screen. Every static
+  gate passed. `tools/build.py` now escapes `</script` and `<!--` inside the
+  inlined code, and the test no longer spells the close tag.
+- **`tools/smoke-dist.py`** opens the built bundle in a real headless browser
+  and fails the pre-flight if the app does not boot and paint (raw template
+  code on the page, no controls, a cut script). CI runs it on every push; a
+  laptop without Chrome gets a warning, not a pass.
+
 ## [6.9.0] — 2026-09-06 — "Nothing borrowed"
 
 The release that stops SAAHAA describing itself as a preview of something.

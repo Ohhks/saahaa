@@ -208,6 +208,12 @@ def build():
         parts.append(f"/* ==== {rel} ==== */\n__def({rel!r}, function(exports){{\n{body}\n}});")
     parts.append(f"__req('app.js');")
     js = '\n\n'.join(parts)
+    # The bundle is ONE inline <script>. An HTML parser ends a script at the first
+    # '</script' it sees - even inside a JS string (a test once carried one and the
+    # live site rendered the rest of the code as page text). '<\\/' is the same
+    # characters to JavaScript and invisible to the HTML parser; '<!--' likewise.
+    js = re.sub(r'</(script)', r'<\\/\1', js, flags=re.I).replace('<!--', '<\\!--')
+    assert re.search(r'</script', js, re.I) is None, 'a </script> survived escaping'
 
     html = read(os.path.join(ROOT, 'index.html'))
     html = re.sub(r'\s*<link rel="stylesheet" href="src/ui/[^"]*">', '', html)

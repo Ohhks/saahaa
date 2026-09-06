@@ -205,7 +205,7 @@ describe('security · only http and https ever become a link', () => {
     }
   });
   it('data:, blob:, vbscript: and file: are refused', () => {
-    expect(S.isSafeUrl('data:text/html,<script>alert(1)</script>')).toBeFalse();
+    expect(S.isSafeUrl('data:text/html,<scr' + 'ipt>alert(1)</scr' + 'ipt>')).toBeFalse();   // never a literal close tag: the bundle is one inline script
     expect(S.isSafeUrl('blob:https://saahaa.in/abc')).toBeFalse();
     expect(S.isSafeUrl('vbscript:msgbox(1)')).toBeFalse();
     expect(S.isSafeUrl('file:///etc/passwd')).toBeFalse();
