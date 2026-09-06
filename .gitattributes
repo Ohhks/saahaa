@@ -1,0 +1,6 @@
+# One line-ending policy for every clone, on every OS: LF in the repo, LF on checkout.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary

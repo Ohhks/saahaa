@@ -32,6 +32,9 @@ if not CHROME:
 
 m = json.load(io.open(os.path.join(DECK, 'manifest.json'), encoding='utf-8'))
 scenes = [os.path.splitext(os.path.basename(s['image']))[0] for sec in m['sections'] for s in sec['slides']]
+# a manifest image named <scene>-d.png is the DESKTOP variant of <scene>: the --desktop pass makes it
+# from the base scene; it is never a scene of its own (shooting it as one gave <scene>-d-d.png junk)
+scenes = list(dict.fromkeys(s[:-2] if s.endswith('-d') else s for s in scenes))
 DESKTOP = '--desktop' in sys.argv          # photograph everything at desktop size, suffixed -d
 want = [a for a in sys.argv[1:] if not a.startswith('--')]
 if want:

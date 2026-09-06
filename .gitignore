@@ -1,2 +1,12 @@
+# build output — CI builds its own from tools/build.py --site
 dist/
+# intermediate deck fragment (the deck itself is docs/presentation.html)
+docs/deck/presentation-artifact.html
+# tooling and OS noise
+__pycache__/
+*.pyc
 *.log
+.claude/
+node_modules/
+.DS_Store
+Thumbs.db

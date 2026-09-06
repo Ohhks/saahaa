@@ -16,8 +16,11 @@ confirmed, and runs itself for a single owner.** Full write-up:
 ## Run it
 
 ```bash
-python -m http.server 8772 --directory C:\Users\siidhu\saahaa
+python tools/serve.py 8772
 ```
+
+(`tools/serve.py` sends `Cache-Control: no-cache`; a plain `http.server` lets the
+browser keep stale modules after an update.)
 
 | | |
 |---|---|

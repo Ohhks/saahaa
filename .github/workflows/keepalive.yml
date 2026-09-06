@@ -26,8 +26,8 @@ jobs:
         run: |
           set -e
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "::error::SUPABASE_URL / SUPABASE_ANON_KEY secrets are not set. Supabase WILL pause."
-            exit 1
+            echo "::warning::SUPABASE_URL / SUPABASE_ANON_KEY secrets are not set: Supabase is not wired yet, nothing to keep alive. Set them the day the backend goes live (docs/SETUP.md)."
+            exit 0
           fi
           CODE=$(curl -s -o /tmp/ka.json -w '%{http_code}' \
             -H "apikey: ${SUPABASE_ANON_KEY}" \
