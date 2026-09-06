@@ -68,6 +68,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
       - name: The live site must actually be the app
         run: |
           set -e
@@ -83,3 +86,5 @@ jobs:
           [ "$CODE" = "200" ] || { echo "::error::live site returned $CODE"; exit 1; }
           grep -q 'SAAHAA' /tmp/live.html || { echo "::error::live page missing app marker"; exit 1; }
           echo "Live site OK ($(wc -c < /tmp/live.html) bytes)."
+          # and it must PAINT as an app in a real browser, not as text
+          python tools/smoke-dist.py "$URL"

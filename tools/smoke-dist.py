@@ -32,12 +32,13 @@ CHROME = os.environ.get('CHROME') or next((c for c in CANDIDATES if os.path.exis
 if not CHROME:
     print('smoke-dist: no Chrome/Edge found — cannot prove the bundle renders')
     sys.exit(2)
-if not os.path.exists(BUNDLE):
+if not (len(sys.argv) > 1 and sys.argv[1].startswith('http')) and not os.path.exists(BUNDLE):
     print('smoke-dist: dist/saahaa.html missing — run tools/build.py first')
     sys.exit(1)
 
 profile = tempfile.mkdtemp(prefix='saahaa-smoke-')
-url = 'file:///' + BUNDLE.replace('\\', '/').lstrip('/')
+LIVE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].startswith('http') else None
+url = LIVE or 'file:///' + BUNDLE.replace('\\', '/').lstrip('/')
 cmd = [CHROME, '--headless=new', '--disable-gpu', '--no-first-run', '--no-sandbox', '--disable-extensions',
        '--allow-file-access-from-files', f'--user-data-dir={profile}',
        '--virtual-time-budget=6000', '--window-size=390,844', '--dump-dom', url]
@@ -67,4 +68,4 @@ if problems:
     for p in problems:
         print('  ·', p)
     sys.exit(1)
-print(f'smoke-dist: OK — bundle boots and paints ({len(dom)//1024} KB DOM, {visible.count("data-act=")} controls)')
+print(f'smoke-dist: OK — {"live site" if LIVE else "bundle"} boots and paints ({len(dom)//1024} KB DOM, {visible.count("data-act=")} controls)')
