@@ -312,6 +312,21 @@ function wireActions() {
       `<button class="chip" data-act="wallet.topup.do" data-id="${d.id}" data-amt="${r * 100}">₹${r}</button>`).join('')}</div>`));
   A('wallet.topup.do',  d => flow.walletTopUp(d.id, Number(d.amt)).then(() => { closeSheet(); render(); }));
   A('wallet.withdraw',  d => flow.walletWithdraw(d.id, Number(d.amt)).then(render));
+  /* ── contracts for the parallel build: each action calls an export the
+        owning view provides (auth/home/orders/admin). Registered here so the
+        views never touch app.js. ── */
+  A('auth.locate',        () => auth.useMyLocation && auth.useMyLocation());
+  A('auth.geocode',       () => auth.searchPlace && auth.searchPlace());
+  A('auth.place',         d => auth.choosePlace && auth.choosePlace(d));
+  A('area.locate',        () => home.useMyLocation && home.useMyLocation());
+  A('area.search',        () => home.searchPlace && home.searchPlace());
+  A('area.choose',        d => { home.choosePlace && home.choosePlace(d); render(); });
+  A('order.map',          d => ordersView.toggleMap && ordersView.toggleMap(d.id));
+  A('admin.pricing.push', () => admin.pushPricing && admin.pushPricing());
+  A('admin.pricing.reset',() => admin.resetPricing && admin.resetPricing());
+  A('admin.flow.pick',    d => { admin.pickFlow && admin.pickFlow(d.key); render(); });
+  A('admin.flow.filter',  d => { admin.filterFlow && admin.filterFlow(d.role); render(); });
+  A('admin.map',          () => admin.refreshMap && admin.refreshMap());
   A('bid.open', d => {
     const p = getState().partners.find(x => x.id === d.pid);
     if (p) ask.bidSheet(d.id, p);
@@ -521,7 +536,12 @@ async function boot() {
   if (!mig.state.createdAt) store.dispatch({ type: 'meta/born', payload: Date.now() });
 
   if (!store.getState().seeded) {
-    const seed = await buildSeed();
+    /* Production starts EMPTY. The demo seed (example customers, pros, shops,
+       products) loads only when explicitly asked for: ?demo=1 — used by the
+       deck capture and local testing, never by a real device. */
+    const demo = new URLSearchParams(location.search).get('demo') === '1' || new URLSearchParams(location.search).get('shot');
+    const seed = demo ? await buildSeed() : await buildSeed({ empty: true });
+    if (demo) flags.set('SIM_MARKET', true);
     store.dispatch({ type: 'seed/users',    payload: seed.users });
     store.dispatch({ type: 'seed/partners', payload: seed.partners });
     store.dispatch({ type: 'seed/shops',    payload: seed.shops });

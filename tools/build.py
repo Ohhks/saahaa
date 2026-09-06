@@ -235,6 +235,11 @@ def build():
         io.open(os.path.join(DIST, 'index.html'), 'w', encoding='utf-8').write(html)
         io.open(os.path.join(DIST, '404.html'),   'w', encoding='utf-8').write(html)
         io.open(os.path.join(DIST, '.nojekyll'),  'w', encoding='utf-8').write('')
+        # the vendored map library (no CDN under our CSP) ships with the site
+        vdir = os.path.join(ROOT, 'vendor')
+        if os.path.isdir(vdir):
+            import shutil
+            shutil.copytree(vdir, os.path.join(DIST, 'vendor'), dirs_exist_ok=True)
         for asset in ('manifest.json', 'icon.svg', 'sw.js'):
             src_p = os.path.join(ROOT, asset)
             if os.path.exists(src_p):

@@ -136,7 +136,7 @@ export function postRequest({ catId, sub, note, complexity = 'simple', budgetBan
   };
   dispatch({ type: 'request/add', payload: req });
   audit.record('request.posted', { id: req.id, catId, target: band.target }, s.key);
-  scheduleSimulatedBids(req);
+  if (flags.isOn('SIM_MARKET')) scheduleSimulatedBids(req);   // demos only; real pros bid from their phones
   return req;
 }
 

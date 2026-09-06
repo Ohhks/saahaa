@@ -23,6 +23,7 @@
    separate, visible delivery fee — never baked into item prices. */
 
 import * as M from '../core/money.js';
+import { getPricing } from './settings.js';
 import { find } from '../core/registry.js';
 
 /* ── constants ─────────────────────────────────────────────── */
@@ -30,7 +31,9 @@ import { find } from '../core/registry.js';
    quote D is paid to the worker in full; SAAHAA's charge is 8% laid on top of
    it and paid by the customer. 8% is the whole of the platform's take on a
    service — GST on that fee is remitted, not kept. */
-export const SERVICE_MARKUP = 0.08;   // customer pays D x 1.08
+export const SERVICE_MARKUP = 0.08;   // launch default; the LIVE value is getPricing().serviceMarkupPct / 100
+export const liveMarkup = () => getPricing().serviceMarkupPct / 100;
+export const liveLoyaltyMarkup = () => getPricing().loyaltyMarkupPct / 100;
 export const GST_RATE       = 0.18;   // GST on the platform fee
 export const LOYALTY_MARKUP = 0.06;   // Tier-4 certified partners: 8% -> 6%
 export const RETAIL_FEE_FLOOR = 500;  // Rs.5 minimum per retail order
@@ -53,7 +56,7 @@ export const RIDER_DISPATCH_CUT = 500; // Rs.5 of the delivery fee is SAAHAA's
  */
 export function quoteService(dealPaise, opts = {}) {
   const D = Math.max(0, dealPaise | 0);
-  const markup = opts.markup ?? SERVICE_MARKUP;
+  const markup = opts.markup ?? liveMarkup();
   const uplift = M.pct(D, markup * 100);              // the whole +8%
   const platformFee = Math.round(uplift / (1 + GST_RATE));
   const gst = uplift - platformFee;                   // remainder: never drops a paisa
@@ -114,7 +117,8 @@ export function compareWithApps(dealPaise) {
 /* ── RETAIL quote ──────────────────────────────────────────── */
 export function deliveryFee(km, mode) {
   if (mode === 'pickup') return 0;
-  const band = DELIVERY_BANDS.find(b => km <= b.maxKm) || DELIVERY_BANDS[DELIVERY_BANDS.length - 1];
+  const bands = getPricing().deliveryBands;
+  const band = bands.find(b => km <= b.maxKm) || bands[bands.length - 1];
   return band.fee;
 }
 
@@ -124,8 +128,9 @@ export function deliveryFee(km, mode) {
  */
 export function quoteRetail(lines, opts = {}) {
   const cat = find('category', opts.catId) || {};
-  const takePct = opts.firstOrders ? 0 : (cat.takePct ?? 3);
-  const cap = cat.takeCapPaise ?? 2500;
+  const P = getPricing();
+  const takePct = opts.firstOrders ? 0 : (cat.takePct ?? P.retailTakePct);
+  const cap = cat.takeCapPaise ?? P.retailTakeCapPaise;
 
   const itemsTotal = lines.reduce((sum, l) => {
     const qty = l.pickedQty != null ? l.pickedQty : l.qty;
@@ -134,7 +139,7 @@ export function quoteRetail(lines, opts = {}) {
 
   let platformFee = M.pct(itemsTotal, takePct);
   platformFee = Math.min(platformFee, cap);
-  if (itemsTotal > 0) platformFee = Math.max(platformFee, opts.firstOrders ? 0 : RETAIL_FEE_FLOOR);
+  if (itemsTotal > 0) platformFee = Math.max(platformFee, opts.firstOrders ? 0 : P.retailFeeFloorPaise);
   // the floor must never exceed the basket, or the shop is paid a negative
   // amount — which would trip the ledger's fatal non-negative invariant
   platformFee = Math.min(platformFee, itemsTotal);
@@ -154,8 +159,8 @@ export function quoteRetail(lines, opts = {}) {
   const customerDelivery = isFree ? 0 : bandFee;
   const riderCost = mode === 'rider' ? bandFee : 0;
 
-  const riderPayout = Math.max(0, riderCost - RIDER_DISPATCH_CUT);
-  const dispatchCut = Math.min(riderCost, RIDER_DISPATCH_CUT);
+  const riderPayout = Math.max(0, riderCost - getPricing().riderDispatchCutPaise);
+  const dispatchCut = Math.min(riderCost, getPricing().riderDispatchCutPaise);
   const shopDeliveryShare = mode === 'self' ? customerDelivery : 0;
   const shopAbsorbs = isFree ? riderCost : 0;
   const delivery = customerDelivery;

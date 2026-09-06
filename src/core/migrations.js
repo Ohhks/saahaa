@@ -9,6 +9,7 @@ import { registerMigration } from './migrate.js';
 import { defaultState } from '../domain/state.js';
 import { toPaise } from './money.js';
 import { depthRoster } from '../domain/seed.depth.js';
+import { bootstrapCredential } from './adminauth.js';
 
 /* v0 -> v6 : anything with no recognisable schema starts fresh but keeps
    any accounts we can salvage, so a returning user is not logged out. */
@@ -118,6 +119,23 @@ registerMigration({
   },
   verify: s => s.schemaVersion === 7 && Array.isArray(s.requests) && Array.isArray(s.bids)
             && s.partners.filter(p => p.cat === 'plumbing').length >= 6,
+});
+
+/* v7 -> v8 : the owner's dials + the owner's credential.
+   Adds the settings slice (null = launch defaults) and replaces any demo or
+   missing admin credential with the bootstrap hash from config. A device that
+   already rotated its password (changedAt > 0, not demo) keeps its own. */
+registerMigration({
+  from: 7, to: 8, label: 'v7 -> v8 (settings dials, owner credential)',
+  up(old) {
+    const next = { ...old, schemaVersion: 8 };
+    next.settings = old.settings && typeof old.settings === 'object' ? old.settings : { pricing: null };
+    const a = old.admin || {};
+    const boot = bootstrapCredential();
+    if (boot && (!a.setupDone || a.isDemo || !a.hash)) next.admin = { ...a, ...boot };
+    return next;
+  },
+  verify: s => s.schemaVersion === 8 && s.settings && 'pricing' in s.settings && !!(s.admin && s.admin.setupDone),
 });
 
 /* ── id remaps: retired ids must MAP, never disappear ─────────

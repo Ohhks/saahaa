@@ -25,10 +25,35 @@ export const AREAS = [
 ];
 export const AREA_NAMES = AREAS.map(a => a.n);
 
+/* Every named Hyderabad area now also has real coordinates, so a place can be
+   a name (legacy) or a {lat, lng} object (the map), and the distance between
+   any two is the same great-circle number either way. Anywhere in the world
+   works: a place with coordinates never needs to be in this table. */
+export const AREA_GEO = {
+  'Madhapur': [17.4486, 78.3908], 'Ameerpet': [17.4375, 78.4483], 'Jubilee Hills': [17.4325, 78.4073],
+  'Kondapur': [17.4622, 78.3568], 'Gachibowli': [17.4401, 78.3489], 'Banjara Hills': [17.4156, 78.4347],
+  'Kukatpally': [17.4849, 78.4138], 'Miyapur': [17.4969, 78.3612], 'Begumpet': [17.4440, 78.4677],
+  'Secunderabad': [17.4399, 78.4983], 'LB Nagar': [17.3457, 78.5522], 'Uppal': [17.4056, 78.5591],
+};
+export const geoOf = place => {
+  if (!place) return null;
+  if (typeof place === 'object' && place.lat != null && place.lng != null) return { lat: +place.lat, lng: +place.lng };
+  const g = AREA_GEO[String(place)]; return g ? { lat: g[0], lng: g[1] } : null;
+};
+export const nameOf = place => typeof place === 'string' ? place : (place && (place.label || place.area)) || 'your area';
+export function haversineKm(a, b) {
+  const R = 6371, toR = d => d * Math.PI / 180;
+  const dLat = toR(b.lat - a.lat), dLng = toR(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toR(a.lat)) * Math.cos(toR(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
 export function kmBetween(a, b) {
-  const A = AREAS.find(x => x.n === a) || AREAS[0];
-  const B = AREAS.find(x => x.n === b) || AREAS[0];
-  return +(Math.sqrt((A.x - B.x) ** 2 + (A.y - B.y) ** 2) * 1.1 + 0.4).toFixed(1);
+  const A = geoOf(a), B = geoOf(b);
+  if (A && B) return +(haversineKm(A, B) + 0.4).toFixed(1);     // +0.4: the last street is never a straight line
+  // no coordinates on either side: the old planar table, so nothing seeded ever breaks
+  const PA = AREAS.find(x => x.n === nameOf(a)) || AREAS[0];
+  const PB = AREAS.find(x => x.n === nameOf(b)) || AREAS[0];
+  return +(Math.sqrt((PA.x - PB.x) ** 2 + (PA.y - PB.y) ** 2) * 1.1 + 0.4).toFixed(1);
 }
 export const etaMins = km => Math.max(6, Math.round(km * 3.2 + 8));
 

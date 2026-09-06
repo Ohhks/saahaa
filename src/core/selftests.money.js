@@ -5,7 +5,7 @@
 import { describe, it, expect } from './selftest.js';
 import * as L from '../domain/ledger.js';
 import * as BID from '../domain/bidding.js';
-import { quoteService, releaseService } from '../domain/pricing.js';
+import { quoteService, releaseService, GST_RATE } from '../domain/pricing.js';
 
 /* ── LEDGER ────────────────────────────────────────────────── */
 describe('ledger · nothing is created and nothing vanishes', () => {
@@ -288,5 +288,37 @@ describe('worker wallet · the stake locks at start and returns in full', () => 
     expect(WL.holdbackDue(legs, now).map(e => e.id)).toEqual(['h1']);
     legs.push({ id: 'r1', kind: 'HOLDBACK_RELEASE', amountPaise: 5000, partyA: 'HOLDBACK:' + P, partyB: 'PARTNER:' + P, ts: now, meta: { of: 'h1' } });
     expect(WL.holdbackDue(legs, now)).toHaveLength(0);
+  });
+});
+
+/* ── the owner's dials ──────────────────────────────────────── */
+import * as S from '../domain/settings.js';
+describe('settings · the owner dials', () => {
+  it('defaults are the launch economics', () => {
+    const P = S.DEFAULT_PRICING;
+    expect(P.serviceMarkupPct).toBe(8); expect(P.retailTakePct).toBe(3); expect(P.deliveryBands.length).toBe(4);
+  });
+  it('validation refuses nonsense and keeps the certified rate under the standard one', () => {
+    expect(S.validatePricing({ serviceMarkupPct: 45 }).ok).toBeFalse();
+    expect(S.validatePricing({ serviceMarkupPct: 'x' }).ok).toBeFalse();
+    expect(S.validatePricing({ serviceMarkupPct: 8, loyaltyMarkupPct: 9 }).ok).toBeFalse();
+    expect(S.validatePricing({ serviceMarkupPct: 10, retailTakeCapPaise: 3000 }).ok).toBeTrue();
+  });
+  it('a pushed service rate changes the next quote, with GST still 18% of the fee', () => {
+    const before = quoteService(100000);
+    const r = S.pushPricing({ serviceMarkupPct: 10 }, 'test');
+    expect(r.ok).toBeTrue();
+    const after = quoteService(100000);
+    expect(after.customerPays).toBe(110000);
+    expect(after.workerPayout).toBe(100000);
+    expect(Math.abs(after.gst - Math.round(after.platformFee * GST_RATE)) <= 1).toBeTrue();
+    S.pushPricing({ serviceMarkupPct: 8 }, 'test');
+    expect(quoteService(100000).customerPays).toBe(before.customerPays);
+  });
+  it('delivery bands are sorted and always end at 999 km', () => {
+    const r = S.validatePricing({ deliveryBands: [{ maxKm: 6, fee: 3900 }, { maxKm: 2, fee: 1900 }] });
+    expect(r.ok).toBeTrue();
+    expect(r.clean.deliveryBands[0].maxKm).toBe(2);
+    expect(r.clean.deliveryBands[r.clean.deliveryBands.length - 1].maxKm).toBe(999);
   });
 });

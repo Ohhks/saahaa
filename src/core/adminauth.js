@@ -18,6 +18,7 @@
    asking for it to be changed. changePassword() replaces it for good. */
 
 import * as persist from './persist.js';
+import { ADMIN_BOOTSTRAP } from './config.js';
 import * as audit from './audit.js';
 import { sha256 } from './crypto.js';
 
@@ -26,7 +27,13 @@ const GATE_KEY = 'SAAHAA_ADMIN_GATE';
 const IDLE_MS  = 15 * 60 * 1000;
 const ABS_MS   = 8 * 60 * 60 * 1000;
 export const STEPUP_THRESHOLD = 500000;   // ₹5,000 in paise
-export const DEMO_PASSWORD = 'saahaa123'; // seeded; change in Admin → System
+export const DEMO_PASSWORD = 'saahaa123'; // retired: any state still carrying it is replaced at boot
+export const ADMIN_USERNAME = (ADMIN_BOOTSTRAP && ADMIN_BOOTSTRAP.username) || 'admin';
+/** The credential a fresh device starts with — a hash, never a password. */
+export const bootstrapCredential = () => ADMIN_BOOTSTRAP && ADMIN_BOOTSTRAP.hash
+  ? { salt: ADMIN_BOOTSTRAP.salt, hash: ADMIN_BOOTSTRAP.hash, iterations: ADMIN_BOOTSTRAP.iterations, weak: false,
+      changedAt: 0, setupDone: true, isDemo: false, bootstrapVersion: ADMIN_BOOTSTRAP.version || 1 }
+  : null;
 
 const ITER = 250000;
 
@@ -86,7 +93,7 @@ export async function login(username, password, cred) {
     audit.record(audit.ACTIONS.ADMIN_LOGIN_FAIL, { reason: g.reason, waitMs: g.waitMs }, username);
     return { ok: false, reason: g.reason, waitMs: g.waitMs };
   }
-  if (String(username).trim().toLowerCase() !== 'admin') {
+  if (String(username).trim().toLowerCase() !== ADMIN_USERNAME.toLowerCase()) {
     onFail();
     audit.record(audit.ACTIONS.ADMIN_LOGIN_FAIL, { reason: 'user' }, username);
     return { ok: false, reason: 'bad' };

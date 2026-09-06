@@ -59,7 +59,7 @@ export async function bookService({ catId, partner, sub, deal, slot }) {
 
   const order = {
     id: nid('ord'), kind: 'service', catId, sub: sub || null,
-    customerKey: s.key, customerName: s.name, customerArea: s.area,
+    customerKey: s.key, customerName: s.name, customerArea: s.area, customerLoc: s.loc || null,
     partnerId: partner.id, partnerName: partner.name, partnerArea: partner.area,
     km, eta: etaMins(km),
     deal: q.deal, customerPays: q.customerPays, platformFee: q.platformFee, gst: q.gst,
@@ -386,7 +386,7 @@ export async function placeRetailOrder(mode = 'rider') {
   const now = Date.now();
   const order = {
     id: nid('ord'), kind: 'retail', catId: q.shop.catId, shopId: q.shop.id, shopName: q.shop.name,
-    customerKey: s.key, customerName: s.name, customerArea: s.area,
+    customerKey: s.key, customerName: s.name, customerArea: s.area, customerLoc: s.loc || null,
     lines: cart.lines.map(l => ({ ...l, pickedQty: null, status: 'pending' })),
     itemsTotal: q.itemsTotal, deliveryFee: q.deliveryFee, customerPays: q.customerPays,
     platformFee: q.platformFee, gst: q.platformFeeGst, shopPayout: q.shopPayout,

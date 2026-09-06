@@ -67,3 +67,18 @@ export function backendMode() {
   return persist.read('SAAHAA_BACKEND', 'auto');
 }
 export const setBackendMode = m => persist.write('SAAHAA_BACKEND', m);
+
+/* ── the owner's credential ─────────────────────────────────────
+   The PASSWORD IS NOT HERE. This is a PBKDF2-SHA256 hash (250,000 rounds)
+   over a random salt; a login is verified by re-deriving and comparing.
+   It bootstraps the admin account on a fresh device and replaces any demo
+   credential. Rotate it from Admin → System & audit → change password (that
+   writes a new hash into state); to rotate the bootstrap itself run
+   `node tools/admin-cred.mjs '<new password>'` and paste the result here. */
+export const ADMIN_BOOTSTRAP = {
+  username: 'siidhartha12',
+  salt: '4da0f76dcbf7f8a102f6eb757c3d46d6',
+  hash: '895883bb11300d91f5bcf91234e0c44b7a0627a0017203b0cd6a975e982bbe14',
+  iterations: 250000,
+  version: 1,
+};

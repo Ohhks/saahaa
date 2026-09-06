@@ -25,6 +25,7 @@ export function defaultState() {
     chats:    {},
     agg:      { serviceOrders:0, retailOrders:0, gmv:0, revenue:0, gst:0, refunds:0, escrow:0, saved:0 },
     admin:    { setupDone:false, salt:'', iterations:0, hash:'', changedAt:0 },
+    settings: { pricing: null },   // the owner's dials; null = launch defaults (domain/settings.js)
     seeded:   false,
   };
 }
@@ -163,6 +164,10 @@ register('reducer', { id:'chats', slice:'chats', reduce(s = {}, a) {
 
 register('reducer', { id:'agg', slice:'agg', reduce(s = {}, a) {
   return a.type === 'agg/bump' ? { ...s, ...a.payload } : s;
+}});
+
+register('reducer', { id:'settings', slice:'settings', reduce(s = { pricing: null }, a) {
+  return a.type === 'settings/set' ? { ...s, ...a.payload } : s;
 }});
 
 register('reducer', { id:'admin', slice:'admin', reduce(s = {}, a) {

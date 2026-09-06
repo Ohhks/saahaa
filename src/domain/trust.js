@@ -3,6 +3,7 @@
    something they can feel, or nobody climbs it. */
 
 import * as M from '../core/money.js';
+import { getPricing } from './settings.js';
 
 /* ── verification ladder ───────────────────────────────────── */
 export const TIERS = [
@@ -111,7 +112,8 @@ export function escrowTier(order, partner) {
 
 /* effective platform markup — Tier-4 loyalty rebate is the ONLY discount */
 export function markupFor(partner) {
-  return (partner && (partner.tier | 0) >= 4) ? 0.06 : 0.08;
+  const P = getPricing();
+  return ((partner && (partner.tier | 0) >= 4) ? P.loyaltyMarkupPct : P.serviceMarkupPct) / 100;
 }
 
 /* rating tag chips (two-sided) */

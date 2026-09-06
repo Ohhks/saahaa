@@ -5,7 +5,7 @@
 import { sha256 } from '../core/crypto.js';
 import { nid } from '../core/id.js';
 import { toPaise } from '../core/money.js';
-import { makeCredential, DEMO_PASSWORD } from '../core/adminauth.js';
+import { bootstrapCredential, makeCredential, DEMO_PASSWORD } from '../core/adminauth.js';
 import { byCategory } from './starter-catalog.js';
 
 const CUSTOMERS = [
@@ -52,7 +52,11 @@ import { depthRoster } from './seed.depth.js';
 
 const jitter = (base, lo, hi) => Math.round(base * (lo + Math.random() * (hi - lo)));
 
-export async function buildSeed(now = Date.now()) {
+export async function buildSeed(opts = {}) {
+  const now = typeof opts === 'number' ? opts : Date.now();
+  /* PRODUCTION STARTS EMPTY. No example customers, pros, shops or products —
+     only the owner's credential. The demo roster below is for ?demo=1. */
+  if (opts && opts.empty) return { users: [], partners: [], shops: [], products: [], admin: bootstrapCredential() || await makeCredential(DEMO_PASSWORD) };
   const pass = await sha256('123');
   const users = [], partners = [], shops = [], products = [];
 
@@ -125,7 +129,7 @@ export async function buildSeed(now = Date.now()) {
     });
   });
 
-  const admin = await makeCredential(DEMO_PASSWORD);
+  const admin = bootstrapCredential() || await makeCredential(DEMO_PASSWORD);   // demo data, real credential
   return { users, partners, shops, products, admin };
 }
 
