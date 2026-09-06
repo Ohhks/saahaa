@@ -562,13 +562,15 @@ export function render() {
       </div>` : ''}
 
       <div class="sec cmd glass glass--gold">
-        <p class="eyebrow">The other side of the circle</p>
-        <b class="cmd__title">Run a shop or work a trade?</b>
-        <p class="cmd__sub">List your services or your products. You keep 100% of a service quote;
-          shops pay 3–5%, not 25%.</p>
-        <button class="btn btn--primary btn--block cmd__action" style="margin-top:14px" data-act="partner.join">
-          Become a SAAHAA partner
-        </button>
+        <div class="cmd__body">
+          <p class="eyebrow">The other side of the circle</p>
+          <b class="cmd__title">Run a shop or work a trade?</b>
+          <p class="cmd__sub">List your services or your products. You keep 100% of a service quote;
+            shops pay 3–5%, not 25%.</p>
+        </div>
+        <div class="cmd__action">
+          <button class="btn btn--primary" data-act="partner.join">Become a SAAHAA partner</button>
+        </div>
       </div>
     `}
 
