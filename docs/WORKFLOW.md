@@ -59,3 +59,31 @@ of the report (diffs, snippets for the lead, what was left undone and why).
 Production starts empty. `?demo=1` loads the example roster and switches the
 simulated market on for that page load only; nothing about it is ever
 shipped to a real device without that query string.
+
+## The agents, by name — the roster used for 6.9.0 "Nothing borrowed"
+
+Every release uses the same five roles. The brief for each is written fresh;
+the role does not change.
+
+| Role | Owns | Never touches | Reports |
+|---|---|---|---|
+| **Lead** (the AI's own session) | foundations: state slices, domain modules, `ui/map.js`-style contracts, `app.js`, CSP, credentials, git | — | the release itself |
+| **Builder(s)** — e.g. *auth + maps + header*, *admin console* | the named view files in the brief | `app.js`, engine, other builders' files | exports added, ids and `data-act`s added, snippets the lead must paste into `app.js`, what was left undone |
+| **Security** | `core/security.js`, `core/selftests.security.js`, `docs/SECURITY.md` | views, `app.js` | findings by file:line with the fix, tests written, anything it saw that it could not touch |
+| **Cleanup** | copy and docs, removal of demo/example material | engine, credentials | a list of what it removed and what it wants the lead to change in lead-owned files |
+| **Guardian** | `src/ui/**` fixes, `docs/TEST-REPORT.md` | `app.js`, engine, `index.html`, tools, git | the matrix: PASS / FIXED (file:line) / BLOCKED (file:line + snippet) |
+
+Rules that held for 6.9.0 and hold for every release after it:
+
+- A builder that needs an engine change does not make it. It reports the
+  snippet; the lead lands it, tests it, refreshes `../saahaa02`.
+- Two agents never own one file. When a finding lands in another agent's file
+  (the security review found two HTML sinks in `ui/map.js` and `app.js`), the
+  lead applies it after the build wave.
+- The guardian runs last and runs alone, so its browser is looking at the
+  integrated product, not at five moving targets.
+- The lead runs the four gates in order before every commit:
+  `node tools/test-node.mjs` → `node tools/guard-ui.mjs` →
+  `python tools/build.py --site` (0 lint problems) → `bash tools/preflight.sh`.
+- The deck is re-shot after the guardian, never before, because it photographs
+  the real product.

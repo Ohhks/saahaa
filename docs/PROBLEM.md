@@ -46,8 +46,9 @@ against: *"Why can't shop owners create websites without coding knowledge?"
    receives ₹1,000; the customer pays ₹1,080; the platform earns ₹67.80 and
    remits ₹12.20 GST. Against a 25% app the worker earns ₹250 more per
    ₹1,000 and the customer still pays less than the padded price. Over
-   5,000 simulated orders: customers saved ₹11.2 lakh, pros and shops earned
-   ₹16.9 lakh more. *(`domain/pricing.js`, `tools/simulate.mjs`)*
+   a 5,000-order model run through the shipping pricing engine: customers
+   saved ₹11.2 lakh, pros and shops earned ₹16.9 lakh more.
+   *(`domain/pricing.js`, `tools/simulate.mjs`)*
 
 3. **Shops list their own products in minutes** from a ready list, pay 3–5%
    capped — never more than their margin — and nothing on their first 30

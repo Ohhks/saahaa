@@ -161,10 +161,50 @@ To resume, set it back to `'false'`.
 
 ---
 
-## 7. Someone reports a bug you cannot reproduce
+## 7. You cannot get into the admin
+
+The username is **`siidhartha12`**. The password is yours and is written down
+nowhere in this repository — `ADMIN_BOOTSTRAP` in `src/core/config.js` holds
+only a PBKDF2-SHA256 hash over a random salt.
+
+**Locked out after failed attempts.** Five failures lock the gate. It clears
+by itself; it is not a permanent state, and there is no "reset" to press.
+Wait it out rather than clearing site data, which also drops the device's
+local session.
+
+**Password genuinely lost.** Mint a new one and re-ship the bootstrap:
+
+```bash
+node tools/admin-cred.mjs '<new password>'
+```
+
+Paste the printed `{salt, hash, iterations}` into `ADMIN_BOOTSTRAP` in
+`src/core/config.js`, bump its `version`, push. A device that has not already
+rotated its own password picks the new bootstrap up on the next load. A device
+that *has* rotated keeps the password you set on it — change that one from
+Admin → System & audit → change password.
+
+**Never** put the password itself in `config.js`, in a commit message, in a
+document, or in a screenshot. The hash is the only form of it that ships.
+
+---
+
+## 8. A charges push was wrong
+
+Admin → Charges → correct the numbers → **Push** again. Orders already booked
+keep the fees they were booked with, so a bad push cannot reprice money
+already in escrow — only quotes made between the two pushes used the wrong
+numbers. Find them in the Flow tracker by booking time, and correct
+individually with a refund or an adjustment; do not edit ledger entries.
+
+Every push is in the audit log with who pushed it and when.
+
+---
+
+## 9. Someone reports a bug you cannot reproduce
 
 1. Ask which page, and get a screenshot showing the version in the footer.
-2. Open the site with `?selftest=1` — if any of the 87 tests fail, start there.
+2. Open the site with `?selftest=1` — if any of the 111 tests fail, start there.
 3. Admin → System & audit → **Health**. A red row names the problem.
 4. Check the audit log for their action around that time.
 5. If their local data is corrupt, the fix is Admin → System → **Restore
@@ -173,10 +213,10 @@ To resume, set it back to `'false'`.
 
 ---
 
-## 8. Before you touch anything
+## 10. Before you touch anything
 
 ```bash
-node tools/test-node.mjs      # 87 tests, ~1 second
+node tools/test-node.mjs      # 111 tests, ~1 second
 python tools/build.py --site  # rebuild + relint + restamp cache-busters
 bash tools/preflight.sh       # the gate CI runs
 ```

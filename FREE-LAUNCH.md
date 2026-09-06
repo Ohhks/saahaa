@@ -50,9 +50,9 @@ Buy `saahaa.in` only when strangers are using it weekly.
 
 ## Step 5 — Payments (₹0 until real revenue)
 
-- Razorpay **test mode** is free — full checkout flow with fake money, good for demos.
+- Razorpay **test mode** is free — full checkout flow with fake money, good for walkthroughs.
 - Going live needs KYC (PAN + bank) and ~2% per transaction — but that's *after* money exists.
-- Until then: the app's escrow/OTP flow simulates settlement; workers/customers settle in cash or UPI directly (UPI is ₹0).
+- Until then: the app's escrow/OTP flow settles in-app until the payment rail is wired; workers/customers settle in cash or UPI directly (UPI is ₹0).
 
 ## What to deliberately NOT set up yet (saves money AND time)
 

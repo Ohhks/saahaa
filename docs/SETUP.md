@@ -102,6 +102,33 @@ git add src/core/config.js && git commit -m "chore: connect Supabase" && git pus
 > You can also skip this and test first by opening the live site with
 > `?sb=https://xxxx.supabase.co&key=eyJ...` once — it stores locally.
 
+### Your admin credential
+
+The admin username is **`siidhartha12`**. There is no shipped password and no
+default to change: what `src/core/config.js` carries in `ADMIN_BOOTSTRAP` is a
+**PBKDF2-SHA256 hash** (250,000 rounds over a random salt), and a login is
+checked by re-deriving and comparing. The password itself exists only in your
+password manager.
+
+To set or rotate it:
+
+```bash
+node tools/admin-cred.mjs '<new password>'
+```
+
+Paste the printed `{salt, hash, iterations}` block into `ADMIN_BOOTSTRAP`,
+bump its `version`, commit and push. That is what a **fresh** device starts
+with. A device already signed in keeps whatever password was set on it from
+Admin → System & audit → change password, which is the faster way to change it
+on a single machine.
+
+Put the password in your password manager the moment you choose it. It cannot
+be recovered from the hash, and there is no reset link — losing it means
+minting a new bootstrap and pushing again.
+
+> **Never** commit the password itself, in `config.js` or anywhere else. Only
+> the hash ships.
+
 ## Part E — Actions secrets (for the keepalive only)
 
 25. Repo → **Settings** → **Secrets and variables** → **Actions**.
@@ -126,6 +153,38 @@ git add src/core/config.js && git commit -m "chore: connect Supabase" && git pus
     - `ohhks.github.io/saahaa/` — the live site
 
 **Done. You never repeat Parts A–E.**
+
+---
+
+## What you will see on the first open
+
+**Nothing, and that is correct.** A new install has no customers, no pros, no
+shops and no products — production seeds only the owner's credential. The
+first real account on a device is the first one somebody signs up.
+
+If you want a populated screen to click through locally, open the app with
+**`?demo=1`**. That loads an example roster of customers, pros, shops and
+products and turns the market simulation on **for that one page load**. It is
+also what the deck capture uses (`python tools/shots.py` opens
+`?shot=<scene>&demo=1`). There is no build, flag or setting that turns it on
+for a real device.
+
+## Two things that need no setup at all
+
+**Maps.** No key, no account, no dashboard. Tiles come from OpenStreetMap,
+geocoding and reverse geocoding from Nominatim (OpenStreetMap's free
+geocoder), and Leaflet is **vendored** under `/vendor/leaflet` rather than
+pulled from a CDN — the CSP allows scripts from `self` only, and a
+tradesperson's phone should not depend on a third party's uptime. Because the
+geocoder is worldwide, a partner or shop can enrol anywhere: search an
+address, drop a pin, or use the device's own location.
+
+**Charges.** The service percentage, the platform's retail percentage and the
+delivery bands by distance are dials in **Admin → Charges**, not constants in
+the source. **Push** applies them to every quote made from then on; orders
+already booked keep the fees they were booked with, so a change can never
+re-price money sitting in escrow. Defaults and their permitted ranges are in
+`src/domain/settings.js`; every push is audited.
 
 ---
 
@@ -169,7 +228,7 @@ create table backup_orders_20260901 as select * from orders;
 | A partner's first in-home job approval | One bad actor in a home ends the business |
 | Any safety, harassment or injury report | Needs a human in minutes, possibly the police |
 | Permanent bans | Irreversible action against someone's livelihood |
-| Fee and commission changes | Silently breaks every open order at once |
+| Fee and delivery-band changes (Admin → Charges → Push) | Nothing already booked reprices, but every quote made afterwards does. It is a pricing decision, and it is yours |
 
 Everything else is either fully automatic or waits for you in one screen.
 See [AUTOMATION.md](AUTOMATION.md).

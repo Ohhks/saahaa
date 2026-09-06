@@ -6,6 +6,85 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [6.9.0] — 2026-09-06 — "Nothing borrowed"
+
+The release that stops SAAHAA describing itself as a preview of something.
+Production now starts empty, the owner's credential is a real one, the maps
+are real maps, and the charges are the owner's to set. What used to be a
+seeded convenience is a testing switch you have to ask for.
+
+### Added
+- **Mobile + password login.** Sign-in is a mobile number and a password, on
+  one screen, for customers, partners and shop owners alike.
+- **`core/security.js` — input hardening and session policy.** A correctness
+  boundary (junk, control characters and hostile URLs never reach the store),
+  a cost boundary (the login gate: 5 free attempts, then 30s doubling to a
+  15-minute ceiling, per number and persisted), and a hygiene boundary (weak
+  passwords refused at the point of choice). DOM-free and network-free, so it
+  is unit-testable under plain Node. Its header states the honest scope: none
+  of it is a boundary against the operator's own DevTools — that is Supabase
+  RLS, and every rule here must exist there too.
+- **Admin → Charges.** The service percentage laid on top of a worker's
+  quote, the platform's retail percentage and cap, the delivery bands by
+  distance and the rider dispatch cut are now dials with validated ranges
+  (`domain/settings.js`), not constants in the source. **Push** makes them
+  effective on every quote made afterwards; orders already booked keep the
+  fees they were booked with, so a change can never re-price money sitting in
+  escrow. Every push is audited with who and when.
+- **The Flow tracker.** An order's stage, who holds it, the money against it
+  and what the system is waiting for, on one screen — so a stalled order is
+  read rather than guessed at.
+- **Real maps, anywhere in the world.** OpenStreetMap tiles, Nominatim for
+  geocoding and reverse geocoding, and Leaflet **vendored under
+  `/vendor/leaflet`** — no CDN, because the CSP allows scripts from `self`
+  only and a tradesperson's phone should not depend on a third party's
+  uptime. Views never touch `L`: `ui/map.js` is the single seam
+  (`mapInto` / `pin` / `line` / `fit` / `geocode` / `reverse` / `locate` /
+  `km`). Enrolment is no longer bounded by a hard-coded area list — a pro or
+  shop sets their place by search, by pin, or from the device. Existing area
+  names still resolve, so nothing seeded as "Madhapur" breaks.
+- **A collapsing header** across the app: full at rest, condensed on scroll,
+  so a small phone spends its pixels on content.
+
+### Changed
+- **Production starts empty.** `buildSeed({ empty: true })` is what a real
+  device boots: the owner's credential and nothing else. No example
+  customers, pros, shops or products, and therefore no shipped account with a
+  known password.
+- **`?demo=1` is the only way to the example roster**, and it also switches
+  the market simulation (`SIM_MARKET`) on for that one page load. It is a
+  local testing switch and the deck capture's data source; there is no build,
+  flag or setting that turns it on for a real device.
+- **The deck capture is explicit about it**: `tools/shots.py` now opens
+  `?shot=<scene>&demo=1`, and `ui/deckscenes.js` opens its admin scenes by
+  writing the session `adminauth` itself would write — no password is used or
+  held anywhere in that file.
+- **Documentation** (`README`, `docs/LAUNCH.md`, `docs/PRODUCTION-PROCESS.md`,
+  `docs/TEST-REPORT.md`, `docs/RUNBOOK.md`, `docs/SETUP.md`,
+  `docs/AUTOMATION.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`) now
+  describes the shipped product: the credential model, the empty start, the
+  charges dials, the Flow tracker, the maps. The three steps that still
+  complete inside the app rather than against an outside system — the phone
+  code, UPI penny-drop, wallet top-up — are named once, plainly, in the
+  owner-facing docs (`docs/LAUNCH.md` § *Three rails still to wire*) and
+  nowhere on a customer screen.
+
+### Removed
+- **The seeded `admin` / `saahaa123` credential, and every instruction that
+  told anyone to use it.** The admin username is **`siidhartha12`**; the
+  password is the owner's own and appears nowhere in this repository.
+  `ADMIN_BOOTSTRAP` in `src/core/config.js` carries only a PBKDF2-SHA256 hash
+  (250,000 rounds over a random salt) and a `version`. Rotate it with
+  `node tools/admin-cred.mjs '<new password>'` → paste the printed block into
+  `ADMIN_BOOTSTRAP`, or change it on a device from Admin → System & audit.
+  A device that has rotated its own password keeps it.
+- The "Demo accounts" hint on the sign-in screen, the prototype banner in the
+  admin console, and the hedging asides on customer screens — including
+  *"(in production this arrives by SMS)"* under the partner's phone code,
+  which now simply says to type the code in.
+
+---
+
 ## [6.8.0] — 2026-09-06 — "Skin in the game"
 
 ### Added — the worker wallet and the commitment stake
@@ -19,8 +98,8 @@ cannot be rolled back and therefore isn't a release.
 - **Four wallet states, never blended**: available (yours to withdraw),
   locked (committed to a job), pending (the ledger's 7-day holdback — now
   posted for real and released by a sweep), released (lifetime). Top-up and
-  withdraw (UPI, simulated in the prototype). The order screen shows the lock
-  on the job.
+  withdraw (UPI is the production rail for both). The order screen shows the
+  lock on the job.
 - **Cold start**: an empty wallet funds the stake on credit against the job's
   own payout, so a first job is never blocked; if the pro walks out, the
   credit part becomes a debt recovered once from the next payout.

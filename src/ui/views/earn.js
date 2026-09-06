@@ -20,7 +20,7 @@
    on a single sticky action. Every string's meaning is the one it had. */
 
 import { esc } from '../dom.js';
-import { SERVICE_MARKUP } from '../../domain/pricing.js';
+import { liveMarkup } from '../../domain/pricing.js';
 import { icon, hasIcon } from '../icons.js';
 import { me } from '../../core/ctx.js';
 import { live } from '../../core/registry.js';
@@ -58,7 +58,7 @@ function earningsStrip() {
   </div>
   <p class="micro muted">
     On a ₹1,000 job. A 25%-commission app keeps ₹250 of it. SAAHAA keeps none of your
-    quote — our ${Math.round(SERVICE_MARKUP * 100)}% is added on top and paid by the customer.
+    quote — our ${Math.round(liveMarkup() * 100)}% is added on top and paid by the customer.
   </p>`;
 }
 

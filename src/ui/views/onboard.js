@@ -102,8 +102,8 @@ function stepPanel(p, id, cat) {
   switch (id) {
     case 'phone': return F(`
       ${shownCode ? `<p class="tiny" style="margin-bottom:8px">Your code: <b class="num" style="font-size:20px;letter-spacing:.15em">${esc(shownCode)}</b>
-          <span class="micro muted">(in production this arrives by SMS)</span></p>
-        <div class="row"><input id="obPhone" class="grow" inputmode="numeric" maxlength="4" placeholder="4-digit code"
+          <span class="micro muted">Type it below to confirm this is your number.</span></p>
+        <div class="row" style="flex-wrap:wrap"><input id="obPhone" class="grow" style="min-width:140px" inputmode="numeric" maxlength="4" placeholder="4-digit code"
           style="height:46px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--r-pill);background:var(--surface-2);color:var(--ink-1);font-size:18px;letter-spacing:.2em">
           <button class="btn btn--primary" data-act="ob.confirmphone">Confirm</button></div>`
         : `<button class="btn btn--primary btn--block" data-act="ob.sendcode">Send code to …${esc(String(p.mobile || '').slice(-4) || 'my number')}</button>`}`);

@@ -1,5 +1,7 @@
 /* SAAHAA · ui/views/admin.js — the admin COMMAND CENTRE, inside the website.
-   Sign in on the normal login screen with the name "admin", or open #/admin.
+   Sign in with the owner's username (core/adminauth.js · ADMIN_USERNAME) and
+   the owner's own password, or open #/admin. No credential is printed here,
+   in the markup, or anywhere else in the shipped bundle.
 
    OPEN CIRCLE · LIVING GLASS.  Same engine, rebuilt experience.
 
@@ -15,7 +17,7 @@
    Flow panel on the dashboard exists so that separation is the first thing
    the owner sees, not a footnote. */
 
-import { esc, toast, timeAgo, clockTime } from '../dom.js';
+import { mount, esc, toast, timeAgo, clockTime } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, dispatch, me } from '../../core/ctx.js';
 import { get, live, all as allOf, namespaces, count } from '../../core/registry.js';
@@ -33,10 +35,18 @@ import { trustScore, tier, ESCROW } from '../../domain/trust.js';
 import { stage } from '../../domain/orders.js';
 import * as flow from '../../domain/flow.js';
 import * as V from '../../domain/verification.js';
+import * as settings from '../../domain/settings.js';
+import { quoteService, quoteRetail } from '../../domain/pricing.js';
+import { geoOf } from '../../domain/match.js';
+import * as gmap from '../map.js';
 import { mark } from '../logo.js';
 
 let section = 'dash';
 let testResult = null, chainResult = null;
+/* FLOW: which role is being watched, and whose journey is open. */
+let flowRole = 'all', flowPick = null;
+/* MAP: the live Leaflet handle and the element it was built into. */
+let mapHandle = null, mapEl = null, mapForce = false;
 export const setSection = s => { section = s; };
 
 const SECTIONS = [
@@ -120,15 +130,15 @@ export function renderLogin() {
         <b style="color:var(--danger)">${g.reason === 'locked' ? 'Locked' : 'Too many attempts'}</b>
         <p class="tiny muted" style="margin-top:6px">Try again in ${Math.ceil(g.waitMs / 1000)}s.</p></div>` : ''}
 
-      <div class="field"><input id="adUser" placeholder=" " value="admin" autocomplete="username"><label>Username</label></div>
+      <div class="field"><input id="adUser" placeholder=" " value="${esc(adminauth.ADMIN_USERNAME)}" autocomplete="username"><label>Username</label></div>
       <div class="field"><input id="adPass" type="password" placeholder=" " autocomplete="current-password"><label>Password</label></div>
       <button class="btn btn--primary btn--lg btn--block" data-act="admin.login" ${g.blocked ? 'disabled' : ''}>
         Sign in</button>
       <button class="btn btn--ghost btn--block" style="margin-top:8px" data-act="nav.home">← Back to SAAHAA</button>
 
       <p class="micro muted" style="margin-top:24px;line-height:1.7">
-        Prototype credential: <b>admin</b> / <b>saahaa123</b><br>
-        Change it in System once you're in.
+        Owner access only. If you have forgotten the password there is no reset
+        from this screen — restore a backup or reinstall.
       </p>
     </div>
   </div>`;
@@ -145,7 +155,7 @@ export async function doLogin() {
         : 'Wrong username or password', 'danger');
     ctx.render(); return;
   }
-  toast('Signed in as admin');
+  toast('Signed in as the owner');
   ctx.render();
 }
 
@@ -162,6 +172,11 @@ export function render() {
   const queued = V.ownerQueue().length;
   const openD = st.disputes.filter(d => d.status === 'OPEN' && !d.resolvedAt).length;
   const healthy = h.checks.filter(c => c.ok).length;
+
+  /* The map is the only thing on this console that needs a live DOM node, so
+     it is built one frame AFTER this string has been mounted. Never inside the
+     render path, never blocking it, and never able to break it. */
+  scheduleMap();
 
   return `
   <header class="hdr on-plum" style="border-radius:0 0 var(--r-2xl) var(--r-2xl)">
@@ -185,10 +200,11 @@ export function render() {
   </header>
   <main class="wrap">
     ${st.admin.isDemo ? `<div class="glass glass--gold rise" style="margin-top:var(--sp-6)">
-      <div class="eyebrow" style="color:var(--warn);display:flex;align-items:center;gap:6px">${icon('warn', { size: 13 })} Prototype mode</div>
-      <b class="tiny" style="color:var(--warn)">Simulated escrow, no real funds.</b>
+      <div class="eyebrow" style="color:var(--warn);display:flex;align-items:center;gap:6px">${icon('warn', { size: 13 })} Bootstrap credential</div>
+      <b class="tiny" style="color:var(--warn)">Set your own password before anyone else uses this.</b>
       <p class="tiny muted" style="margin-top:6px;color:var(--warn)">
-        You are on the shipped demo password. Change it in System &amp; audit before anyone else uses this.</p>
+        This device is still on a bootstrap credential. Set your own password in System &amp; audit
+        before anyone else uses this.</p>
     </div>` : ''}
 
     <nav class="seg" role="tablist" aria-label="Admin sections" style="margin:var(--sp-6) 0">
@@ -219,6 +235,8 @@ function dash(st) {
   ${note('every number on this screen, live from the ledger and the order registry',
          'nothing — this screen is read-only by design')}
 
+  ${liveMap(st)}
+
   <div class="capsules">
     ${capsule('Users', st.users.length, `${st.users.filter(u => u.role === 'customer').length} customers`, 'soft', 1)}
     ${capsule('Partners', st.partners.length, `${st.shops.length} shops`, 'soft', 2)}
@@ -240,6 +258,101 @@ function dash(st) {
     <div class="sec">${secHead('Rating statistics')}
       <div class="glass">${ratingStats(st)}</div></div>
   </div>`;
+}
+
+/* ── THE LIVE MAP ─────────────────────────────────────────────
+   A marketplace is a place before it is a table. Every non-terminal order sits
+   at the customer's place, every online pro at theirs, every shop at its own —
+   so "is anything actually happening in Kondapur tonight?" is a glance, not a
+   query. Read-only: the map never writes, and a map that fails to load must
+   never take the console down with it. */
+const PIN_ORDER = '#E0B558', PIN_PARTNER = '#7C3AED', PIN_SHOP = '#14B8A6';
+
+const legendDot = (c, label) => `<span class="chip--smart"><span aria-hidden="true"
+  style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${c};margin-right:6px"></span>${esc(label)}</span>`;
+
+function liveMap(st) {
+  const liveOrders = st.orders.filter(o => !stage(o.stage).terminal);
+  const online = st.partners.filter(p => p.online !== false && !p.suspended);
+  return `
+  <div class="sec">${secHead('Live map', `<button class="more" data-act="admin.map">Refresh</button>`)}
+    <div class="glass glass--deep rise">
+      <div id="adminMap" style="height:320px;border-radius:var(--r-lg);overflow:hidden;background:var(--border)"></div>
+      <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:12px">
+        ${legendDot(PIN_ORDER, `${liveOrders.length} order(s) in flight`)}
+        ${legendDot(PIN_PARTNER, `${online.length} pro(s) online`)}
+        ${legendDot(PIN_SHOP, `${st.shops.length} shop(s)`)}
+      </div>
+      <p class="tiny muted" style="margin-top:10px">
+        Tiles from OpenStreetMap. Places come from each order, pro and shop — nothing about a
+        customer is sent anywhere to draw this.</p>
+    </div></div>`;
+}
+
+/* Two people in the same area share one coordinate, so without a deterministic
+   nudge the second pin hides under the first for good. */
+function jitter(seed, i) {
+  let h = i * 2654435761;
+  for (let k = 0; k < String(seed).length; k++) h = (h * 31 + String(seed).charCodeAt(k)) | 0;
+  return [((h & 255) / 255 - 0.5) * 0.006, (((h >> 8) & 255) / 255 - 0.5) * 0.006];
+}
+
+function mapPoints(st) {
+  const pts = [];
+  const push = (place, seed, i, color, glyph, label) => {
+    const g = geoOf(place);
+    if (!g) return;
+    const [dy, dx] = jitter(seed, i);
+    pts.push({ lat: g.lat + dy, lng: g.lng + dx, color, glyph, label });
+  };
+  st.orders.filter(o => !stage(o.stage).terminal).slice(0, 120).forEach((o, i) =>
+    push(o.customerLoc || o.customerArea, o.id, i, PIN_ORDER, o.kind === 'retail' ? 'S' : 'J',
+      `${esc(o.customerName || 'Customer')} · ${esc(stage(o.stage).label || o.stage)} · ${M.fmt(o.customerPays)}`));
+  st.partners.filter(p => p.online !== false && !p.suspended).slice(0, 120).forEach((p, i) =>
+    push(p.loc || p.area, p.id, i, PIN_PARTNER, 'P',
+      `${esc(p.name)} · ${esc(get('category', p.cat).name || '')} · ${esc(p.area || '')}`));
+  st.shops.slice(0, 80).forEach((s, i) =>
+    push(s.loc || s.area, s.id, i, PIN_SHOP, 'K', `${esc(s.name)} · ${esc(s.area || '')}`));
+  return pts;
+}
+
+function scheduleMap() {
+  try {
+    if (typeof requestAnimationFrame !== 'function') return;
+    requestAnimationFrame(() => { try { buildMap(); } catch (e) { /* never break admin */ } });
+  } catch (e) {}
+}
+
+function mapFail(el, e) {
+  try {
+    mount(el, `<div class="empty--smart"><p class="tiny muted">Map unavailable — ${esc(
+      (e && e.message) || 'could not load')}. Everything else on this console still works.</p></div>`);
+  } catch (_) {}
+  mapHandle = null;
+}
+
+function buildMap() {
+  const el = typeof document !== 'undefined' ? document.getElementById('adminMap') : null;
+  if (!el) { mapHandle = null; mapEl = null; return; }
+  if (mapEl === el && mapHandle && !mapForce) return;
+  if (mapEl !== el && mapHandle) { try { mapHandle.destroy(); } catch (e) {} mapHandle = null; }
+  mapEl = el; mapForce = false;
+  gmap.ready().then(() => {
+    try {
+      if (!document.body.contains(el)) return;
+      if (!mapHandle) mapHandle = gmap.mapInto(el, { center: [17.4486, 78.3908], zoom: 12 });
+      if (!mapHandle) return;
+      drawMap(mapHandle);
+    } catch (err) { mapFail(el, err); }
+  }).catch(err => mapFail(el, err));
+}
+
+function drawMap(h) {
+  const pts = mapPoints(getState());
+  h.clear();
+  pts.forEach(p => h.pin(p.lat, p.lng, { color: p.color, glyph: p.glyph, label: p.label }));
+  if (pts.length) h.fit(pts.map(p => [p.lat, p.lng]));
+  h.invalidate();
 }
 
 /* Where the money actually is, in the only shape that cannot lie: the ledger.
@@ -511,6 +624,8 @@ function people(st) {
   ${note('trust scores, lifetime stats, earnings ledgers, risk flags, duplicate-account clusters',
          'suspend, ban, promote or demote a tier, waive a strike, adjust a wallet with a reason')}
 
+  ${flowBlock(st)}
+
   <div class="sec">${secHead(`Pros · ${st.partners.length}`,
       `<span class="avatars">${st.partners.slice(0, 6).map(p => avatar(p.name)).join('')}</span>`)}
     ${st.partners.length ? st.partners.map(p => {
@@ -539,6 +654,150 @@ function people(st) {
         <span class="grow tiny">${esc(u.name)} <span class="micro muted">· ${esc(u.mobile)}</span></span>
         ${pill(u.area, 'soft')}</div></div>`).join('')
       : empty('No customers yet.')}</div>`;
+}
+
+/* ── FLOW — track everyone's flow ─────────────────────────────
+   The eight sections answer "what needs me?". This answers the other question
+   the owner actually asks: "what is each person DOING right now?" One row per
+   human — customer, pro, shop owner alike — with where they are, when they
+   were last seen, which step they are standing on, and what they have spent or
+   earned. Tapping a row unrolls their whole journey: the audit log for that
+   actor merged with the stage history of their orders, newest first.
+
+   Nothing here is stored. It is a join over state + the audit log, capped at
+   60 rows and 40 events so a busy Saturday never makes the console crawl. */
+const ROLE_CHIPS = [['all', 'Everyone'], ['customer', 'Customers'], ['partner', 'Pros'], ['shop', 'Shop owners']];
+const ROLE_LABEL = { customer: 'Customer', partner: 'Pro', shop: 'Shop owner' };
+const FLOW_ROWS = 60, FLOW_EVENTS = 40;
+
+/* Who an in-flight order is waiting on, in the owner's words. The stage machine
+   names an owner for every stage, so a stalled order is always stalled AT
+   someone — and the money against it is the escrow it is sitting in. */
+const HOLDER = { customer: 'the customer', worker: 'the pro', shop: 'the shop', rider: 'the rider',
+                 system: 'SAAHAA (automatic)', admin: 'you (the owner)', either: 'either side' };
+function holdOf(o) {
+  const sg = stage(o.stage) || {};
+  const who = HOLDER[sg.owner] || sg.owner || '—';
+  const next = (sg.to || []).map(id => (stage(id) || {}).label || id).slice(0, 2);
+  return { stage: sg.label || o.stage, who, money: o.customerPays | 0, next };
+}
+
+const detailOf = d => { try { return JSON.stringify(d || {}).slice(0, 80); } catch (e) { return ''; } };
+
+function flowRows(st) {
+  /* entries() comes back newest-first, so the first hit per actor is the last
+     thing that person did. One pass, not one scan per row. */
+  const lastSeen = new Map();
+  audit.entries({ limit: 400 }).forEach(e => { if (!lastSeen.has(e.actor)) lastSeen.set(e.actor, e); });
+
+  const byCustomer = new Map(), byPartner = new Map(), byShop = new Map();
+  const put = (m, k, o) => { if (!k) return; if (!m.has(k)) m.set(k, []); m.get(k).push(o); };
+  st.orders.forEach(o => { put(byCustomer, o.customerKey, o); put(byPartner, o.partnerId, o); put(byShop, o.shopId, o); });
+
+  return st.users
+    .filter(u => flowRole === 'all' || u.role === flowRole)
+    .map(u => {
+      const p = u.role === 'partner' ? st.partners.find(x => x.userKey === u.key || x.id === u.partnerId) : null;
+      const sh = u.role === 'shop' ? st.shops.find(x => x.ownerKey === u.key || x.id === u.shopId) : null;
+      const mine = (u.role === 'partner' ? byPartner.get(p && p.id)
+                  : u.role === 'shop'    ? byShop.get(sh && sh.id)
+                  : byCustomer.get(u.key)) || [];
+      const orders = mine.slice().sort((a, b) => (b.stageTs || b.createdAt || 0) - (a.stageTs || a.createdAt || 0));
+      const latest = orders[0] || null;
+      const aud = lastSeen.get(u.key) || null;
+      const seen = Math.max(aud ? aud.ts : 0, latest ? (latest.stageTs || 0) : 0,
+                            p ? (p.lastActiveTs || 0) : 0, u.createdAt || 0);
+
+      /* The current step is whatever they are standing on: an order stage if
+         they have one in flight, otherwise the verification step they stalled
+         at, otherwise the last thing the audit log saw them do. */
+      let step;
+      if (latest) step = stage(latest.stage).label || latest.stage;
+      else if (p) { const r = V.readiness(p); step = r.complete ? `Verified · ${tier(p.tier).label}` : (r.next ? r.next.title : 'Verifying'); }
+      else if (sh) step = sh.status === 'active' ? 'Shop open' : `Shop ${sh.status}`;
+      else step = aud ? aud.action : 'Signed up';
+
+      const spend = orders.reduce((n, o) => n + (o.customerPays | 0), 0);
+      const earned = orders.reduce((n, o) => n + (o.settledAt
+        ? ((u.role === 'partner' ? o.workerPayout : o.shopPayout) | 0) : 0), 0);
+      const place = (u.loc && u.loc.label) || (p && p.area) || (sh && sh.area) || u.area || '—';
+
+      const counts = u.role === 'partner'
+        ? `${(p && p.completed) || 0} jobs · earned ${M.fmt(earned)}`
+        : u.role === 'shop'
+        ? `${orders.length} order(s) · earned ${M.fmt(earned)}`
+        : `${orders.length} order(s) · spent ${M.fmt(spend)}`;
+
+      const live = !!(latest && !stage(latest.stage).terminal);
+      return { key: u.key, name: u.name, role: u.role, place, step, seen, orders, counts, live, hold: live ? holdOf(latest) : null };
+    })
+    .sort((a, b) => b.seen - a.seen)
+    .slice(0, FLOW_ROWS);
+}
+
+function flowTimeline(row) {
+  const evs = [];
+  audit.entries({ limit: 400 }).forEach(e => {
+    if (e.actor === row.key) evs.push({ ts: e.ts, title: e.action, body: detailOf(e.detail) });
+  });
+  row.orders.forEach(o => (o.history || []).forEach(h => evs.push({
+    ts: h.at,
+    title: stage(h.stage).label || h.stage,
+    body: `${o.kind === 'retail' ? (o.shopName || 'Shop') : (o.partnerName || 'Pro')} · ${M.fmt(o.customerPays)}`,
+  })));
+  evs.sort((a, b) => b.ts - a.ts);
+  const list = evs.slice(0, FLOW_EVENTS);
+  if (!list.length) return empty('Nothing recorded for this person yet.');
+  return `<ol class="timeline">${list.map(e => `<li class="timeline__item">
+    <span class="timeline__dot" aria-hidden="true"></span>
+    <div class="timeline__body">
+      <div class="between"><b class="micro">${esc(e.title)}</b>
+        <span class="timeline__time meta">${esc(clockTime(e.ts))}</span></div>
+      <p class="tiny muted">${esc(timeAgo(e.ts))}${e.body ? ' · ' + esc(e.body) : ''}</p>
+    </div></li>`).join('')}</ol>
+    <p class="micro muted" style="margin-top:8px">${evs.length > FLOW_EVENTS
+      ? `Newest ${FLOW_EVENTS} of ${evs.length} events.` : `${evs.length} event(s), newest first.`}</p>`;
+}
+
+function flowRow(row, ix) {
+  const open = flowPick === row.key;
+  return `<div class="glass ${open ? 'glass--gold' : ''} ${riseOf(ix + 1)}" style="padding:0;margin-bottom:8px;overflow:hidden">
+    <button class="tap" aria-expanded="${open ? 'true' : 'false'}"
+      style="display:block;width:100%;text-align:left;padding:11px 14px;background:none;border:0;color:inherit;cursor:pointer"
+      data-act="admin.flow.pick" data-key="${esc(row.key)}">
+      <div class="between">
+        ${avatar(row.name)}
+        <div class="grow"><b class="tiny">${esc(row.name)}</b>
+          ${row.live ? '<span class="pill pill--live pill--info">in flight</span>' : ''}
+          <p class="tiny muted">${esc(ROLE_LABEL[row.role] || row.role)} · ${esc(row.place)} · ${esc(row.step)}</p>
+          ${row.hold ? `<p class="micro" style="margin-top:4px">Held by <b>${esc(row.hold.who)}</b> · ${M.fmt(row.hold.money)} on this order ·
+            waiting for ${esc(row.hold.who)}${row.hold.next.length ? ` → ${esc(row.hold.next.join(' / '))}` : ''}</p>` : ''}</div>
+        <div style="text-align:right">
+          <span class="meta">${esc(row.seen ? timeAgo(row.seen) : 'never')}</span>
+          <div class="micro muted" style="margin-top:4px">${esc(row.counts)}</div>
+        </div>
+      </div>
+    </button>
+    ${open ? `<div style="padding:0 14px 14px">${flowTimeline(row)}</div>` : ''}
+  </div>`;
+}
+
+function flowBlock(st) {
+  const rows = flowRows(st);
+  return `
+  <div class="sec">${secHead(`Flow · ${rows.length}`, `<span class="pill pill--live">live</span>`)}
+    <p class="tiny muted" style="margin-bottom:12px">
+      Everyone on SAAHAA, most recently active first: where they are, what step they are on, and
+      what they have spent or earned. Tap a row to unroll that person's whole journey.</p>
+    <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      ${ROLE_CHIPS.map(([k, l]) => `<button class="btn ${flowRole === k ? 'btn--primary' : 'btn--ghost'} btn--sm"
+        aria-pressed="${flowRole === k ? 'true' : 'false'}"
+        data-act="admin.flow.filter" data-role="${k}">${esc(l)}</button>`).join('')}
+    </div>
+    ${rows.length ? rows.map((r, ix) => flowRow(r, ix)).join('')
+      : empty(flowRole === 'all' ? 'Nobody has signed up yet.' : 'Nobody in that role yet.')}
+    ${rows.length >= FLOW_ROWS ? `<p class="micro muted">Showing the ${FLOW_ROWS} most recently active.</p>` : ''}
+  </div>`;
 }
 
 /* ── 6. MODERATION ────────────────────────────────────────── */
@@ -579,6 +838,8 @@ function finance(st) {
   return `
   ${note('revenue split per order, GST liability (18% of the fee), payout queue, unit economics',
          'mark a payout batch paid with its UTR, record a manual adjustment with a reason, export the GST report')}
+
+  ${charges()}
 
   <div class="glass ${drift ? '' : 'glass--gold'} rise" style="${drift ? 'border-color:var(--danger)' : ''}">
     <div class="between">
@@ -633,6 +894,117 @@ function finance(st) {
       </div>
     </details>
     <button class="btn btn--ghost btn--block" style="margin-top:10px" data-act="admin.exportledger">Export ledger CSV</button>
+  </div>`;
+}
+
+/* ── CHARGES — the owner's dials ──────────────────────────────
+   Three groups, one Push. Everything the company charges anyone lives here and
+   nowhere else: the service markup laid on top of the worker's quote, the
+   platform take on a shop basket, and the delivery bands. The engine
+   (domain/pricing.js) already reads these live, so a push is felt by the very
+   next quote — and by no quote already made, because an order snapshots its
+   fees at booking. That last sentence is the whole safety property. */
+
+const rup = paise => (Number(paise || 0) / 100);
+const rupStr = paise => rup(paise).toFixed(2).replace(/\.00$/, '');
+
+/** One dial: the input, its live value and the launch default beside it. */
+const dial = (id, label, value, hint) => `
+  <div class="field" style="margin-bottom:4px">
+    <input id="${id}" type="number" step="any" inputmode="decimal" placeholder=" " value="${esc(String(value))}">
+    <label>${esc(label)}</label>
+  </div>
+  <p class="micro muted" style="margin:0 0 12px">${hint}</p>`;
+
+const dialHint = (live, def) => `now <b>${esc(live)}</b> · launch default ${esc(def)}`;
+
+const dialGroup = (title, blurb, body) => `
+  <div class="glass" style="margin-bottom:10px">
+    <div class="eyebrow">${esc(title)}</div>
+    <p class="tiny muted" style="margin:4px 0 12px">${esc(blurb)}</p>
+    ${body}
+  </div>`;
+
+function charges() {
+  const P = settings.getPricing();
+  const D = settings.DEFAULT_PRICING;
+  const bands = P.deliveryBands;
+  const dbands = D.deliveryBands;
+
+  /* The worked example is computed from the values that are LIVE right now —
+     i.e. what the last Push did — so after the next Push it re-reads itself. */
+  const ex = quoteService(100000);
+  const exr = quoteRetail([{ qty: 1, unitPrice: 60000 }], { km: 3, mode: 'rider' });
+
+  const bandRow = (i) => {
+    const b = bands[i] || bands[bands.length - 1] || { maxKm: 999, fee: 0 };
+    const d = dbands[i] || dbands[dbands.length - 1];
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      ${dial(`pxBand${i}Km`, `Band ${i + 1} · up to km`, b.maxKm, dialHint(`${b.maxKm} km`, `${d.maxKm} km`))}
+      ${dial(`pxBand${i}Fee`, `Band ${i + 1} · fee ₹`, rup(b.fee), dialHint(`₹${rupStr(b.fee)}`, `₹${rupStr(d.fee)}`))}
+    </div>`;
+  };
+
+  return `
+  <div class="sec">${secHead('Charges', P.pushedAt
+      ? `<span class="pill pill--ok">live since ${esc(timeAgo(P.pushedAt))}</span>`
+      : `<span class="pill pill--soft">launch defaults</span>`)}
+    <p class="tiny muted" style="margin-bottom:12px">
+      Everything SAAHAA charges anybody, in one place. Change a number, press Push, and the very
+      next quote uses it. These are the only dials — no other screen can move a rate.</p>
+
+    ${dialGroup('Service', 'Laid on top of the worker’s quote and paid by the customer. The worker keeps 100% of what they quoted.', `
+      ${dial('pxService', 'Standard markup %', P.serviceMarkupPct, dialHint(`${P.serviceMarkupPct}%`, `${D.serviceMarkupPct}%`))}
+      ${dial('pxLoyalty', 'Certified (tier-4) markup %', P.loyaltyMarkupPct, dialHint(`${P.loyaltyMarkupPct}%`, `${D.loyaltyMarkupPct}%`))}
+    `)}
+
+    ${dialGroup('Platform (shops)', 'Taken out of the shop’s own margin, never added to the item price — MRP can never be exceeded.', `
+      ${dial('pxRetail', 'Take %', P.retailTakePct, dialHint(`${P.retailTakePct}%`, `${D.retailTakePct}%`))}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        ${dial('pxRetailCap', 'Cap ₹ per order', rup(P.retailTakeCapPaise), dialHint(`₹${rupStr(P.retailTakeCapPaise)}`, `₹${rupStr(D.retailTakeCapPaise)}`))}
+        ${dial('pxRetailFloor', 'Floor ₹ per order', rup(P.retailFeeFloorPaise), dialHint(`₹${rupStr(P.retailFeeFloorPaise)}`, `₹${rupStr(D.retailFeeFloorPaise)}`))}
+      </div>
+    `)}
+
+    ${dialGroup('Delivery', 'Four distance bands, charged to the customer and paid to the rider, minus our dispatch cut.', `
+      ${[0, 1, 2, 3].map(bandRow).join('')}
+      ${dial('pxDispatch', 'Dispatch cut ₹ per delivery', rup(P.riderDispatchCutPaise), dialHint(`₹${rupStr(P.riderDispatchCutPaise)}`, `₹${rupStr(D.riderDispatchCutPaise)}`))}
+    `)}
+
+    <div class="glass glass--gold rise" style="margin-bottom:10px">
+      <div class="eyebrow">Worked example · after push</div>
+      <p class="tiny" style="margin-top:6px">
+        A <b>₹1,000</b> job: the customer pays <b class="num">${M.fmt(ex.customerPays)}</b> —
+        pro keeps ${M.fmt(ex.workerPayout)}, our fee ${M.fmt(ex.platformFee)}, GST ${M.fmt(ex.gst)}
+        (markup ${ex.markupPct}%).</p>
+      <p class="tiny" style="margin-top:6px">
+        A <b>₹600</b> shop basket 3 km away: customer pays <b class="num">${M.fmt(exr.customerPays)}</b>
+        (items ${M.fmt(exr.itemsTotal)} + delivery ${M.fmt(exr.deliveryFee)}) — shop keeps
+        ${M.fmt(exr.shopPayout)}, rider ${M.fmt(exr.riderPayout)}, we keep
+        ${M.fmt(exr.platformRevenue)}.</p>
+      <p class="micro muted" style="margin-top:8px">
+        These are the numbers as they stand this second. Edit the dials above and press Push to
+        move them — the example redraws from whatever was actually pushed.</p>
+    </div>
+
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn--primary grow" data-act="admin.pricing.push">Push</button>
+      <button class="btn btn--ghost" data-act="admin.pricing.reset">Reset to defaults</button>
+    </div>
+
+    <p class="tiny muted" style="margin-top:10px">
+      Last pushed: ${P.pushedAt
+        ? `<b>${esc(clockTime(P.pushedAt))}, ${esc(timeAgo(P.pushedAt))}</b> by <b>${esc(P.pushedBy || 'admin')}</b>`
+        : '<b>never</b> — these are the launch defaults'}</p>
+
+    <div class="glass" style="margin-top:10px;border-color:var(--warn)">
+      <b class="tiny" style="color:var(--warn)">A push never re-prices money already taken.</b>
+      <p class="tiny muted" style="margin-top:6px">
+        Every order snapshots its own fee, GST, delivery and payout at the moment it is booked.
+        Orders already placed — including everything sitting in escrow right now — keep the numbers
+        they were booked at, whatever you do on this screen. Only quotes made from the push onwards
+        use the new dials.</p>
+    </div>
   </div>`;
 }
 
@@ -844,6 +1216,58 @@ export async function changePassword() {
   audit.record('admin.password.changed', {}, 'admin');
   toast('Password changed'); ctx.render();
 }
+/* ── the dials ─────────────────────────────────────────────── */
+const fieldVal = id => { const el = typeof document !== 'undefined' ? document.getElementById(id) : null; return el ? String(el.value).trim() : ''; };
+/** Rupees in the box, paise in the state. An empty box means "leave it alone". */
+const fieldPaise = id => { const v = fieldVal(id); return v === '' ? '' : Math.round(Number(v) * 100); };
+
+export function pushPricing() {
+  const bands = [0, 1, 2, 3]
+    .map(i => ({ maxKm: Number(fieldVal(`pxBand${i}Km`)), fee: Number(fieldPaise(`pxBand${i}Fee`)) }))
+    .filter(b => Number.isFinite(b.maxKm) && b.maxKm > 0 && Number.isFinite(b.fee) && b.fee >= 0);
+
+  const input = {
+    serviceMarkupPct:      fieldVal('pxService'),
+    loyaltyMarkupPct:      fieldVal('pxLoyalty'),
+    retailTakePct:         fieldVal('pxRetail'),
+    retailTakeCapPaise:    fieldPaise('pxRetailCap'),
+    retailFeeFloorPaise:   fieldPaise('pxRetailFloor'),
+    riderDispatchCutPaise: fieldPaise('pxDispatch'),
+  };
+  if (bands.length) input.deliveryBands = bands;
+
+  const r = settings.pushPricing(input, 'admin');
+  if (!r.ok) { toast(r.errors[0] || 'Those numbers do not add up', 'danger'); ctx.render(); return; }
+  audit.record('pricing.push', r.clean, 'admin');
+  toast('Pushed — every new quote uses these');
+  ctx.render();
+}
+
+export function resetPricing() {
+  const D = settings.DEFAULT_PRICING;
+  const r = settings.pushPricing({
+    serviceMarkupPct: D.serviceMarkupPct, loyaltyMarkupPct: D.loyaltyMarkupPct,
+    retailTakePct: D.retailTakePct, retailTakeCapPaise: D.retailTakeCapPaise,
+    retailFeeFloorPaise: D.retailFeeFloorPaise, riderDispatchCutPaise: D.riderDispatchCutPaise,
+    deliveryBands: D.deliveryBands.map(b => ({ ...b })),
+  }, 'admin');
+  if (!r.ok) { toast(r.errors[0] || 'Could not reset', 'danger'); return; }
+  audit.record('pricing.reset', r.clean, 'admin');
+  toast('Back to the launch defaults');
+  ctx.render();
+}
+
+/* ── the flow ──────────────────────────────────────────────── */
+export function pickFlow(key) { flowPick = (flowPick && flowPick === key) ? null : (key || null); }
+export function filterFlow(role) { flowRole = role || 'all'; flowPick = null; }
+
+/* ── the map ───────────────────────────────────────────────── */
+export function refreshMap() {
+  mapForce = true;
+  try { buildMap(); toast('Map refreshed'); }
+  catch (e) { toast('Map unavailable', 'danger'); }
+}
+
 function download(name, text) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));

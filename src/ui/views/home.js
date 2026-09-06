@@ -10,9 +10,12 @@
    products and the customer's own orders, because a neighbourhood is not
    divided into tabs inside anybody's head. */
 
-import { esc, sheet, closeSheet, toast, ratingStars } from '../dom.js';
-import { ctx, getState, me, myArea, isGuest, myOrders } from '../../core/ctx.js';
+import { mount, esc, sheet, closeSheet, toast, ratingStars } from '../dom.js';
+import { ctx, getState, me, myArea, isGuest, myOrders, saveSession, dispatch } from '../../core/ctx.js';
+import * as persist from '../../core/persist.js';
 import { live, get } from '../../core/registry.js';
+import { AREA_NAMES, AREA_GEO } from '../../domain/match.js';
+import * as gmap from '../map.js';
 import { GROUPS } from '../../domain/catalog.services.js';
 import { mark, pillarRow } from '../logo.js';
 import { icon, medallion, hasIcon } from '../icons.js';
@@ -49,6 +52,220 @@ const cats = () => live('category');
 const services = () => cats().filter(c => c.kind === 'service');
 const retails  = () => cats().filter(c => c.kind === 'retail');
 
+/* ══════════════ WHERE THE CUSTOMER IS ══════════════════════════
+   An area used to be one of twelve words. It is now a place: a label the user
+   recognises AND the coordinates behind it, so a distance is a real distance
+   and SAAHAA works in a town nobody hard-coded.
+
+   We keep writing `area` — the short label — everywhere it was written before,
+   so ctx.myArea(), the matcher's name fallbacks and every seeded record still
+   read exactly what they always read. `loc` is added alongside it. */
+const GUEST_LOC = 'SAAHAA_GUEST_LOC';
+const HYD = { lat: 17.4486, lng: 78.3908 };
+
+/** The signed-in user's place, the guest's place, or — failing both — the
+    label alone, which domain/match.js still knows how to measure from. */
+export function myPlace() {
+  const s = me();
+  if (s && s.loc && s.loc.lat != null) return s.loc;
+  if (!s) {
+    try {
+      const r = persist.read(GUEST_LOC, null);
+      if (r && r.lat != null) return r;
+    } catch (e) { /* private mode, or a value from an older build */ }
+  }
+  return myArea();
+}
+
+function setMyPlace(p) {
+  const s = me();
+  if (s) {
+    /* Both, deliberately: the session is what the current tab reads, the user
+       record is what survives a reload (restoreSession re-reads the record). */
+    saveSession({ ...s, area: p.label, loc: p });
+    dispatch({ type: 'user/patch', payload: { key: s.key, patch: { area: p.label, loc: p } } });
+  } else {
+    persist.write(persist.KEYS.guestArea, p.label);   // keeps ctx.myArea() honest
+    persist.write(GUEST_LOC, p);
+  }
+}
+
+/* ── the place picker (data-act="area.pick", routed by app.js) ── */
+
+let hits = [];                 // last geocode results
+let mapH = null, mapEl = null; // the picker's map
+
+export function openPlacePicker() {
+  hits = [];
+  sheet('Where are you?', pickerBody(), { onClose: destroyMap });
+  setTimeout(mountMap, 0);
+}
+
+function pickerBody() {
+  const cur = myPlace();
+  return `
+    <p class="meta" style="margin-bottom:12px">Search any place in the world, use your location, or
+      tap an area. Everything nearby is measured from here.</p>
+
+    <div class="search">
+      ${icon('search', { size: 18 })}
+      <input id="areaQ" type="search" placeholder="Search a place — area, town or city"
+             aria-label="Search for a place">
+      <button class="btn btn--secondary btn--sm" data-act="area.search">Search</button>
+    </div>
+
+    <div class="row" style="gap:8px;margin-top:8px">
+      <button class="btn btn--ghost btn--sm" data-act="area.locate">
+        ${icon('pin', { size: 14 })} Use my location</button>
+    </div>
+
+    <div id="areaMap" style="height:200px;margin-top:10px;border-radius:var(--r-md);overflow:hidden;
+      border:1px solid var(--border);background:var(--surface-2)"></div>
+    <p class="micro muted" style="margin-top:6px">Drag the pin, or tap the map, to fix your exact spot.</p>
+
+    <div id="areaResults" class="chiprow" style="flex-wrap:wrap;gap:8px;margin-top:10px"></div>
+
+    <p class="tiny" id="areaLabel" style="margin-top:10px">
+      Serving <b>${esc(typeof cur === 'string' ? cur : cur.label)}</b></p>
+
+    <p class="eyebrow" style="margin-top:14px">Hyderabad areas</p>
+    <div class="chiprow" style="flex-wrap:wrap;gap:6px;margin-top:6px">
+      ${AREA_NAMES.map(a => {
+        const g = AREA_GEO[a];
+        return g ? `<button class="chip${myArea() === a ? ' on' : ''}" data-act="area.choose"
+          data-lat="${g[0]}" data-lng="${g[1]}" data-label="${esc(a)}">${esc(a)}</button>` : '';
+      }).join('')}
+    </div>
+    <div style="height:8px"></div>`;
+}
+
+function resultChips() {
+  return hits.map(h => `<button class="chip chip--smart" data-act="area.choose"
+    data-lat="${h.lat}" data-lng="${h.lng}" data-label="${esc(h.label)}">${esc(h.label)}</button>`).join('');
+}
+
+function destroyMap() {
+  if (mapH) { mapH.destroy(); mapH = null; }
+  mapEl = null;
+}
+
+async function mountMap() {
+  const el = document.getElementById('areaMap');
+  if (!el) { destroyMap(); return; }
+  if (el === mapEl && mapH) { paintMap(); return; }
+  try { await gmap.ready(); }
+  catch (e) {
+    mount(el, '<p class="micro muted" style="padding:12px">Map unavailable — search and the ' +
+      'area chips still work.</p>');
+    return;
+  }
+  const cur = document.getElementById('areaMap');
+  if (!cur) return;
+  destroyMap();
+  mapEl = cur;
+  const p = myPlace();
+  const c = typeof p === 'string' ? (AREA_GEO[p] ? { lat: AREA_GEO[p][0], lng: AREA_GEO[p][1] } : HYD) : p;
+  mapH = gmap.mapInto(cur, { center: [c.lat, c.lng], zoom: 13 });
+  if (mapH) mapH.on('click', pt => pinTo(pt));
+  paintMap();
+}
+
+function paintMap() {
+  if (!mapH) return;
+  mapH.clear();
+  const p = myPlace();
+  const c = typeof p === 'string' ? (AREA_GEO[p] ? { lat: AREA_GEO[p][0], lng: AREA_GEO[p][1] } : null) : p;
+  if (!c) return;
+  mapH.pin(c.lat, c.lng, {
+    color: '#E0B558', label: c.label || myArea(), draggable: true,
+    onMove: pt => pinTo(pt),
+  });
+  mapH.fit([[c.lat, c.lng]]);
+  mapH.invalidate();
+}
+
+/* a dropped pin is committed straight away — the sheet has no Save button
+   because there is nothing to save: the map IS the choice */
+async function pinTo(pt) {
+  let label = `${pt.lat.toFixed(4)}, ${pt.lng.toFixed(4)}`;
+  try { const r = await gmap.reverse(pt.lat, pt.lng); if (r && r.label) label = r.label; }
+  catch (e) { /* offline: the coordinates still stand */ }
+  setMyPlace({ lat: pt.lat, lng: pt.lng, label });
+  const el = document.getElementById('areaLabel');
+  if (el) mount(el, `Serving <b>${esc(label)}</b>`);
+  paintMap();
+  ctx.render();
+}
+
+/* ── the three actions app.js registered for this screen ─────── */
+export async function useMyLocation() {
+  toast('Asking your device where you are…');
+  try {
+    const p = await gmap.locate();
+    await pinTo(p);
+    toast('Got it — drag the pin if it is slightly off');
+  } catch (e) {
+    toast(e.message || 'Could not get your location — search for it instead', 'warn');
+  }
+}
+
+export async function searchPlace() {
+  const el = document.getElementById('areaQ');
+  const q = el ? el.value.trim() : '';
+  if (q.length < 3) { toast('Type at least three letters', 'warn'); return; }
+  const box = document.getElementById('areaResults');
+  if (box) mount(box, '<span class="micro muted">Searching…</span>');
+  try { hits = await gmap.geocode(q, { limit: 6 }); }
+  catch (e) {
+    hits = [];
+    if (box) mount(box, '<span class="micro muted">Search is unavailable right now — drop the pin instead.</span>');
+    return;
+  }
+  if (box) mount(box, hits.length ? resultChips()
+    : `<span class="micro muted">Nothing matched &ldquo;${esc(q)}&rdquo;.</span>`);
+}
+
+export function choosePlace(d) {
+  if (!d || d.lat == null) return;
+  const p = { lat: +d.lat, lng: +d.lng, label: String(d.label || 'Your place') };
+  setMyPlace(p);
+  closeSheet();
+  toast(`Serving ${p.label}`);
+}
+
+/* ══════════════ THE HEADER THAT GETS OUT OF THE WAY ═════════════
+   Home's header carries four things a customer needs on arrival — where they
+   are, who they are, what SAAHAA is, and the search box — and exactly one
+   thing they need while scanning results: the search box. So on the way down
+   everything but the search folds away; on the way back up it returns.
+
+   Hysteresis, not a threshold. A bare `y > 80` toggles twice a frame on a
+   trackpad at exactly 80px: the collapse changes the header height, which
+   changes the scroll position, which uncollapses it. Direction is latched at
+   the reversal point and a move of 12px is required to act on it. */
+const COLLAPSE_AT = 80, TRAVEL = 12, TOP = 24;
+let hdrY = 0, hdrDir = 0, hdrAnchor = 0, hdrCompact = false;
+
+function onHdrScroll() {
+  const y = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
+  const d = y - hdrY;
+  /* the anchor is where the direction TURNED, which is the previous position,
+     not this one — anchoring on `y` makes a single large jump (an in-page
+     anchor, a restored scroll position) look like no travel at all */
+  if (d > 0 && hdrDir <= 0) { hdrDir = 1; hdrAnchor = hdrY; }
+  if (d < 0 && hdrDir >= 0) { hdrDir = -1; hdrAnchor = hdrY; }
+  hdrY = y;
+  if (y <= TOP) hdrCompact = false;
+  else if (hdrDir > 0 && y > COLLAPSE_AT && y - hdrAnchor >= TRAVEL) hdrCompact = true;
+  else if (hdrDir < 0 && hdrAnchor - y >= TRAVEL) hdrCompact = false;
+  applyHdr();
+}
+function applyHdr() {
+  const el = document.querySelector('.hdr--home');
+  if (el) el.classList.toggle('hdr--compact', hdrCompact);
+}
+window.addEventListener('scroll', onHdrScroll, { passive: true });
+
 function matchCat(c, q) {
   const n = q.toLowerCase();
   return c.name.toLowerCase().includes(n) || (c.blurb || '').toLowerCase().includes(n) ||
@@ -82,11 +299,15 @@ function supplyLine(c) {
 function tileHtml(c, wide = false) {
   return `<button class="tile${wide ? ' tile--wide' : ''}" data-act="cat.open" data-id="${c.id}"
       style="--tile-accent:${esc(c.accent || '#C99A5B')}" aria-label="${esc(c.name)}">
-    ${hasIcon(c.id) ? medallion(c.id) : `<span class="med" aria-hidden="true">${c.ico}</span>`}
+    ${hasIcon(c.id) ? medallion(c.id) : `<span class="med" aria-hidden="true">${esc(c.name[0])}</span>`}
     <span class="lbl">${esc(c.name)}</span>
     <span class="from">${esc(supplyLine(c))}</span>
   </button>`;
 }
+
+/* a category's chip glyph is its SVG icon — never the registry's emoji, which
+   renders as tofu or fragments on the phones this app is for (see icons.js) */
+const catGlyph = c => hasIcon(c.id) ? icon(c.id, { size: 14 }) : '';
 
 /* a suggestion chip is a real destination, never a decorative word */
 function smartChip(label, catId, ico) {
@@ -164,7 +385,7 @@ function searchResults(q) {
     <h3>Nothing matched &ldquo;${esc(q)}&rdquo;</h3>
     <p>These are live in ${esc(myArea())} right now.</p>
     <div class="chiprow" style="justify-content:center;flex-wrap:wrap;margin-top:14px">
-      ${services().slice(0, 4).map(c => smartChip(c.name, c.id, c.ico)).join('')}
+      ${services().slice(0, 4).map(c => smartChip(c.name, c.id, catGlyph(c))).join('')}
     </div></div>`;
 
   const st = getState();
@@ -189,7 +410,7 @@ function searchResults(q) {
   ${r.subHits.length ? sec('Exactly what you need', r.subHits.length,
     `<div class="chiprow" style="flex-wrap:wrap;gap:8px">${r.subHits.map(({ c, s }) =>
       `<button class="chip chip--smart" data-act="book.sub" data-id="${c.id}" data-sub="${esc(s)}">
-        <span class="chip__ic" aria-hidden="true">${c.ico}</span>${esc(s)}</button>`).join('')}</div>`) : ''}
+        <span class="chip__ic" aria-hidden="true">${catGlyph(c)}</span>${esc(s)}</button>`).join('')}</div>`) : ''}
 
   ${r.prodHits.length ? sec('On shop shelves', r.prodHits.length,
     `<div class="grid2">${r.prodHits.map(p => {
@@ -228,6 +449,10 @@ export function render() {
     .sort((a, b) => b.n - a.n).slice(0, 5).map(x => x.c);
   const recentChips = recent.map(t => ({ t, c: bestCat(t) })).filter(x => x.c);
 
+  // the header is rebuilt by every render; re-apply whatever the scroll
+  // position already decided, so a re-render never pops it back open
+  setTimeout(applyHdr, 0);
+
   return `
   <header class="hdr hdr--home on-plum glass glass--deep" style="border-radius:0 0 var(--r-xl) var(--r-xl)">
     <div class="wrap inner">
@@ -251,8 +476,8 @@ export function render() {
     </div>
 
     <div class="wrap hero">
-      <p class="eyebrow">${esc(myArea())} · one circle</p>
-      <h1 class="hero__title display">Everything your neighbourhood needs.</h1>
+      <p class="eyebrow hdr__fold">${esc(myArea())} · one circle</p>
+      <h1 class="hero__title display hdr__fold">Everything your neighbourhood needs.</h1>
       <div class="search hero__search">
         ${icon('search', { size: 20 })}
         <input id="q" type="search" placeholder="What do you need today?"
@@ -260,12 +485,12 @@ export function render() {
                aria-label="Search services, shops, products and your orders">
         ${q ? '<button class="btn btn--ghost btn--sm tap" data-act="search.clear" aria-label="Clear search">✕</button>' : ''}
       </div>
-      <p class="tiny" style="opacity:.82;max-width:44ch" style="margin:8px 4px 0">
+      <p class="tiny hdr__fold" style="opacity:.82;max-width:44ch;margin:8px 4px 0">
         One search finds people who come to you, shops that deliver to you, and your own orders.</p>
-      ${!q ? `<div class="chiprow" style="margin-top:12px;flex-wrap:wrap">
+      ${!q ? `<div class="chiprow hdr__fold" style="margin-top:12px;flex-wrap:wrap">
         ${recentChips.length
           ? recentChips.map(x => smartChip(x.t, x.c.id, icon('refresh', { size: 14 }))).join('')
-          : suggest.map(c => smartChip(c.name, c.id, c.ico)).join('')}
+          : suggest.map(c => smartChip(c.name, c.id, catGlyph(c))).join('')}
       </div>` : ''}
     </div>
   </header>
@@ -351,7 +576,7 @@ export function render() {
       <div class="cmark">${mark(180, { detail: true, glow: false })}</div>
       <div class="cw">One circle. One purpose.</div>
       <p class="micro muted" style="margin-top:10px">
-        SAAHAA · Hyderabad · prototype build — simulated escrow, no real funds
+        SAAHAA · locally, professionally · your money is held until the work is confirmed
       </p>
     </div>
   </main>
@@ -362,6 +587,35 @@ export function render() {
         gap:var(--sp-6,18px);align-items:start}
       .home-lay__main{min-width:0}
       .home-lay__side{position:sticky;top:12px}
+    }
+
+    /* a place label is now a real one — "Kondapur, Hyderabad", "Brooklyn, New
+       York City" — so it is allowed one line and no more */
+    .hdr--home .loc b{display:block;max-width:46vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    @media (min-width:768px){ .hdr--home .loc b{max-width:260px} }
+
+    /* THE COLLAPSE. Only transforms, opacity and max-height animate, so the
+       browser never re-lays-out the page mid-scroll. */
+    .hdr--home .inner,
+    .hdr--home .hdr__fold{
+      max-height:200px;opacity:1;transform:none;
+      transition:max-height var(--dur,.26s) var(--ease-out,ease),
+                 opacity .18s ease, transform .26s ease, margin .26s ease;
+    }
+    .hdr--home .hero{transition:padding .26s ease}
+    .hdr--home .hero__search{transition:height .26s ease, margin .26s ease}
+    .hdr--home.hdr--compact .inner,
+    .hdr--home.hdr--compact .hdr__fold{
+      max-height:0;opacity:0;transform:translateY(-6px);
+      margin-top:0;margin-bottom:0;padding-top:0;padding-bottom:0;
+      overflow:hidden;pointer-events:none;
+    }
+    .hdr--home.hdr--compact .hero{padding-top:2px;padding-bottom:2px}
+    .hdr--home.hdr--compact .hero__search{height:46px;margin-top:0}
+    .hdr--home.hdr--compact .hero__search input{height:44px}
+    @media (prefers-reduced-motion: reduce){
+      .hdr--home .inner,.hdr--home .hdr__fold,.hdr--home .hero,
+      .hdr--home .hero__search,.hdr--home .hero__search input{transition:none}
     }
   </style>`;
 }
@@ -380,7 +634,7 @@ function stepbar(cur) {
 export function openCategory(catId, sub = null) {
   const c = get('category', catId);
   if (c.kind === 'retail') { ctx.go('shops', catId); return; }
-  const m = flow.findMatch(catId);
+  const m = flow.findMatch(catId, { area: myPlace() });   // coordinates when we have them
   // The chosen sub-service used to be dropped on the floor: openCategory took
   // one argument, so the sheet re-rendered byte-identical, mount() skipped the
   // write, and tapping a chip did nothing visible. It now selects, and it is
@@ -517,7 +771,7 @@ export function avgOf(p) {
 }
 
 export function showAlternates(catId, sub = null) {
-  const m = flow.findMatch(catId);
+  const m = flow.findMatch(catId, { area: myPlace() });   // coordinates when we have them
   const list = [m.hero, ...m.alternates].filter(Boolean);
   const cat = get('category', catId);
   const base = (cat && cat.base) || 0;

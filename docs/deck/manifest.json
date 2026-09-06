@@ -2,7 +2,7 @@
   "title": "SAAHAA — how it works",
   "name": "How SAAHAA Works",
   "subtitle": "One circle for every service and every shop in your neighbourhood. Locally, professionally.",
-  "date": "v6.5.0 · Open Circle — Living Glass · September 2026",
+  "date": "v6.9.0 · Nothing borrowed · September 2026",
   "sections": [
     {
       "id": "customer",
@@ -13,6 +13,16 @@
           "title": "Home — everything your neighbourhood needs",
           "caption": "One search finds people who come to you, shops that deliver to you, and your own orders. Services are grouped Home & Repairs · Care & Wellbeing · Learn, Move & Live · Shops Near You, rendered live from the registry.",
           "image": "docs/deck/c01-home.png"
+        },
+        {
+          "title": "Sign in — a number and a password",
+          "caption": "No names, no OTP theatre: a mobile number and a password you chose. Five wrong tries and the door slows down (30 s, doubling) — per number, remembered across reloads.",
+          "image": "docs/deck/c00-login.png"
+        },
+        {
+          "title": "Your place — anywhere in the world",
+          "caption": "Search any address (OpenStreetMap), use the device's location, or drag the pin. Enrolment and service are no longer bounded by a list of Hyderabad areas; the old names still resolve.",
+          "image": "docs/deck/c14-place.png"
         },
         {
           "title": "Search is the front door",
@@ -65,6 +75,11 @@
           "image": "docs/deck/c11-tracker.png"
         },
         {
+          "title": "Where your pro is",
+          "caption": "One tap on the tracker opens a real map: your place, your pro, the straight-line distance between them. The pin re-reads the pro's position on every render.",
+          "image": "docs/deck/c13-track-map.png"
+        },
+        {
           "title": "My SAAHAA",
           "caption": "Bookings, orders, wallet legs from the ledger, chats, reviews, settings — one connected hub, not a settings list.",
           "image": "docs/deck/c12-account.png"
@@ -85,6 +100,11 @@
           "title": "Sign up",
           "caption": "Name, mobile, trade, area, your usual rate. Two minutes.",
           "image": "docs/deck/p02-signup.png"
+        },
+        {
+          "title": "Set your working place",
+          "caption": "A partner signs up with the place they work from — searched, located or pinned — so matching uses real distance from day one.",
+          "image": "docs/deck/p13-place.png"
         },
         {
           "title": "Step 1 · Confirm your number",
@@ -140,12 +160,12 @@
     },
     {
       "id": "admin",
-      "title": "Admin — one owner, eight sections",
+      "title": "Admin — one owner, one console",
       "intro": "The system computes; you decide. The only two decisions that reach you: a background check to confirm and a Certified badge to award.",
       "slides": [
         {
           "title": "Dashboard",
-          "caption": "Users, partners, orders, revenue, GMV, escrow, approvals, disputes, savings, listings, booking and rating statistics — and the money flow CUSTOMER → ESCROW → PARTNER / SHOP.",
+          "caption": "Users, partners, orders, revenue, GMV, escrow, approvals, disputes, savings, listings, booking and rating statistics — and the money flow CUSTOMER → ESCROW → PARTNER / SHOP. The live map plots every pro and shop the owner serves — on OpenStreetMap, vendored, no third-party script.",
           "image": "docs/deck/a01-dashboard.png"
         },
         {
@@ -182,6 +202,16 @@
           "title": "System & Audit",
           "caption": "Health checks, feature flags as kill switches, backups, exports, the self-test suite, the audit log.",
           "image": "docs/deck/a08-system.png"
+        },
+        {
+          "title": "Charges — the owner's dials",
+          "caption": "Service markup on top of the worker's quote, the retail take and its cap, the delivery bands by distance, the rider dispatch cut. Validated ranges; Push makes them effective on every quote made afterwards; booked orders keep the fees they were booked with; every push is audited.",
+          "image": "docs/deck/a09-charges.png"
+        },
+        {
+          "title": "The Flow tracker",
+          "caption": "Everyone on SAAHAA, most recently active first: where they are, which step they are on, what they have spent or earned. Tap a row to unroll that person's whole journey; filter by role or stage.",
+          "image": "docs/deck/a10-flow.png"
         }
       ]
     },

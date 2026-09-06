@@ -22,6 +22,7 @@ import { VERSION, SCHEMA_VERSION, BUILD_ID } from '../../core/version.js';
 import { stage, isTerminal, trackerFor, trackerIndex } from '../../domain/orders.js';
 import { header, emptyBlock } from './shops.js';
 import * as auth from './auth.js';
+import { myPlace } from './home.js';
 
 const TONE_PILL = { ok:'pill--ok', info:'pill--info', warn:'pill--warn', bad:'pill--bad', soft:'pill--soft' };
 
@@ -165,12 +166,24 @@ export function render() {
              <button class="chip chip--smart" data-act="nav.shops">Browse shops</button>
            </div>`))}
 
-      ${card('Addresses', 'Where we come to you', `
+      ${(() => {
+        /* An area used to be one of twelve words. It is a place now: the short
+           label the user recognises, and — when they searched it or dropped a
+           pin — the coordinates every distance in the app is measured from. */
+        const place = myPlace();
+        const pinned = typeof place === 'object' && place.lat != null;
+        return card('Addresses', 'Where we come to you', `
         <div class="capsules" style="margin-top:10px">
           <span class="capsule capsule--ok"><span class="capsule__k">Serving</span>
             <span class="capsule__v">${esc(myArea())}</span>
             <span class="capsule__d">tap to change</span></span>
-        </div>`, { act: 'area.pick' })}
+          ${pinned ? `<span class="capsule capsule--info"><span class="capsule__k">Pinned</span>
+            <span class="capsule__v num">${place.lat.toFixed(3)}, ${place.lng.toFixed(3)}</span>
+            <span class="capsule__d">measured from here</span></span>` : ''}
+        </div>
+        ${pinned ? '' : `<p class="micro muted" style="margin-top:8px">
+          Drop a pin and every distance you see becomes a real one.</p>`}`, { act: 'area.pick' });
+      })()}
 
       ${walletCard(s.key)}
 

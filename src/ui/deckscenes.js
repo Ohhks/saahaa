@@ -1,15 +1,19 @@
 /* SAAHAA · ui/deckscenes.js — presentation scenes for headless capture.
 
-   Loaded ONLY when the page is opened with ?shot=<scene>. Each scene seeds a
-   real state through the real domain functions (nothing is mocked, nothing is
-   painted on), signs in as the right person, and walks to the screen — then
-   tools/shots.py photographs it with headless Chrome. The screenshots in the
-   deck are therefore the product, not a mock-up of it. */
+   Loaded ONLY when the page is opened with ?shot=<scene>. The capture URL is
+   always `?shot=<scene>&demo=1`: production boots with an empty store, and
+   these scenes need the example roster to walk through. (`shot` alone already
+   implies demo in app.js; the flag is written out so the URL says what it
+   does.)
+
+   Each scene builds its state through the real domain functions — nothing is
+   mocked, nothing is painted on — signs in as the right person, and walks to
+   the screen. tools/shots.py then photographs it with headless Chrome, so the
+   deck shows the running product rather than a mock-up of it. */
 
 import { ctx, getState, dispatch, saveSession } from '../core/ctx.js';
 import { nid } from '../core/id.js';
 import { sha256 } from '../core/crypto.js';
-import * as adminauth from '../core/adminauth.js';
 import * as flow from '../domain/flow.js';
 import * as auction from '../domain/auction.js';
 import * as V from '../domain/verification.js';
@@ -19,6 +23,7 @@ import * as auth from './views/auth.js';
 import * as admin from './views/admin.js';
 import * as onboard from './views/onboard.js';
 import * as partner from './views/partner.js';
+import * as orders from './views/orders.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const byMobile = m => getState().users.find(u => u.mobile === m);
@@ -85,10 +90,12 @@ async function retailOrder() {
 async function adminAt(section) {
   /* adminauth.login runs PBKDF2, which is real CPU time — headless Chrome's
      virtual-time budget can expire before it resolves and photograph the wrong
-     screen. Write the session adminauth itself would write; same shape, same
-     idle/absolute expiry checks apply. */
+     screen. So the capture writes the session adminauth itself would write:
+     same shape, same idle/absolute expiry checks apply. No password is used
+     or held anywhere in this file. */
   const sess = { t: 'shot', start: Date.now(), touched: Date.now() };
-  try { sessionStorage.setItem('SAAHAA_ADMIN_SESS', JSON.stringify(sess)); } catch (e) { await adminauth.login('admin', adminauth.DEMO_PASSWORD, getState().admin); }
+  try { sessionStorage.setItem('SAAHAA_ADMIN_SESS', JSON.stringify(sess)); }
+  catch (e) { console.warn('[shot] could not open an admin session', e); }
   admin.setSection(section);
   ctx.go('admin');
 }
@@ -99,6 +106,8 @@ async function startAsk(catId) {
   ask.startAsk(catId, m.hero.id, held);
   return auction.myRequests()[0];
 }
+
+const scrollTo = sel => { const el = document.querySelector(sel); if (el) el.scrollIntoView({ block: 'center' }); };
 
 const SCENES = {
   /* ── customer ─────────────────────────────────────────────── */
@@ -119,6 +128,10 @@ const SCENES = {
     getState().products.filter(p => p.shopId === shop.id && p.active).slice(0, 3).forEach(p => flow.addToCart(p, 1)); ctx.go('cart'); },
   async 'c11-tracker'(){ const { o } = await bookWithHero('plumbing'); flow.advance(o.id, 'EN_ROUTE'); ctx.go('order', o.id); },
   async 'c12-account'(){ login(CUSTOMER); ctx.go('account'); },
+  async 'c00-login'()  { auth.setAuthTab('login'); auth.setAuthRole('customer'); ctx.go('auth'); },
+  async 'c13-track-map'(){ const { o } = await bookWithHero('plumbing'); flow.advance(o.id, 'EN_ROUTE'); ctx.go('order', o.id);
+    await sleep(300); orders.toggleMap(o.id); await sleep(2500); scrollTo('#orderMap'); },
+  async 'c14-place'()  { login(CUSTOMER); ctx.go('home'); await sleep(300); home.openPlacePicker(); await sleep(2500); },
 
   /* ── partner ──────────────────────────────────────────────── */
   async 'p01-earn'()   { ctx.go('earn'); },
@@ -139,6 +152,7 @@ const SCENES = {
   async 'p11-job'()    { const { o, partner: pr } = await bookWithHero('plumbing'); flow.advance(o.id, 'EN_ROUTE'); flow.advance(o.id, 'ARRIVED');
     loginPartner(pr.id); ctx.go('order', o.id); },
   async 'p12-shop'()   { login(SHOP_OWNER); partner.setShopTab('catalog'); ctx.go('shopadmin'); },
+  async 'p13-place'()  { auth.setAuthTab('signup'); auth.setAuthRole('partner'); ctx.go('auth'); await sleep(2500); scrollTo('#suMap'); },
 
   /* ── admin ────────────────────────────────────────────────── */
   async 'a01-dashboard'() { await bookWithHero('plumbing'); await adminAt('dash'); },
@@ -157,6 +171,8 @@ const SCENES = {
     dispatch({ type: 'order/patch', payload: { id: o.id, patch: { otpVerified: true } } }); flow.advance(o.id, 'IN_PROGRESS');
     flow.addEvidence(o.id, 'After'); flow.markDone(o.id); await flow.confirmAndRelease(o.id, 1); await adminAt('finance'); },
   async 'a08-system'()    { await adminAt('system'); },
+  async 'a09-charges'()   { await adminAt('finance'); await sleep(400); scrollTo('#pxService'); },
+  async 'a10-flow'()      { await bookWithHero('plumbing'); await adminAt('people'); await sleep(400); scrollTo('[data-act="admin.flow.pick"]'); },
 };
 
 export async function run(id) {

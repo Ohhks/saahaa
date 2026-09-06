@@ -6,7 +6,7 @@
        authorises nothing on its own; Row Level Security decides access.
 
    WHAT MUST NEVER APPEAR HERE, OR ANYWHERE IN THIS REPO:
-     · the service_role key  (bypasses ALL RLS — it is a master key)
+     · the service-role key  (bypasses ALL RLS — it is a master key)
      · the database password
      · any personal access token
    Those live only in GitHub Actions secrets and in your Supabase dashboard.

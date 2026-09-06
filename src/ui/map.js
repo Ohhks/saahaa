@@ -27,6 +27,8 @@
    seeded with "Madhapur" breaks. */
 
 const BASE = './vendor/leaflet/';
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const COLORS = new Set(['#7C3AED', '#E0B558', '#14B8A6', '#EF4444', '#3B82F6', '#22C55E', '#64748B']);
 let leaflet = null, loading = null;
 
 export function ready() {
@@ -57,6 +59,9 @@ export function ready() {
 
 /* SAAHAA-coloured pins: a small SVG, so a customer and a pro never look alike */
 function pinIcon(L, color = '#7C3AED', glyph = '') {
+  // a popup and a divIcon are HTML: colour is whitelisted, the glyph escaped
+  if (!COLORS.has(String(color).toUpperCase())) color = '#7C3AED';
+  glyph = esc(String(glyph).slice(0, 2));
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="42" viewBox="0 0 30 42">
     <path d="M15 41s-13-13.6-13-24A13 13 0 0 1 28 17c0 10.4-13 24-13 24z" fill="${color}" stroke="#fff" stroke-width="2"/>
     <circle cx="15" cy="17" r="6" fill="#fff"/>${glyph ? `<text x="15" y="21" font-size="10" text-anchor="middle" fill="${color}" font-family="system-ui" font-weight="700">${glyph}</text>` : ''}</svg>`;
@@ -73,21 +78,25 @@ export function mapInto(el, { center = [17.4486, 78.3908], zoom = 13, interactiv
   }).addTo(map);
   map.setView(center, zoom);
   const layers = [];
+  /* destroy() sets this: the 60ms invalidate timer, or a caller holding a stale
+     handle, must never touch a removed map — Leaflet throws on `_leaflet_pos`. */
+  let dead = false;
   const handle = {
     map,
     pin(lat, lng, o = {}) {
-      const m = L.marker([lat, lng], { icon: pinIcon(L, o.color, o.glyph), draggable: !!o.draggable, title: o.label || '' }).addTo(map);
-      if (o.label) m.bindPopup(o.label);
+      if (dead) return null;
+      const m = L.marker([lat, lng], { icon: pinIcon(L, o.color, o.glyph), draggable: !!o.draggable, title: String(o.label || '').slice(0, 120) }).addTo(map);
+      if (o.label) m.bindPopup(esc(o.label));   // Leaflet renders a popup string as HTML
       if (o.onMove) m.on('dragend', e => { const p = e.target.getLatLng(); o.onMove({ lat: +p.lat.toFixed(6), lng: +p.lng.toFixed(6) }); });
       layers.push(m); return m;
     },
-    circle(lat, lng, meters, o = {}) { const c = L.circle([lat, lng], { radius: meters, color: o.color || '#E0B558', weight: 1, fillOpacity: .08 }).addTo(map); layers.push(c); return c; },
-    line(points, o = {}) { const l = L.polyline(points, { color: o.color || '#E0B558', weight: 3, dashArray: o.dashed ? '6 6' : null }).addTo(map); layers.push(l); return l; },
-    fit(points, pad = 40) { if (points.length === 1) map.setView(points[0], 15); else if (points.length) map.fitBounds(points, { padding: [pad, pad] }); },
+    circle(lat, lng, meters, o = {}) { if (dead) return null; const c = L.circle([lat, lng], { radius: meters, color: o.color || '#E0B558', weight: 1, fillOpacity: .08 }).addTo(map); layers.push(c); return c; },
+    line(points, o = {}) { if (dead) return null; const l = L.polyline(points, { color: o.color || '#E0B558', weight: 3, dashArray: o.dashed ? '6 6' : null }).addTo(map); layers.push(l); return l; },
+    fit(points, pad = 40) { if (dead) return; if (points.length === 1) map.setView(points[0], 15); else if (points.length) map.fitBounds(points, { padding: [pad, pad] }); },
     on(ev, fn) { map.on(ev, e => fn(e.latlng ? { lat: +e.latlng.lat.toFixed(6), lng: +e.latlng.lng.toFixed(6) } : e)); },
-    clear() { layers.splice(0).forEach(l => map.removeLayer(l)); },
-    invalidate() { setTimeout(() => map.invalidateSize(), 60); },
-    destroy() { try { map.remove(); } catch (e) {} },
+    clear() { if (dead) return; layers.splice(0).forEach(l => map.removeLayer(l)); },
+    invalidate() { setTimeout(() => { if (dead || !map._container) return; try { map.invalidateSize(); } catch (e) {} }, 60); },
+    destroy() { dead = true; try { map.remove(); } catch (e) {} },
   };
   handle.invalidate();
   return handle;

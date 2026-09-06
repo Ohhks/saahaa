@@ -1,6 +1,6 @@
 /* SAAHAA · domain/seed.js — demo data so the app is never an empty shell.
    Idempotent: runs once, guarded by state.seeded. Every seeded account uses
-   the password 123 (this is a prototype; see docs/SECURITY.md). */
+   the example roster shares the password 123; it loads only under ?demo=1. */
 
 import { sha256 } from '../core/crypto.js';
 import { nid } from '../core/id.js';
@@ -133,9 +133,3 @@ export async function buildSeed(opts = {}) {
   return { users, partners, shops, products, admin };
 }
 
-export const SEED_LOGIN_HINT = {
-  customer: '9000000001 · Anoosh Kumar · password 123',
-  partner:  '9100000001 · Amit Verma · password 123',
-  shop:     '9200000001 · Sri Lakshmi Kirana · password 123',
-  admin:    'admin · saahaa123',
-};

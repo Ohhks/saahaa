@@ -9,19 +9,125 @@
 
    The stage labels are the machine's own. They are never renamed here. */
 
-import { esc, sheet, closeSheet, toast, clockTime, timeAgo } from '../dom.js';
+import { mount, esc, sheet, closeSheet, toast, clockTime, timeAgo } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
-import { ctx, getState, me, myOrders } from '../../core/ctx.js';
+import { ctx, getState, me, myArea, myOrders } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
 import { trackerFor, trackerIndex, stage, canTransition, isTerminal } from '../../domain/orders.js';
+import { kmBetween, etaMins, geoOf, nameOf } from '../../domain/match.js';
+import * as gmap from '../map.js';
 import * as flow from '../../domain/flow.js';
 import * as M from '../../core/money.js';
 import { header, emptyBlock } from './shops.js';
+
+/* ══════════════ THE MAP ON A LIVE ORDER ════════════════════════
+   "3 km away" is a number. A customer waiting at their door wants to know
+   WHERE — and a pro on the way wants to see the same picture, so neither of
+   them is describing a landmark down a phone line.
+
+   Customer gold, pro violet, shop teal — the same three colours the rest of
+   the product uses for those three people. The line between them is dashed
+   because it is a distance, not a route: we do not have turn-by-turn and we
+   will not draw a road we cannot promise. */
+const PIN = { customer: '#E0B558', partner: '#7C3AED', shop: '#14B8A6' };
+let openMapId = null;                 // which order has its map card open
+const maps = new Map();               // element id → { el, h }
+
+export function toggleMap(id) {
+  openMapId = openMapId === id ? null : id;
+  ctx.render();
+}
+
+/* the two ends of the order, in coordinates where we have them and in names
+   where we do not — kmBetween() understands both */
+function endsOf(o) {
+  const st = getState();
+  const cust = o.customerLoc ||
+    ((st.users.find(u => u.key === o.customerKey) || {}).loc) ||
+    o.customerArea || myArea();
+  if (o.kind === 'service') {
+    // re-read the partner on every render: this is what makes the pin move
+    const p = st.partners.find(x => x.id === o.partnerId) || {};
+    return { cust, them: p.loc || p.area || o.partnerArea, colour: PIN.partner,
+             name: o.partnerName || p.name || 'Your pro', role: 'Pro' };
+  }
+  const sh = st.shops.find(x => x.id === o.shopId) || {};
+  return { cust, them: sh.loc || sh.area || o.shopArea, colour: PIN.shop,
+           name: o.shopName || sh.name || 'The shop', role: 'Shop' };
+}
+
+function mapCard(o, { interactive = true, id = 'orderMap' } = {}) {
+  const e = endsOf(o);
+  const km = kmBetween(e.cust, e.them);
+  const eta = etaMins(km);
+  const plotted = !!(geoOf(e.cust) && geoOf(e.them));
+  return `<div class="card glass" style="padding:12px;margin-top:12px">
+    <div class="between" style="margin-bottom:8px">
+      <span class="eyebrow">On the map</span>
+      <span class="meta">${km} km apart · ~${eta} min</span>
+    </div>
+    <div id="${id}" style="height:220px;border-radius:var(--r-md);overflow:hidden;
+      border:1px solid var(--border);background:var(--surface-2)"></div>
+    <div class="row" style="gap:12px;margin-top:8px;flex-wrap:wrap">
+      <span class="micro muted"><b style="color:${PIN.customer}">●</b> You · ${esc(nameOf(e.cust))}</span>
+      <span class="micro muted"><b style="color:${e.colour}">●</b> ${esc(e.role)} · ${esc(nameOf(e.them))}</span>
+    </div>
+    ${plotted ? '' : `<p class="micro muted" style="margin-top:6px">
+      One of these is an area name with no coordinates yet, so the distance is an estimate.</p>`}
+  </div>`;
+}
+
+/* One mounter for both maps on the screen — the customer's card and the pro's
+   job panel — keyed by element, so a re-render reuses the map it already has
+   instead of tearing down and rebuilding a tile layer. */
+async function mountMap(orderId, id, interactive) {
+  const first = document.getElementById(id);
+  if (!first) { kill(id); return; }
+  try { await gmap.ready(); }
+  catch (e) {
+    mount(first, '<p class="micro muted" style="padding:12px">Map unavailable right now.</p>');
+    return;
+  }
+  const el = document.getElementById(id);
+  if (!el) { kill(id); return; }
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o) { kill(id); return; }
+  const e = endsOf(o);
+  const A = geoOf(e.cust), B = geoOf(e.them);
+  if (!A && !B) { mount(el, '<p class="micro muted" style="padding:12px">No coordinates on this order yet.</p>'); return; }
+
+  let rec = maps.get(id);
+  if (!rec || rec.el !== el) {
+    kill(id);
+    const c = A || B;
+    rec = { el, h: gmap.mapInto(el, { center: [c.lat, c.lng], zoom: 13, interactive }) };
+    if (!rec.h) return;
+    maps.set(id, rec);
+  }
+  const h = rec.h;
+  h.clear();
+  const pts = [];
+  if (A) { h.pin(A.lat, A.lng, { color: PIN.customer, label: 'You', glyph: 'Y' }); pts.push([A.lat, A.lng]); }
+  if (B) { h.pin(B.lat, B.lng, { color: e.colour, label: e.name, glyph: e.role[0] }); pts.push([B.lat, B.lng]); }
+  if (pts.length === 2) h.line(pts, { color: e.colour, dashed: true });
+  h.fit(pts, 46);
+  h.invalidate();
+}
+function kill(id) {
+  const rec = maps.get(id);
+  if (rec && rec.h) rec.h.destroy();
+  maps.delete(id);
+}
+/* a map whose element left the document is a leaked tile layer */
+function sweepMaps() {
+  for (const [id, rec] of [...maps]) if (!document.body.contains(rec.el)) kill(id);
+}
 
 const TONE_BADGE = { ok:'badge--ok', info:'badge--info', warn:'badge--warn', bad:'badge--bad', soft:'badge--soft' };
 const TONE_PILL  = { ok:'pill--ok', info:'pill--info', warn:'pill--warn', bad:'pill--bad', soft:'pill--soft' };
 
 export function renderList() {
+  sweepMaps();
   const list = myOrders();
   if (!me()) return `${header('Your orders', '')}<main class="wrap">
     ${emptyBlock('Sign in to see orders', 'Your bookings and deliveries live here.',
@@ -86,7 +192,7 @@ function timeline(o, track, idx) {
       const cls = i < idx ? 'done' : i === idx ? 'cur' : 'pend';
       const hit = (o.history || []).find(h => h.stage === sg.id);
       return `<li class="timeline__node ${cls}"${i === idx ? ' aria-current="step"' : ''}>
-        <span class="timeline__dot" aria-hidden="true">${i < idx ? '✓' : sg.ico || ''}</span>
+        <span class="timeline__dot" aria-hidden="true">${i < idx ? '✓' : i + 1}</span>
         ${i < track.length - 1 ? '<span class="timeline__bar" aria-hidden="true"></span>' : ''}
         <span class="timeline__label"><b>${esc(sg.label)}</b>
           <span class="meta">${hit ? clockTime(hit.at) : i === idx ? 'now' : ''}</span></span>
@@ -108,6 +214,17 @@ export function renderDetail(orderId) {
   const isShop = s && s.role === 'shop' && getState().shops.some(x => x.ownerKey === s.key && x.id === o.shopId);
   const chats = getState().chats[o.id] || [];
   const running = !isTerminal(o.stage);
+  const ends = endsOf(o);
+  /* the stored o.km was measured once, from area names, at booking time.
+     Coordinates are better and they are current. */
+  const km = kmBetween(ends.cust, ends.them);
+  const showMap = openMapId === o.id;
+
+  sweepMaps();
+  setTimeout(() => {
+    if (showMap) mountMap(o.id, 'orderMap', true); else kill('orderMap');
+    if (document.getElementById('jobMap')) mountMap(o.id, 'jobMap', false); else kill('jobMap');
+  }, 0);
 
   return `
   ${header(o.kind === 'service' ? cat.name : o.shopName, st.label)}
@@ -122,7 +239,12 @@ export function renderDetail(orderId) {
       </div>
       <b class="cmd__title h-display" style="display:block;margin-top:8px">${esc(st.label)}</b>
       <p class="cmd__sub">${esc(o.kind === 'service' ? o.partnerName : o.shopName)}
-        · ${o.km || 0} km · ${o.eta || 0} min away</p>
+        · ${km} km · ${o.eta || etaMins(km)} min away</p>
+      <div class="row" style="gap:8px;margin-top:10px">
+        <button class="btn btn--secondary btn--sm" data-act="order.map" data-id="${esc(o.id)}"
+          aria-pressed="${showMap}">${icon('pin', { size: 14 })} ${showMap ? 'Hide map' : 'Map'}</button>
+      </div>
+      ${showMap ? mapCard(o) : ''}
       <div class="capsules" style="margin-top:12px">
         <span class="capsule capsule--gold"><span class="capsule__k">You pay${o.provisional ? ' (est.)' : ''}</span>
           <span class="capsule__v num">${M.fmt(o.customerPays)}</span></span>
@@ -247,8 +369,15 @@ function actionPanel(o, r) {
     // no legal move but cancel. The pro can now accept it themselves.
     if (s === 'MATCHING')    return panel('New job for you', B('stage.accept', 'Accept this job'));
     if (s === 'ASSIGNED')    return panel('Head to the customer', B('stage.enroute', 'Start travelling'));
-    if (s === 'EN_ROUTE')    return panel('Arrived?', B('stage.arrived', "I've arrived"));
+    /* The pro is travelling to a place, not to a word. The same map the
+       customer is looking at, without the controls — a job card is not a place
+       to go exploring. */
+    if (s === 'EN_ROUTE')    return panel('Arrived?',
+      `${mapCard(o, { interactive: false, id: 'jobMap' })}
+       <div style="height:12px"></div>${B('stage.arrived', "I've arrived")}`);
     if (s === 'ARRIVED')     return panel('Ask the customer for their 4-digit code', `
+      ${mapCard(o, { interactive: false, id: 'jobMap' })}
+      <div style="height:12px"></div>
       <div class="otp-row" style="justify-content:center;margin-bottom:14px">
         ${[0,1,2,3].map(i => `<input id="otp${i}" inputmode="numeric" maxlength="1" data-role="otp">`).join('')}
       </div>${B('otp.submit', 'Verify & start work')}`);

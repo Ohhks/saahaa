@@ -26,16 +26,17 @@ import { esc, sheet, closeSheet, toast, ratingStars } from '../dom.js';
 import { get } from '../../core/registry.js';
 import * as A from '../../domain/auction.js';
 import { budgetChips, priceScore } from '../../domain/bidding.js';
-import { quoteService, SERVICE_MARKUP } from '../../domain/pricing.js';
+import { quoteService, liveMarkup } from '../../domain/pricing.js';
 
 /* Workers bid the DEAL — their own rate, which they keep 100% of. The
-   customer is charged the deal plus the platform's 8%. Showing the customer
+   customer is charged the deal plus the platform's service markup — the LIVE
+   one from Admin → Charges, never a constant. Showing the customer
    a worker's raw rate while charging them the all-in total made every saving
    figure on this screen wrong: it promised a Rs.66 saving on a booking that
    actually saved Rs.23. Every customer-facing number here is what they PAY;
    every worker-facing number is what he EARNS. Never mix the two. */
 const pay = deal => quoteService(deal).customerPays;
-const payGap = deal => Math.round(deal * (1 + SERVICE_MARKUP));
+const payGap = deal => Math.round(deal * (1 + liveMarkup()));
 
 /* ── the live clock ───────────────────────────────────────────
    One interval for the whole module. A screen that stops moving while workers

@@ -25,7 +25,7 @@
 
    WHAT WE STORE. Never a document number. A SHA-256 of it plus the last four
    digits is enough to detect the same ID used twice and to show the pro
-   "…4821" as proof we have it. If this prototype's storage were ever read,
+   "…4821" as proof we have it. If a device's storage were ever read,
    there would be nothing in it to steal. */
 
 import { getState, dispatch, me } from '../core/ctx.js';
@@ -39,7 +39,7 @@ import { tradeBank, CONDUCT, shuffled, score, PASS, MAX_ATTEMPTS, LOCK_MS } from
 
 /* ── the chronology ────────────────────────────────────────── */
 export const STEPS = [
-  { id: 'phone',     n: 1, title: 'Confirm your number',   sub: 'A code comes to your phone. Type it in.',                 mins: 1 },
+  { id: 'phone',     n: 1, title: 'Confirm your number',   sub: 'A 4-digit code confirms your number.',                 mins: 1 },
   { id: 'identity',  n: 2, title: 'Show us your ID',       sub: 'Aadhaar, PAN or licence. We keep only the last 4 digits.', mins: 2 },
   { id: 'selfie',    n: 3, title: 'One photo of you',      sub: 'Customers see this face at the door.',                     mins: 1 },
   { id: 'trade',     n: 4, title: 'Five trade questions',  sub: 'Things every real pro knows. Get 4 right.',                mins: 3 },
@@ -120,7 +120,7 @@ export function settle(p) {
 }
 
 /* 1 · phone — the same virtual-OTP pattern the rest of the product uses.
-   In production this is an SMS; here the code is shown so the flow is real. */
+   Until the SMS rail is wired (docs/LAUNCH.md) the code is shown on screen. */
 export function sendPhoneCode(p) {
   const code = makeOtp();
   patchVerification(p, v => { v.phoneCode = code; v.phoneSentAt = Date.now(); return v; });

@@ -13,9 +13,9 @@
      · step-up re-auth for money movements above ₹5,000
      · every attempt, success and failure written to the audit log
 
-   The demo credential (admin / saahaa123) is SEEDED so the owner is never
-   locked out of their own prototype, and the console shows a standing banner
-   asking for it to be changed. changePassword() replaces it for good. */
+   The owner's credential is a PBKDF2 hash shipped in core/config.js
+   (ADMIN_BOOTSTRAP) — never a password. Any state still carrying the retired
+   demo credential is replaced by it at boot (migration v8). */
 
 import * as persist from './persist.js';
 import { ADMIN_BOOTSTRAP } from './config.js';

@@ -717,7 +717,7 @@ function shopSetup(s) {
         <div class="row">
           <span class="avatar avatar--lg">${esc(s.name[0])}</span>
           <div class="grow"><b>${esc(s.name)}</b>
-            <p class="tiny muted" style="margin-top:4px">${cat.ico} ${esc(cat.name)} · ${esc(s.area)} · ${esc(s.mobile)}</p></div>
+            <p class="tiny muted" style="margin-top:4px">${esc(cat.name)} · ${esc(s.area)} · ${esc(s.mobile)}</p></div>
         </div>
         <div class="rule" style="margin:12px 0"></div>
         ${line('Minimum order', `<b class="num">${M.fmt(s.minOrder)}</b>`)}

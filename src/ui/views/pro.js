@@ -24,6 +24,7 @@ import * as M from '../../core/money.js';
 import { trustScore, tier } from '../../domain/trust.js';
 import { kmBetween, etaMins } from '../../domain/match.js';
 import { myArea, dispatch } from '../../core/ctx.js';
+import { myPlace } from './home.js';
 import { header } from './shops.js';
 import { readiness } from '../../domain/verification.js';
 
@@ -53,7 +54,10 @@ export function render(id) {
   const ts = trustScore(p);
   const s = me();
   const mine = !!(s && s.key === p.userKey);
-  const km = kmBetween(myArea(), p.area);
+  /* Coordinates on both ends where we have them, names where we do not.
+     "4 km from you" printed off a twelve-word table was a guess with a decimal
+     point on it; myPlace() and p.loc make it a measurement. */
+  const km = kmBetween(myPlace(), p.loc || p.area);
   const reviews = getState().reviews.filter(r => r.partnerId === p.id && !r.hidden).slice(0, 8);
   const a = avg(p);
   const prof = p.profile || {};

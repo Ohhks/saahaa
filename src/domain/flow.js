@@ -506,7 +506,10 @@ export async function settleRetail(orderId) {
   // rider order; and GST sat inside the fee leg, so `revenue` mixed
   // gross-of-GST retail with net-of-GST service in the same total.
   const feeExGst = Math.max(0, o.platformFee - (o.gst | 0));
-  const dispatchCut = Math.max(0, (o.deliveryFee | 0) - (o.riderPayout | 0));
+  // the dispatch cut is the RESIDUAL of what the customer paid after the shop,
+  // the fee, the GST and the rider — so a free-delivery rider order (shop
+  // absorbed the ride, cut still carved) leaves nothing stranded in escrow
+  const dispatchCut = Math.max(0, (o.customerPays | 0) - (o.shopPayout | 0) - (o.platformFee | 0) - (o.riderPayout | 0));
   const shopPayout = Math.max(0, o.shopPayout - lineRefund);
   await ledger('SHOP_PAYOUT', shopPayout, acct.escrow(o.id), acct.shop(o.shopId), {});
   if (lineRefund) await ledger('REFUND', lineRefund, acct.escrow(o.id), acct.customer(o.customerKey), { reason: 'unavailable items' });

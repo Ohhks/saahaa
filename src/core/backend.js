@@ -9,7 +9,7 @@
    verified state is listed under `MONEY_OPS`. In the cloud adapter each one is
    a single SECURITY DEFINER Postgres function — the browser cannot compute a
    balance, cannot mint a rupee, and cannot skip a state. In the local adapter
-   they are simulated in JS, clearly labelled as a prototype.
+   they run in JS until the Supabase RPCs are wired (docs/SETUP.md).
 
    Adding a new operation: add it to OPS, implement it in both adapters, and
    the self-test suite will fail until you do. */

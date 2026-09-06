@@ -4,8 +4,12 @@ SAAHAA · tools/shots.py — photographs the real app for the presentation.
 
 For every scene in docs/deck/manifest.json it starts headless Chrome on a
 FRESH profile (so every scene begins from a clean seed), opens
-http://localhost:8772/?shot=<scene>, lets virtual time run so timers,
+http://localhost:8772/?shot=<scene>&demo=1, lets virtual time run so timers,
 auctions and animations settle, and writes docs/deck/<scene>.png.
+
+`demo=1` is what loads the example roster: the app itself starts with an empty
+store, so without it every scene would photograph an empty screen. It is a
+local capture switch and never ships to a device.
 
     python tools/shots.py              all scenes
     python tools/shots.py c06 a01      scenes whose id starts with these
@@ -44,7 +48,7 @@ for scene in scenes:
     out = os.path.join(DECK, scene + ('-d' if DESKTOP and not scene.startswith('a') else '') + '.png')
     cmd = [CHROME, '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--disable-extensions', '--force-prefers-reduced-motion',
            f'--window-size={w},{h}', '--virtual-time-budget=30000', f'--user-data-dir={prof}',
-           f'--screenshot={out}', f'{URL}/?shot={scene}']
+           f'--screenshot={out}', f'{URL}/?shot={scene}&demo=1']
     t = time.time()
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)

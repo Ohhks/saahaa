@@ -25,9 +25,9 @@ import { buildSeed } from './domain/seed.js';
 import * as flow from './domain/flow.js';
 import * as auction from './domain/auction.js';
 import * as bidding from './domain/bidding.js';
-import { AREA_NAMES } from './domain/match.js';
 import './core/selftests.js';
 import './core/selftests.money.js';
+import './core/selftests.security.js';
 
 /* ui */
 import { mount, action, initActions, toast, sheet, closeSheet, esc, stickyToast } from './ui/dom.js';
@@ -230,8 +230,7 @@ function wireActions() {
   A('splash.replay', () => replaySplash());
 
   /* area */
-  A('area.pick', () => sheet('Where are you?', `<div class="grid2">${AREA_NAMES.map(a =>
-    `<button class="tile" data-act="area.set" data-area="${esc(a)}"><span class="lbl">${esc(a)}</span></button>`).join('')}</div>`));
+  A('area.pick', () => home.openPlacePicker());   // search, pin or device — anywhere in the world
   A('area.set', d => {
     // persist.read JSON.parses; a raw setItem here made every guest Madhapur
     // a signed-in user's area was updated in memory only, so it reverted on
@@ -307,7 +306,7 @@ function wireActions() {
   });
   /* ── worker wallet ─────────────────────────────────────────── */
   A('wallet.topup', d => sheet('Add money to your wallet', `
-    <p class="tiny muted" style="margin-bottom:12px">This is the money that gets locked when a job starts and comes back when it is finished. In production this is a UPI payment; here it is simulated.</p>
+    <p class="tiny muted" style="margin-bottom:12px">This is the money that gets locked when a job starts and comes back when it is finished. In production this is a UPI payment.</p>
     <div class="chiprow" style="flex-wrap:wrap;gap:8px">${[100, 200, 500, 1000].map(r =>
       `<button class="chip" data-act="wallet.topup.do" data-id="${d.id}" data-amt="${r * 100}">₹${r}</button>`).join('')}</div>`));
   A('wallet.topup.do',  d => flow.walletTopUp(d.id, Number(d.amt)).then(() => { closeSheet(); render(); }));
@@ -616,8 +615,8 @@ boot().catch(err => {
   console.error('[saahaa] boot failed', err);
   document.getElementById('app').innerHTML =
     `<main style="padding:40px 20px;font-family:system-ui">
-      <h1>SAAHAA could not start</h1><p>${String(err.message)}</p>
+      <h1>SAAHAA could not start</h1><p>${String(err.message).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))}</p>
       <p style="opacity:.6">v${VERSION} · ${BUILD_ID}</p>
-      <button onclick="localStorage.clear();location.reload()">Reset local data and retry</button>
+      <button id="bootReset">Reset local data and retry</button>
     </main>`;
 });

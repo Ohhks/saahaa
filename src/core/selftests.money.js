@@ -322,3 +322,37 @@ describe('settings · the owner dials', () => {
     expect(r.clean.deliveryBands[r.clean.deliveryBands.length - 1].maxKm).toBe(999);
   });
 });
+
+/* ── retail settlement · every rupee the customer paid leaves escrow ─────
+   The dispatch cut posted at settlement is the RESIDUAL of the customer's
+   payment after the shop, the fee and the rider. On a free-delivery rider
+   order the customer's delivery line is ₹0 while the rider is still paid out
+   of the shop's share — the old "deliveryFee − riderPayout" formula posted a
+   ₹0 cut there and stranded the carved ₹5 in escrow (ledger replay ≠ 0). */
+import { quoteRetail } from '../domain/pricing.js';
+describe('retail settlement · the dispatch cut is the residual, so escrow empties exactly', () => {
+  const lines = [{ unitPrice: 30000, qty: 2 }];              // ₹600 basket
+  const residual = q => q.customerPays - q.shopPayout - q.platformFee - q.riderPayout;
+  const cases = {
+    'rider, delivery charged':          { mode: 'rider',  km: 2 },
+    'rider, free delivery over ₹499':   { mode: 'rider',  km: 2, freeDeliveryAbove: 49900 },
+    'shop delivers itself':             { mode: 'self',   km: 2 },
+    'customer picks up':                { mode: 'pickup', km: 2 },
+  };
+  for (const [name, opts] of Object.entries(cases)) {
+    it(name, () => {
+      const q = quoteRetail(lines, { catId: 'kirana', ...opts });
+      expect(q.reconciles).toBeTrue();
+      expect(residual(q)).toBe(q.dispatchCut);
+      expect(residual(q)).toSatisfy(n => n >= 0, 'never negative');
+      expect(q.shopPayout + q.platformFee + q.riderPayout + residual(q)).toBe(q.customerPays);
+    });
+  }
+  it('free delivery really is free to the customer and the rider is still paid', () => {
+    const q = quoteRetail(lines, { catId: 'kirana', mode: 'rider', km: 2, freeDeliveryAbove: 49900 });
+    expect(q.deliveryFee).toBe(0);
+    expect(q.freeDelivery).toBeTrue();
+    expect(q.riderPayout).toSatisfy(n => n > 0, 'rider paid');
+    expect(residual(q)).toSatisfy(n => n > 0, 'the cut is carved even when the customer pays nothing for delivery');
+  });
+});

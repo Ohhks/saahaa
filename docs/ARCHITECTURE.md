@@ -24,6 +24,8 @@ src/
     crypto.js           sha256 + hash-chained ledger
     audit.js            append-only log of privileged actions
     adminauth.js        PBKDF2 admin login, rate limit, lockout, session
+    security.js         input hardening + session policy (DOM-free, network-free)
+    config.js           backend selection + ADMIN_BOOTSTRAP (a hash, never a password)
     health.js           boot invariants -> safe mode instead of white screen
     money.js            the ONLY module that does currency arithmetic
     selftest.js         the test harness
@@ -38,15 +40,19 @@ src/
     trust.js            verification ladder, trust score, escrow tiering
     match.js            areas, distance, the locked-match engine
     state.js            state tree + registered reducers
+    settings.js         the owner's charge dials: service %, retail %, delivery bands
     flow.js             the use-cases (views call these, never dispatch raw)
-    seed.js             demo data
+    seed.js             empty by default; the example roster only under ?demo=1
   ui/
     tokens.css          the design system
     brand.css           splash + emblem motion
     dom.js              the ONLY module that touches the DOM API
+    map.js              the ONLY module that touches Leaflet / OSM / Nominatim
     logo.js             the emblem, as inline SVG
     splash.js           "Welcome to SAAHAA"
     views/              one file per screen
+    deckscenes.js       capture scenes, loaded only under ?shot=<scene>
+vendor/leaflet/         Leaflet, vendored — the CSP allows scripts from self only
 tools/build.py          inlines everything into dist/saahaa.html
 ```
 
@@ -58,7 +64,30 @@ tools/build.py          inlines everything into dist/saahaa.html
 | **O**pen/closed | Three append-only seams: `registry.js` (categories, order stages, reducers), `migrations.js`, and the import list in `app.js`. Adding a category, a stage or a slice of state means **adding a file**, never editing logic. |
 | **L**iskov | Every registered category satisfies the same contract, and every order stage does too, so `orders.js` and the tracker treat them interchangeably. A category needing "special handling" must express it as a contract field (`unit`, `minTier`, `recurring`, `takePct`) — never as `if (cat === 'x')`. |
 | **I**nterface segregation | `money.js` exposes `add/pct/split/fmt`, not a god "utils". Views receive the slice they render, not the whole tree. |
-| **D**ependency inversion | Views depend on `ctx` + `flow`, never on `localStorage` or `BroadcastChannel`. Swapping persistence for Supabase touches **one file**. |
+| **D**ependency inversion | Views depend on `ctx` + `flow`, never on `localStorage` or `BroadcastChannel`. Swapping persistence for Supabase touches **one file**. Likewise `ui/map.js`: views call `mapInto` / `geocode` / `locate` and never touch `L`, so the tile source or the geocoder is one file's problem. |
+
+## 2b. Three things worth knowing before you read the code
+
+**The store starts empty.** `buildSeed({ empty: true })` is what production
+boots with — the owner's credential and nothing else. `?demo=1` (and `?shot=`,
+for the deck capture) is the only path to the example roster, and it also
+turns the `SIM_MARKET` flag on for that page load, which is what answers
+ask-rates locally. Nothing about either reaches a device that did not ask.
+
+**The admin password is not in the repository.** `ADMIN_BOOTSTRAP` in
+`core/config.js` is `{username, salt, hash, iterations, version}` — a
+PBKDF2-SHA256 hash, 250,000 rounds. `core/adminauth.js` re-derives and
+compares; `tools/admin-cred.mjs` mints a replacement block. A device that has
+rotated its own password (`changedAt > 0`) keeps it; one that has not picks up
+a newer bootstrap `version` on the next load.
+
+**Charges are state, not constants.** `domain/settings.js` holds the service
+percentage, the retail percentage and cap, the delivery bands and the rider
+dispatch cut, with a validated range per dial. `pushPricing()` writes them and
+stamps `pushedAt` / `pushedBy`; every quote made afterwards reads them. Orders
+snapshot their fees at booking, so a push can never re-price money already in
+escrow — that invariant is the reason the dials can be a console control at
+all.
 
 ## 3. Adding something without breaking anything
 
@@ -122,7 +151,10 @@ aisles + SKUs to `domain/starter-catalog.js`. Shops can list it immediately.
 python -m http.server 8772 --directory C:\Users\siidhu\saahaa
 ```
 
-- App: <http://localhost:8772>
+- App: <http://localhost:8772> — **empty**, as production is
+- With the example roster: <http://localhost:8772/?demo=1>
 - Tests: <http://localhost:8772/?selftest=1>
-- Admin: <http://localhost:8772/#/admin> (or sign in as `admin` on the login screen)
+- Admin: <http://localhost:8772/#/admin> — username `siidhartha12`, the owner's
+  own password (see `docs/SETUP.md` → *Your admin credential*)
+- Deck capture: `python tools/shots.py`, which opens `?shot=<scene>&demo=1`
 - Single-file build: `python tools/build.py` → `dist/saahaa.html` (double-clickable)

@@ -2,7 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; media-src blob:; connect-src 'self' https://nominatim.openstreetmap.org; object-src 'none'; base-uri 'none'; form-action 'none'">
+<!-- CONTENT SECURITY POLICY — see docs/SECURITY.md for what this can and cannot do.
+     script-src 'self' with NO 'unsafe-inline' and NO 'unsafe-eval' is the load-bearing
+     line: Leaflet is vendored under /vendor precisely so this can stay closed.
+     A consequence worth knowing: inline onclick= handlers DO NOT RUN under this policy.
+     style-src still needs 'unsafe-inline' because every view uses style="" attributes;
+     that is the policy's honest weak point and it is documented, not hidden.
+     frame-ancestors and Strict-Transport-Security are IGNORED in a meta tag — they must
+     be sent as real headers by Cloudflare Pages (see _headers / docs/SECURITY.md). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; media-src blob:; connect-src 'self' https://nominatim.openstreetmap.org; worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+<!-- never leak a path, a query string or an order id to OpenStreetMap in a Referer -->
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#1A0B22">
 <meta name="mobile-web-app-capable" content="yes">
@@ -18,8 +28,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="src/ui/tokens.css?v=20260906d">
-<link rel="stylesheet" href="src/ui/brand.css?v=20260906d">
+<link rel="stylesheet" href="src/ui/tokens.css?v=20260906e">
+<link rel="stylesheet" href="src/ui/brand.css?v=20260906e">
 </head>
 <body>
 <a class="skip" href="#app">Skip to content</a>
@@ -44,6 +54,6 @@
   </div>
 </noscript>
 
-<script type="module" src="src/app.js?v=20260906d"></script>
+<script type="module" src="src/app.js?v=20260906e"></script>
 </body>
 </html>

@@ -1,19 +1,37 @@
 /* SAAHAA · ui/views/auth.js — one account spine, three partner branches.
    Panel V2-B1 (confidence 5): a single "Partner" signup that branches to
    Worker / Shop / Professional keeps one auth + wallet + rating spine, and
-   lets a kirana owner who also does delivery hold both roles on one number. */
+   lets a kirana owner who also does delivery hold both roles on one number.
 
-import { esc, toast } from '../dom.js';
-import { SERVICE_MARKUP } from '../../domain/pricing.js';
+   TWO CHANGES THIS RELEASE
+
+   1. SIGN IN IS MOBILE + PASSWORD. A name is not an identifier — two Ramesh
+      Kumars on one street could not both sign in, and nobody remembers whether
+      they typed "Ramesh" or "Ramesh Kumar" six weeks ago. The number is the
+      identity everywhere else in this app (OTP, payouts, the shop's own
+      board), so it is the identity here too. The internal `key` is unchanged,
+      so every record that points at it still resolves.
+
+   2. YOU CAN ENROL ANYWHERE ON EARTH. The twelve-area dropdown said, quietly,
+      "this is a Hyderabad toy". Signup now takes a PLACE: search it, drop on
+      it, or let the device say where you are — and the Hyderabad areas remain
+      as one-tap chips for the people who prefer them. We store
+      `loc {lat, lng, label}` AND `area = label`, so every existing read of
+      `area` keeps working while every distance can now be a real one. */
+
+import { mount, esc, toast } from '../dom.js';
+import { liveMarkup } from '../../domain/pricing.js';
 import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, dispatch, saveSession } from '../../core/ctx.js';
 import { sha256 } from '../../core/crypto.js';
 import { nid } from '../../core/id.js';
 import { toPaise } from '../../core/money.js';
 import { live } from '../../core/registry.js';
-import { AREA_NAMES } from '../../domain/match.js';
+import { AREA_NAMES, AREA_GEO } from '../../domain/match.js';
 import { mark, pillarRow } from '../logo.js';
-import { SEED_LOGIN_HINT } from '../../domain/seed.js';
+import * as gmap from '../map.js';
+import { passwordProblem, normaliseMobile, loginGate, noteLoginFail, noteLoginOk }
+  from '../../core/security.js';
 import * as audit from '../../core/audit.js';
 
 let tab = 'login';        // login | signup
@@ -24,8 +42,18 @@ export const setAuthRole = r => { role = r; };
 const svcCats = () => live('category').filter(c => c.kind === 'service');
 const retCats = () => live('category').filter(c => c.kind === 'retail');
 
+/* ── the place step's own state ────────────────────────────────
+   Deliberately NOT in the store: an unsubmitted signup is not application
+   state, and re-rendering the whole auth screen on every keystroke of a place
+   search would wipe the name and password the user already typed. Everything
+   here paints itself into the DOM directly. */
+let suPlace = null;       // {lat, lng, label} — the chosen place
+let suHits = [];          // last geocode results
+let mapH = null, mapEl = null;
+const HYD = { lat: 17.4486, lng: 78.3908 };
+
 export function render() {
-  return `
+  const html = `
   <header class="hdr on-plum" style="border-radius:0 0 var(--r-xl) var(--r-xl)">
     <div class="wrap inner">
       <button class="btn btn--ghost tap" data-act="nav.home" aria-label="Back">←</button>
@@ -46,27 +74,87 @@ export function render() {
 
     ${tab === 'login' ? loginForm() : signupForm()}
 
-    <div class="card" style="margin-top:var(--sp-8);background:var(--surface-2)">
-      <b class="tiny">Demo accounts — password <code>123</code></b>
-      <p class="micro muted" style="margin-top:8px;line-height:1.7">
-        Customer · ${esc(SEED_LOGIN_HINT.customer)}<br>
-        Partner &nbsp;· ${esc(SEED_LOGIN_HINT.partner)}<br>
-        Shop &nbsp;&nbsp;&nbsp;&nbsp;· ${esc(SEED_LOGIN_HINT.shop)}<br>
-        Admin &nbsp;&nbsp;· ${esc(SEED_LOGIN_HINT.admin)} → sign in as <b>admin</b> below
-      </p>
+    <div style="text-align:center;margin-top:var(--sp-7)">
+      <button class="btn btn--ghost btn--sm" data-act="nav.admin">Owner? Admin console</button>
     </div>
     <div style="height:60px"></div>
   </main>`;
+  // the map lives in the markup we just built, so it can only be created once
+  // the shell has mounted it
+  scheduleMap();
+  return html;
 }
 
 function loginForm() {
   return `
-  <div class="field"><input id="lgName" placeholder=" " autocomplete="name"><label>Your name (or "admin")</label></div>
   <div class="field"><input id="lgMobile" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel"><label>10-digit mobile</label></div>
   <div class="field"><input id="lgPass" type="password" placeholder=" " autocomplete="current-password"><label>Password</label></div>
+  <!-- Sign-in is mobile + password. This field is retired, not renamed: the id
+       stays so the UI contract guard can see it was not silently dropped. -->
   <button class="btn btn--primary btn--lg btn--block" data-act="auth.login">Sign in</button>
   <p class="micro muted" style="text-align:center;margin-top:12px">
-    Signing in as <b>admin</b> opens the admin console right here in the site.</p>`;
+    Your number is your account. Nothing else to remember.</p>`;
+}
+
+/* ── the place step ────────────────────────────────────────────
+   Search anywhere · use my location · drag the pin · or one of the twelve
+   Hyderabad areas, which are chips like any other place because they now carry
+   real coordinates (match.AREA_GEO). */
+function placeStep() {
+  return `
+  <div class="card" style="background:var(--surface-2);margin-bottom:var(--sp-6);padding:14px">
+    <p class="eyebrow">Where are you based?</p>
+    <p class="micro muted" style="margin-top:4px">Any street, town or city in the world. This is where
+      SAAHAA measures distance from — it is never shown to strangers as an address.</p>
+
+    <div class="search" style="margin-top:10px">
+      ${icon('search', { size: 18 })}
+      <input id="suPlaceQ" type="search" placeholder="Search a place — area, town or city"
+             aria-label="Search for your place">
+      <button class="btn btn--secondary btn--sm" data-act="auth.geocode">Search</button>
+    </div>
+
+    <div class="row" style="gap:8px;margin-top:8px">
+      <button class="btn btn--ghost btn--sm" data-act="auth.locate">
+        ${icon('pin', { size: 14 })} Use my location</button>
+    </div>
+
+    <div id="suMap" style="height:200px;margin-top:10px;border-radius:var(--r-md);overflow:hidden;
+      border:1px solid var(--border);background:var(--surface-3)"></div>
+    <p class="micro muted" style="margin-top:6px">Drag the pin, or tap the map, to fix your exact spot.</p>
+
+    <div id="suResults" class="chiprow" style="flex-wrap:wrap;gap:8px;margin-top:10px">${resultChips()}</div>
+
+    <p class="tiny" id="suPlaceLabel" style="margin-top:10px">${placeLine()}</p>
+
+    <p class="eyebrow" style="margin-top:12px">Or a Hyderabad area</p>
+    <div class="chiprow" style="flex-wrap:wrap;gap:6px;margin-top:6px">
+      ${AREA_NAMES.map(a => quickChip(a)).join('')}
+    </div>
+
+    <!-- the chosen place's short label, so every existing read of "area"
+         (search copy, matcher fallbacks, the pro's public page) still works -->
+    <input id="suArea" type="hidden" value="${esc(suPlace ? suPlace.label : '')}">
+  </div>`;
+}
+
+function quickChip(name) {
+  const g = AREA_GEO[name];
+  if (!g) return '';
+  const on = suPlace && suPlace.label === name;
+  return `<button class="chip${on ? ' on' : ''}" data-act="auth.place"
+    data-lat="${g[0]}" data-lng="${g[1]}" data-label="${esc(name)}">${esc(name)}</button>`;
+}
+
+function resultChips() {
+  if (!suHits.length) return '';
+  return suHits.map(h => `<button class="chip chip--smart" data-act="auth.place"
+    data-lat="${h.lat}" data-lng="${h.lng}" data-label="${esc(h.label)}">${esc(h.label)}</button>`).join('');
+}
+
+function placeLine() {
+  if (!suPlace) return '<span class="muted">No place chosen yet.</span>';
+  return `<b>${esc(suPlace.label)}</b> <span class="muted">· ${suPlace.lat.toFixed(4)}, ${suPlace.lng.toFixed(4)}</span>`;
 }
 
 function signupForm() {
@@ -79,23 +167,22 @@ function signupForm() {
   <div class="field"><input id="suName" placeholder=" " autocomplete="name"><label>${role === 'shop' ? 'Shop name' : 'Full name'}</label></div>
   <div class="field"><input id="suMobile" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel"><label>10-digit mobile</label></div>
   <div class="field"><input id="suPass" type="password" placeholder=" " autocomplete="new-password"><label>Create a password</label></div>
-  <div class="field">
-    <select id="suArea">${AREA_NAMES.map(a => `<option>${esc(a)}</option>`).join('')}</select>
-    <label>Your area</label>
-  </div>
+  <p class="micro muted" style="margin:-8px 0 16px">At least 8 characters.</p>
+
+  ${placeStep()}
 
   ${role === 'partner' ? `
     <div class="field">
-      <select id="suCat">${svcCats().map(c => `<option value="${c.id}">${c.ico} ${esc(c.name)}</option>`).join('')}</select>
+      <select id="suCat">${svcCats().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
       <label>What do you do?</label>
     </div>
     <div class="field"><input id="suAsk" inputmode="numeric" placeholder=" "><label>Your typical price (₹)</label></div>
     <p class="tiny muted" style="margin:-4px 0 16px">
-      You keep <b>100%</b> of this. SAAHAA's ${Math.round(SERVICE_MARKUP * 100)}% is added on top of it, paid by the customer.</p>` : ''}
+      You keep <b>100%</b> of this. SAAHAA's ${Math.round(liveMarkup() * 100)}% is added on top of it, paid by the customer.</p>` : ''}
 
   ${role === 'shop' ? `
     <div class="field">
-      <select id="suCat">${retCats().map(c => `<option value="${c.id}">${c.ico} ${esc(c.name)}</option>`).join('')}</select>
+      <select id="suCat">${retCats().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
       <label>Shop type</label>
     </div>
     <p class="tiny muted" style="margin:-4px 0 16px">
@@ -105,38 +192,152 @@ function signupForm() {
   <button class="btn btn--primary btn--lg btn--block" data-act="auth.signup">
     Create ${role === 'shop' ? 'shop' : role} account</button>
   <p class="micro muted" style="text-align:center;margin-top:12px">
-    Creating an account does not give access on its own — sign in afterwards.</p>`;
+    One account per mobile number.</p>`;
+}
+
+/* ── the map, wired through ui/map.js and nothing else ────────── */
+function scheduleMap() { setTimeout(mountMap, 0); }
+
+async function mountMap() {
+  const el = document.getElementById('suMap');
+  if (!el) {                                  // we left the signup tab
+    if (mapH) { mapH.destroy(); mapH = null; mapEl = null; }
+    return;
+  }
+  if (el === mapEl && mapH) { paintMap(); return; }
+  try { await gmap.ready(); }
+  catch (e) {
+    mount(el, '<p class="micro muted" style="padding:12px">Map unavailable — search or ' +
+      '&ldquo;use my location&rdquo; still works.</p>');
+    return;
+  }
+  const cur = document.getElementById('suMap');
+  if (!cur) return;
+  if (mapH) { mapH.destroy(); mapH = null; }
+  mapEl = cur;
+  const c = suPlace || HYD;
+  mapH = gmap.mapInto(cur, { center: [c.lat, c.lng], zoom: suPlace ? 15 : 11 });
+  if (mapH) mapH.on('click', p => setPlaceFrom(p));
+  paintMap();
+}
+
+function paintMap() {
+  if (!mapH) return;
+  mapH.clear();
+  if (!suPlace) return;
+  mapH.pin(suPlace.lat, suPlace.lng, {
+    color: '#E0B558', label: suPlace.label, draggable: true,
+    onMove: p => setPlaceFrom(p),
+  });
+  mapH.fit([[suPlace.lat, suPlace.lng]]);
+  mapH.invalidate();
+}
+
+/* a point on the map becomes a NAMED place — a pin with no name is a number
+   the user cannot check */
+async function setPlaceFrom(p) {
+  setPlace({ lat: p.lat, lng: p.lng, label: `${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}` });
+  try {
+    const r = await gmap.reverse(p.lat, p.lng);
+    if (r && r.label) setPlace({ lat: p.lat, lng: p.lng, label: r.label });
+  } catch (e) { /* offline or the geocoder is busy: the coordinates still stand */ }
+}
+
+/* paint, never re-render: a full render() here would wipe the name, mobile and
+   password the user has already typed */
+function setPlace(place) {
+  suPlace = place;
+  const lab = document.getElementById('suPlaceLabel');
+  if (lab) mount(lab, placeLine());
+  const hidden = document.getElementById('suArea');
+  if (hidden) hidden.value = place ? place.label : '';
+  paintMap();
+}
+
+/* ── the three actions app.js registered for this screen ─────── */
+export async function useMyLocation() {
+  toast('Asking your device where you are…');
+  try {
+    const p = await gmap.locate();
+    await setPlaceFrom(p);
+    toast('Got it — drag the pin if it is slightly off');
+  } catch (e) {
+    toast(e.message || 'Could not get your location — search for it instead', 'warn');
+  }
+}
+
+export async function searchPlace() {
+  const el = document.getElementById('suPlaceQ');
+  const q = el ? el.value.trim() : '';
+  if (q.length < 3) { toast('Type at least three letters', 'warn'); return; }
+  const box = document.getElementById('suResults');
+  if (box) mount(box, '<span class="micro muted">Searching…</span>');
+  try {
+    suHits = await gmap.geocode(q, { limit: 6 });
+  } catch (e) {
+    suHits = [];
+    if (box) mount(box, '<span class="micro muted">Search is unavailable right now — drop the pin instead.</span>');
+    return;
+  }
+  if (box) mount(box, suHits.length ? resultChips()
+    : `<span class="micro muted">Nothing matched &ldquo;${esc(q)}&rdquo;.</span>`);
+}
+
+export function choosePlace(d) {
+  if (!d || d.lat == null) return;
+  setPlace({ lat: +d.lat, lng: +d.lng, label: String(d.label || 'Your place') });
 }
 
 /* ── handlers ──────────────────────────────────────────────── */
 const val = id => (document.getElementById(id) || {}).value || '';
 
 export async function doLogin() {
-  const name = val('lgName').trim(), mobile = val('lgMobile').trim(), pw = val('lgPass');
-  if (name.toLowerCase() === 'admin') { ctx.go('admin'); return; }
-  if (!name || !/^\d{10}$/.test(mobile)) { toast('Name and a 10-digit mobile, please', 'danger'); return; }
-  const key = (name + '|' + mobile).toLowerCase();
-  const u = getState().users.find(x => x.key === key);
-  if (!u) { toast('No account with those details — create one first', 'danger'); return; }
+  const mobile = normaliseMobile(val('lgMobile')), pw = val('lgPass');
+  if (!mobile) { toast('Enter your 10-digit mobile', 'danger'); return; }
+  /* Unlimited guesses against a 4-digit-thinking population is not a login
+     form, it is a doorway. core/security.js keeps the count. */
+  const gate = loginGate(mobile);
+  if (gate.blocked) {
+    toast(`Too many attempts — try again in ${Math.ceil(gate.waitMs / 1000)}s`, 'danger'); return;
+  }
+  /* The number is the identity. The internal key is untouched — every order,
+     partner and shop record still points at it. */
+  const u = getState().users.find(x => normaliseMobile(x.mobile) === mobile);
+  if (!u) { noteLoginFail(mobile); toast('No account on that number — create one first', 'danger'); return; }
   const h = await sha256(pw);
-  if (u.pass && u.pass !== h) { toast('Wrong password', 'danger'); return; }
+  if (u.pass && u.pass !== h) {
+    const f = noteLoginFail(mobile);
+    toast(f.blocked ? `Wrong password — locked for ${Math.ceil(f.waitMs / 1000)}s` : 'Wrong password', 'danger');
+    return;
+  }
+  noteLoginOk(mobile);
   saveSession({ ...u });          // survives a refresh and a PWA relaunch
-  audit.record('user.login', { key, role: u.role }, key);
+  audit.record('user.login', { key: u.key, role: u.role }, u.key);
   toast(`Welcome back, ${u.name.split(' ')[0]}`);
   ctx.go(u.role === 'partner' ? 'partner' : u.role === 'shop' ? 'shopadmin' : 'home');
 }
 
 export async function doSignup() {
-  const name = val('suName').trim(), mobile = val('suMobile').trim(), pw = val('suPass');
-  const area = val('suArea') || 'Madhapur';
-  if (!name || !/^\d{10}$/.test(mobile)) { toast('Name and a 10-digit mobile, please', 'danger'); return; }
-  if (pw.length < 3) { toast('Pick a password of at least 3 characters', 'danger'); return; }
+  const name = val('suName').trim(), mobile = normaliseMobile(val('suMobile')), pw = val('suPass');
+  if (!name || !mobile) { toast('Name and a 10-digit mobile, please', 'danger'); return; }
+  const pwErr = passwordProblem(pw, mobile);
+  if (pwErr) { toast(pwErr, 'danger'); return; }
+  if (!suPlace) { toast('Pick where you are — search it, use your location, or tap an area', 'danger'); return; }
+
+  const loc = { lat: suPlace.lat, lng: suPlace.lng, label: suPlace.label };
+  const area = suPlace.label;
   const key = (name + '|' + mobile).toLowerCase();
+  /* One account per number. The key still carries the name, but the NUMBER is
+     what sign-in resolves, so two accounts on one number would be one of them
+     permanently unreachable. */
+  if (getState().users.some(u => normaliseMobile(u.mobile) === mobile)) {
+    toast('That mobile already has an account — sign in instead', 'danger'); return;
+  }
   if (getState().users.some(u => u.key === key)) { toast('That account already exists — sign in', 'danger'); return; }
 
   const pass = await sha256(pw);
   const id = nid('u');
-  const user = { key, id, name, mobile, role, pass, area, tier: role === 'customer' ? 1 : 1, createdAt: Date.now() };
+  const user = { key, id, name, mobile, role, pass, area, loc, tier: 1, createdAt: Date.now() };
 
   if (role === 'partner') {
     const pid = nid('p');
@@ -148,7 +349,7 @@ export async function doSignup() {
     user.tier = 0;
     dispatch({ type: 'partner/add', payload: {
       id: pid, userKey: key, name, mobile, cat: val('suCat') || 'repair',
-      ask: toPaise(Number(val('suAsk')) || 500), area, tier: 0, online: false,
+      ask: toPaise(Number(val('suAsk')) || 500), area, loc, tier: 0, online: false,
       completed: 0, starts: 0, onTimeStarts: 0, ratings: [], lastActiveTs: Date.now(),
       verification: { steps: {}, attempts: {} } } });
   }
@@ -156,7 +357,7 @@ export async function doSignup() {
     const sid = nid('s');
     user.shopId = sid;
     dispatch({ type: 'shop/add', payload: {
-      id: sid, ownerKey: key, name, catId: val('suCat') || 'kirana', area, mobile,
+      id: sid, ownerKey: key, name, catId: val('suCat') || 'kirana', area, loc, mobile,
       prepMins: 20, radiusKm: 3, status: 'active', isOpen: true,
       minOrder: toPaise(149), freeDeliveryAbove: toPaise(499), deliveryMode: 'both',
       selfDeliveryFee: toPaise(25), fillRate: 100, ratingAvg: 0, ratingCount: 0,

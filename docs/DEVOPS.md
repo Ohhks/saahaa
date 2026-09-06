@@ -8,7 +8,7 @@ ever "down for maintenance", because nothing is ever taken down.
 
 | Trigger | Workflow | What it proves |
 |---|---|---|
-| every push / PR to `main` | `ci.yml` | every module parses · 107 domain tests · bundle builds · pre-flight gate · migration lint |
+| every push / PR to `main` | `ci.yml` | every module parses · 111 domain tests · bundle builds · pre-flight gate · migration lint |
 | push to `main` | `deploy.yml` | builds `dist/` and publishes it to GitHub Pages **via Actions** — so a rollback is re-running an older deploy, a button, not a git revert under pressure |
 | a `v*` tag | `release.yml` | the release with its CHANGELOG section attached |
 | weekly | `keepalive.yml` | keeps the free Supabase project from pausing |

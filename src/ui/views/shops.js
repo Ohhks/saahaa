@@ -69,7 +69,7 @@ export function renderList(catId) {
     <div class="chiprow" style="margin:var(--sp-6) 0;flex-wrap:wrap">
       ${retailCats.map(c => `<button class="chip chip--smart ${c.id === activeId ? 'on' : ''}"
         data-act="shops.cat" data-id="${c.id}" style="--tile-accent:${esc(c.accent || '#C99A5B')}">
-        <span class="chip__ic" aria-hidden="true">${c.ico}</span>${esc(c.name)}</button>`).join('')}
+        <span class="chip__ic" aria-hidden="true">${hasIcon(c.id) ? icon(c.id, { size: 14 }) : ''}</span>${esc(c.name)}</button>`).join('')}
     </div>
 
     <div class="capsules" style="margin-bottom:14px">
@@ -97,7 +97,7 @@ function shopCard(s) {
       style="width:100%;text-align:left;--tile-accent:${esc(cat.accent || '#C99A5B')}">
     <div class="row" style="align-items:flex-start">
       <span class="med" style="width:48px;height:48px;border-radius:var(--r-md);background:var(--accent-soft);
-        display:grid;place-items:center;font-size:22px;flex:0 0 auto">${cat.ico}</span>
+        display:grid;place-items:center;font-size:22px;flex:0 0 auto;color:var(--accent)">${hasIcon(cat.id) ? icon(cat.id, { size: 24 }) : esc((cat.name || '?')[0])}</span>
       <div class="grow">
         <div class="between"><b class="cmd__title">${esc(s.name)}</b>
           <span class="pill ${s.isOpen ? 'pill--ok' : 'pill--bad'}">${s.isOpen ? 'Open' : 'Closed'}</span></div>

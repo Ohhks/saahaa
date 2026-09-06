@@ -57,7 +57,7 @@ Legend: **AUTO** = happens with no human · **ALERT** = happens, then tells you 
 | Refund > ₹500 | YOU DECIDE | — |
 | Holdback maturity (7 clean days) | AUTO | — |
 | Nightly reconciliation | AUTO | **Any drift → payouts freeze and you get a critical alert.** Never auto-repaired: an auto-repair is indistinguishable from an attacker covering their tracks. |
-| **Fee / commission changes** | **YOU ONLY** | Silently changes every open order at once. Flag-gated, effective-dated, announced. |
+| **Fee / delivery-band changes** | **YOU ONLY** | Admin → **Charges** → set the service %, the retail %, the delivery bands → **Push**. Effective on every quote made afterwards; orders already booked keep the fees they were booked with, so nothing in escrow reprices. Audited with who and when. |
 
 ## Disputes and safety
 
@@ -91,7 +91,11 @@ empty, the app says so and shows you nothing else.
 
 1. Header strip: orders, escrow held, disputes open, quota. All green → stop reading. *(1 min)*
 2. Partner first-job approvals — expect 2–4 *(4 min)*
-3. Held escrows — expect 3–6, each showing why it was held *(4 min)*
+3. Held escrows — expect 3–6, each showing why it was held. The **Flow
+   tracker** is the screen to open when one of them does not make sense: it
+   shows an order's stage, who holds it, the money against it, and what the
+   system is waiting for, so a stalled order is read rather than guessed at
+   *(4 min)*
 4. Escalated disputes — expect 1–2, with a suggested resolution pre-filled *(4 min)*
 5. Flagged content, bulk-approved *(1 min)*
 
@@ -114,7 +118,11 @@ scratch project.** An untested backup is decoration.
 ## The first 30 days: turn automation OFF
 
 With zero users most automation has nothing to work on, and manual is genuinely
-better at small scale.
+better at small scale. And you really will start at zero: a new install seeds
+nothing but your own credential, so every pro, shop and customer on it is one
+you put there. (`?demo=1` fills a local browser with an example roster if you
+want to rehearse a screen — it is a testing switch and never reaches a real
+device.)
 
 **Pick one pincode. Launch 3 service categories and 2 retail, not 24.** A
 marketplace with one plumber in every category is a marketplace with nothing.
