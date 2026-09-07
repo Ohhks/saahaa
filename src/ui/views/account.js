@@ -274,7 +274,14 @@ export function render() {
 
     <div class="credo"><div class="cmark">${mark(150, { detail: true, glow: false })}</div>
       <div class="cw">One circle. One purpose.</div>
-      <p class="micro muted" style="margin-top:8px">v${VERSION} · schema v${SCHEMA_VERSION} · ${BUILD_ID}</p></div>
+      <p class="micro muted" style="margin-top:8px">v${VERSION} · schema v${SCHEMA_VERSION} · ${BUILD_ID}</p>
+      <p class="micro muted" style="margin-top:8px;position:relative;z-index:1">
+        <a class="micro muted" href="#/legal/terms">Terms</a> ·
+        <a class="micro muted" href="#/legal/privacy">Privacy</a> ·
+        <a class="micro muted" href="#/legal/refunds">Refunds</a> ·
+        <a class="micro muted" href="#/legal/contact">Contact</a> ·
+        <a class="micro muted" href="#/legal/about">About</a>
+      </p></div>
     <div style="height:40px"></div>
   </main>
   <style>

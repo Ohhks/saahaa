@@ -50,6 +50,8 @@ import * as ask from './ui/views/ask.js';
 import * as onboard from './ui/views/onboard.js';
 import * as pro from './ui/views/pro.js';
 import * as account from './ui/views/account.js';
+import * as legal from './ui/views/legal.js';
+import * as checkout from './ui/checkout.js';
 
 /* ══════════════ ROUTES ══════════════ */
 const ROUTES = {
@@ -68,6 +70,7 @@ const ROUTES = {
   onboard:   () => onboard.render(),
   pro:       p => pro.render(p),
   account:   () => account.render(),
+  legal:     p => legal.render(p),          // #/legal/terms · privacy · refunds · contact · about
 };
 
 const NAV = [
@@ -445,6 +448,8 @@ function wireActions() {
   A('admin.snapshot',() => admin.snapshot());
   A('admin.restore', d => admin.restore(d.key));
   A('admin.fresh',   () => admin.freshStart && admin.freshStart());
+  A('admin.payments.save',  () => admin.savePayments());
+  A('admin.payments.clear', () => admin.clearPayments());
   A('admin.automation.push',  () => admin.pushAutomation && admin.pushAutomation());
   A('admin.automation.reset', () => admin.resetAutomation && admin.resetAutomation());
   A('admin.treasury.withdraw', d => admin.treasuryWithdraw && admin.treasuryWithdraw(d));
@@ -585,6 +590,7 @@ async function boot() {
   if (!health.ok) console.warn('[saahaa] health', health.checks.filter(c => !c.ok));
   if (health.fatal) { flags.safeMode(); toast('Safe mode — see Admin → System', 'danger'); }
 
+  gateway.useOpener(checkout.open);            // how Razorpay Checkout is shown, when the rail is live
   initActions();
   wireActions();
   wireInputs();

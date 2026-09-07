@@ -62,7 +62,7 @@ it on for yourself first (Admin → System), then leave it on.
   server-side: append-only, numbered, applied in order. `pg_cron` runs the
   automations the browser runs today (auto-release, holdback release,
   substitution timeout).
-- The Cloudflare Worker receives payment webhooks (`docs/PRODUCTION.md` §4);
+- The `razorpay-webhook` Edge Function receives payment webhooks (`docs/PRODUCTION.md` §4);
   it is versioned and deployed the same way — push, verify, publish.
 - Secrets never enter the repo: the pre-flight refuses any bundle that
   contains one (`tools/preflight.sh`, "no forbidden secrets").

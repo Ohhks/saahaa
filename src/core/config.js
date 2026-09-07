@@ -82,3 +82,51 @@ export const ADMIN_BOOTSTRAP = {
   iterations: 250000,
   version: 1,
 };
+
+/* ── payments: the rail (core/gateway.js) ───────────────────────
+   'sim' until the Razorpay account exists. keyId is the PUBLIC key id — it
+   is meant to sit in the page. The SECRET key and the webhook secret NEVER
+   come near this file: they live in the Edge Functions' secrets
+   (supabase/functions/README.md). functionsUrl is the base of those
+   functions, e.g. https://<ref>.functions.supabase.co */
+export const PAYMENTS = {
+  mode: 'sim',            // 'sim' | 'razorpay'
+  keyId: '',              // rzp_test_… or rzp_live_… (public)
+  functionsUrl: '',       // Supabase Edge Functions base URL
+  name: 'SAAHAA',
+  themeColor: '#7C3AED',
+};
+const KEY_PAY = 'SAAHAA_PAYMENTS';
+/** Live payments config: URL switch (?payments=razorpay&rzkey=…&fnurl=…) > device override > baked. */
+export function paymentsConfig() {
+  let o = null;
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get('payments')) {
+      o = { mode: q.get('payments'), keyId: q.get('rzkey') || '', functionsUrl: q.get('fnurl') || '' };
+      persist.write(KEY_PAY, o);
+    }
+  } catch (e) {}
+  const saved = o || persist.read(KEY_PAY, null) || {};
+  const cfg = { ...PAYMENTS, ...saved };
+  cfg.mode = cfg.mode === 'razorpay' ? 'razorpay' : 'sim';
+  return cfg;
+}
+export function setPaymentsConfig({ mode, keyId, functionsUrl } = {}) {
+  const next = { mode: mode === 'razorpay' ? 'razorpay' : 'sim', keyId: String(keyId || ''), functionsUrl: String(functionsUrl || '').replace(/\/+$/, '') };
+  persist.write(KEY_PAY, next);
+  return next;
+}
+export function clearPaymentsConfig() { persist.remove(KEY_PAY); }
+
+/* ── the company, as the legal pages and the gateway show it ──
+   Empty strings render as "not yet set" on the Contact page; fill these the
+   day the entity exists (docs/LAUNCH.md step 6). Nothing here is secret. */
+export const CONTACT = {
+  legalName: '',          // e.g. "SAAHAA (sole proprietorship of …)"
+  email: '',
+  phone: '',
+  address: '',            // registered address, one line
+  gstin: '',
+  city: 'Hyderabad',
+};

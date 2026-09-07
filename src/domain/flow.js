@@ -70,7 +70,7 @@ export async function customerWithdraw(paise) {
   const s = me(); if (!s) return null;
   const amt = M.int(paise), w = customerWallet(s.key);
   if (amt < 1000 || amt > w.balance) { toast(`You can take out up to ${M.fmt(w.balance)}`, 'warn'); return null; }
-  const r = await gateway.payout({ paise: amt, purpose: 'refund-out', key: s.key });
+  const r = await gateway.payout({ paise: amt, purpose: 'refund-out', key: s.key, upi: s.upi || (getState().users.find(u => u.key === s.key) || {}).upi || '' });
   if (!r.ok) { toast('Could not send that right now', 'danger'); return null; }
   await ledger('WITHDRAW', amt, acct.customer(s.key), acct.world(), { via: r.via, ref: r.ref });
   audit.record('cwallet.withdraw', { amt }, s.key);
@@ -231,7 +231,8 @@ export async function walletWithdraw(partnerId, paise) {
   const amt = M.int(paise);
   const w = W.walletOf(getState().ledger, partnerId, getState().partners.find(x => x.id === partnerId) || {});
   if (amt < 1000 || amt > w.available) { toast(`You can withdraw up to ${M.fmt(w.available)}`, 'warn'); return null; }
-  const r = await gateway.payout({ paise: amt, purpose: 'earnings', key: partnerId });
+  const pUpi = ((getState().partners.find(x => x.id === partnerId) || {}).verification || {}).upi || '';
+  const r = await gateway.payout({ paise: amt, purpose: 'earnings', key: partnerId, upi: pUpi });
   if (!r.ok) { toast('Could not send that right now', 'danger'); return null; }
   await ledger('WITHDRAW', amt, acct.partner(partnerId), acct.world(), { via: r.via, ref: r.ref });
   audit.record('wallet.withdraw', { partnerId, amt }, me() ? me().key : 'system');

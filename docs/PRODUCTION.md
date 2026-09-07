@@ -183,48 +183,71 @@ from 1% in October 2024), with no deduction for a resident individual under
 ## 4. Webhooks — where they land
 
 GitHub Pages serves static bytes; it cannot receive a webhook. You need exactly
-one piece of server-side compute.
+one piece of server-side compute, and it is **Supabase Edge Functions** — the
+project that already holds the database, so no second vendor, no second bill,
+no domain needed to start. The code is in `supabase/functions/`, four
+functions and a `_shared/` folder, deployed with one CLI command each
+(`supabase/README.md`).
 
 This is also the real difference between the sandbox and the rail. In `MODE
 'sim'` a `collect()` resolves the moment it is called; with Razorpay the app
-must treat a checkout as **pending** until `payment.captured` arrives here,
-and the ledger leg is posted by this handler. A customer who closes the tab
-after paying still gets their wallet credited, because the webhook does not
-need the tab.
+must treat a checkout as **pending** until `payment.captured` arrives here.
+A customer who closes the tab after paying is still on record, because the
+webhook does not need the tab.
 
-**Use Cloudflare Workers**, not Supabase Edge Functions, for this:
+**The four functions**
 
-- `api.saahaa.in` on your own domain, **free** (Supabase custom domains are a
-  paid add-on) — and Razorpay needs a stable URL you control.
-- Native **Cron Triggers**, free — for the release-queue drainer and nightly
-  reconciliation.
-- Zero cold start, so you always return 200 inside Razorpay's timeout.
-- 100,000 requests/day free. At 10,000 orders/month you use ~40,000/month.
+| Function | Called by | Does | Answers |
+|---|---|---|---|
+| `razorpay-order` | the browser, `gateway.collect()` | validates `{amount, purpose, key}` (whole paise, 100 … 1,00,00,000) and creates a Razorpay Order with the secret key | `{ok, orderId, amount, currency:'INR', keyId}` |
+| `razorpay-verify` | the browser, after Checkout | recomputes HMAC-SHA256(`orderId|paymentId`, key secret), compares in constant time, then reads the payment back and insists on `captured` / `authorized` for this order | `{ok, status, amount}` |
+| `razorpay-webhook` | Razorpay | HMAC over the **raw** body with the webhook secret → `gateway_events` (event id = primary key) → mirrors into `gateway_payments` / `gateway_payouts` | 200; 400 on a bad signature |
+| `razorpay-payout` | the browser, `gateway.payout()`, **owner session only** | Route transfer if the key is in `RAZORPAY_ACCOUNT_MAP`, else a RazorpayX payout to the UPI id if `RAZORPAYX_ACCOUNT_NUMBER` is set, else `{ok:false}` | `{ok, ref, mode:'route'|'payoutx'}` |
 
-**The handler, in order:**
+**The webhook handler, in order** (this is what `razorpay-webhook/index.ts` does):
 
 1. Read the **raw** body. Never parse-then-restringify before checking the HMAC.
-2. `HMAC-SHA256(raw, WEBHOOK_SECRET)` vs `x-razorpay-signature`, compared in
-   constant time. Fail → 400.
+2. `HMAC-SHA256(raw, RAZORPAY_WEBHOOK_SECRET)` vs `x-razorpay-signature`,
+   compared in constant time. Fail → 400, nothing stored.
 3. Idempotency key is `x-razorpay-event-id` — stable across all retries.
-4. `INSERT ... ON CONFLICT DO NOTHING`. No row returned means a replay: 200.
-5. Return 200 **now** (under 500ms), process in `waitUntil`.
-6. The processing RPC must be a **state machine**, not just "insert if absent",
-   because Razorpay does not guarantee event order.
+4. `INSERT into gateway_events … ON CONFLICT DO NOTHING`. No row returned
+   means a replay: 200.
+5. Mirror what matters (`payment.captured` → `gateway_payments`, …), stamp
+   `processed_at`, return 200. A mirror write that fails still gets a 200:
+   the event row already holds the payload and `processed_at is null` marks
+   it for replay from the table. The one 5xx after a good signature is when
+   the event row itself could not be stored — then a retry is exactly what
+   we want.
+6. The mirror is a **state machine**, not "insert if absent": a late
+   `payment.failed` never overwrites a `captured`, because Razorpay does not
+   guarantee event order.
 
 > Do **not** reject events on a timestamp window. Razorpay retries over ~24
 > hours reusing the same event id; a 5-minute window would drop legitimate
 > retries. **Event-id uniqueness is the replay defence.** (Cashfree is the
 > opposite — it signs `timestamp + body`, and there a window *is* correct.)
 
+**Environment — every name the functions read**
+
+| Name | Set with | Read by | Notes |
+|---|---|---|---|
+| `RAZORPAY_KEY_ID` | `supabase secrets set` | order, verify, payout | the **public** id (`rzp_test_…` / `rzp_live_…`); the only one that is also in the browser |
+| `RAZORPAY_KEY_SECRET` | `supabase secrets set` | order, verify, payout | Basic-auth password to `api.razorpay.com` and the checkout-signature key. Never in the repo, never in a response |
+| `RAZORPAY_WEBHOOK_SECRET` | `supabase secrets set` | webhook | the string you type into the Razorpay webhook form; rotate independently of the key secret |
+| `ALLOWED_ORIGINS` | `supabase secrets set` | order, verify, payout | comma-separated CORS origins; defaults to `https://ohhks.github.io,http://localhost:8772` |
+| `RAZORPAY_ACCOUNT_MAP` | `supabase secrets set` | payout | JSON `{"<app key>":"acc_…"}` — keys listed here are paid by Route |
+| `RAZORPAYX_ACCOUNT_NUMBER` | `supabase secrets set` | payout | RazorpayX current-account number; unset = that path is off |
+| `VERIFY_CONFIRM` | `supabase secrets set` | verify | `0` skips the read-back after the signature check; leave unset |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | **injected by Supabase** | webhook, payout | never set by hand. The service-role key is why the browser cannot write a `gateway_*` row (§6) |
+
 ## 5. Cloudflare — what actually earns its place
 
 | Piece | Free tier | Need it now? | Why |
 |---|---|---|---|
-| **DNS + custom domain** | unlimited | **Yes, day 1** | Gateway onboarding, webhook URLs and brand trust all need a domain you own |
+| **DNS + custom domain** | unlimited | **Yes, day 1** | Gateway onboarding and brand trust need a domain you own. The webhook does not: Razorpay is happy with `https://<ref>.functions.supabase.co/razorpay-webhook` |
 | **Transform Rules** (response headers) | 10 rules | **Yes** | GitHub Pages **cannot set headers at all** — no CSP, no HSTS. This is the only way to add them |
-| **Workers** | 100k req/day | **Yes** | The only server you have. Webhooks + cron |
-| **Turnstile** (captcha) | ~1M/mo | **Yes** | Gates signup and OTP abuse. Verify the token in the Worker, never the browser |
+| **Workers** | 100k req/day | **Not now** | The Edge Functions (§4) are the server, and `pg_cron` (migration 0003) is the cron. A Worker earns its place only if you later want `api.saahaa.in` in front of the functions |
+| **Turnstile** (captcha) | ~1M/mo | **Yes** | Gates signup and OTP abuse. Verify the token in an Edge Function or a SECURITY DEFINER RPC, never the browser |
 | **Cloudflare Pages** | 500 builds/mo | **No — don't switch** | You'd gain PR previews and lose a working pipeline. Revisit if you exceed Pages' limits |
 | **R2** (images) | 10GB, zero egress | **Not yet** | Move when Supabase egress overage appears, around 50GB/month of images |
 | **Access** on `/admin` | 50 users | Optional | Stops casual discovery. **It is not the control** — real admin security is the `is_admin()` check inside every RPC |
@@ -238,33 +261,78 @@ need the tab.
 ## 6. Topology and where each secret lives
 
 ```
-domain -> CLOUDFLARE (DNS, WAF, Turnstile, Transform Rules)
-   |                                   |
-   |  saahaa.in                        |  api.saahaa.in/*
-   v                                   v
-GITHUB PAGES                      CLOUDFLARE WORKER
-  the static app                    POST /orders
-  ships ONLY:                       POST /webhooks/razorpay
-   - SUPABASE_URL                    CRON: release queue, reconcile
-   - SUPABASE_ANON_KEY               holds ONLY:
-   - RAZORPAY_KEY_ID                  - SUPABASE_SERVICE_ROLE_KEY
-   (all public by design)             - RAZORPAY_KEY_SECRET
-        |                             - RAZORPAY_WEBHOOK_SECRET
-        | browser fetch                      |
-        v                                    v
-   SUPABASE (auth, RLS, RPCs)  <---->  RAZORPAY (escrow, Route)
+domain -> CLOUDFLARE (DNS, Transform Rules)         RAZORPAY (escrow, Route, RazorpayX)
+   |                                                   ^                 ^
+   |  saahaa.in                           key secret   |                 |  webhooks, HMAC
+   v                                                   |                 v
+GITHUB PAGES                           SUPABASE EDGE FUNCTIONS  supabase/functions/
+  the static app                         razorpay-order     razorpay-verify
+  ships ONLY:                            razorpay-webhook   razorpay-payout
+   - SUPABASE_URL                        hold ONLY (supabase secrets set):
+   - SUPABASE_ANON_KEY                    - RAZORPAY_KEY_SECRET
+   - RAZORPAY_KEY_ID                      - RAZORPAY_WEBHOOK_SECRET
+   (all public by design)                 - SUPABASE_SERVICE_ROLE_KEY (injected)
+        |                                        |
+        | browser fetch: anon key, RLS           | service role: gateway_* mirror only
+        v                                        v
+   SUPABASE POSTGRES (auth, RLS, RPCs, pg_cron)  <--+
 ```
 
 | Secret | Lives in | Must never reach |
 |---|---|---|
 | `SUPABASE_ANON_KEY` | the public bundle | — public by design. **It is not a security control**: with RLS off it is a full data dump |
-| `SUPABASE_SERVICE_ROLE_KEY` | Worker secret **only** | browser, repo, build output, error messages. **Bypasses all RLS — treat as a root password** |
-| `RAZORPAY_KEY_SECRET` | Worker secret | everywhere else |
-| `RAZORPAY_WEBHOOK_SECRET` | Worker secret | rotate independently of the key secret |
-| `SUPABASE_DB_URL` | GitHub Actions `production` environment | the Worker, the browser, the repo |
-| `CLOUDFLARE_API_TOKEN` | GitHub Actions secret, scoped to Workers:Edit on one zone | never a Global API Key |
+| `SUPABASE_SERVICE_ROLE_KEY` | the Edge Functions' environment, **injected by Supabase** | browser, repo, build output, error messages, GitHub secrets. **Bypasses all RLS — treat as a root password.** It is the only thing that can write `gateway_events` / `gateway_payments` / `gateway_payouts`, which is the whole point of those tables |
+| `RAZORPAY_KEY_SECRET` | Edge Function secret (`supabase secrets set`) | everywhere else |
+| `RAZORPAY_WEBHOOK_SECRET` | Edge Function secret | rotate independently of the key secret |
+| `RAZORPAY_ACCOUNT_MAP`, `RAZORPAYX_ACCOUNT_NUMBER` | Edge Function secrets | the browser; a response body |
+| `SUPABASE_DB_URL` | GitHub Actions `production` environment | the functions, the browser, the repo |
+| `CLOUDFLARE_API_TOKEN` | GitHub Actions secret, only if a Worker is ever added; scoped to one zone | never a Global API Key |
 
-## 7. Custom domain and HTTPS
+## 7. Wiring the rail, step by step
+
+Everything below is in test mode and costs nothing. The long form, with the
+dashboard clicks, is `supabase/README.md`; this is the order.
+
+1. **Razorpay account** at razorpay.com → Settings → API Keys → *Generate
+   Test Key*. You get a key id (`rzp_test_…`) and a secret. The secret is
+   shown once — password manager, now.
+2. **Supabase CLI** on your machine: `npm i -g supabase`, then
+   `supabase login` and `supabase link --project-ref <ref>`.
+3. **Migration 0004** — SQL Editor → paste `supabase/migrations/0004_gateway.sql`
+   → Run. Confirm with `select count(*) from gateway_events;` (0 rows, no error).
+4. **Secrets** — one command, from `supabase/README.md`, *Secrets*:
+   `supabase secrets set RAZORPAY_KEY_ID=… RAZORPAY_KEY_SECRET=… RAZORPAY_WEBHOOK_SECRET=… ALLOWED_ORIGINS=…`.
+   Make the webhook secret up (32+ random characters); you will paste the
+   same string into Razorpay in step 6.
+5. **Deploy** the four functions, each with `--no-verify-jwt`
+   (`supabase/README.md`, *Deploy*). `supabase functions list` shows all four.
+6. **Webhook** — Razorpay → Webhooks → Add: URL
+   `https://<ref>.functions.supabase.co/razorpay-webhook`, the secret from
+   step 4, and tick `payment.captured`, `payment.failed`, `refund.processed`,
+   `transfer.processed`, `settlement.processed`.
+7. **Switch one device**: open the live site with
+   `?payments=razorpay&rzkey=rzp_test_…&fnurl=https://<ref>.functions.supabase.co`.
+   The *Sandbox UPI* label is gone; `gateway.mode()` reads `razorpay`.
+8. **Pay ₹10 with the test card** (`supabase/README.md`, *The test-card
+   walkthrough*): wallet + ₹10, ledger leg `via: 'razorpay'`, one row in
+   `gateway_payments` with `status = 'captured'`, one `payment.captured` in
+   `gateway_events` with `processed_at` set. Then a failed card, then a
+   closed window: no leg, no captured row.
+9. **Try a take-out.** It must say *Could not send that right now* — the
+   payout function fails closed until an owner session header is sent by
+   the app and a payout path is configured. That is the correct state to
+   go live in for collection only (§2, *Phase 0*).
+10. **Every device**: the lead bakes `mode`, `keyId` and `functionsUrl` into
+    `PAYMENTS` in `src/core/config.js` and ships a release.
+11. **Live mode**, when the Razorpay account is activated: live keys
+    (`rzp_live_…`), a **second** webhook with its own secret,
+    `ALLOWED_ORIGINS` without `localhost`, and Supabase Pro the same week
+    (§10).
+12. **Rollback** is a query string: `?payments=sim` on the device;
+    `PAYMENTS.mode = 'sim'` in config for everyone;
+    `supabase functions delete <name>` to take a function off the internet.
+
+## 8. Custom domain and HTTPS
 
 1. Buy it. **Cloudflare Registrar** sells `.com` at wholesale (~₹950/yr, free
    WHOIS privacy). `.in` must come from BigRock/GoDaddy India (~₹500–900 first
@@ -291,7 +359,7 @@ Then: Always Use HTTPS on, minimum TLS 1.2, HSTS **only after a week of stable
 HTTPS** (it is not reversible in browsers that cached it), and a redirect rule
 canonicalising `www` to the apex.
 
-## 8. GitHub production settings
+## 9. GitHub production settings
 
 Assume a **public repo** — most of the good controls are free on public and
 paid on private.
@@ -312,7 +380,7 @@ paid on private.
   tag is the realistic supply-chain attack on a repo holding a Cloudflare token.
 - Migrations are **manual dispatch only**. Never auto-run on push.
 
-## 9. Before the first real rupee
+## 10. Before the first real rupee
 
 **Legal** — Udyam + Shop & Establishment registration; a current account; GST
 registration (mandatory, no threshold); **a CA opinion on §9(5)**; TAN for TDS;
@@ -340,7 +408,7 @@ a stated worker payout SLA (payout ambiguity is the top reason supply churns);
 an incident runbook (`docs/RUNBOOK.md`); and ₹15–25k of your own float for
 goodwill refunds in month one.
 
-## 10. What it costs
+## 11. What it costs
 
 | | 0/mo | 100/mo | 1,000/mo | 10,000/mo |
 |---|---|---|---|---|

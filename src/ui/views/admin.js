@@ -40,6 +40,7 @@ import * as treasury from '../../domain/treasury.js';
 import * as autoverify from '../../domain/autoverify.js';
 import * as fresh from '../../domain/fresh.js';
 import * as gateway from '../../core/gateway.js';
+import { paymentsConfig, setPaymentsConfig, clearPaymentsConfig } from '../../core/config.js';
 import { quoteService, quoteRetail } from '../../domain/pricing.js';
 import { geoOf } from '../../domain/match.js';
 import * as gmap from '../map.js';
@@ -1361,6 +1362,8 @@ function freshCard(st) {
   const c = fresh.counts(st);
   const residue = fresh.demoResidue(st).total;
   return `
+  ${paymentsCard()}
+
   <div class="sec">${secHead('Fresh start', pill('irreversible without the snapshot', 'warn'))}
     <div class="glass" style="border-color:var(--danger)">
       <div class="eyebrow" style="color:var(--danger);display:flex;align-items:center;gap:6px">${icon('trash', { size: 13 })} Wipe to a clean slate</div>
@@ -1580,6 +1583,36 @@ export function resetAutomation() {
 }
 
 /* ── fresh start ───────────────────────────────────────────── */
+/* ── the rail: sim until the Razorpay account exists ─────────── */
+function paymentsCard() {
+  const c = paymentsConfig();
+  const live = c.mode === 'razorpay';
+  return `
+  <div class="sec">${secHead('Payments rail', pill(live ? 'Razorpay' : 'sandbox', live ? 'ok' : 'soft'))}
+    <p class="tiny muted" style="margin-bottom:12px">${esc(gateway.label())}. The public key id may sit here; the
+      secret key never does — it lives in the Edge Functions' secrets (supabase/README.md). Switching to Razorpay with a
+      missing key or URL fails closed: nothing is collected, nothing pretends to be.</p>
+    <div class="field"><select id="payMode"><option value="sim"${live ? '' : ' selected'}>Sandbox — no real money</option><option value="razorpay"${live ? ' selected' : ''}>Razorpay — live rail</option></select><label>Mode</label></div>
+    <div class="field"><input id="payKey" type="text" autocomplete="off" placeholder=" " value="${esc(c.keyId)}"><label>Razorpay key id (public)</label></div>
+    <div class="field"><input id="payFn" type="url" autocomplete="off" placeholder=" " value="${esc(c.functionsUrl)}"><label>Edge Functions URL</label></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn--primary" data-act="admin.payments.save">Save on this device</button>
+      <button class="btn btn--ghost" data-act="admin.payments.clear">Back to sandbox</button>
+    </div>
+    <p class="micro muted" style="margin-top:10px">Saved on this device only. To ship it to every device, bake it into PAYMENTS in src/core/config.js.</p>
+  </div>`;
+}
+export function savePayments() {
+  const mode = fieldVal('payMode') || 'sim', keyId = fieldVal('payKey').trim(), functionsUrl = fieldVal('payFn').trim();
+  if (mode === 'razorpay' && (!/^rzp_(test|live)_[A-Za-z0-9]{6,}$/.test(keyId) || !/^https:\/\//.test(functionsUrl))) {
+    toast('Razorpay mode needs a public key id (rzp_test_… / rzp_live_…) and an https Functions URL', 'danger'); return;
+  }
+  const next = setPaymentsConfig({ mode, keyId, functionsUrl });
+  audit.record('payments.config', { mode: next.mode, keyId: next.keyId.slice(0, 12), functionsUrl: next.functionsUrl }, 'admin');
+  toast(next.mode === 'razorpay' ? 'Razorpay rail set on this device' : 'Back to the sandbox rail'); ctx.render();
+}
+export function clearPayments() { clearPaymentsConfig(); audit.record('payments.config', { mode: 'sim' }, 'admin'); toast('Back to the sandbox rail'); ctx.render(); }
+
 export function freshStart() {
   if (fieldVal('freshWord').toUpperCase() !== 'FRESH') { toast('Type FRESH in the box to confirm', 'danger'); return; }
   stepUpThen('This wipes every account, order and ledger entry on this device.', () => {

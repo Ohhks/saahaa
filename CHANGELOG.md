@@ -6,6 +6,50 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [7.1.0] — 2026-09-07 — "Ready for the rail"
+
+The release that makes the day the Razorpay account exists a one-line switch.
+Nothing about money changes in the sandbox; everything a live rail needs is
+now in place, fails closed when half-configured, and is written down.
+
+### Added
+- **`core/gateway.js` has two modes.** `sim` (the honest sandbox, unchanged)
+  and `razorpay`: collect() asks a server-side Edge Function for a Razorpay
+  Order, opens Razorpay Checkout through an opener the UI registers
+  (`ui/checkout.js` — core never touches the DOM), and has the server verify
+  the payment signature before a receipt is returned. payout() asks the server
+  to move money out (Route transfer or RazorpayX) and carries an idempotency
+  key so a retry can never pay twice. A half-configured live mode refuses to
+  collect — it never falls back to the sandbox.
+- **Four Supabase Edge Functions** under `supabase/functions/`:
+  `razorpay-order`, `razorpay-verify`, `razorpay-webhook` (HMAC over the raw
+  body, idempotent event store, `gateway_events` / `gateway_payments` /
+  `gateway_payouts` in migration 0004) and `razorpay-payout` (admin session
+  required; Route when a linked account is mapped, RazorpayX otherwise). The
+  secret key and the webhook secret live only in the functions' secrets.
+  Type-checked and lint-clean under Deno; 42 behavioural checks against a
+  mock backend. `supabase/README.md` is the deploy, secrets and rollback guide.
+- **The rail switch in the product.** `PAYMENTS` in `core/config.js` (baked),
+  a per-device override (`?payments=razorpay&rzkey=…&fnurl=…`, or Admin →
+  System & audit → Payments rail, audited), and `?payments=sim` to roll back.
+  The CSP now admits exactly Razorpay's checkout script, its frames and its
+  API, plus the Supabase functions origin.
+- **Legal pages** at `#/legal/terms · privacy · refunds · contact · about`,
+  linked from Home, Sign in and My SAAHAA. Written for what the product
+  actually does: charges and delivery bands read live from the dials, the
+  refund table is generated from `CANCEL_RULES`, the stake and holdback from
+  their constants, the company details from `CONTACT` in `core/config.js`
+  (empty fields render "not yet set" — nothing is invented), and a banner
+  says so while payments are in sandbox. These are what a gateway's activation
+  review asks to see.
+
+### Changed
+- Payouts carry the saved UPI id (a customer's refund-out, a worker's
+  earnings), so the live rail has a destination.
+- `docs/PRODUCTION.md` §4–§7, `docs/SETUP.md`, `docs/LAUNCH.md`, `docs/DEVOPS.md`:
+  the Cloudflare Worker plan is replaced by the Edge Functions that now exist.
+- 173 node tests: the rail switch, fail-closed behaviour, config precedence.
+
 ## [7.0.0] — 2026-09-07 — "Self-running"
 
 The release that takes the owner out of the daily loop. A device starts clean

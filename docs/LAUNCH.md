@@ -40,7 +40,7 @@ You are one person. This list is ordered so that nothing needs you twice.
    order; paste the anon key into `src/core/config.js`; `docs/SETUP.md`.
    Money mutations are SECURITY DEFINER RPCs; RLS is deny-by-default.
 10. **Payment gateway**: `docs/PRODUCTION.md` §2–§3 — start with UPI-only
-    collection (0% MDR) via Razorpay; webhooks land in the Cloudflare Worker
+    collection (0% MDR) via Razorpay; webhooks land in the Supabase Edge Functions (`supabase/functions/`)
     (§4). In the code this is one file, `src/core/gateway.js`: `collect()`
     becomes an Order + Checkout, `payout()` a Route transfer or a Payout.
     Until then it runs as a sandbox UPI and every screen that moves money says
@@ -69,9 +69,9 @@ what is missing.
 |---|---|---|
 | Phone verification | The code is generated and shown on the partner's screen | A DLT-registered SMS sender (step 11) |
 | The reference's code | The 4-digit code is generated and shown on the pro's screen, for the pro to pass to the reference | The same SMS sender (step 11) |
-| UPI payout id | The id is format-checked and saved | Penny-drop beneficiary verification at the gateway (step 10) |
-| Money in and out | `src/core/gateway.js` in `MODE 'sim'`: a collect or a payout succeeds at once, moves no real money, and is labelled *Sandbox UPI* on the screen and `upi-sim` on the ledger leg — customer top-ups, booking shortfalls, worker stake top-ups, every take-out | Razorpay in that one file (step 10) |
-| Withdraw fees / Remit GST | The treasury posts the leg and audits it; nothing reaches a bank or the GST portal | The settlement webhook and the GSTR-3B challan (`docs/PRODUCTION.md` §3) |
+| UPI payout id | The id is format-checked and saved | `razorpay-payout` turns it into a RazorpayX fund account on the first payout; penny-drop validation (`/v1/fund_accounts/validations`) before that is the next step (step 10) |
+| Money in and out | `src/core/gateway.js` in `MODE 'sim'`: a collect or a payout succeeds at once, moves no real money, and is labelled *Sandbox UPI* on the screen and `upi-sim` on the ledger leg — customer top-ups, booking shortfalls, worker stake top-ups, every take-out | The four Edge Functions in `supabase/functions/`: `razorpay-order` + `razorpay-verify` behind `collect()`, `razorpay-payout` behind `payout()`, `razorpay-webhook` as the server's own record (`gateway_events`, `gateway_payments`, migration 0004). Deploy, set secrets, then switch a device with `?payments=razorpay&rzkey=…&fnurl=…` — `supabase/README.md`, `docs/PRODUCTION.md` §7. Payouts stay fail-closed until a Route account map or RazorpayX is configured |
+| Withdraw fees / Remit GST | The treasury posts the leg and audits it; nothing reaches a bank or the GST portal | `razorpay-webhook` already stores every `settlement.processed` in `gateway_events`; posting the `FEE_WITHDRAW` leg from that row is the lead's, and the GSTR-3B challan stays manual (`docs/PRODUCTION.md` §3) |
 
 ## Every day — four minutes
 

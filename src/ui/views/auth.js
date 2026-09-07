@@ -77,6 +77,13 @@ export function render() {
     <div style="text-align:center;margin-top:var(--sp-7)">
       <button class="btn btn--ghost btn--sm" data-act="nav.admin">Owner? Admin console</button>
     </div>
+    <p class="micro muted" style="text-align:center;margin-top:var(--sp-5)">
+      <a class="micro muted" href="#/legal/terms">Terms</a> ·
+      <a class="micro muted" href="#/legal/privacy">Privacy</a> ·
+      <a class="micro muted" href="#/legal/refunds">Refunds</a> ·
+      <a class="micro muted" href="#/legal/contact">Contact</a> ·
+      <a class="micro muted" href="#/legal/about">About</a>
+    </p>
     <div style="height:60px"></div>
   </main>`;
   // the map lives in the markup we just built, so it can only be created once

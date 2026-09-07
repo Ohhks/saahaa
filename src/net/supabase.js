@@ -10,7 +10,7 @@
 
    The ANON KEY IS PUBLIC BY DESIGN. It identifies the project, it does not
    authorise anything — Row Level Security decides what a caller may read or
-   write. The service_role key must NEVER appear in this repo or in a browser.
+   write. The service-role key must NEVER appear in this repo or in a browser.
 
    Everything money-related goes through rpc() to a SECURITY DEFINER function.
    The client is never trusted to compute or move a rupee. */

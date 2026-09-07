@@ -2,6 +2,9 @@
 dist/
 # intermediate deck fragment (the deck itself is docs/presentation.html)
 docs/deck/presentation-artifact.html
+# local Supabase function env files (secrets) never enter git
+supabase/.env*
+supabase/**/.env*
 # tooling and OS noise
 __pycache__/
 *.pyc

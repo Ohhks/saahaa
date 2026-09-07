@@ -126,3 +126,32 @@ describe('migration v9 · vouches and the automation slot exist, nothing is lost
     expect(st.admin.hash).toBe('h'); expect(st.users).toHaveLength(1);
   });
 });
+
+/* ── the rail switch ───────────────────────────────────────── */
+import { paymentsConfig, setPaymentsConfig, clearPaymentsConfig } from './config.js';
+describe('gateway · the rail is sim until configured, and razorpay fails closed when half-configured', () => {
+  it('ships in sim mode with the sandbox label', () => {
+    clearPaymentsConfig();
+    expect(paymentsConfig().mode).toBe('sim'); expect(G.mode()).toBe('sim'); expect(G.via()).toBe('upi-sim');
+  });
+  it('a device override switches the mode and strips a trailing slash from the functions URL', () => {
+    const c = setPaymentsConfig({ mode: 'razorpay', keyId: 'rzp_test_x', functionsUrl: 'https://abc.functions.supabase.co/' });
+    expect(c.functionsUrl).toBe('https://abc.functions.supabase.co');
+    expect(paymentsConfig().mode).toBe('razorpay'); expect(G.isSandbox()).toBeFalse(); expect(G.label()).toContain('Razorpay');
+    clearPaymentsConfig();
+  });
+  it('razorpay mode with no key or no opener refuses to collect — it never falls back to the sandbox', async () => {
+    setPaymentsConfig({ mode: 'razorpay', keyId: '', functionsUrl: 'https://abc.functions.supabase.co' });
+    const r = await G.collect({ paise: 500, key: 'c1' });
+    expect(r.ok).toBeFalse(); expect(r.reason).toContain('not configured');
+    setPaymentsConfig({ mode: 'razorpay', keyId: 'rzp_test_x', functionsUrl: 'https://abc.functions.supabase.co' });
+    G.useOpener(null);
+    const r2 = await G.collect({ paise: 500, key: 'c1' });
+    expect(r2.ok).toBeFalse(); expect(r2.reason).toContain('opener');
+    clearPaymentsConfig();
+    expect((await G.collect({ paise: 500, key: 'c1' })).via).toBe('upi-sim');
+  });
+  it('an unknown mode value is treated as sim, never as live', () => {
+    setPaymentsConfig({ mode: 'stripe' }); expect(paymentsConfig().mode).toBe('sim'); clearPaymentsConfig();
+  });
+});

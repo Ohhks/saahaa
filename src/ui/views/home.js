@@ -580,6 +580,13 @@ export function render() {
       <p class="micro muted" style="margin-top:10px">
         SAAHAA · locally, professionally · your money is held until the work is confirmed
       </p>
+      <p class="micro muted" style="margin-top:8px;position:relative;z-index:1">
+        <a class="micro muted" href="#/legal/terms">Terms</a> ·
+        <a class="micro muted" href="#/legal/privacy">Privacy</a> ·
+        <a class="micro muted" href="#/legal/refunds">Refunds</a> ·
+        <a class="micro muted" href="#/legal/contact">Contact</a> ·
+        <a class="micro muted" href="#/legal/about">About</a>
+      </p>
     </div>
   </main>
   <style>

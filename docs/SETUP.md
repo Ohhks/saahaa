@@ -54,7 +54,8 @@ Sign in when the browser window pops up. Refresh GitHub — your files are there
 17. Left sidebar → **SQL Editor** → **New query**.
 18. Open `supabase/migrations/0001_schema.sql` from your repo, copy all of it,
     paste, **Run**.
-19. Same with `0002_money_rls.sql`, then `0003_automation.sql`. **Order matters.**
+19. Same with `0002_money_rls.sql`, then `0003_automation.sql`, then
+    `0004_gateway.sql`. **Order matters.**
 20. Set the OTP pepper — **this is the single most important line in the whole
     setup**. Without it, a leaked code hash is brute-forced in milliseconds,
     because a 6-digit code is only a million possibilities:
@@ -153,6 +154,50 @@ minting a new bootstrap and pushing again.
     - `ohhks.github.io/saahaa/` — the live site
 
 **Done. You never repeat Parts A–E.**
+
+## Part G — Payments (later, the day the Razorpay account exists)
+
+Nothing above depends on this. Until it is done the app runs in `sim` mode:
+every screen that moves money says *Sandbox UPI — no real money moves yet*,
+and that is honest, not broken. Test mode costs nothing and needs no
+activated account.
+
+34. Razorpay → Settings → API Keys → **Generate Test Key**. Key id
+    (`rzp_test_…`) and secret → password manager. The secret is shown once.
+35. On your machine: `npm i -g supabase`, `supabase login`,
+    `supabase link --project-ref <ref>` (`<ref>` = the `xxxx` in your
+    project URL).
+36. Set the secrets — **never in the repo, never in `config.js`**:
+
+```bash
+supabase secrets set RAZORPAY_KEY_ID=rzp_test_XXXX RAZORPAY_KEY_SECRET=XXXX RAZORPAY_WEBHOOK_SECRET=XXXX ALLOWED_ORIGINS=https://ohhks.github.io,http://localhost:8772
+```
+
+    Make `RAZORPAY_WEBHOOK_SECRET` up: 32+ random characters, same generator
+    as the OTP pepper. You paste the same string into Razorpay in step 38.
+37. Deploy the four functions, each with `--no-verify-jwt`:
+
+```bash
+supabase functions deploy razorpay-order   --no-verify-jwt
+supabase functions deploy razorpay-verify  --no-verify-jwt
+supabase functions deploy razorpay-webhook --no-verify-jwt
+supabase functions deploy razorpay-payout  --no-verify-jwt
+```
+
+38. Razorpay → Webhooks → Add: URL
+    `https://<ref>.functions.supabase.co/razorpay-webhook`, the secret from
+    step 36, events `payment.captured`, `payment.failed`, `refund.processed`,
+    `transfer.processed`, `settlement.processed`.
+39. Open the live site **once** with
+    `?payments=razorpay&rzkey=rzp_test_XXXX&fnurl=https://<ref>.functions.supabase.co`.
+    Top up ₹10 with card `4111 1111 1111 1111`. The wallet moves, and
+    `select * from gateway_payments;` in the SQL Editor shows one
+    `captured` row. Full walkthrough, the Route/Payouts choice and rollback:
+    `supabase/README.md`.
+40. Back to the sandbox at any time: `?payments=sim`.
+
+The service-role key is **still** not needed anywhere: Supabase injects it
+into the functions itself. Step 28 stands.
 
 ---
 
