@@ -114,3 +114,38 @@ needed had already been done. The docs agent wrote the deck captions for the
 four new scenes (`c15-wallet`, `p14-standing`, `a11-treasury`,
 `a12-automation`) before the screenshots existed; the lead captured them after
 the guardian, as always.
+
+## The roster for 8.0.0 "Modernist" — a whole-surface redesign
+
+A redesign is the one release where every view changes at once, so the waves
+are drawn by SCREEN OWNERSHIP rather than by feature. The spec
+(`docs/design/DESIGN-SPEC.md`) is written before any agent starts and is the
+single answer to "what should this look like" — an agent that has to ask that
+question mid-build has been briefed badly.
+
+| Role | Owns | Mockup screens |
+|---|---|---|
+| **Lead** | `app.js`, `core/**`, `domain/**`, `index.html`, `tokens.css`, `brand.css`, tools, git, the spec, the archives | — |
+| **A · customer core** | `views/home.js` `shops.js` `ask.js` | 1, 2, 4, 5, 7, 8, 10 |
+| **B · customer money & trust** | `views/orders.js` `pro.js` `account.js` `legal.js` | 3, 6, 9, 11, 12, 13 |
+| **C · the working side** | `views/partner.js` `earn.js` `onboard.js` `auth.js` | 14–22 |
+| **D · admin & shell** | `views/admin.js` `ui/dom.js` `splash.js` `map.js` `icons.js` | none drawn — same system applied |
+| **Guardian** | `src/ui/**` fixes, `docs/TEST-REPORT.md` | the whole matrix, last and alone |
+
+Rules that a redesign adds to the standing ones:
+
+- **The design system lands first, from the lead, before any agent starts.**
+  `tokens.css` carries both layers: the mockup's own component classes, and
+  every legacy class the views still use restyled to the system — so a view
+  that has not been rebuilt yet looks wrong-ish, never broken.
+- **A new screen needs its route registered by the lead first.** Agents build
+  into a route that already exists; they never edit `app.js`.
+- **Where the mockup and the product disagree, the product wins**, and the
+  disagreement is written down in the spec before the build (here: the
+  mockup's "3% from the pro" against the shipped "8% on top, worker keeps
+  100%"). A mockup is a drawing, not a decision about money.
+- **Never hard-code a number a dial owns.** Screens read `getPricing()`; the
+  guardian greps for stray percentages.
+- The contract check (`guard-ui.mjs`) is what makes a full-surface restyle
+  safe: every `data-act`, id and export must survive, so the behaviour cannot
+  drift while the paint changes.

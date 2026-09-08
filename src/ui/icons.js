@@ -113,6 +113,10 @@ const P = {
   signin:     'M14 4h5v16h-5M10 8l4 4-4 4M14 12H3',
   chevron:    'M6 9l6 6 6-6',
   back:       'M15 5l-7 7 7 7',
+  // drawn in the same hand as `back`, so a "go on" arrow on a button is the
+  // same family as the chevron beside it — &rarr; is a different typeface's
+  // idea of an arrow and changes shape with the font stack
+  forward:    'M4 12h14M12 6l6 6-6 6',
   person:     'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 21a7.5 7.5 0 0 1 15 0',
   check:      'M5 12.5l4.5 4.5L19 7',
   cross:      'M6 6l12 12M18 6 6 18',

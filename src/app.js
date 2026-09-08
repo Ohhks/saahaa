@@ -70,6 +70,8 @@ const ROUTES = {
   onboard:   () => onboard.render(),
   pro:       p => pro.render(p),
   account:   () => account.render(),
+  nearby:    () => home.renderNearby(),      // mockup 7 — the neighbourhood, map first
+  chat:      p => ordersView.renderChat(p),  // mockup 6 — the thread with the pro
   legal:     p => legal.render(p),          // #/legal/terms · privacy · refunds · contact · about
 };
 
@@ -449,6 +451,8 @@ function wireActions() {
   A('admin.restore', d => admin.restore(d.key));
   A('admin.fresh',   () => admin.freshStart && admin.freshStart());
   A('admin.payments.save',  () => admin.savePayments());
+  A('nav.nearby',  () => go('nearby'));                                   // the neighbourhood screen
+  A('nav.chat',    d => go('chat', d.id));                                // the thread with the pro
   A('admin.payments.clear', () => admin.clearPayments());
   A('admin.automation.push',  () => admin.pushAutomation && admin.pushAutomation());
   A('admin.automation.reset', () => admin.resetAutomation && admin.resetAutomation());

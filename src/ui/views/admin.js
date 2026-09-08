@@ -3,13 +3,20 @@
    the owner's own password, or open #/admin. No credential is printed here,
    in the markup, or anywhere else in the shipped bundle.
 
-   OPEN CIRCLE · LIVING GLASS.  Same engine, rebuilt experience.
+   MODERNIST 8.0.  Same engine, rebuilt experience.
 
-   Eight sections, no more: an admin console with twenty nav items is an
-   unused admin console. Each screen still separates what the ADMIN DOES BY
-   HAND from what the SYSTEM COMPUTES — the distinction the owner asked for —
-   and nothing on any screen is invented: every number is read straight off
-   the ledger, the order registry, the aggregate or the health checks.
+   The console is a desktop dashboard that folds to a phone: an ink header
+   strip carrying the identity and the sign-out, the four numbers that decide
+   whether the owner needs to act at all as stat blocks, the eight sections as
+   one underlined tab row, and every list of things as a table — uppercase
+   11px column heads, one-pixel row rules, scrolling inside its own box on a
+   narrow screen. Cards carry a 2px top rule; the only red left rule on the
+   console is the one on Fresh start.
+
+   Each screen still separates what the ADMIN DOES BY HAND from what the
+   SYSTEM COMPUTES — the distinction the owner asked for — and nothing on any
+   screen is invented: every number is read straight off the ledger, the order
+   registry, the aggregate or the health checks.
 
    The money rule, made visible rather than merely obeyed: customer money,
    escrow, pro payouts, shop payouts, platform fee, GST, rider pool, holdback
@@ -18,9 +25,9 @@
    the owner sees, not a footnote. */
 
 import { mount, esc, toast, timeAgo, clockTime, sheet, closeSheet, $ } from '../dom.js';
-import { icon, hasIcon } from '../icons.js';
-import { ctx, getState, dispatch, me } from '../../core/ctx.js';
-import { get, live, all as allOf, namespaces, count } from '../../core/registry.js';
+import { icon } from '../icons.js';
+import { ctx, getState, dispatch } from '../../core/ctx.js';
+import { get, namespaces, count } from '../../core/registry.js';
 import * as adminauth from '../../core/adminauth.js';
 import * as audit from '../../core/audit.js';
 import * as flags from '../../core/flags.js';
@@ -41,10 +48,9 @@ import * as autoverify from '../../domain/autoverify.js';
 import * as fresh from '../../domain/fresh.js';
 import * as gateway from '../../core/gateway.js';
 import { paymentsConfig, setPaymentsConfig, clearPaymentsConfig } from '../../core/config.js';
-import { quoteService, quoteRetail } from '../../domain/pricing.js';
+import { quoteService, quoteRetail, GST_RATE } from '../../domain/pricing.js';
 import { geoOf } from '../../domain/match.js';
 import * as gmap from '../map.js';
-import { mark } from '../logo.js';
 
 let section = 'dash';
 let testResult = null, chainResult = null;
@@ -60,57 +66,140 @@ const SECTIONS = [
   ['finance','Finance'], ['system','System & audit'],
 ];
 
+/* ══════════════ the console's own layout rules ══════════════
+   Scoped to .ad, built only from the system's tokens. tokens.css owns every
+   colour and component; this block only arranges them for a working screen:
+   the ink strip, the tab row, the two-column dial grids, the map box. */
+const ADMIN_CSS = `<style>
+  /* the ink strip is tokens.css's .on-plum — the ONE dark treatment the
+     working side uses. This block only gives it its padding, so the sign-out
+     button, the muted type and any link inside inherit the strip's own rules
+     instead of the light theme's (ink-on-ink was the bug). */
+  .ad-hdr{padding:var(--sp-6) 0 var(--sp-5)}
+  .ad-hdr .wrap{padding-bottom:0}
+  .ad-brand{display:flex;align-items:center;gap:var(--sp-5);flex-wrap:wrap}
+  .ad-wm{font:800 18px/1 var(--font-heading);letter-spacing:.02em;white-space:nowrap}
+  .ad-wm .sep{color:var(--color-accent);margin:0 6px}
+  .ad-ver{font-size:11px;letter-spacing:.04em;color:color-mix(in srgb,var(--color-bg) 70%,transparent)}
+  .ad-tabs{display:flex;gap:var(--sp-7);overflow-x:auto;scrollbar-width:none;border-bottom:2px solid var(--color-divider);margin:var(--sp-6) 0 0}
+  .ad-tabs::-webkit-scrollbar{display:none}
+  .ad-tab{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0;font:600 12px/1 var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+  .ad-tab:hover{color:var(--ink-1)}
+  .ad-tab[aria-selected="true"]{color:var(--color-accent);border-bottom-color:var(--color-accent)}
+  .ad-tab .tag{padding:2px 6px;font-size:10px}
+  .ad-note{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-4) var(--sp-8);padding:var(--sp-5) 0;border-bottom:1px solid var(--color-divider)}
+  .ad-g2{display:grid;grid-template-columns:minmax(0,1fr);gap:0 var(--sp-6)}
+  .ad-cards{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-5);align-items:start}
+  .ad-split{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-6);align-items:start}
+  @media (min-width:768px){
+    .ad-note,.ad-g2,.ad-cards,.ad-split{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .ad-cards--3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  }
+  @media (min-width:1280px){ .ad .wrap{max-width:1280px} }
+  .ad .card{border-top:2px solid var(--color-text)}
+  .ad .card--gold{border-top-color:var(--color-accent)}
+  .ad .card--warn{border-top-color:var(--warn)} .ad .card--bad{border-top-color:var(--danger)} .ad .card--ok{border-top-color:var(--success)}
+  .ad .card--red{border-left:3px solid var(--color-accent)}
+  .ad .card > .tablewrap,.ad .tablewrap{min-width:0;max-width:100%}
+  .ad .table{min-width:100%}
+  .ad .table td{vertical-align:middle} .ad .table td.act{white-space:nowrap;text-align:right}
+  .ad .table td.nowrap,.ad .table th.nowrap{white-space:nowrap}
+  .ad .table .sub{display:block;font-size:11px;color:var(--ink-3);font-weight:400}
+  .ad .table tr.on td{background:var(--color-accent-100)}
+  :root[data-theme="dark"] .ad .table tr.on td{background:var(--brand-soft)}
+  /* a money table's last line: the total, ruled off in ink like the mockup's
+     .ad-kv.total was, so the figure that matters is the one you land on */
+  .ad .table tr.tot td{border-top:2px solid var(--color-text);border-bottom:0;font-weight:800}
+  .ad .table tr.tot:hover td{background:transparent}
+  .ad .table tr.detail td{background:var(--surface-2);padding:var(--sp-5)}
+  .ad .table tr.detail:hover td{background:var(--surface-2)}
+  .ad-rowbtn{display:block;width:100%;text-align:left;padding:0;background:none;border:0;color:inherit;cursor:pointer;font:inherit;min-height:32px}
+  .ad-rowbtn b{display:block}
+  .ad-mapbox{border:2px solid var(--color-text);background:var(--surface-2)}
+  #adminMap{height:320px}
+  @media (min-width:1024px){ #adminMap{height:440px} }
+  .ad-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;padding:var(--sp-4) var(--sp-5);border-top:2px solid var(--color-text)}
+  .ad-dot{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px}
+  .ad-bar{height:6px;background:var(--color-neutral-300);min-width:80px} .ad-bar i{display:block;height:100%;background:var(--color-accent)}
+  .ad-kv{display:flex;justify-content:space-between;gap:var(--sp-5);padding:7px 0;border-bottom:1px solid var(--hairline);font-size:13px}
+  .ad-kv.total{border-top:2px solid var(--color-text);border-bottom:0;font-weight:800;margin-top:4px}
+  .ad-check{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--hairline);cursor:pointer}
+  .ad-check input{width:22px;height:22px;flex:none;accent-color:var(--color-accent);margin:0}
+  .ad-actions{display:flex;flex-wrap:wrap;gap:var(--sp-4)} .ad-actions .grow{flex:1 1 150px}
+  /* the mockup's segmented switch, scrolling inside its own box on a phone
+     rather than widening the page */
+  .ad-segwrap{overflow-x:auto;scrollbar-width:none;margin-bottom:var(--sp-5)}
+  .ad-segwrap::-webkit-scrollbar{display:none}
+  /* tokens.css gives .seg__btn 40px; the console keeps the 44px touch target */
+  .ad .seg__btn{min-height:44px}
+  .ad-fields .field{margin-bottom:var(--sp-4)} .ad-hint{margin:-2px 0 var(--sp-5);font-size:11px;color:var(--ink-3)}
+  .ad-facts{display:flex;flex-wrap:wrap;gap:6px}
+  .ad-login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg)}
+  .ad-login .card{width:100%;max-width:400px;padding:var(--sp-8) var(--sp-7)}
+  .ad-kpis{margin-top:calc(-1 * var(--sp-6))}
+  .ad .hd{margin:var(--sp-7) 0 var(--sp-5)}
+  .ad .sec + .sec{margin-top:var(--sp-5)}
+  .ad .empty{padding:var(--sp-6)}
+</style>`;
+
 /* ══════════════ shared vocabulary ══════════════ */
 
 const initials = n => (String(n || '?').trim().split(/\s+/).slice(0, 2)
   .map(w => w[0] || '').join('') || '?').toUpperCase();
-const avatar = n => `<span class="avatar" aria-hidden="true">${esc(initials(n))}</span>`;
+const avatar = n => `<span class="avatar avatar--sm" aria-hidden="true">${esc(initials(n))}</span>`;
 
 const pill = (text, tone = 'soft', extra = '') =>
   `<span class="pill pill--${tone}${extra ? ' ' + extra : ''}">${esc(text)}</span>`;
 
-const riseOf = i => `rise${i > 1 ? ' rise-' + Math.min(5, i) : ''}`;
-
-/** One computed fact. Huge number, quiet label. `v` is already-formatted. */
-const capsule = (k, v, d, tone = 'soft', i = 1) => `<div class="capsule capsule--${tone} ${riseOf(i)}">
+/** One computed fact. Big number, quiet label, a 2px rule on top. `v` is already-formatted. */
+const capsule = (k, v, d, tone = 'soft') => `<div class="capsule capsule--${tone}">
   <div class="capsule__k">${esc(k)}</div>
   <div class="capsule__v num">${v}</div>
   ${d ? `<div class="capsule__d">${esc(d)}</div>` : ''}</div>`;
 
 /** A thing that needs a decision: evidence first, then one primary action. */
-const cmd = ({ title, sub = '', right = '', facts = '', actions = '', tone = '', i = 1 }) => `
-  <div class="cmd glass ${tone} ${riseOf(i)}">
-    <div class="between">
+const cmd = ({ title, sub = '', right = '', facts = '', actions = '', tone = '' }) => `
+  <div class="card ${tone}">
+    <div class="between" style="align-items:flex-start">
       <div class="grow">
-        <div class="cmd__title">${title}</div>
-        ${sub ? `<div class="cmd__sub">${sub}</div>` : ''}
+        <div class="card-title">${title}</div>
+        ${sub ? `<div class="card-meta">${sub}</div>` : ''}
       </div>
       ${right}
     </div>
     ${facts}
-    ${actions ? `<div class="cmd__action">${actions}</div>` : ''}
+    ${actions ? `<div class="ad-actions">${actions}</div>` : ''}
   </div>`;
 
-const facts = parts => `<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:10px">
-  ${parts.filter(Boolean).map(p => `<span class="chip--smart">${p}</span>`).join('')}</div>`;
+const facts = parts => `<div class="ad-facts">
+  ${parts.filter(Boolean).map(p => `<span class="chip chip--smart">${p}</span>`).join('')}</div>`;
 
-const empty = msg => `<div class="empty--smart"><p class="tiny muted">${esc(msg)}</p></div>`;
+const empty = msg => `<div class="empty"><p class="tiny muted">${esc(msg)}</p></div>`;
 
 const secHead = (title, right = '') =>
   `<div class="hd"><h2 class="h-sec">${esc(title)}</h2>${right}</div>`;
 
+/** The table every list on this console is drawn as. `cols` are the heads
+    (a string, or [label, 'num'] for a right-aligned column); `rows` are
+    ready-made <tr>s. Scrolls inside .tablewrap on a narrow screen. */
+const table = (cols, rows, emptyMsg = 'Nothing here.') => rows
+  ? `<div class="tablewrap"><table class="table">
+      <thead><tr>${cols.map(c => Array.isArray(c)
+        ? `<th class="${c[1] || ''}">${esc(c[0])}</th>` : `<th>${esc(c)}</th>`).join('')}</tr></thead>
+      <tbody>${rows}</tbody></table></div>`
+  : empty(emptyMsg);
+
 /** THE separation of powers, on every single screen. Never dropped. */
-const note = (auto, manual) => `<div class="glass rise" style="margin-bottom:var(--sp-6)">
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:var(--sp-6)">
+const note = (auto, manual) => `<div class="ad-note">
     <div>
       <div class="eyebrow">System computes</div>
       <p class="tiny muted">${esc(auto)}</p>
     </div>
     <div>
-      <div class="eyebrow">You do by hand</div>
+      <div class="eyebrow em">You do by hand</div>
       <p class="tiny muted">${esc(manual)}</p>
     </div>
-  </div></div>`;
+  </div>`;
 
 /* Escrow release tiering — the label and the temperature both come from the
    domain, so this table never drifts from trust.js. */
@@ -124,24 +213,22 @@ const tierPill = id => {
 /* ══════════════ LOGIN ══════════════ */
 export function renderLogin() {
   const g = adminauth.gateStatus();
-  return `
-  <div class="on-plum" style="min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px">
-    <div class="glass glass--deep rise" style="width:100%;max-width:380px;text-align:center;padding:32px 24px">
-      <div style="display:flex;justify-content:center;margin-bottom:20px">${mark(96, { detail: true })}</div>
-      <div class="wordmark display" style="font-size:26px">SAAHAA</div>
-      <p class="eyebrow" style="margin:8px 0 26px">ADMIN CONSOLE</p>
+  return `${ADMIN_CSS}
+  <div class="ad ad-login">
+    <div class="card rise">
+      <div class="wordmark" style="font-size:26px">SAAHAA</div>
+      <div class="eyebrow em" style="margin-bottom:var(--sp-6)">Owner console</div>
 
-      ${g.blocked ? `<div class="glass glass--deep" style="border-color:var(--danger);margin-bottom:16px">
+      ${g.blocked ? `<div class="card card--bad" style="margin-bottom:var(--sp-5)">
         <b style="color:var(--danger)">${g.reason === 'locked' ? 'Locked' : 'Too many attempts'}</b>
-        <p class="tiny muted" style="margin-top:6px">Try again in ${Math.ceil(g.waitMs / 1000)}s.</p></div>` : ''}
+        <p class="tiny muted">Try again in ${Math.ceil(g.waitMs / 1000)}s.</p></div>` : ''}
 
       <div class="field"><input id="adUser" placeholder=" " value="${esc(adminauth.ADMIN_USERNAME)}" autocomplete="username"><label>Username</label></div>
       <div class="field"><input id="adPass" type="password" placeholder=" " autocomplete="current-password"><label>Password</label></div>
-      <button class="btn btn--primary btn--lg btn--block" data-act="admin.login" ${g.blocked ? 'disabled' : ''}>
-        Sign in</button>
-      <button class="btn btn--ghost btn--block" style="margin-top:8px" data-act="nav.home">← Back to SAAHAA</button>
+      <button class="btn btn--primary btn--lg btn--block" data-act="admin.login" ${g.blocked ? 'disabled' : ''}>Sign in</button>
+      <button class="btn btn--ghost btn--block" data-act="nav.home">Back to SAAHAA</button>
 
-      <p class="micro muted" style="margin-top:24px;line-height:1.7">
+      <p class="micro muted" style="margin-top:var(--sp-5);line-height:1.7;border-top:1px solid var(--color-divider);padding-top:var(--sp-5)">
         Owner access only. If you have forgotten the password there is no reset
         from this screen — restore a backup or reinstall.
       </p>
@@ -178,46 +265,47 @@ export function render() {
   const openD = st.disputes.filter(d => d.status === 'OPEN' && !d.resolvedAt).length;
   const healthy = h.checks.filter(c => c.ok).length;
   const ours = treasury.treasury(st.ledger).feeEarned;
+  const badge = { approvals: queued, disputes: openD, escrow: liveOrders };
 
   /* The map is the only thing on this console that needs a live DOM node, so
      it is built one frame AFTER this string has been mounted. Never inside the
      render path, never blocking it, and never able to break it. */
   scheduleMap();
 
-  return `
-  <header class="hdr on-plum" style="border-radius:0 0 var(--r-2xl) var(--r-2xl)">
-    <div class="wrap inner">
-      ${mark(28, { glow: false })}
-      <div class="grow">
-        <span class="eyebrow">Admin console</span>
-        <b class="h-display" style="display:block;line-height:1.15">SAAHAA</b>
-        <span class="micro muted">v${VERSION} “${CODENAME}” · schema v${SCHEMA_VERSION} · ${BUILD_ID}</span>
-      </div>
-      <button class="btn btn--ghost btn--sm" data-act="admin.logout">Sign out</button>
-    </div>
-    <div class="wrap" style="margin-top:var(--sp-5)">
-      <div class="row" style="flex-wrap:wrap;gap:8px">
-        ${pill(`${liveOrders} orders in flight`, 'info', 'pill--live')}
-        ${pill(`${queued} awaiting you`, queued ? 'warn' : 'soft')}
-        ${pill(openD ? `${openD} open disputes` : 'no open disputes', openD ? 'bad' : 'soft')}
-        ${pill(`Health ${healthy}/${h.checks.length}`, h.ok ? 'ok' : h.fatal ? 'bad' : 'warn')}
-        ${pill(`Ours ${M.fmt(ours)} (fees earned)`, ours > 0 ? 'gold' : 'soft')}
+  return `${ADMIN_CSS}
+  <div class="ad">
+  <header class="ad-hdr on-plum">
+    <div class="wrap">
+      <div class="ad-brand">
+        <div class="grow">
+          <div class="ad-wm">SAAHAA<span class="sep">·</span>ADMIN</div>
+          <div class="ad-ver">v${VERSION} “${CODENAME}” · schema v${SCHEMA_VERSION} · ${BUILD_ID}</div>
+        </div>
+        <button class="btn btn--secondary btn--sm" data-act="admin.logout">${icon('signout', { size: 16 })} Sign out</button>
       </div>
     </div>
   </header>
   <main class="wrap">
-    ${st.admin.isDemo ? `<div class="glass glass--gold rise" style="margin-top:var(--sp-6)">
+    <div class="capsules ad-kpis">
+      ${capsule('In flight', liveOrders, 'orders not yet settled', 'info')}
+      ${capsule('Awaiting you', queued, 'approvals only you can give', queued ? 'warn' : 'soft')}
+      ${capsule('Open disputes', openD, openD ? 'action needed' : 'all clear', openD ? 'bad' : 'ok')}
+      ${capsule('Health', `${healthy}/${h.checks.length}`, h.ok ? 'every check holds' : h.fatal ? 'fatal' : 'degraded', h.ok ? 'ok' : h.fatal ? 'bad' : 'warn')}
+      ${capsule('Ours', M.fmt(ours), 'fees earned, net of GST', ours > 0 ? 'gold' : 'soft')}
+    </div>
+
+    ${st.admin.isDemo ? `<div class="card card--warn" style="margin-top:var(--sp-6)">
       <div class="eyebrow" style="color:var(--warn);display:flex;align-items:center;gap:6px">${icon('warn', { size: 13 })} Bootstrap credential</div>
-      <b class="tiny" style="color:var(--warn)">Set your own password before anyone else uses this.</b>
-      <p class="tiny muted" style="margin-top:6px;color:var(--warn)">
+      <b class="tiny">Set your own password before anyone else uses this.</b>
+      <p class="tiny muted">
         This device is still on a bootstrap credential. Set your own password in System &amp; audit
         before anyone else uses this.</p>
     </div>` : ''}
 
-    <nav class="seg" role="tablist" aria-label="Admin sections" style="margin:var(--sp-6) 0">
-      ${SECTIONS.map(([k, l]) => `<button class="seg__btn" role="tab"
-        aria-pressed="${section === k ? 'true' : 'false'}"
-        data-act="admin.sec" data-sec="${k}">${esc(l)}</button>`).join('')}
+    <nav class="ad-tabs" role="tablist" aria-label="Admin sections">
+      ${SECTIONS.map(([k, l]) => `<button class="ad-tab" role="tab"
+        aria-selected="${section === k ? 'true' : 'false'}"
+        data-act="admin.sec" data-sec="${k}">${esc(l)}${badge[k] ? `<span class="tag ${k === 'escrow' ? 'tag-neutral' : 'tag-accent'}">${badge[k]}</span>` : ''}</button>`).join('')}
     </nav>
 
     ${section === 'dash' ? dash(st)
@@ -228,8 +316,9 @@ export function render() {
     : section === 'moderation' ? moderation(st)
     : section === 'finance' ? finance(st)
     : system(st)}
-    <div style="height:72px"></div>
-  </main>`;
+    <div style="height:48px"></div>
+  </main>
+  </div>`;
 }
 
 /* ── 1. DASHBOARD ─────────────────────────────────────────── */
@@ -245,27 +334,28 @@ function dash(st) {
 
   ${liveMap(st)}
 
+  <div class="sec">${secHead('The numbers')}
   <div class="capsules">
-    ${capsule('Ours (fees earned)', M.fmt(t.feeEarned), `${M.fmt(t.withdrawn)} withdrawn so far`, 'gold', 1)}
-    ${capsule('Users', st.users.length, `${st.users.filter(u => u.role === 'customer').length} customers`, 'soft', 1)}
-    ${capsule('Partners', st.partners.length, `${st.shops.length} shops`, 'soft', 2)}
-    ${capsule('Orders', st.orders.length, `${liveOrders} live`, 'info', 3)}
-    ${capsule('Revenue', M.fmt(a.revenue), `GST ${M.fmt(a.gst)} collected`, 'gold', 4)}
-    ${capsule('GMV', M.fmt(a.gmv), 'paid to pros & shops', 'ok', 5)}
-    ${capsule('In escrow', M.fmt(a.escrow), 'locked, not revenue', 'info', 2)}
-    ${capsule('Pending approvals', pending, 'partners awaiting tier', pending ? 'warn' : 'soft', 3)}
-    ${capsule('Open disputes', openD, openD ? 'action needed' : 'all clear', openD ? 'bad' : 'ok', 4)}
-    ${capsule('Customer savings', M.fmt(a.saved), 'vs commission apps', 'gold', 5)}
-    ${capsule('Listings', st.products.length, 'products across all shops', 'soft', 5)}
-  </div>
+    ${capsule('Ours (fees earned)', M.fmt(t.feeEarned), `${M.fmt(t.withdrawn)} withdrawn so far`, 'gold')}
+    ${capsule('Users', st.users.length, `${st.users.filter(u => u.role === 'customer').length} customers`, 'soft')}
+    ${capsule('Partners', st.partners.length, `${st.shops.length} shops`, 'soft')}
+    ${capsule('Orders', st.orders.length, `${liveOrders} live`, 'info')}
+    ${capsule('Revenue', M.fmt(a.revenue), `GST ${M.fmt(a.gst)} collected`, 'gold')}
+    ${capsule('GMV', M.fmt(a.gmv), 'paid to pros & shops', 'ok')}
+    ${capsule('In escrow', M.fmt(a.escrow), 'locked, not revenue', 'info')}
+    ${capsule('Pending approvals', pending, 'partners awaiting tier', pending ? 'warn' : 'soft')}
+    ${capsule('Open disputes', openD, openD ? 'action needed' : 'all clear', openD ? 'bad' : 'ok')}
+    ${capsule('Customer savings', M.fmt(a.saved), 'vs commission apps', 'gold')}
+    ${capsule('Listings', st.products.length, 'products across all shops', 'soft')}
+  </div></div>
 
   ${moneyFlow(st)}
 
-  <div class="workspace">
+  <div class="ad-split" style="margin-top:var(--sp-5)">
     <div class="sec">${secHead('Booking statistics')}
-      <div class="glass">${byStage(st)}</div></div>
-    <div class="sec">${secHead('Rating statistics')}
-      <div class="glass">${ratingStats(st)}</div></div>
+      ${byStage(st)}</div>
+    <div class="sec" style="border-top:0">${secHead('Rating statistics')}
+      ${ratingStats(st)}</div>
   </div>`;
 }
 
@@ -274,28 +364,30 @@ function dash(st) {
    at the customer's place, every online pro at theirs, every shop at its own —
    so "is anything actually happening in Kondapur tonight?" is a glance, not a
    query. Read-only: the map never writes, and a map that fails to load must
-   never take the console down with it. */
-const PIN_ORDER = '#E0B558', PIN_PARTNER = '#7C3AED', PIN_SHOP = '#14B8A6';
+   never take the console down with it. The pins are the system's palette
+   (ui/map.js · PINS): the accent for the order being watched, ink for a pro,
+   neutral for a shop. */
+const PIN_ORDER = gmap.PINS.accent, PIN_PARTNER = gmap.PINS.ink, PIN_SHOP = gmap.PINS.neutral;
 
-const legendDot = (c, label) => `<span class="chip--smart"><span aria-hidden="true"
-  style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${c};margin-right:6px"></span>${esc(label)}</span>`;
+const legendDot = (c, label) => `<span><span class="ad-dot" aria-hidden="true" style="background:${c}"></span>${esc(label)}</span>`;
 
 function liveMap(st) {
   const liveOrders = st.orders.filter(o => !stage(o.stage).terminal);
   const online = st.partners.filter(p => p.online !== false && !p.suspended);
   return `
   <div class="sec">${secHead('Live map', `<button class="more" data-act="admin.map">Refresh</button>`)}
-    <div class="glass glass--deep rise">
-      <div id="adminMap" style="height:320px;border-radius:var(--r-lg);overflow:hidden;background:var(--border)"></div>
-      <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:12px">
+    <div class="ad-mapbox">
+      <div id="adminMap"></div>
+      <div class="ad-legend">
         ${legendDot(PIN_ORDER, `${liveOrders.length} order(s) in flight`)}
         ${legendDot(PIN_PARTNER, `${online.length} pro(s) online`)}
         ${legendDot(PIN_SHOP, `${st.shops.length} shop(s)`)}
       </div>
-      <p class="tiny muted" style="margin-top:10px">
-        Tiles from OpenStreetMap. Places come from each order, pro and shop — nothing about a
-        customer is sent anywhere to draw this.</p>
-    </div></div>`;
+    </div>
+    <p class="micro muted" style="margin-top:var(--sp-4)">
+      Tiles from OpenStreetMap. Places come from each order, pro and shop — nothing about a
+      customer is sent anywhere to draw this.</p>
+  </div>`;
 }
 
 /* Two people in the same area share one coordinate, so without a deterministic
@@ -334,7 +426,7 @@ function scheduleMap() {
 
 function mapFail(el, e) {
   try {
-    mount(el, `<div class="empty--smart"><p class="tiny muted">Map unavailable — ${esc(
+    mount(el, `<div class="empty"><p class="tiny muted">Map unavailable — ${esc(
       (e && e.message) || 'could not load')}. Everything else on this console still works.</p></div>`);
   } catch (_) {}
   mapHandle = null;
@@ -392,56 +484,43 @@ function moneyFlow(st) {
     if (o.paidOut) availableOut += amt; else pendingOut += amt;
   });
 
+  const node = (k, v, d) => `<div class="moneyflow__node">
+    <div class="eyebrow">${esc(k)}</div>
+    <div class="num" style="font-size:var(--fs-lg)">${M.fmt(v)}</div>
+    <div class="micro muted">${esc(d)}</div></div>`;
+
   return `
   <div class="sec">${secHead('Money flow', `<span class="pill pill--live">live</span>`)}
-    <div class="glass glass--deep rise">
-      <div class="moneyflow">
-        <div class="moneyflow__node">
-          <div class="eyebrow">Customer</div>
-          <div class="num num-xl">${M.fmt(lockedEver)}</div>
-          <div class="meta">paid in, all time</div>
-        </div>
-        <div class="moneyflow__arrow" aria-hidden="true">→</div>
-        <div class="moneyflow__node">
-          <div class="eyebrow">Escrow</div>
-          <div class="num num-xl">${M.fmt(held)}</div>
-          <div class="meta">locked right now · not revenue</div>
-        </div>
-        <div class="moneyflow__arrow" aria-hidden="true">→</div>
-        <div class="moneyflow__node">
-          <div class="eyebrow">Partner</div>
-          <div class="num num-xl">${M.fmt(toPartner)}</div>
-          <div class="meta">released to pros</div>
-        </div>
-        <div class="moneyflow__node">
-          <div class="eyebrow">Shop</div>
-          <div class="num num-xl">${M.fmt(toShop)}</div>
-          <div class="meta">released to shops</div>
-        </div>
-      </div>
+    <div class="tablewrap"><div class="moneyflow" style="min-width:560px">
+      ${node('Customer', lockedEver, 'paid in, all time')}
+      <div class="moneyflow__arrow" aria-hidden="true">${icon('chevron', { size: 14 })}</div>
+      ${node('Escrow', held, 'locked right now · not revenue')}
+      <div class="moneyflow__arrow" aria-hidden="true">${icon('chevron', { size: 14 })}</div>
+      ${node('Partner', toPartner, 'released to pros')}
+      ${node('Shop', toShop, 'released to shops')}
+    </div></div>
 
-      <div class="eyebrow" style="margin-top:var(--sp-7)">The split — six separate books</div>
-      <div class="moneyflow__split">
-        ${capsule('Platform fee', M.fmt(fee), 'revenue, net of GST', 'gold', 1)}
-        ${capsule('GST', M.fmt(gst), 'owed to government', 'info', 2)}
-        ${capsule('Rider pool', M.fmt(rider), 'delivery earnings', 'soft', 3)}
-        ${capsule('Holdback', M.fmt(holdback), 'pro reliability stake', 'soft', 4)}
-        ${capsule('Goodwill', M.fmt(goodwill), 'credits we fund ourselves', 'warn', 5)}
-        ${capsule('Refunded', M.fmt(refunded), 'returned to customers', 'bad', 5)}
-      </div>
-
-      <div class="eyebrow" style="margin-top:var(--sp-7)">Where every rupee stands</div>
-      <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:var(--sp-4)">
-        <span class="state--held">Held · ${M.fmt(held)}</span>
-        <span class="state--released">Released · ${M.fmt(released)}</span>
-        <span class="state--pending">Pending payout · ${M.fmt(pendingOut)}</span>
-        <span class="state--available">Available · ${M.fmt(availableOut)}</span>
-      </div>
-      <p class="tiny muted" style="margin-top:var(--sp-5)">
-        Held is escrow this second. Released is what has already left escrow to a pro or a shop.
-        Pending is settled but not yet paid out by hand. Available is settled and paid out.
-        Four different numbers — never one.</p>
+    <div class="eyebrow" style="margin-top:var(--sp-6)">The split — six separate books</div>
+    <div class="capsules" style="margin-top:var(--sp-4)">
+      ${capsule('Platform fee', M.fmt(fee), 'revenue, net of GST', 'gold')}
+      ${capsule('GST', M.fmt(gst), 'owed to government', 'info')}
+      ${capsule('Rider pool', M.fmt(rider), 'delivery earnings', 'soft')}
+      ${capsule('Holdback', M.fmt(holdback), 'pro reliability stake', 'soft')}
+      ${capsule('Goodwill', M.fmt(goodwill), 'credits we fund ourselves', 'warn')}
+      ${capsule('Refunded', M.fmt(refunded), 'returned to customers', 'bad')}
     </div>
+
+    <div class="eyebrow" style="margin-top:var(--sp-6)">Where every rupee stands</div>
+    <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:var(--sp-4)">
+      <span class="state state--held">Held · ${M.fmt(held)}</span>
+      <span class="state state--released">Released · ${M.fmt(released)}</span>
+      <span class="state state--pending">Pending payout · ${M.fmt(pendingOut)}</span>
+      <span class="state state--available">Available · ${M.fmt(availableOut)}</span>
+    </div>
+    <p class="tiny muted" style="margin-top:var(--sp-5)">
+      Held is escrow this second. Released is what has already left escrow to a pro or a shop.
+      Pending is settled but not yet paid out by hand. Available is settled and paid out.
+      Four different numbers — never one.</p>
   </div>`;
 }
 
@@ -451,11 +530,10 @@ function byStage(st) {
   const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   if (!rows.length) return empty('No orders yet.');
   const max = rows[0][1];
-  return rows.map(([s, n]) => `<div style="margin-bottom:10px">
-    <div class="between"><span class="tiny">${esc(stage(s).label)}</span><b class="num tiny">${n}</b></div>
-    <div style="height:6px;border-radius:3px;background:var(--border);margin-top:4px">
-      <div style="height:100%;border-radius:3px;background:var(--gold-grad-soft);width:${(n / max) * 100}%"></div></div>
-  </div>`).join('');
+  return table(['Stage', 'Share', ['Orders', 'num']], rows.map(([s, n]) => `<tr>
+    <td>${esc(stage(s).label)}</td>
+    <td><div class="ad-bar"><i style="width:${(n / max) * 100}%"></i></div></td>
+    <td class="num">${n}</td></tr>`).join(''));
 }
 
 function ratingStats(st) {
@@ -463,14 +541,13 @@ function ratingStats(st) {
   if (!all.length) return empty('No ratings yet.');
   const avg = all.reduce((n, r) => n + r.stars, 0) / all.length;
   const dist = [5,4,3,2,1].map(s => [s, all.filter(r => r.stars === s).length]);
-  return `<div class="between" style="margin-bottom:14px">
-      <div><div class="eyebrow">Average</div><b class="num num-xl">${avg.toFixed(2)}</b></div>
-      <span class="meta" style="text-align:right">${all.length} ratings<br>across ${st.partners.length} pros</span></div>
-    ${dist.map(([s, n]) => `<div class="between" style="margin-bottom:6px">
-      <span class="tiny">${s} ★</span>
-      <div style="flex:1;height:6px;border-radius:3px;background:var(--border);margin:0 10px">
-        <div style="height:100%;border-radius:3px;background:var(--gold-grad-soft);width:${(n / all.length) * 100}%"></div></div>
-      <b class="num tiny" style="width:32px;text-align:right">${n}</b></div>`).join('')}`;
+  return `<div class="capsules" style="margin-bottom:var(--sp-5)">
+      ${capsule('Average', avg.toFixed(2), `${all.length} ratings across ${st.partners.length} pros`, 'gold')}
+    </div>
+    ${table(['Stars', 'Share', ['Count', 'num']], dist.map(([s, n]) => `<tr>
+      <td class="nowrap">${s} ${icon('star', { size: 12 })}</td>
+      <td><div class="ad-bar"><i style="width:${(n / all.length) * 100}%"></i></div></td>
+      <td class="num">${n}</td></tr>`).join(''))}`;
 }
 
 /* ── 2. APPROVALS ─────────────────────────────────────────── */
@@ -485,52 +562,55 @@ function approvals(st) {
   ${note('tier 3 and tier 4 promotions from the pipeline below, queue ordering by risk, duplicate detection, price-outlier flags, ban-list prefilter',
          'turn automation off, move the dials, suspend — and approve by hand when you want to override the machine')}
 
-  ${automation(st)}
-
   <div class="sec">${secHead(`Partner applications · ${queue.length}`, pill('your override', 'soft'))}
-    ${queue.length ? queue.map((p, ix) => {
+    <div class="ad-cards">
+    ${queue.length ? queue.map(p => {
       const t = trustScore(p);
       const v = p.verification || {};
       const bg = v.background || {};
       const next = Math.min(4, (p.tier | 0) + 1);
       const e = V.certifiedEligible(p);
       const evidence = next === 3
-        ? `<div class="eyebrow" style="margin-top:12px">Background check requested ${esc(timeAgo(bg.at))}</div>
+        ? `<div class="eyebrow">Background check requested ${esc(timeAgo(bg.at))}</div>
            ${facts([
              `ID ${esc((v.idType || '').toUpperCase())} …${esc(v.idLast4 || '????')}`,
              `Reference ${esc(bg.refName || '—')} …${esc(bg.refPhone || '')}`,
              'Consent given',
            ])}
-           <p class="tiny muted" style="margin-top:8px">Call the reference. Approve only after the call.</p>`
-        : `<div class="eyebrow" style="margin-top:12px">Qualifies for Certified</div>
+           <p class="tiny muted">Call the reference. Approve only after the call.</p>`
+        : `<div class="eyebrow">Qualifies for Certified</div>
            ${facts([
              `${e.completed} jobs`,
              `rating ${e.avg.toFixed(1)}`,
              `${p.disputesUpheld || 0} upheld disputes`,
            ])}`;
       return cmd({
-        i: ix + 1,
-        tone: next === 3 ? '' : 'glass--gold',
-        title: `${avatar(p.name)} ${esc(p.name)}`,
+        tone: next === 3 ? '' : 'card--gold',
+        title: `${esc(p.name)}`,
         sub: `${esc(get('category', p.cat).name)} · ${esc(p.area)} · ${esc(tier(p.tier).label)} · trust ${t.score}`,
         right: pill(t.band.label, t.band.tone),
         facts: evidence,
         actions: `<button class="btn btn--primary btn--sm grow" data-act="admin.approve" data-id="${p.id}" data-tier="${next}">Approve → ${esc(tier(next).label)}</button>
-          <button class="btn btn--ghost btn--sm" data-act="admin.suspend" data-id="${p.id}">Suspend</button>`,
+          <button class="btn btn--secondary btn--sm" data-act="admin.suspend" data-id="${p.id}">Suspend</button>`,
       });
-    }).join('') : empty('Nothing needs you. Partners verify themselves.')}</div>
+    }).join('') : empty('Nothing needs you. Partners verify themselves.')}</div></div>
 
+  ${automation(st)}
+
+  <div class="ad-split">
   <div class="sec">${secHead(`Self-verifying now · ${inProgress.length}`)}
-    ${inProgress.length ? inProgress.map(p => { const r = V.readiness(p); return `<div class="glass" style="padding:11px 14px;margin-bottom:8px">
-      <div class="between"><span class="tiny">${avatar(p.name)} ${esc(p.name)} <span class="micro muted">· ${esc(get('category', p.cat).name)}</span></span>
-        <span class="meta">${r.pct}% · next: ${esc(r.next ? r.next.title : '—')}</span></div></div>`; }).join('')
-      : empty('Nobody mid-way.')}</div>
+    ${table(['Pro', 'Trade', ['Done', 'num'], 'Next step'], inProgress.map(p => { const r = V.readiness(p); return `<tr>
+      <td class="nowrap"><b>${esc(p.name)}</b></td>
+      <td>${esc(get('category', p.cat).name)}</td>
+      <td class="num">${r.pct}%</td>
+      <td>${esc(r.next ? r.next.title : '—')}</td></tr>`; }).join(''), 'Nobody mid-way.')}</div>
 
-  <div class="sec">${secHead(`Shop applications · ${shops.length}`)}
-    ${shops.length ? shops.map(s => `<div class="glass" style="padding:12px 14px;margin-bottom:8px">
-      <div class="between"><span class="tiny">${avatar(s.name)} <b>${esc(s.name)}</b></span>
-        ${pill(s.area, 'soft')}</div></div>`).join('')
-      : empty('No shops waiting.')}</div>`;
+  <div class="sec" style="border-top:0">${secHead(`Shop applications · ${shops.length}`)}
+    ${table(['Shop', 'Area', 'Status'], shops.map(s => `<tr>
+      <td class="nowrap"><b>${esc(s.name)}</b></td>
+      <td>${esc(s.area)}</td>
+      <td>${pill(s.status, 'warn')}</td></tr>`).join(''), 'No shops waiting.')}</div>
+  </div>`;
 }
 
 /* ── AUTOMATION — approvals that happen by themselves ─────────
@@ -540,9 +620,9 @@ function approvals(st) {
    this panel shows the dials, the pipeline and what the machine has done.
    Same shape as Charges: a dial, its live value, its launch default, one Push. */
 const checkRow = (id, label, on, hint) => `
-  <label class="between" style="gap:12px;margin-bottom:12px;cursor:pointer">
+  <label class="ad-check">
     <span><b class="tiny">${esc(label)}</b><p class="micro muted" style="margin:2px 0 0">${hint}</p></span>
-    <input id="${id}" type="checkbox" ${on ? 'checked' : ''} style="width:20px;height:20px;flex:none;accent-color:var(--accent)">
+    <input id="${id}" type="checkbox" ${on ? 'checked' : ''}>
   </label>`;
 
 function automation(st) {
@@ -555,60 +635,62 @@ function automation(st) {
   return `
   <div class="sec">${secHead('Automation — approvals that happen by themselves',
       A.autoApprove ? pill('running', 'ok', 'pill--live') : pill('switched off', 'warn'))}
-    <p class="tiny muted" style="margin-bottom:12px">
+    <p class="tiny muted" style="margin-bottom:var(--sp-5)">
       Background Checked and Certified are earned by the network itself — real jobs, ratings, vouches
       from people who can know, a reference who confirms by code, then time. Nobody waits for you.
       The switch below stops it; the dials say how much is enough.</p>
 
+    <div class="ad-cards">
     ${dialGroup('The switch', 'Off means tiers 3 and 4 wait for you again. Suspension always wins either way.', `
       ${checkRow('atAuto', 'Promote by itself', A.autoApprove, dialHint(onOff(A.autoApprove), onOff(D.autoApprove)))}
-    `)}
-
-    ${dialGroup('Background Checked (tier 3)', 'Every line must hold before the network promotes a pro. Upheld disputes must be zero — that is not a dial.', `
-      ${dial('atJobs', 'Real jobs settled cleanly (code + photo)', A.bgJobs, dialHint(`${A.bgJobs} jobs`, `${D.bgJobs} jobs`))}
-      ${dial('atRating', 'Average rating over those jobs', A.bgRating, dialHint(`${A.bgRating}`, `${D.bgRating}`))}
-      ${dial('atVouches', 'Vouches from customers or same-trade pros', A.bgVouches, dialHint(`${A.bgVouches}`, `${D.bgVouches}`))}
-      ${checkRow('atReference', 'The named reference must confirm by code', A.bgReference, dialHint(onOff(A.bgReference), onOff(D.bgReference)))}
     `)}
 
     ${dialGroup('Certified (tier 4)', 'The 25-job / 4.6-rating / zero-dispute rule is fixed. This dial is how long a pro must have been Background Checked first.', `
       ${dial('atCertDays', 'Days as Background Checked', A.certDays, dialHint(`${A.certDays} days`, `${D.certDays} days`))}
     `)}
-
-    <div class="row" style="gap:8px;flex-wrap:wrap">
-      <button class="btn btn--primary grow" data-act="admin.automation.push">Push</button>
-      <button class="btn btn--ghost" data-act="admin.automation.reset">Reset to defaults</button>
     </div>
-    <p class="tiny muted" style="margin-top:10px">
+
+    <div style="margin-top:var(--sp-5)">
+    ${dialGroup('Background Checked (tier 3)', 'Every line must hold before the network promotes a pro. Upheld disputes must be zero — that is not a dial.', `
+      <div class="ad-g2">
+      ${dial('atJobs', 'Real jobs settled cleanly (code + photo)', A.bgJobs, dialHint(`${A.bgJobs} jobs`, `${D.bgJobs} jobs`))}
+      ${dial('atRating', 'Average rating over those jobs', A.bgRating, dialHint(`${A.bgRating}`, `${D.bgRating}`))}
+      ${dial('atVouches', 'Vouches from customers or same-trade pros', A.bgVouches, dialHint(`${A.bgVouches}`, `${D.bgVouches}`))}
+      </div>
+      ${checkRow('atReference', 'The named reference must confirm by code', A.bgReference, dialHint(onOff(A.bgReference), onOff(D.bgReference)))}
+    `)}
+    </div>
+
+    <div class="ad-actions" style="margin-top:var(--sp-5)">
+      <button class="btn btn--primary grow" data-act="admin.automation.push">Push</button>
+      <button class="btn btn--secondary" data-act="admin.automation.reset">Reset to defaults</button>
+    </div>
+    <p class="tiny muted" style="margin-top:var(--sp-4)">
       Last pushed: ${A.pushedAt
         ? `<b>${esc(clockTime(A.pushedAt))}, ${esc(timeAgo(A.pushedAt))}</b> by <b>${esc(A.pushedBy || 'admin')}</b>`
         : '<b>never</b> — these are the launch defaults'}</p>
   </div>
 
   <div class="sec">${secHead(`Pipeline · ${pipe.length}`, pill(`${pipe.filter(r => r.ready).length} ready`, pipe.some(r => r.ready) ? 'ok' : 'soft'))}
-    <p class="tiny muted" style="margin-bottom:12px">
+    <p class="tiny muted" style="margin-bottom:var(--sp-5)">
       Every tier-2 and tier-3 pro, closest to promotion first, with what they are still missing.
       A ready row is promoted on the next sweep while the switch is on.</p>
-    ${pipe.length ? pipe.map((r, ix) => `<div class="glass ${r.ready ? 'glass--gold' : ''} ${riseOf(ix + 1)}" style="padding:11px 14px;margin-bottom:8px">
-      <div class="between">
-        ${avatar(r.name)}
-        <div class="grow"><b class="tiny">${esc(r.name)}</b>
-          <p class="tiny muted">${esc(get('category', r.cat).name || r.cat)} · ${esc(tier(r.tier).label)} → ${esc(tier(r.next).label)}</p>
-          <p class="micro ${r.ready ? '' : 'muted'}" style="margin-top:4px">${r.ready
-            ? `${icon('check', { size: 12 })} everything holds — promoted on the next sweep`
-            : `missing: ${esc(r.missing.join(' · '))}`}</p></div>
-        ${r.ready ? pill('ready', 'ok') : pill(`${r.missing.length} to go`, 'soft')}
-      </div></div>`).join('') : empty('Nobody in the pipeline — no tier-2 or tier-3 pro yet.')}
+    ${table(['Pro', 'Trade', 'Promotion', 'Still missing', 'Status'], pipe.map(r => `<tr class="${r.ready ? 'on' : ''}">
+      <td class="nowrap"><b>${esc(r.name)}</b></td>
+      <td>${esc(get('category', r.cat).name || r.cat)}</td>
+      <td class="nowrap">${esc(tier(r.tier).label)} → ${esc(tier(r.next).label)}</td>
+      <td>${r.ready ? 'everything holds — promoted on the next sweep' : esc(r.missing.join(' · '))}</td>
+      <td class="nowrap">${r.ready ? pill('ready', 'ok') : pill(`${r.missing.length} to go`, 'soft')}</td></tr>`).join(''),
+      'Nobody in the pipeline — no tier-2 or tier-3 pro yet.')}
   </div>
 
   <div class="sec">${secHead(`Promoted by the network · ${recent.length}`)}
-    ${recent.length ? `<ol class="timeline timeline--list">${recent.map(e => `<li class="timeline__item">
-      <span class="timeline__dot" aria-hidden="true"></span>
-      <div class="timeline__body">
-        <div class="between"><b class="micro">${esc(nameOf((e.detail || {}).partner))} → ${esc(tier((e.detail || {}).tier | 0).label)}</b>
-          <span class="timeline__time meta">${esc(clockTime(e.ts))}</span></div>
-        <p class="tiny muted">${esc(timeAgo(e.ts))} · ${esc(Object.entries((e.detail || {}).evidence || {}).map(([k, v]) => `${k} ${v}`).join(' · '))}</p>
-      </div></li>`).join('')}</ol>` : empty('No automatic promotion yet.')}
+    ${table(['When', 'Pro', 'To', 'Evidence'], recent.map(e => `<tr>
+      <td class="nowrap">${esc(clockTime(e.ts))}<span class="sub">${esc(timeAgo(e.ts))}</span></td>
+      <td class="nowrap"><b>${esc(nameOf((e.detail || {}).partner))}</b></td>
+      <td class="nowrap">${esc(tier((e.detail || {}).tier | 0).label)}</td>
+      <td class="tiny muted">${esc(Object.entries((e.detail || {}).evidence || {}).map(([k, v]) => `${k} ${v}`).join(' · '))}</td></tr>`).join(''),
+      'No automatic promotion yet.')}
   </div>`;
 }
 
@@ -622,18 +704,14 @@ function escrow(st) {
   ${note('escrow state machine, release tiering (instant / 6h / 24h / hold), release timers, stuck-order detection',
          'force-release, partial release, refund, extend a hold, reassign a pro')}
 
-  <div class="glass glass--gold rise" style="margin-bottom:var(--sp-6)">
-    <div class="between">
-      <div><div class="eyebrow">Locked in escrow</div>
-        <b class="num num-xl">${M.fmt(st.agg.escrow)}</b></div>
-      <span class="state--held">Held</span>
-    </div>
-    <p class="tiny muted" style="margin-top:8px">Customers' money, not revenue. Released only on confirmation or review.</p>
+  <div class="capsules" style="margin-top:var(--sp-5)">
+    ${capsule('Locked in escrow', M.fmt(st.agg.escrow), "customers' money, not revenue", 'gold')}
+    ${capsule('Awaiting release', held.length, 'service jobs done or disputed', held.length ? 'warn' : 'soft')}
   </div>
 
-  <div class="sec">${secHead(`Awaiting release · ${held.length}`)}
-  ${held.length ? held.map((o, ix) => cmd({
-    i: ix + 1,
+  <div class="sec">${secHead(`Awaiting release · ${held.length}`, `<span class="state state--held">Held</span>`)}
+  <div class="ad-cards">
+  ${held.length ? held.map(o => cmd({
     title: `${esc(o.kind === 'service' ? o.partnerName : o.shopName)} <span class="num">${M.fmt(o.customerPays)}</span>`,
     sub: `${esc(o.customerName)} · ${esc(stage(o.stage).label)} · ${esc(timeAgo(o.stageTs))}`,
     right: tierPill(o.escrowTier),
@@ -644,7 +722,7 @@ function escrow(st) {
     ]),
     actions: `<button class="btn btn--primary btn--sm grow" data-act="admin.release" data-id="${o.id}" data-pct="1">Release 100%</button>
       <button class="btn btn--secondary btn--sm grow" data-act="admin.release" data-id="${o.id}" data-pct="0.6">Partial 60%</button>`,
-  })).join('') : empty('Nothing awaiting release.')}</div>
+  })).join('') : empty('Nothing awaiting release. Released only on confirmation or review.')}</div></div>
 
   ${stuckRetail(st)}`;
 }
@@ -663,19 +741,19 @@ function stuckRetail(st) {
   const stalled = stuck.filter(o => now - (o.stageTs || 0) > STALE_MS).length;
   return `<div class="sec">${secHead('Shop orders in flight',
       `<span class="pill pill--${stalled ? 'warn' : 'soft'}">${stalled} stalled</span>`)}
-    ${stuck.map((o, ix) => {
+    <div class="ad-cards">
+    ${stuck.map(o => {
       const stale = now - (o.stageTs || 0) > STALE_MS;
       return cmd({
-        i: ix + 1,
-        tone: stale ? 'glass--gold' : '',
+        tone: stale ? 'card--warn' : '',
         title: `${esc(o.shopName || 'Shop')} <span class="num">${M.fmt(o.customerPays)}</span>`,
         sub: `${esc(o.customerName)} · ${esc(stage(o.stage).label)} · ${esc(timeAgo(o.stageTs))}`,
         right: stale ? pill('stalled', 'warn') : pill('moving', 'soft'),
-        facts: stale ? `<p class="tiny muted" style="margin-top:8px;color:var(--warn)">Stalled — the shop has not moved this on.</p>` : '',
+        facts: stale ? `<p class="tiny" style="color:var(--warn)">Stalled — the shop has not moved this on.</p>` : '',
         actions: `<button class="btn btn--secondary btn--sm btn--block"
           data-act="admin.refundretail" data-id="${o.id}">Refund the customer in full</button>`,
       });
-    }).join('')}</div>`;
+    }).join('')}</div></div>`;
 }
 
 /* ── 4. DISPUTES ──────────────────────────────────────────── */
@@ -686,12 +764,12 @@ function disputes(st) {
          'read the evidence and pick one of three outcomes, with a written reason')}
 
   <div class="sec">${secHead(`Open disputes · ${open.length}`)}
-  ${open.length ? open.map((d, ix) => {
+  <div class="ad-cards">
+  ${open.length ? open.map(d => {
     const o = st.orders.find(x => x.id === d.orderId) || {};
     const ageH = (Date.now() - d.openedAt) / 3600000;
     return cmd({
-      i: ix + 1,
-      tone: ageH > 24 ? 'glass--gold' : '',
+      tone: ageH > 24 ? 'card--bad' : '',
       title: esc(d.reason),
       sub: `${esc(o.customerName || '')} vs ${esc(o.partnerName || o.shopName || '')} · ${esc(timeAgo(d.openedAt))}`,
       right: pill(`${Math.round(ageH)}h`, ageH > 24 ? 'bad' : 'warn'),
@@ -704,7 +782,7 @@ function disputes(st) {
         <button class="btn btn--secondary btn--sm grow" data-act="admin.resolve" data-id="${d.id}" data-out="partial">Partial 60%</button>
         <button class="btn btn--ghost btn--sm grow" data-act="admin.resolve" data-id="${d.id}" data-out="refund">Full refund</button>`,
     });
-  }).join('') : empty('No open disputes.')}</div>`;
+  }).join('') : empty('No open disputes.')}</div></div>`;
 }
 
 /* ── 5. PEOPLE ────────────────────────────────────────────── */
@@ -718,34 +796,29 @@ function people(st) {
 
   <div class="sec">${secHead(`Pros · ${st.partners.length}`,
       `<span class="avatars">${st.partners.slice(0, 6).map(p => avatar(p.name)).join('')}</span>`)}
-    ${st.partners.length ? st.partners.map(p => {
+    ${table(['Pro', 'Trade', ['Jobs', 'num'], 'Area', 'Tier', 'Trust', ''], st.partners.map(p => {
       const t = trustScore(p);
-      return `<div class="glass" style="padding:12px 14px;margin-bottom:8px">
-        <div class="between">
-          ${avatar(p.name)}
-          <div class="grow"><b class="tiny">${esc(p.name)}</b>
-            <p class="tiny muted">${esc(get('category', p.cat).name)} · ${p.completed} jobs · ${esc(p.area)}
-              · ${(p.vouches || []).length} vouch(es)${(p.tier | 0) >= 3 && p.tier3At
-                ? ` · background checked ${esc(new Date(p.tier3At).toLocaleDateString('en-IN'))}` : ''}</p></div>
-          <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end">
-            ${pill(tier(p.tier).label, tier(p.tier).tone)}
-            ${pill(`${t.score} · ${t.band.label}`, t.band.tone)}
-          </div>
-        </div>
-        <div class="row" style="margin-top:10px;gap:6px">
+      return `<tr>
+        <td class="nowrap"><b>${esc(p.name)}</b>${p.suspended ? '<span class="sub">suspended</span>' : ''}</td>
+        <td>${esc(get('category', p.cat).name)}<span class="sub">${(p.vouches || []).length} vouch(es)${(p.tier | 0) >= 3 && p.tier3At
+          ? ` · checked ${esc(new Date(p.tier3At).toLocaleDateString('en-IN'))}` : ''}</span></td>
+        <td class="num">${p.completed}</td>
+        <td>${esc(p.area)}</td>
+        <td class="nowrap">${pill(tier(p.tier).label, tier(p.tier).tone)}</td>
+        <td class="nowrap">${pill(`${t.score} · ${t.band.label}`, t.band.tone)}</td>
+        <td class="act">
           <button class="btn btn--ghost btn--sm" data-act="admin.suspend" data-id="${p.id}">
             ${p.suspended ? 'Unsuspend' : 'Suspend'}</button>
           ${(p.tier | 0) >= 4 ? '<span class="pill pill--gold">Top tier</span>'
             : `<button class="btn btn--ghost btn--sm" data-act="admin.approve" data-id="${p.id}">Promote</button>`}
-        </div></div>`;
-    }).join('') : empty('No pros yet.')}</div>
+        </td></tr>`;
+    }).join(''), 'No pros yet.')}</div>
 
   <div class="sec">${secHead(`Customers · ${customers.length}`)}
-    ${customers.length ? customers.map(u => `<div class="glass" style="padding:10px 14px;margin-bottom:7px">
-      <div class="between">${avatar(u.name)}
-        <span class="grow tiny">${esc(u.name)} <span class="micro muted">· ${esc(u.mobile)}</span></span>
-        ${pill(u.area, 'soft')}</div></div>`).join('')
-      : empty('No customers yet.')}</div>`;
+    ${table(['Customer', 'Mobile', 'Area'], customers.map(u => `<tr>
+      <td class="nowrap"><b>${esc(u.name)}</b></td>
+      <td class="nowrap muted">${esc(u.mobile)}</td>
+      <td>${esc(u.area)}</td></tr>`).join(''), 'No customers yet.')}</div>`;
 }
 
 /* ── FLOW — track everyone's flow ─────────────────────────────
@@ -841,55 +914,46 @@ function flowTimeline(row) {
   evs.sort((a, b) => b.ts - a.ts);
   const list = evs.slice(0, FLOW_EVENTS);
   if (!list.length) return empty('Nothing recorded for this person yet.');
-  return `<ol class="timeline timeline--list">${list.map(e => `<li class="timeline__item">
-    <span class="timeline__dot" aria-hidden="true"></span>
-    <div class="timeline__body">
-      <div class="between"><b class="micro">${esc(e.title)}</b>
-        <span class="timeline__time meta">${esc(clockTime(e.ts))}</span></div>
-      <p class="tiny muted">${esc(timeAgo(e.ts))}${e.body ? ' · ' + esc(e.body) : ''}</p>
-    </div></li>`).join('')}</ol>
-    <p class="micro muted" style="margin-top:8px">${evs.length > FLOW_EVENTS
+  return `<div class="eyebrow" style="margin-bottom:var(--sp-4)">${esc(row.name)} — the whole journey</div>
+    ${table(['When', 'Event', 'Detail'], list.map(e => `<tr>
+      <td class="nowrap">${esc(clockTime(e.ts))}<span class="sub">${esc(timeAgo(e.ts))}</span></td>
+      <td class="nowrap"><b>${esc(e.title)}</b></td>
+      <td class="tiny muted">${e.body ? esc(e.body) : ''}</td></tr>`).join(''))}
+    <p class="micro muted" style="margin-top:var(--sp-4)">${evs.length > FLOW_EVENTS
       ? `Newest ${FLOW_EVENTS} of ${evs.length} events.` : `${evs.length} event(s), newest first.`}</p>`;
 }
 
-function flowRow(row, ix) {
+function flowRow(row) {
   const open = flowPick === row.key;
-  return `<div class="glass ${open ? 'glass--gold' : ''} ${riseOf(ix + 1)}" style="padding:0;margin-bottom:8px;overflow:hidden">
-    <button class="tap" aria-expanded="${open ? 'true' : 'false'}"
-      style="display:block;width:100%;text-align:left;padding:11px 14px;background:none;border:0;color:inherit;cursor:pointer"
-      data-act="admin.flow.pick" data-key="${esc(row.key)}">
-      <div class="between">
-        ${avatar(row.name)}
-        <div class="grow"><b class="tiny">${esc(row.name)}</b>
-          ${row.live ? '<span class="pill pill--live pill--info">in flight</span>' : ''}
-          <p class="tiny muted">${esc(ROLE_LABEL[row.role] || row.role)} · ${esc(row.place)} · ${esc(row.step)}</p>
-          ${row.hold ? `<p class="micro" style="margin-top:4px">Held by <b>${esc(row.hold.who)}</b> · ${M.fmt(row.hold.money)} on this order ·
-            waiting for ${esc(row.hold.who)}${row.hold.next.length ? ` → ${esc(row.hold.next.join(' / '))}` : ''}</p>` : ''}</div>
-        <div style="text-align:right">
-          <span class="meta">${esc(row.seen ? timeAgo(row.seen) : 'never')}</span>
-          <div class="micro muted" style="margin-top:4px">${esc(row.counts)}</div>
-        </div>
-      </div>
-    </button>
-    ${open ? `<div style="padding:0 14px 14px">${flowTimeline(row)}</div>` : ''}
-  </div>`;
+  return `<tr class="${open ? 'on' : ''}">
+    <td><button class="ad-rowbtn" aria-expanded="${open ? 'true' : 'false'}"
+        data-act="admin.flow.pick" data-key="${esc(row.key)}">
+        <b>${esc(row.name)}</b><span class="sub">${esc(ROLE_LABEL[row.role] || row.role)}</span></button></td>
+    <td>${esc(row.place)}</td>
+    <td>${esc(row.step)}${row.live ? ' <span class="pill pill--live">in flight</span>' : ''}
+      ${row.hold ? `<span class="sub">Held by <b>${esc(row.hold.who)}</b> · ${M.fmt(row.hold.money)} on this order${row.hold.next.length ? ` → ${esc(row.hold.next.join(' / '))}` : ''}</span>` : ''}</td>
+    <td class="nowrap">${esc(row.seen ? timeAgo(row.seen) : 'never')}</td>
+    <td class="tiny muted">${esc(row.counts)}</td>
+  </tr>${open ? `<tr class="detail"><td colspan="5">${flowTimeline(row)}</td></tr>` : ''}`;
 }
 
 function flowBlock(st) {
   const rows = flowRows(st);
   return `
   <div class="sec">${secHead(`Flow · ${rows.length}`, `<span class="pill pill--live">live</span>`)}
-    <p class="tiny muted" style="margin-bottom:12px">
+    <p class="tiny muted" style="margin-bottom:var(--sp-5)">
       Everyone on SAAHAA, most recently active first: where they are, what step they are on, and
-      what they have spent or earned. Tap a row to unroll that person's whole journey.</p>
-    <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">
-      ${ROLE_CHIPS.map(([k, l]) => `<button class="btn ${flowRole === k ? 'btn--primary' : 'btn--ghost'} btn--sm"
-        aria-pressed="${flowRole === k ? 'true' : 'false'}"
-        data-act="admin.flow.filter" data-role="${k}">${esc(l)}</button>`).join('')}
+      what they have spent or earned. Tap a name to unroll that person's whole journey.</p>
+    <div class="ad-segwrap">
+      <div class="seg" role="group" aria-label="Filter the flow by role">
+        ${ROLE_CHIPS.map(([k, l]) => `<button class="seg__btn"
+          aria-pressed="${flowRole === k ? 'true' : 'false'}"
+          data-act="admin.flow.filter" data-role="${k}">${esc(l)}</button>`).join('')}
+      </div>
     </div>
-    ${rows.length ? rows.map((r, ix) => flowRow(r, ix)).join('')
-      : empty(flowRole === 'all' ? 'Nobody has signed up yet.' : 'Nobody in that role yet.')}
-    ${rows.length >= FLOW_ROWS ? `<p class="micro muted">Showing the ${FLOW_ROWS} most recently active.</p>` : ''}
+    ${table(['Who', 'Where', 'Step', 'Seen', 'Spent / earned'], rows.map(r => flowRow(r)).join(''),
+      flowRole === 'all' ? 'Nobody has signed up yet.' : 'Nobody in that role yet.')}
+    ${rows.length >= FLOW_ROWS ? `<p class="micro muted" style="margin-top:var(--sp-4)">Showing the ${FLOW_ROWS} most recently active.</p>` : ''}
   </div>`;
 }
 
@@ -903,22 +967,20 @@ function moderation(st) {
 
   <div class="sec">${secHead(`Off-platform payment attempts · ${flagged.length}`,
       `<span class="pill pill--${flagged.length ? 'bad' : 'ok'}">${flagged.length ? 'leaking' : 'clean'}</span>`)}
-    <p class="tiny muted" style="margin-bottom:12px">
+    <p class="tiny muted" style="margin-bottom:var(--sp-5)">
       The single biggest revenue leak in a local marketplace: a pro asking to be paid in cash outside the app.
       Numbers and UPI handles are masked automatically; repeat offences cost trust points.</p>
-    ${flagged.length ? flagged.map(m => `<div class="glass" style="padding:11px 14px;margin-bottom:7px">
-      <div class="between">${avatar(m.name)}
-        <span class="grow tiny">${esc(m.name)}</span>
-        <span class="meta">${esc(clockTime(m.ts))}</span></div>
-      <p class="tiny muted" style="margin-top:6px">${esc(m.text)}</p></div>`).join('')
-      : empty('Nothing flagged.')}</div>
+    ${table(['When', 'Who', 'Message'], flagged.map(m => `<tr>
+      <td class="nowrap">${esc(clockTime(m.ts))}</td>
+      <td class="nowrap"><b>${esc(m.name)}</b></td>
+      <td class="tiny">${esc(m.text)}</td></tr>`).join(''), 'Nothing flagged.')}</div>
 
   <div class="sec">${secHead(`Reviews · ${st.reviews.length}`)}
-    ${st.reviews.length ? st.reviews.slice(0, 20).map(r => `<div class="glass" style="padding:11px 14px;margin-bottom:7px">
-      <div class="between">${avatar(r.byName || r.by || '?')}
-        <span class="grow tiny"><b class="num">${r.stars}★</b> ${esc(r.byName || r.by || '')}</span>
-        <button class="btn btn--ghost btn--sm" data-act="admin.hidereview" data-id="${r.id}">Hide</button></div></div>`).join('')
-      : empty('No reviews yet.')}</div>`;
+    ${table([['Stars', 'num'], 'By', ''], st.reviews.slice(0, 20).map(r => `<tr>
+      <td class="num">${r.stars} ${icon('star', { size: 12 })}</td>
+      <td>${esc(r.byName || r.by || '')}</td>
+      <td class="act"><button class="btn btn--ghost btn--sm" data-act="admin.hidereview" data-id="${r.id}">Hide</button></td></tr>`).join(''),
+      'No reviews yet.')}</div>`;
 }
 
 /* ── 7. FINANCE — including the reconciliation screen ─────── */
@@ -929,66 +991,52 @@ function finance(st) {
     .reduce((n, [, v]) => n + v, 0);
   const drift = escrowLedger !== a.escrow;
   return `
-  ${note('revenue split per order, GST liability (18% of the fee), payout queue, unit economics',
+  ${note(`revenue split per order, GST liability (${gstPct()} of the fee), payout queue, unit economics`,
          'mark a payout batch paid with its UTR, record a manual adjustment with a reason, export the GST report')}
+
+  <div class="ad-split" style="margin-top:var(--sp-5)">
+    <div class="card ${drift ? 'card--bad' : 'card--ok'}">
+      <div class="between">
+        <div><div class="eyebrow">Reconciliation</div>
+          <b class="h-sec">${drift ? 'Drift' : 'Balanced'}</b></div>
+        ${pill(drift ? 'do not trust this screen' : 'books agree', drift ? 'bad' : 'ok')}
+      </div>
+      <p class="tiny muted">
+        Escrow held, ledger replay and the aggregate must agree. If they ever don't, everything else on
+        this screen is fiction — that is why this box sits at the top.</p>
+      ${table(['Book', ['Escrow', 'num']], `
+        <tr><td>Aggregate escrow</td><td class="num">${M.fmt(a.escrow)}</td></tr>
+        <tr><td>Ledger replay</td><td class="num">${M.fmt(escrowLedger)}</td></tr>
+        <tr class="tot"><td>Difference</td>
+          <td class="num" style="color:var(--${drift ? 'danger' : 'success'})"><b>${M.fmt(Math.abs(escrowLedger - a.escrow))}</b></td></tr>`)}
+    </div>
+    <div class="capsules">
+      ${capsule('Platform revenue', M.fmt(a.revenue), 'net of GST', 'gold')}
+      ${capsule('GST collected', M.fmt(a.gst), `${gstPct()} of the fee, remitted`, 'info')}
+      ${capsule('Refunds', M.fmt(a.refunds), 'returned to customers', 'bad')}
+      ${capsule('Ledger blocks', st.chain.length, 'hash-chained', 'soft')}
+    </div>
+  </div>
 
   ${treasuryBlock(st)}
 
   ${charges()}
-
-  <div class="glass ${drift ? '' : 'glass--gold'} rise" style="${drift ? 'border-color:var(--danger)' : ''}">
-    <div class="between">
-      <div><div class="eyebrow">Reconciliation</div>
-        <b class="h-sec">${drift ? 'Drift' : '✓ balanced'}</b></div>
-      ${pill(drift ? 'do not trust this screen' : 'books agree', drift ? 'bad' : 'ok')}
-    </div>
-    <p class="tiny muted" style="margin:8px 0 12px">
-      Escrow held, ledger replay and the aggregate must agree. If they ever don't, everything else on
-      this screen is fiction — that is why this box sits at the top.</p>
-    <div class="between" style="margin-bottom:6px"><span class="tiny">Aggregate escrow</span><b class="num tiny">${M.fmt(a.escrow)}</b></div>
-    <div class="between" style="margin-bottom:6px"><span class="tiny">Ledger replay</span><b class="num tiny">${M.fmt(escrowLedger)}</b></div>
-    <div class="between"><span class="tiny">Difference</span>
-      <b class="num tiny" style="color:var(--${drift ? 'danger' : 'success'})">${M.fmt(Math.abs(escrowLedger - a.escrow))}</b></div>
-  </div>
-
-  <div class="capsules" style="margin-top:var(--sp-6)">
-    ${capsule('Platform revenue', M.fmt(a.revenue), 'net of GST', 'gold', 1)}
-    ${capsule('GST collected', M.fmt(a.gst), '18% of the fee, remitted', 'info', 2)}
-    ${capsule('Refunds', M.fmt(a.refunds), 'returned to customers', 'bad', 3)}
-    ${capsule('Ledger blocks', st.chain.length, 'hash-chained', 'soft', 4)}
-  </div>
 
   <div class="sec">${secHead('Payout queue')}
     ${payoutQueue(st)}</div>
 
   <div class="sec">${secHead('Ledger',
       `<button class="more" data-act="admin.verifychain">Verify chain</button>`)}
-    ${chainResult ? `<p class="tiny" style="color:var(--${chainResult.ok ? 'success' : 'danger'});margin-bottom:10px">
-      ${chainResult.ok ? `✓ ${st.chain.length} blocks verified` : `✗ broken at block ${chainResult.at} (${chainResult.reason})`}</p>` : ''}
-    <details class="expand">
-      <summary>Last 30 blocks of ${st.ledger.length}</summary>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:var(--fs-micro)">
-          <thead><tr>
-            <th style="text-align:left;padding:6px 8px" class="eyebrow">Block</th>
-            <th style="text-align:left;padding:6px 8px" class="eyebrow">Kind</th>
-            <th style="text-align:left;padding:6px 8px" class="eyebrow">From</th>
-            <th style="text-align:left;padding:6px 8px" class="eyebrow">To</th>
-            <th style="text-align:right;padding:6px 8px" class="eyebrow">Amount</th>
-          </tr></thead>
-          <tbody>
-          ${st.ledger.slice(-30).reverse().map(b => `<tr style="border-top:1px solid var(--hairline)">
-            <td class="num" style="padding:6px 8px">#${b.blockIdx}</td>
-            <td style="padding:6px 8px">${esc(b.kind)}</td>
-            <td class="muted" style="padding:6px 8px">${esc(b.partyA)}</td>
-            <td class="muted" style="padding:6px 8px">${esc(b.partyB)}</td>
-            <td class="num" style="padding:6px 8px;text-align:right">${M.fmt(b.amountPaise)}</td>
-          </tr>`).join('') || `<tr><td colspan="5" style="padding:10px 8px" class="muted">Empty.</td></tr>`}
-          </tbody>
-        </table>
-      </div>
-    </details>
-    <button class="btn btn--ghost btn--block" style="margin-top:10px" data-act="admin.exportledger">Export ledger CSV</button>
+    ${chainResult ? `<p class="tiny" style="color:var(--${chainResult.ok ? 'success' : 'danger'});margin-bottom:var(--sp-4)">
+      ${chainResult.ok ? `${st.chain.length} blocks verified` : `Broken at block ${chainResult.at} (${chainResult.reason})`}</p>` : ''}
+    <p class="micro muted" style="margin-bottom:var(--sp-4)">Last 30 blocks of ${st.ledger.length}, newest first.</p>
+    ${table([['Block', 'num'], 'Kind', 'From', 'To', ['Amount', 'num']], st.ledger.slice(-30).reverse().map(b => `<tr>
+        <td class="num">#${b.blockIdx}</td>
+        <td class="nowrap">${esc(b.kind)}</td>
+        <td class="muted tiny">${esc(b.partyA)}</td>
+        <td class="muted tiny">${esc(b.partyB)}</td>
+        <td class="num">${M.fmt(b.amountPaise)}</td></tr>`).join(''), 'Empty.')}
+    <button class="btn btn--secondary btn--block" style="margin-top:var(--sp-5)" data-act="admin.exportledger">Export ledger CSV</button>
   </div>`;
 }
 
@@ -998,8 +1046,8 @@ function finance(st) {
    stakes, holdbacks, the rider pool — is other people's money, and the
    liabilities table says so in those words. domain/treasury.js replays the
    hash-chained ledger for every figure here; nothing is typed in. */
-const trRow = (k, v, strong = false) => `<div class="between" style="margin-bottom:6px">
-  <span class="tiny${strong ? '' : ' muted'}">${esc(k)}</span><b class="num tiny">${M.fmt(v)}</b></div>`;
+const trRow = (k, v, strong = false) => `<tr class="${strong ? 'tot' : ''}">
+  <td>${esc(k)}</td><td class="num">${strong ? `<b>${M.fmt(v)}</b>` : M.fmt(v)}</td></tr>`;
 
 function treasuryBlock(st) {
   const t = treasury.treasury(st.ledger);
@@ -1009,85 +1057,72 @@ function treasuryBlock(st) {
   return `
   <div class="sec">${secHead('Treasury — the company’s wallet',
       t.reconciles ? pill('Books reconcile', 'ok') : pill('DO NOT RECONCILE', 'bad'))}
-    <div class="glass glass--gold rise" style="margin-bottom:10px">
-      <div class="between">
-        <div><div class="eyebrow">Our earnings held</div>
-          <b class="num num-xl">${M.fmt(t.feeEarned)}</b>
-          <div class="meta">platform fee, net of GST, still in the system</div></div>
-        <span class="state--available">Withdrawable · ${M.fmt(t.withdrawable)}</span>
-      </div>
-      <div class="capsules" style="margin-top:var(--sp-5)">
-        ${capsule('GST held for the government', M.fmt(t.gstPayable), `${M.fmt(t.gstDue)} due`, 'info', 1)}
-        ${capsule('Money in', M.fmt(t.moneyIn), 'everything that ever entered', 'soft', 2)}
-        ${capsule('Withdrawn so far', M.fmt(t.withdrawn), 'to the company bank', 'gold', 3)}
-        ${capsule('GST remitted so far', M.fmt(t.remitted), 'paid to the government', 'ok', 4)}
-        ${capsule('Goodwill', M.fmt(t.goodwill), 'credits we fund ourselves', t.goodwill < 0 ? 'warn' : 'soft', 5)}
-      </div>
-      <p class="micro muted" style="margin-top:10px;display:flex;align-items:center;gap:6px">
-        ${icon('coin', { size: 12 })} ${esc(gateway.label())}</p>
+    <div class="capsules">
+      ${capsule('Our earnings held', M.fmt(t.feeEarned), 'platform fee, net of GST, still in the system', 'gold')}
+      ${capsule('Withdrawable', M.fmt(t.withdrawable), 'to the company bank', 'ok')}
+      ${capsule('GST held for the government', M.fmt(t.gstPayable), `${M.fmt(t.gstDue)} due`, 'info')}
+      ${capsule('Money in', M.fmt(t.moneyIn), 'everything that ever entered', 'soft')}
+      ${capsule('Withdrawn so far', M.fmt(t.withdrawn), 'to the company bank', 'gold')}
+      ${capsule('GST remitted so far', M.fmt(t.remitted), 'paid to the government', 'ok')}
+      ${capsule('Goodwill', M.fmt(t.goodwill), 'credits we fund ourselves', t.goodwill < 0 ? 'warn' : 'soft')}
     </div>
+    <p class="micro muted" style="margin:var(--sp-4) 0 var(--sp-6);display:flex;align-items:center;gap:6px">
+      ${icon('coin', { size: 12 })} ${esc(gateway.label())}</p>
 
-    <div class="glass" style="margin-bottom:10px">
-      <div class="eyebrow">Liabilities — other people’s money</div>
-      <p class="tiny muted" style="margin:4px 0 12px">
-        These are held by SAAHAA but are never ours: they belong to customers, pros, shops and riders,
-        and they leave the books only to those people.</p>
-      ${trRow('Escrow in flight', t.escrow)}
-      ${trRow('Customer wallets', t.customerWallets)}
-      ${trRow('Worker wallets', t.partnerWallets)}
-      ${trRow('Shop wallets', t.shopWallets)}
-      ${trRow('Stakes', t.stakes)}
-      ${trRow('Holdbacks', t.holdbacks)}
-      ${trRow('Rider pool', t.riderPool)}
-      <div style="border-top:1px solid var(--hairline);margin:8px 0"></div>
-      ${trRow('Total held for others', t.liabilities, true)}
-      <p class="micro muted" style="margin-top:8px">
-        Money in must equal liabilities + ours + GST + goodwill + withdrawn + remitted.
-        ${t.reconciles ? 'It does.' : 'It does not — stop and check the ledger before moving anything.'}</p>
-    </div>
-
-    <div class="workspace">
-      <div class="glass">
-        <div class="eyebrow">Withdraw our earnings</div>
-        <p class="tiny muted" style="margin:4px 0 12px">PLATFORM:fee to the company bank. Never more than earned; above ${esc(bigWithdraw)} you re-type your password.</p>
-        <div class="field" style="margin-bottom:8px">
-          <input id="trAmt" type="number" step="any" inputmode="decimal" min="1" placeholder=" " value="${esc(rupStr(t.withdrawable))}">
-          <label>Amount ₹</label></div>
-        <button class="btn btn--primary btn--block" data-act="admin.treasury.withdraw" ${t.withdrawable >= 100 ? '' : 'disabled'}>Withdraw</button>
+    <div class="ad-split">
+      <div class="card">
+        <div class="eyebrow">Liabilities — other people’s money</div>
+        <p class="tiny muted">
+          These are held by SAAHAA but are never ours: they belong to customers, pros, shops and riders,
+          and they leave the books only to those people.</p>
+        ${table(['Held for', ['Amount', 'num']], [
+          trRow('Escrow in flight', t.escrow),
+          trRow('Customer wallets', t.customerWallets),
+          trRow('Worker wallets', t.partnerWallets),
+          trRow('Shop wallets', t.shopWallets),
+          trRow('Stakes', t.stakes),
+          trRow('Holdbacks', t.holdbacks),
+          trRow('Rider pool', t.riderPool),
+          trRow('Total held for others', t.liabilities, true),
+        ].join(''))}
+        <p class="micro muted">
+          Money in must equal liabilities + ours + GST + goodwill + withdrawn + remitted.
+          ${t.reconciles ? 'It does.' : 'It does not — stop and check the ledger before moving anything.'}</p>
       </div>
-      <div class="glass">
-        <div class="eyebrow">Remit GST</div>
-        <p class="tiny muted" style="margin:4px 0 12px">PLATFORM:gst to the GST portal. Never more than held; above ${esc(bigWithdraw)} you re-type your password.</p>
-        <div class="field" style="margin-bottom:8px">
-          <input id="trGst" type="number" step="any" inputmode="decimal" min="1" placeholder=" " value="${esc(rupStr(t.gstDue))}">
-          <label>Amount ₹</label></div>
-        <button class="btn btn--secondary btn--block" data-act="admin.treasury.remit" ${t.gstDue >= 100 ? '' : 'disabled'}>Remit</button>
+
+      <div class="stack" style="gap:var(--sp-5)">
+        <div class="card card--gold ad-fields">
+          <div class="eyebrow">Withdraw our earnings</div>
+          <p class="tiny muted">PLATFORM:fee to the company bank. Never more than earned; above ${esc(bigWithdraw)} you re-type your password.</p>
+          <div class="field">
+            <input id="trAmt" type="number" step="any" inputmode="decimal" min="1" placeholder=" " value="${esc(rupStr(t.withdrawable))}">
+            <label>Amount ₹</label></div>
+          <button class="btn btn--primary btn--block" data-act="admin.treasury.withdraw" ${t.withdrawable >= 100 ? '' : 'disabled'}>Withdraw</button>
+        </div>
+        <div class="card ad-fields">
+          <div class="eyebrow">Remit GST</div>
+          <p class="tiny muted">PLATFORM:gst to the GST portal. Never more than held; above ${esc(bigWithdraw)} you re-type your password.</p>
+          <div class="field">
+            <input id="trGst" type="number" step="any" inputmode="decimal" min="1" placeholder=" " value="${esc(rupStr(t.gstDue))}">
+            <label>Amount ₹</label></div>
+          <button class="btn btn--secondary btn--block" data-act="admin.treasury.remit" ${t.gstDue >= 100 ? '' : 'disabled'}>Remit</button>
+        </div>
       </div>
     </div>
 
-    <div class="glass" style="margin-top:10px">
+    <div style="margin-top:var(--sp-6)">
       <div class="eyebrow">Our part, per order</div>
-      <p class="tiny muted" style="margin:4px 0 10px">The last ${settled.length} settled orders, as booked — an order keeps the fee it was priced at.</p>
-      ${settled.length ? `<div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:var(--fs-micro)">
-          <thead><tr>
-            <th style="text-align:left;padding:6px 8px" class="eyebrow">Order</th>
-            <th style="text-align:right;padding:6px 8px" class="eyebrow">Customer paid</th>
-            <th style="text-align:right;padding:6px 8px" class="eyebrow">Fee</th>
-            <th style="text-align:right;padding:6px 8px" class="eyebrow">GST</th>
-            <th style="text-align:right;padding:6px 8px" class="eyebrow">Dispatch</th>
-            <th style="text-align:right;padding:6px 8px" class="eyebrow">Ours</th>
-          </tr></thead>
-          <tbody>${settled.map(o => { const p = treasury.ourPartOf(o); return `<tr style="border-top:1px solid var(--hairline)">
-            <td style="padding:6px 8px">${esc(o.kind === 'retail' ? (o.shopName || 'Shop') : (o.partnerName || 'Pro'))}
-              <span class="muted">· ${esc(o.customerName || '')} · ${esc(timeAgo(o.settledAt))}</span></td>
-            <td class="num" style="padding:6px 8px;text-align:right">${M.fmt(p.customerPays)}</td>
-            <td class="num" style="padding:6px 8px;text-align:right">${M.fmt(p.fee)}</td>
-            <td class="num muted" style="padding:6px 8px;text-align:right">${M.fmt(p.gst)}</td>
-            <td class="num muted" style="padding:6px 8px;text-align:right">${M.fmt(p.dispatchCut)}</td>
-            <td class="num" style="padding:6px 8px;text-align:right"><b>${M.fmt(p.ours)}</b></td>
-          </tr>`; }).join('')}</tbody>
-        </table></div>` : empty('No settled order yet — our part appears the moment a job or a basket settles.')}
+      <p class="tiny muted" style="margin:4px 0 var(--sp-4)">The last ${settled.length} settled orders, as booked — an order keeps the fee it was priced at.</p>
+      ${table(['Order', ['Customer paid', 'num'], ['Fee', 'num'], ['GST', 'num'], ['Dispatch', 'num'], ['Ours', 'num']],
+        settled.map(o => { const p = treasury.ourPartOf(o); return `<tr>
+          <td class="nowrap">${esc(o.kind === 'retail' ? (o.shopName || 'Shop') : (o.partnerName || 'Pro'))}
+            <span class="sub">${esc(o.customerName || '')} · ${esc(timeAgo(o.settledAt))}</span></td>
+          <td class="num">${M.fmt(p.customerPays)}</td>
+          <td class="num">${M.fmt(p.fee)}</td>
+          <td class="num muted">${M.fmt(p.gst)}</td>
+          <td class="num muted">${M.fmt(p.dispatchCut)}</td>
+          <td class="num"><b>${M.fmt(p.ours)}</b></td></tr>`; }).join(''),
+        'No settled order yet — our part appears the moment a job or a basket settles.')}
     </div>
   </div>`;
 }
@@ -1102,22 +1137,30 @@ function treasuryBlock(st) {
 
 const rup = paise => (Number(paise || 0) / 100);
 const rupStr = paise => rup(paise).toFixed(2).replace(/\.00$/, '');
+/* The statutory GST rate is domain/pricing.js's to state, not this screen's —
+   a view that types "18%" is a defect the day the rate moves. */
+const gstPct = () => `${+(GST_RATE * 100).toFixed(2)}%`;
+/* The worked example's premise, in paise, so the sentence and the sum below it
+   can never drift apart. */
+const EXAMPLE_JOB = 100000, EXAMPLE_BASKET = 60000, EXAMPLE_KM = 3;
 
-/** One dial: the input, its live value and the launch default beside it. */
+/** One dial: a stacked field row — the input, its live value and the launch default beneath. */
 const dial = (id, label, value, hint) => `
-  <div class="field" style="margin-bottom:4px">
-    <input id="${id}" type="number" step="any" inputmode="decimal" placeholder=" " value="${esc(String(value))}">
-    <label>${esc(label)}</label>
-  </div>
-  <p class="micro muted" style="margin:0 0 12px">${hint}</p>`;
+  <div>
+    <div class="field" style="margin-bottom:4px">
+      <input id="${id}" type="number" step="any" inputmode="decimal" placeholder=" " value="${esc(String(value))}">
+      <label>${esc(label)}</label>
+    </div>
+    <p class="ad-hint">${hint}</p>
+  </div>`;
 
 const dialHint = (live, def) => `now <b>${esc(live)}</b> · launch default ${esc(def)}`;
 
 const dialGroup = (title, blurb, body) => `
-  <div class="glass" style="margin-bottom:10px">
+  <div class="card">
     <div class="eyebrow">${esc(title)}</div>
-    <p class="tiny muted" style="margin:4px 0 12px">${esc(blurb)}</p>
-    ${body}
+    <p class="tiny muted">${esc(blurb)}</p>
+    <div>${body}</div>
   </div>`;
 
 function charges() {
@@ -1128,13 +1171,13 @@ function charges() {
 
   /* The worked example is computed from the values that are LIVE right now —
      i.e. what the last Push did — so after the next Push it re-reads itself. */
-  const ex = quoteService(100000);
-  const exr = quoteRetail([{ qty: 1, unitPrice: 60000 }], { km: 3, mode: 'rider' });
+  const ex = quoteService(EXAMPLE_JOB);
+  const exr = quoteRetail([{ qty: 1, unitPrice: EXAMPLE_BASKET }], { km: EXAMPLE_KM, mode: 'rider' });
 
   const bandRow = (i) => {
     const b = bands[i] || bands[bands.length - 1] || { maxKm: 999, fee: 0 };
     const d = dbands[i] || dbands[dbands.length - 1];
-    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    return `<div class="ad-g2">
       ${dial(`pxBand${i}Km`, `Band ${i + 1} · up to km`, b.maxKm, dialHint(`${b.maxKm} km`, `${d.maxKm} km`))}
       ${dial(`pxBand${i}Fee`, `Band ${i + 1} · fee ₹`, rup(b.fee), dialHint(`₹${rupStr(b.fee)}`, `₹${rupStr(d.fee)}`))}
     </div>`;
@@ -1144,62 +1187,71 @@ function charges() {
   <div class="sec">${secHead('Charges', P.pushedAt
       ? `<span class="pill pill--ok">live since ${esc(timeAgo(P.pushedAt))}</span>`
       : `<span class="pill pill--soft">launch defaults</span>`)}
-    <p class="tiny muted" style="margin-bottom:12px">
+    <p class="tiny muted" style="margin-bottom:var(--sp-5)">
       Everything SAAHAA charges anybody, in one place. Change a number, press Push, and the very
       next quote uses it. These are the only dials — no other screen can move a rate.</p>
 
+    <div class="ad-cards">
     ${dialGroup('Service', 'Laid on top of the worker’s quote and paid by the customer. The worker keeps 100% of what they quoted.', `
+      <div class="ad-g2">
       ${dial('pxService', 'Standard markup %', P.serviceMarkupPct, dialHint(`${P.serviceMarkupPct}%`, `${D.serviceMarkupPct}%`))}
       ${dial('pxLoyalty', 'Certified (tier-4) markup %', P.loyaltyMarkupPct, dialHint(`${P.loyaltyMarkupPct}%`, `${D.loyaltyMarkupPct}%`))}
+      </div>
     `)}
 
     ${dialGroup('Platform (shops)', 'Taken out of the shop’s own margin, never added to the item price — MRP can never be exceeded.', `
       ${dial('pxRetail', 'Take %', P.retailTakePct, dialHint(`${P.retailTakePct}%`, `${D.retailTakePct}%`))}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="ad-g2">
         ${dial('pxRetailCap', 'Cap ₹ per order', rup(P.retailTakeCapPaise), dialHint(`₹${rupStr(P.retailTakeCapPaise)}`, `₹${rupStr(D.retailTakeCapPaise)}`))}
         ${dial('pxRetailFloor', 'Floor ₹ per order', rup(P.retailFeeFloorPaise), dialHint(`₹${rupStr(P.retailFeeFloorPaise)}`, `₹${rupStr(D.retailFeeFloorPaise)}`))}
       </div>
     `)}
+    </div>
 
+    <div style="margin-top:var(--sp-5)">
     ${dialGroup('Delivery', 'Four distance bands, charged to the customer and paid to the rider, minus our dispatch cut.', `
       ${[0, 1, 2, 3].map(bandRow).join('')}
+      <div class="ad-g2">
       ${dial('pxDispatch', 'Dispatch cut ₹ per delivery', rup(P.riderDispatchCutPaise), dialHint(`₹${rupStr(P.riderDispatchCutPaise)}`, `₹${rupStr(D.riderDispatchCutPaise)}`))}
+      </div>
     `)}
-
-    <div class="glass glass--gold rise" style="margin-bottom:10px">
-      <div class="eyebrow">Worked example · after push</div>
-      <p class="tiny" style="margin-top:6px">
-        A <b>₹1,000</b> job: the customer pays <b class="num">${M.fmt(ex.customerPays)}</b> —
-        pro keeps ${M.fmt(ex.workerPayout)}, our fee ${M.fmt(ex.platformFee)}, GST ${M.fmt(ex.gst)}
-        (markup ${ex.markupPct}%).</p>
-      <p class="tiny" style="margin-top:6px">
-        A <b>₹600</b> shop basket 3 km away: customer pays <b class="num">${M.fmt(exr.customerPays)}</b>
-        (items ${M.fmt(exr.itemsTotal)} + delivery ${M.fmt(exr.deliveryFee)}) — shop keeps
-        ${M.fmt(exr.shopPayout)}, rider ${M.fmt(exr.riderPayout)}, we keep
-        ${M.fmt(exr.platformRevenue)}.</p>
-      <p class="micro muted" style="margin-top:8px">
-        These are the numbers as they stand this second. Edit the dials above and press Push to
-        move them — the example redraws from whatever was actually pushed.</p>
     </div>
 
-    <div class="row" style="gap:8px;flex-wrap:wrap">
+    <div class="ad-split" style="margin-top:var(--sp-5)">
+      <div class="card card--gold">
+        <div class="eyebrow">Worked example · after push</div>
+        <p class="tiny">
+          A <b>${M.fmt(EXAMPLE_JOB)}</b> job: the customer pays <b class="num">${M.fmt(ex.customerPays)}</b> —
+          pro keeps ${M.fmt(ex.workerPayout)}, our fee ${M.fmt(ex.platformFee)}, GST ${M.fmt(ex.gst)}
+          (markup ${ex.markupPct}%).</p>
+        <p class="tiny">
+          A <b>${M.fmt(EXAMPLE_BASKET)}</b> shop basket ${EXAMPLE_KM} km away: customer pays <b class="num">${M.fmt(exr.customerPays)}</b>
+          (items ${M.fmt(exr.itemsTotal)} + delivery ${M.fmt(exr.deliveryFee)}) — shop keeps
+          ${M.fmt(exr.shopPayout)}, rider ${M.fmt(exr.riderPayout)}, we keep
+          ${M.fmt(exr.platformRevenue)}.</p>
+        <p class="micro muted">
+          These are the numbers as they stand this second. Edit the dials above and press Push to
+          move them — the example redraws from whatever was actually pushed.</p>
+      </div>
+      <div class="card card--warn">
+        <b class="tiny">A push never re-prices money already taken.</b>
+        <p class="tiny muted">
+          Every order snapshots its own fee, GST, delivery and payout at the moment it is booked.
+          Orders already placed — including everything sitting in escrow right now — keep the numbers
+          they were booked at, whatever you do on this screen. Only quotes made from the push onwards
+          use the new dials.</p>
+      </div>
+    </div>
+
+    <div class="ad-actions" style="margin-top:var(--sp-5)">
       <button class="btn btn--primary grow" data-act="admin.pricing.push">Push</button>
-      <button class="btn btn--ghost" data-act="admin.pricing.reset">Reset to defaults</button>
+      <button class="btn btn--secondary" data-act="admin.pricing.reset">Reset to defaults</button>
     </div>
 
-    <p class="tiny muted" style="margin-top:10px">
+    <p class="tiny muted" style="margin-top:var(--sp-4)">
       Last pushed: ${P.pushedAt
         ? `<b>${esc(clockTime(P.pushedAt))}, ${esc(timeAgo(P.pushedAt))}</b> by <b>${esc(P.pushedBy || 'admin')}</b>`
         : '<b>never</b> — these are the launch defaults'}</p>
-
-    <div class="glass" style="margin-top:10px;border-color:var(--warn)">
-      <b class="tiny" style="color:var(--warn)">A push never re-prices money already taken.</b>
-      <p class="tiny muted" style="margin-top:6px">
-        Every order snapshots its own fee, GST, delivery and payout at the moment it is booked.
-        Orders already placed — including everything sitting in escrow right now — keep the numbers
-        they were booked at, whatever you do on this screen. Only quotes made from the push onwards
-        use the new dials.</p>
-    </div>
   </div>`;
 }
 
@@ -1230,18 +1282,17 @@ function payoutQueue(st) {
   const rows = Object.entries(owed);
   if (!rows.length) return empty('Nothing to pay out yet.');
   const total = rows.reduce((n, [, v]) => n + v.amt, 0);
-  return `<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px">
-      <span class="state--pending">Pending payout · ${M.fmt(total)}</span>
+  return `<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:var(--sp-5)">
+      <span class="state state--pending">Pending payout · ${M.fmt(total)}</span>
       ${pill(`${rows.length} payee(s)`, 'soft')}
     </div>
-    ${rows.map(([who, v], ix) => cmd({
-      i: ix + 1,
-      title: `${avatar(who)} ${esc(who)} <span class="num">${M.fmt(v.amt)}</span>`,
-      sub: `${v.ids.length} settled order(s), not yet paid out`,
-      right: `<span class="state--pending">Pending</span>`,
-      actions: `<button class="btn btn--secondary btn--sm btn--block" data-act="admin.markpaid"
-          data-ids="${esc(v.ids.join(','))}">Mark paid</button>`,
-    })).join('')}`;
+    ${table(['Payee', ['Orders', 'num'], ['Owed', 'num'], 'Status', ''], rows.map(([who, v]) => `<tr>
+      <td class="nowrap"><b>${esc(who)}</b></td>
+      <td class="num">${v.ids.length}</td>
+      <td class="num"><b>${M.fmt(v.amt)}</b></td>
+      <td class="nowrap"><span class="state state--pending">Pending</span></td>
+      <td class="act"><button class="btn btn--secondary btn--sm" data-act="admin.markpaid"
+          data-ids="${esc(v.ids.join(','))}">Mark paid</button></td></tr>`).join(''))}`;
 }
 
 /* ── 8. SYSTEM & AUDIT — the DevOps screen ────────────────── */
@@ -1252,87 +1303,86 @@ function system(st) {
   ${note('health checks, registry integrity, storage quota, migration history, the audit log',
          'change the admin password, flip feature flags, run the self-test, restore a backup, export everything')}
 
-  <div class="glass glass--deep rise" style="margin-bottom:var(--sp-6)">
-    <div class="between">
-      <div><div class="eyebrow">Health</div>
-        <b class="h-sec">${h.ok ? '✓ all clear' : h.fatal ? '✗ fatal' : 'Degraded'}</b></div>
-      ${pill(`${h.checks.filter(c => c.ok).length}/${h.checks.length}`, h.ok ? 'ok' : h.fatal ? 'bad' : 'warn')}
-    </div>
-    <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:12px">
-      ${h.checks.map(c => `<span class="pill pill--${c.ok ? 'ok' : c.fatal ? 'bad' : 'warn'}"
-        title="${esc(c.detail)}">${c.ok ? '✓' : '✗'} ${esc(c.id)}</span>`).join('')}
-    </div>
-    <div style="margin-top:12px">${h.checks.map(c => `<div class="between" style="margin-bottom:5px">
-      <span class="micro">${esc(c.id)}</span>
-      <span class="meta">${esc(c.detail)}</span></div>`).join('')}</div>
-  </div>
-
-  <div class="sec">${secHead('Self-test — this is our CI',
-      `<button class="more" data-act="admin.runtests">Run ${selftest.caseCount()} tests</button>`)}
-    ${testResult ? `<div class="glass" style="border-color:var(--${testResult.failed ? 'danger' : 'success'})">
+  <div class="ad-split" style="margin-top:var(--sp-5)">
+    <div class="card ${h.ok ? 'card--ok' : h.fatal ? 'card--bad' : 'card--warn'}">
       <div class="between">
-        <b style="color:var(--${testResult.failed ? 'danger' : 'success'})">
-          ${testResult.passed} passed · ${testResult.failed} failed · ${testResult.durationMs}ms</b>
-        ${pill(testResult.failed ? 'does not ship' : 'green', testResult.failed ? 'bad' : 'ok')}
+        <div><div class="eyebrow">Health</div>
+          <b class="h-sec">${h.ok ? 'All clear' : h.fatal ? 'Fatal' : 'Degraded'}</b></div>
+        ${pill(`${h.checks.filter(c => c.ok).length}/${h.checks.length}`, h.ok ? 'ok' : h.fatal ? 'bad' : 'warn')}
       </div>
-      ${testResult.failures.length ? testResult.failures.map(f => `<p class="micro" style="margin-top:8px;color:var(--danger)">
-        ${esc(f.suite)} › ${esc(f.case)}<br>${esc(f.message)}</p>`).join('')
-        : '<p class="tiny muted" style="margin-top:6px">Money math, state transitions, migration idempotence and referential integrity all hold.</p>'}
-      <div style="margin-top:12px">${testResult.suites.map(s => `<div class="between" style="margin-bottom:4px">
-        <span class="micro">${esc(s.name)}</span>
-        <span class="micro ${s.failed ? '' : 'muted'}" style="${s.failed ? 'color:var(--danger)' : ''}">${s.passed}/${s.passed + s.failed}</span>
-      </div>`).join('')}</div>
-    </div>` : empty('Not run yet this session. A release with any failure does not ship.')}
+      ${table(['Check', 'Detail', ''], h.checks.map(c => `<tr>
+        <td class="nowrap"><b class="tiny">${esc(c.id)}</b></td>
+        <td class="tiny muted">${esc(c.detail)}</td>
+        <td class="act">${pill(c.ok ? 'ok' : c.fatal ? 'fatal' : 'warn', c.ok ? 'ok' : c.fatal ? 'bad' : 'warn')}</td></tr>`).join(''))}
+    </div>
+
+    <div class="card">
+      <div class="between">
+        <div><div class="eyebrow">Self-test — this is our CI</div>
+          <b class="h-sec">${testResult ? `${testResult.passed} passed · ${testResult.failed} failed` : 'Not run this session'}</b></div>
+        <button class="btn btn--secondary btn--sm" data-act="admin.runtests">Run ${selftest.caseCount()} tests</button>
+      </div>
+      ${testResult ? `
+        <div class="between">
+          <span class="tiny muted">${testResult.durationMs}ms</span>
+          ${pill(testResult.failed ? 'does not ship' : 'green', testResult.failed ? 'bad' : 'ok')}
+        </div>
+        ${testResult.failures.length ? testResult.failures.map(f => `<p class="micro" style="color:var(--danger)">
+          ${esc(f.suite)} › ${esc(f.case)}<br>${esc(f.message)}</p>`).join('')
+          : '<p class="tiny muted">Money math, state transitions, migration idempotence and referential integrity all hold.</p>'}
+        ${table(['Suite', ['Passed', 'num']], testResult.suites.map(s => `<tr>
+          <td class="tiny">${esc(s.name)}</td>
+          <td class="num ${s.failed ? '' : 'muted'}" style="${s.failed ? 'color:var(--danger)' : ''}">${s.passed}/${s.passed + s.failed}</td></tr>`).join(''))}`
+        : '<p class="tiny muted">A release with any failure does not ship.</p>'}
+    </div>
   </div>
 
   <div class="sec">${secHead('Feature flags')}
-    <p class="tiny muted" style="margin-bottom:12px">
+    <p class="tiny muted" style="margin-bottom:var(--sp-5)">
       Every new feature ships default-off for one release. These are the kill-switch and the canary.</p>
-    ${flags.all().map(f => `<div class="glass" style="padding:11px 14px;margin-bottom:7px">
-      <div class="between"><div class="grow"><b class="tiny">${esc(f.name)}</b>
-        <p class="tiny muted">default ${String(f.default)} · source ${esc(f.source)}</p></div>
-        <button class="btn ${f.value ? 'btn--primary' : 'btn--ghost'} btn--sm" role="switch"
+    ${table(['Flag', 'Default', 'Source', ''], flags.all().map(f => `<tr>
+      <td class="nowrap"><b>${esc(f.name)}</b></td>
+      <td class="nowrap tiny muted">${String(f.default)}</td>
+      <td class="nowrap tiny muted">${esc(f.source)}</td>
+      <td class="act"><button class="btn ${f.value ? 'btn--primary' : 'btn--secondary'} btn--sm" role="switch"
           aria-checked="${f.value ? 'true' : 'false'}"
-          data-act="admin.flag" data-name="${esc(f.name)}">${f.value ? 'ON' : 'OFF'}</button></div></div>`).join('')}
+          data-act="admin.flag" data-name="${esc(f.name)}">${f.value ? 'ON' : 'OFF'}</button></td></tr>`).join(''))}
   </div>
 
-  <div class="workspace">
+  <div class="ad-split">
     <div class="sec">${secHead('Registry')}
-      <div class="glass">
-        ${namespaces().map(ns => `<div class="between" style="margin-bottom:5px">
-          <span class="tiny">${esc(ns)}</span><b class="num tiny">${count(ns)}</b></div>`).join('')}
-        <p class="tiny muted" style="margin-top:10px">
-          Every one of these is an extension point. Adding a category, an order stage, a reducer or a
-          migration means registering one more entry — no existing file changes.</p>
-      </div>
+      ${table(['Namespace', ['Entries', 'num']], namespaces().map(ns => `<tr>
+        <td class="nowrap">${esc(ns)}</td><td class="num">${count(ns)}</td></tr>`).join(''))}
+      <p class="tiny muted" style="margin-top:var(--sp-4)">
+        Every one of these is an extension point. Adding a category, an order stage, a reducer or a
+        migration means registering one more entry — no existing file changes.</p>
     </div>
 
-    <div class="sec">${secHead('Backups & migration')}
-      <div class="glass">
-        <p class="tiny muted" style="margin-bottom:10px">
-          A snapshot is written before any migration runs. If a migration throws, it rolls back to that snapshot.</p>
-        ${backups.length ? backups.map(b => `<div class="between" style="margin-bottom:6px">
-          <span class="micro">v${b.version} · ${esc(timeAgo(b.ts))} · ${(b.bytes / 1024).toFixed(0)} KB</span>
-          <button class="btn btn--ghost btn--sm" data-act="admin.restore" data-key="${esc(b.key)}">Restore</button>
-        </div>`).join('') : empty('No backups yet.')}
-        <div class="row" style="margin-top:12px;gap:8px">
-          <button class="btn btn--secondary btn--sm grow" data-act="admin.snapshot">Take snapshot</button>
-          <button class="btn btn--secondary btn--sm grow" data-act="admin.export">Export JSON</button>
-        </div>
-        <p class="tiny muted" style="margin-top:10px">
-          Storage used: ${(persist.usageBytes() / 1024).toFixed(0)} KB ·
-          migrations registered: ${migrate.listMigrations().length}</p>
+    <div class="sec" style="border-top:0">${secHead('Backups & migration')}
+      <p class="tiny muted" style="margin-bottom:var(--sp-4)">
+        A snapshot is written before any migration runs. If a migration throws, it rolls back to that snapshot.</p>
+      ${table(['Snapshot', ['Size', 'num'], ''], backups.map(b => `<tr>
+        <td class="nowrap">v${b.version}<span class="sub">${esc(timeAgo(b.ts))}</span></td>
+        <td class="num">${(b.bytes / 1024).toFixed(0)} KB</td>
+        <td class="act"><button class="btn btn--ghost btn--sm" data-act="admin.restore" data-key="${esc(b.key)}">Restore</button></td></tr>`).join(''),
+        'No backups yet.')}
+      <div class="ad-actions" style="margin-top:var(--sp-5)">
+        <button class="btn btn--secondary btn--sm grow" data-act="admin.snapshot">Take snapshot</button>
+        <button class="btn btn--secondary btn--sm grow" data-act="admin.export">Export JSON</button>
       </div>
+      <p class="tiny muted" style="margin-top:var(--sp-4)">
+        Storage used: ${(persist.usageBytes() / 1024).toFixed(0)} KB ·
+        migrations registered: ${migrate.listMigrations().length}</p>
     </div>
   </div>
 
   ${freshCard(st)}
 
   <div class="sec">${secHead('Change admin password')}
-    <div class="glass">
+    <div class="card ad-fields" style="max-width:520px">
       <div class="field"><input id="pwNew" type="password" placeholder=" "><label>New password</label></div>
       <button class="btn btn--primary btn--block" data-act="admin.changepw">Change password</button>
-      <p class="tiny muted" style="margin-top:10px">
+      <p class="tiny muted">
         Stored as PBKDF2-SHA256, 250,000 iterations, with a random salt. Read docs/SECURITY.md for
         what client-side auth can and cannot protect.</p>
     </div>
@@ -1340,16 +1390,12 @@ function system(st) {
 
   <div class="sec">${secHead(`Audit log · ${audit.count()}`,
       `<button class="more" data-act="admin.exportaudit">Export CSV</button>`)}
-    <div class="glass" style="max-height:320px;overflow-y:auto">
-      ${audit.entries({ limit: 60 }).length ? `<ol class="timeline timeline--list">
-        ${audit.entries({ limit: 60 }).map(e => `<li class="timeline__item">
-          <span class="timeline__dot" aria-hidden="true"></span>
-          <div class="timeline__body">
-            <div class="between"><b class="micro">${esc(e.action)}</b>
-              <span class="timeline__time meta">${esc(clockTime(e.ts))}</span></div>
-            <p class="tiny muted">${esc(e.actor)} · ${esc(JSON.stringify(e.detail).slice(0, 90))}</p>
-          </div></li>`).join('')}
-      </ol>` : empty('Empty.')}
+    <div style="max-height:420px;overflow-y:auto;border-bottom:2px solid var(--color-divider)">
+      ${table(['When', 'Action', 'Actor', 'Detail'], audit.entries({ limit: 60 }).map(e => `<tr>
+        <td class="nowrap">${esc(clockTime(e.ts))}</td>
+        <td class="nowrap"><b>${esc(e.action)}</b></td>
+        <td class="nowrap tiny muted">${esc(e.actor)}</td>
+        <td class="tiny muted">${esc(JSON.stringify(e.detail).slice(0, 90))}</td></tr>`).join(''), 'Empty.')}
     </div>
   </div>`;
 }
@@ -1365,9 +1411,9 @@ function freshCard(st) {
   ${paymentsCard()}
 
   <div class="sec">${secHead('Fresh start', pill('irreversible without the snapshot', 'warn'))}
-    <div class="glass" style="border-color:var(--danger)">
-      <div class="eyebrow" style="color:var(--danger);display:flex;align-items:center;gap:6px">${icon('trash', { size: 13 })} Wipe to a clean slate</div>
-      <p class="tiny muted" style="margin:6px 0 10px">
+    <div class="card card--red ad-fields">
+      <div class="eyebrow em" style="display:flex;align-items:center;gap:6px">${icon('trash', { size: 13 })} Wipe to a clean slate</div>
+      <p class="tiny muted">
         Removes every account, every order and every ledger entry on this device. Keeps your
         credential and every dial on this console. A snapshot is taken first and the wipe is written
         to the audit log with the counts.</p>
@@ -1375,14 +1421,40 @@ function freshCard(st) {
         `${c.users} users`, `${c.partners} pros`, `${c.shops} shops`,
         `${c.products} listings`, `${c.orders} orders`, `${c.ledger} ledger entries`,
       ])}
-      ${residue > 0 ? `<p class="tiny" style="margin-top:10px;color:var(--warn)">
+      ${residue > 0 ? `<p class="tiny" style="color:var(--warn)">
         ${residue} example record(s) from the demo roster are on this device. They will be removed on the
         next boot without <span class="num">?demo=1</span> whether or not you press this.</p>` : ''}
-      <div class="field" style="margin:14px 0 8px">
-        <input id="freshWord" type="text" autocomplete="off" autocapitalize="characters" placeholder=" ">
-        <label>Type FRESH to confirm</label></div>
-      <button class="btn btn--ghost btn--block" style="border-color:var(--danger);color:var(--danger)" data-act="admin.fresh">Fresh start</button>
-      <p class="micro muted" style="margin-top:8px">You will be asked for your password. Your session stays open afterwards.</p>
+      <div class="ad-g2" style="align-items:end;margin-top:var(--sp-4)">
+        <div class="field" style="margin:0">
+          <input id="freshWord" type="text" autocomplete="off" autocapitalize="characters" placeholder=" ">
+          <label>Type FRESH to confirm</label></div>
+        <button class="btn btn--danger btn--block" data-act="admin.fresh" style="margin-top:var(--sp-4)">Fresh start</button>
+      </div>
+      <p class="micro muted">You will be asked for your password. Your session stays open afterwards.</p>
+    </div>
+  </div>`;
+}
+
+/* ── the rail: sim until the Razorpay account exists ─────────── */
+function paymentsCard() {
+  const c = paymentsConfig();
+  const live = c.mode === 'razorpay';
+  return `
+  <div class="sec">${secHead('Payments rail', pill(live ? 'Razorpay' : 'sandbox', live ? 'ok' : 'soft'))}
+    <div class="card ad-fields">
+      <p class="tiny muted">${esc(gateway.label())}. The public key id may sit here; the
+        secret key never does — it lives in the Edge Functions' secrets (supabase/README.md). Switching to Razorpay with a
+        missing key or URL fails closed: nothing is collected, nothing pretends to be.</p>
+      <div class="ad-g2">
+        <div class="field"><select id="payMode"><option value="sim"${live ? '' : ' selected'}>Sandbox — no real money</option><option value="razorpay"${live ? ' selected' : ''}>Razorpay — live rail</option></select><label>Mode</label></div>
+        <div class="field"><input id="payKey" type="text" autocomplete="off" placeholder=" " value="${esc(c.keyId)}"><label>Razorpay key id (public)</label></div>
+      </div>
+      <div class="field"><input id="payFn" type="url" autocomplete="off" placeholder=" " value="${esc(c.functionsUrl)}"><label>Edge Functions URL</label></div>
+      <div class="ad-actions">
+        <button class="btn btn--primary" data-act="admin.payments.save">Save on this device</button>
+        <button class="btn btn--secondary" data-act="admin.payments.clear">Back to sandbox</button>
+      </div>
+      <p class="micro muted">Saved on this device only. To ship it to every device, bake it into PAYMENTS in src/core/config.js.</p>
     </div>
   </div>`;
 }
@@ -1583,25 +1655,6 @@ export function resetAutomation() {
 }
 
 /* ── fresh start ───────────────────────────────────────────── */
-/* ── the rail: sim until the Razorpay account exists ─────────── */
-function paymentsCard() {
-  const c = paymentsConfig();
-  const live = c.mode === 'razorpay';
-  return `
-  <div class="sec">${secHead('Payments rail', pill(live ? 'Razorpay' : 'sandbox', live ? 'ok' : 'soft'))}
-    <p class="tiny muted" style="margin-bottom:12px">${esc(gateway.label())}. The public key id may sit here; the
-      secret key never does — it lives in the Edge Functions' secrets (supabase/README.md). Switching to Razorpay with a
-      missing key or URL fails closed: nothing is collected, nothing pretends to be.</p>
-    <div class="field"><select id="payMode"><option value="sim"${live ? '' : ' selected'}>Sandbox — no real money</option><option value="razorpay"${live ? ' selected' : ''}>Razorpay — live rail</option></select><label>Mode</label></div>
-    <div class="field"><input id="payKey" type="text" autocomplete="off" placeholder=" " value="${esc(c.keyId)}"><label>Razorpay key id (public)</label></div>
-    <div class="field"><input id="payFn" type="url" autocomplete="off" placeholder=" " value="${esc(c.functionsUrl)}"><label>Edge Functions URL</label></div>
-    <div class="row" style="gap:8px;flex-wrap:wrap">
-      <button class="btn btn--primary" data-act="admin.payments.save">Save on this device</button>
-      <button class="btn btn--ghost" data-act="admin.payments.clear">Back to sandbox</button>
-    </div>
-    <p class="micro muted" style="margin-top:10px">Saved on this device only. To ship it to every device, bake it into PAYMENTS in src/core/config.js.</p>
-  </div>`;
-}
 export function savePayments() {
   const mode = fieldVal('payMode') || 'sim', keyId = fieldVal('payKey').trim(), functionsUrl = fieldVal('payFn').trim();
   if (mode === 'razorpay' && (!/^rzp_(test|live)_[A-Za-z0-9]{6,}$/.test(keyId) || !/^https:\/\//.test(functionsUrl))) {

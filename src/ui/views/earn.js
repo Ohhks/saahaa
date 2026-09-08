@@ -15,66 +15,86 @@
    with the only number that matters to a tradesperson: they keep 100% of what
    they quote, against roughly 75% on a commission app.
 
-   OPEN CIRCLE · LIVING GLASS: this screen is an invitation, not a console —
-   so it opens on deep plum and gold, keeps one promise per block, and ends
-   on a single sticky action. Every string's meaning is the one it had. */
+   MODERNIST 8.0 — this screen is the public sibling of the mockup's WHICH
+   SIDE ARE YOU ON: the accent block with the wordmark and "Together, we
+   elevate life", the two working-side choices as full-bleed rows, the honest
+   cost lines, then the worked example, who joins, the four steps and the
+   reasons — all in the system's own vocabulary (2px rules, zero radius,
+   Archivo, one red). No decoration that is not a rule or a number.
+
+   EVERY FIGURE IS READ FROM THE ENGINE. SAAHAA lays its percentage ON TOP of
+   the worker's quote and the customer pays it, so the worker keeps 100% —
+   getPricing()/liveMarkup() say what the percentage is today, and a shop's
+   own rate and cap come from the same dials. Nothing here is typed. */
 
 import { esc } from '../dom.js';
-import { liveMarkup } from '../../domain/pricing.js';
-import { icon, hasIcon } from '../icons.js';
+import { liveMarkup, AGG_COMMISSION } from '../../domain/pricing.js';
+import { getPricing } from '../../domain/settings.js';
+import { icon } from '../icons.js';
 import { me } from '../../core/ctx.js';
 import { live } from '../../core/registry.js';
-import { mark, pillarIcon, PILLARS } from '../logo.js';
 import * as M from '../../core/money.js';
 import { header } from './shops.js';
 import { renderPartner, renderShopAdmin } from './partner.js';
 
 /* A worked example beats an adjective. Same job, same pro, two platforms. */
 const EXAMPLE_DEAL = 100000;            // ₹1,000 quote
-const AGG_COMMISSION = 0.25;
 
 const earnCSS = `<style>
-  .earnwho{display:grid;gap:10px}
+  .ern{max-width:640px}
+  .ern__hero{background:var(--color-accent);color:var(--accent-on-fill);padding:26px var(--gutter) 22px}
+  .ern__hero .wm{color:inherit;font:800 11px/1 var(--font-heading);letter-spacing:.2em;opacity:.85;display:block}
+  .ern__hero h1{font:800 32px/1.06 var(--font-heading);letter-spacing:-.02em;margin:14px 0 8px}
+  .ern__hero p{font-size:13px;opacity:.92;max-width:30ch;margin:0}
+  .ern__side{display:block;width:100%;text-align:left;padding:16px 14px 16px 12px;color:inherit;
+    border-bottom:1px solid var(--color-divider);border-left:4px solid var(--color-accent)}
+  .ern__side + .ern__side{border-left-color:transparent}
+  .ern__side b{font:800 18px/1.15 var(--font-heading);display:block}
+  .ern__side span{display:block;font-size:12.5px;color:var(--ink-3);margin-top:5px}
+  .ern__side:hover{background:var(--color-neutral-100)}
+  :root[data-theme="dark"] .ern__side:hover{background:var(--surface-2)}
+  .ern__note{padding:14px 12px;border-bottom:2px solid var(--color-divider);font-size:12.5px;color:var(--ink-3)}
+  .ern__cost{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:9px 0;border-bottom:1px solid var(--color-divider)}
+  .ern__cost:last-child{border-bottom:0}
+  .ern__nums{display:grid;grid-template-columns:1fr 1fr;border-top:2px solid var(--color-divider);border-bottom:2px solid var(--color-divider)}
+  .ern__num{padding:14px 12px} .ern__num + .ern__num{border-left:1px solid var(--color-divider);background:var(--color-accent-100)}
+  :root[data-theme="dark"] .ern__num + .ern__num{background:#3a201c}
+  .ern__num .k{font:600 10px/1.3 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+  .ern__num .v{font:800 30px/1 var(--font-heading);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:7px 0 5px;word-break:break-word}
+  .ern__num .d{font-size:11.5px;color:var(--ink-3)}
+  .ern__num.on .v{color:var(--color-accent)}
+  .ern__row{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--color-divider)}
+  .ern__row .ic{width:36px;height:36px;flex:none;display:grid;place-items:center;background:var(--color-accent-100);color:var(--color-accent)}
+  :root[data-theme="dark"] .ern__row .ic{background:var(--surface-3)}
+  .ern__row b{font:800 14.5px/1.2 var(--font-heading);display:block}
+  .ern__row p{font-size:11.5px;color:var(--ink-3);margin:3px 0 0}
+  .ern__n{width:24px;height:24px;flex:none;display:grid;place-items:center;background:var(--color-text);color:var(--color-bg);font:800 11px/1 var(--font-heading)}
+  .ern__foot{position:sticky;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));z-index:var(--z-sticky);
+    background:var(--bg);border-top:2px solid var(--color-divider);padding:12px 0 14px;margin-top:var(--sp-8)}
+  .ern__foot .btn-primary{width:100%;justify-content:flex-start}
+  @media (min-width:768px){
+    .ern{max-width:1100px} .ern__hero{padding-left:var(--sp-8);padding-right:var(--sp-8)}
+    .ern__foot{bottom:0}
+  }
   @media (min-width:1024px){
-    .earnwho{grid-template-columns:1fr 1fr}
-    .earnwhy{grid-template-columns:repeat(2,1fr)}
+    .ern__hero{padding-left:var(--sp-10);padding-right:var(--sp-10)}
+    .ern__two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--sp-10);align-items:start}
   }
 </style>`;
 
-const capsule = (k, v, d = '', tone = '') =>
-  `<div class="capsule${tone ? ` capsule--${tone}` : ''}">
-    <span class="capsule__k">${k}</span>
-    <span class="capsule__v num">${v}</span>
-    ${d ? `<span class="capsule__d">${d}</span>` : ''}
-  </div>`;
-
-function earningsStrip() {
-  const theirs = Math.round(EXAMPLE_DEAL * (1 - AGG_COMMISSION));
-  return `
-  <div class="capsules metricrow">
-    ${capsule('On a commission app', M.fmt(theirs), 'they keep the rest', 'bad')}
-    ${capsule('On SAAHAA', M.fmt(EXAMPLE_DEAL), 'your whole quote', 'gold')}
-    ${capsule('You keep', `+${M.fmt(EXAMPLE_DEAL - theirs)}`, 'every ₹1,000 job', 'ok')}
-  </div>
-  <p class="micro muted">
-    On a ₹1,000 job. A 25%-commission app keeps ₹250 of it. SAAHAA keeps none of your
-    quote — our ${Math.round(liveMarkup() * 100)}% is added on top and paid by the customer.
-  </p>`;
-}
-
 const WHO = [
-  { ico: 'repair', t: 'You do a trade',      s: 'Plumbing, electrical, AC, carpentry, painting, pest control' },
-  { ico: 'cleaning', t: 'You clean or cook',   s: 'Home cleaning, maid work, cooking, laundry, ironing' },
-  { ico: 'kirana', t: 'You run a shop',      s: 'Kirana, vegetables, meat, dairy, chemist, water cans, stationery' },
-  { ico: 'salon', t: 'You have a skill',    s: 'Salon, beauty, massage, tuition, music, pet grooming' },
-  { ico: 'moving', t: 'You have a vehicle',  s: 'Shifting, tempo, deliveries, parcels' },
+  { ico: 'repair', t: 'You do a trade', s: 'Plumbing, electrical, AC, carpentry, painting, pest control' },
+  { ico: 'cleaning', t: 'You clean or cook', s: 'Home cleaning, maid work, cooking, laundry, ironing' },
+  { ico: 'kirana', t: 'You run a shop', s: 'Kirana, vegetables, meat, dairy, chemist, water cans, stationery' },
+  { ico: 'salon', t: 'You have a skill', s: 'Salon, beauty, massage, tuition, music, pet grooming' },
+  { ico: 'moving', t: 'You have a vehicle', s: 'Shifting, tempo, deliveries, parcels' },
 ];
 
 const HOW = [
-  { n: '1', t: 'Tell us what you do',    s: 'Your trade, your area, your usual price. Two minutes.' },
+  { n: '1', t: 'Tell us what you do', s: 'Your trade, your area, your usual price. Two minutes.' },
   { n: '2', t: 'Verify yourself — 10 min', s: 'Phone code, your ID (we keep only the last 4 digits), one photo, five trade questions, six rules. No waiting for anyone.' },
-  { n: '3', t: 'Your page goes live',    s: 'A professional page with your badge, ratings and reviews — built and kept current by SAAHAA. Share it on WhatsApp.' },
-  { n: '4', t: 'Start getting jobs',     s: 'Jobs near you arrive on your phone. Money is locked before you start. You keep 100% of your quote.' },
+  { n: '3', t: 'Your page goes live', s: 'A professional page with your badge, ratings and reviews — built and kept current by SAAHAA. Share it on WhatsApp.' },
+  { n: '4', t: 'Start getting jobs', s: 'Jobs near you arrive on your phone. Money is locked before you start. You keep 100% of your quote.' },
 ];
 
 const WHY = [
@@ -84,90 +104,109 @@ const WHY = [
   { ic: 'trend', t: 'Your price, your call', s: 'Set your own rate. When several pros are free, you bid — and bidding fairly wins more often than bidding cheapest.' },
 ];
 
+/* The two working sides, worded from the live dials. A service partner keeps
+   every rupee they quote; a shop pays a small per-order fee out of its own
+   price, capped, and never a yearly plan. */
+function sideRows(pct, P) {
+  const rows = [
+    ['I offer a service', `Quote jobs and keep 100% of your price. SAAHAA's ${pct}% is added on top and paid by the customer.`],
+    ['I run a shop', `A storefront with your stock, live today. ${P.retailTakePct}% an order, capped at ${M.fmt(P.retailTakeCapPaise)}. No yearly plan.`],
+  ];
+  return rows.map(([t, s]) => `<button class="ern__side tap" type="button" data-act="earn.start">
+      <b>${esc(t)}</b><span>${esc(s)}</span></button>`).join('');
+}
+
+/* The one number a tradesperson checks first, on a real job. */
+function worked(pct) {
+  const theirs = Math.round(EXAMPLE_DEAL * (1 - AGG_COMMISSION));
+  return `<div class="ern__nums">
+      <div class="ern__num"><div class="k">On a commission app</div>
+        <div class="v">${M.fmt(theirs)}</div><div class="d">they keep the rest</div></div>
+      <div class="ern__num on"><div class="k">On SAAHAA</div>
+        <div class="v">${M.fmt(EXAMPLE_DEAL)}</div><div class="d">your whole quote</div></div>
+    </div>
+    <p class="micro muted" style="padding:10px 0 0">
+      On a ${M.fmt(EXAMPLE_DEAL)} job. A ${Math.round(AGG_COMMISSION * 100)}%-commission app keeps
+      ${M.fmt(EXAMPLE_DEAL - theirs)} of it. SAAHAA keeps none of your quote — our ${pct}% is added on
+      top of it and paid by the customer, so what you quote is what you are paid.</p>`;
+}
+
 /* ── the invitation (guest and customer) ───────────────────── */
 function invite() {
   const s = me();
   const cats = live('category');
   const services = cats.filter(c => c.kind === 'service').length;
   const shops = cats.filter(c => c.kind === 'retail').length;
+  const pct = Math.round(liveMarkup() * 100);
+  const P = getPricing();
 
   return `
   ${header('Earn with SAAHAA', s ? `Hello ${esc(s.name.split(' ')[0])}` : 'Open to everyone')}
   ${earnCSS}
-  <main class="wrap">
 
-    <div class="hero glass glass--deep sheen rise" style="margin-top:var(--sp-6);position:relative;overflow:hidden;
-         padding:22px 18px;border-radius:var(--r-lg)">
-      <div style="position:absolute;right:-26px;top:-22px;opacity:.10;pointer-events:none">
-        ${mark(150, { detail: true, glow: false })}
-      </div>
-      <div style="position:relative">
-        <span class="pill pill--gold">Locally, professionally</span>
-        <h1 class="display" style="font-size:var(--fs-xl);line-height:var(--lh-xl);margin:10px 0 6px;max-width:16ch">
-          Your trade. Your price. Your own page.</h1>
-        <p class="tiny muted" style="max-width:34ch">
-          SAAHAA never takes a cut of your quote — and it runs your professional presence for you:
-          a page, a badge, ratings, bookings. You do the work; we do the rest.</p>
-      </div>
+  <div class="ern__hero">
+    <span class="wm">SAAHAA</span>
+    <h1>Your trade.<br>Your price.<br>All of it yours.</h1>
+    <p>One circle for every service and every shop in your neighbourhood.</p>
+  </div>
+
+  <div>${sideRows(pct, P)}</div>
+  <p class="ern__note">Both open the same sign-up, and the first thing on it is this same choice — so pick either one and change your mind there.
+    Already need something done instead? That is the Home tab: always free, and no markup on anyone's prices.</p>
+
+  <main class="wrap ern" style="padding-top:0">
+
+    <div style="padding:14px 0 4px">
+      <div class="ern__cost"><span class="muted">Cost to list</span><strong>₹0</strong></div>
+      <div class="ern__cost"><span class="muted">Cost per order — a service</span><strong>₹0 · the customer pays ${pct}% on top</strong></div>
+      <div class="ern__cost"><span class="muted">Cost per order — a shop</span><strong>${P.retailTakePct}%, capped ${M.fmt(P.retailTakeCapPaise)}</strong></div>
+      <div class="ern__cost"><span class="muted">Typical aggregator</span><strong class="em">${Math.round(AGG_COMMISSION * 100)}%</strong></div>
     </div>
 
-    <div style="margin-top:var(--sp-6)">${earningsStrip()}</div>
+    <div style="margin-top:var(--sp-6)">${worked(pct)}</div>
 
-    <div class="sec">
-      <div class="hd"><div><span class="eyebrow">Who joins</span><h2 class="h-sec">Is this you?</h2></div></div>
-      <div class="earnwho">
-        ${WHO.map((w, i) => `
-          <div class="tile--wide card glass rise${i ? ` rise-${Math.min(5, i + 1)}` : ''}" style="padding:13px">
-            <div class="row">
-              <span class="chip__ic med" style="width:42px;height:42px;border-radius:50%;background:var(--accent-soft);
-                display:grid;place-items:center;flex:0 0 auto">${icon(w.ico, { size: 22 })}</span>
-              <div class="grow"><b style="font-size:15px">${esc(w.t)}</b>
-                <p class="micro muted" style="margin-top:2px">${esc(w.s)}</p></div>
-            </div>
+    <div class="ern__two">
+      <div>
+        <div class="hd"><div><span class="eyebrow">Who joins</span><h2 class="h-sec">Is this you?</h2></div></div>
+        <div>
+          ${WHO.map(w => `<div class="ern__row">
+            <span class="ic" aria-hidden="true">${icon(w.ico, { size: 20 })}</span>
+            <div class="grow" style="min-width:0"><b>${esc(w.t)}</b><p>${esc(w.s)}</p></div>
           </div>`).join('')}
+        </div>
+        <p class="micro muted" style="padding:10px 0">
+          ${services} kinds of service and ${shops} kinds of shop are open to partners right now.
+        </p>
       </div>
-      <p class="tiny muted" style="margin-top:10px">
-        ${services} kinds of service and ${shops} kinds of shop are open to partners right now.
-      </p>
-    </div>
 
-    <div class="sec">
-      <div class="hd"><div><span class="eyebrow">Four steps</span><h2 class="h-sec">How it works</h2></div>
-        <span class="pill pill--soft">about 15 min</span></div>
-      <ol class="track timeline" style="margin-top:4px">
-        ${HOW.map((h, i) => `<li class="done timeline__item">
-          <span class="node timeline__node"><span class="dot timeline__dot">${h.n}</span>
-            ${i < HOW.length - 1 ? '<span class="bar timeline__bar"></span>' : ''}</span>
-          <span class="body timeline__body"><b>${esc(h.t)}</b><span>${esc(h.s)}</span></span>
-        </li>`).join('')}
-      </ol>
-    </div>
+      <div>
+        <div class="hd"><div><span class="eyebrow">Four steps</span><h2 class="h-sec">How it works</h2></div>
+          <span class="tag tag-neutral">about 15 min</span></div>
+        <div>
+          ${HOW.map(h => `<div class="ern__row">
+            <span class="ern__n" aria-hidden="true">${h.n}</span>
+            <div class="grow" style="min-width:0"><b>${esc(h.t)}</b><p>${esc(h.s)}</p></div>
+          </div>`).join('')}
+        </div>
 
-    <div class="sec">
-      <div class="hd"><div><span class="eyebrow">The reason</span><h2 class="h-sec">Why pros stay</h2></div></div>
-      <div class="grid2 earnwhy">
-        ${WHY.map(w => `<div class="card glass">
-          <h4 style="font-size:14px"><span style="display:inline-flex;align-items:center;gap:8px">${icon(w.ic, { size: 16 })} ${esc(w.t)}</span></h4>
-          <p class="micro muted">${esc(w.s)}</p></div>`).join('')}
+        <div class="hd"><div><span class="eyebrow">The reason</span><h2 class="h-sec">Why pros stay</h2></div></div>
+        <div>
+          ${WHY.map(w => `<div class="ern__row">
+            <span class="ic" aria-hidden="true">${icon(w.ic, { size: 18 })}</span>
+            <div class="grow" style="min-width:0"><b>${esc(w.t)}</b><p>${esc(w.s)}</p></div>
+          </div>`).join('')}
+        </div>
       </div>
     </div>
 
-    <div class="sec">
-      ${PILLARS.length ? `<div class="pillars pillars--c">${PILLARS.map(p => `
-        <div class="pill"><span class="pico">${pillarIcon(p, 20)}</span>
-        <span class="plbl">${p.label}</span></div>`).join('')}</div>` : ''}
-    </div>
-
-    <div style="position:sticky;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 10px);
-                padding-top:var(--sp-8);z-index:var(--z-sticky)">
-      <button class="btn btn--primary btn--lg btn--block" data-act="earn.start">
+    <div class="ern__foot">
+      <button class="btn btn-primary btn--lg" data-act="earn.start">
         Join as a partner — it's free
       </button>
-      <p class="micro muted" style="text-align:center;margin-top:10px">
+      <p class="micro muted" style="margin-top:10px">
         No joining fee, ever. No monthly charge. You are paid after every job.
       </p>
     </div>
-    <div style="height:30px"></div>
   </main>`;
 }
 

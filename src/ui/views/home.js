@@ -1,30 +1,37 @@
 /* SAAHAA · ui/views/home.js — the customer home screen and the 3-tap booking.
 
-   OPEN CIRCLE · LIVING GLASS. The engine is untouched: same registry, same
-   matcher, same quote, same actions. What changed is the surface — home is a
-   command screen (who you are, where you are, what is live, what you need),
-   and booking is a visible six-step path that lands on one dominant match card
-   carrying its own reasons.
+   MODERNIST. Home is the mockup's 1b "the ask" on top of 1a's list: a red
+   band that asks the question, the ask box (which IS the search — one query
+   reaches services, sub-services, shops, products and the customer's own
+   orders), what is still open from before, one-tap chips, who is open now,
+   and the categories. The engine is untouched: same registry, same matcher,
+   same quote, same actions, same ids. What changed is the surface.
 
-   Search is the front door. One query reaches services, sub-services, shops,
-   products and the customer's own orders, because a neighbourhood is not
-   divided into tabs inside anybody's head. */
+   The booking sheet is the mockup's "Booking & payment": the worker's own
+   price, SAAHAA's charge laid on top (the LIVE dial, never a constant), what
+   you pay, how it is paid (wallet first, the gateway for the rest), and the
+   refund rule read from CANCEL_RULES. */
 
-import { mount, esc, sheet, closeSheet, toast, ratingStars } from '../dom.js';
+import { mount, esc, sheet, closeSheet, toast, ratingStars, delegate } from '../dom.js';
 import { ctx, getState, me, myArea, isGuest, myOrders, saveSession, dispatch } from '../../core/ctx.js';
 import * as persist from '../../core/persist.js';
 import { live, get } from '../../core/registry.js';
-import { AREA_NAMES, AREA_GEO } from '../../domain/match.js';
+import { AREA_NAMES, AREA_GEO, kmBetween, etaMins } from '../../domain/match.js';
 import * as gmap from '../map.js';
 import { GROUPS } from '../../domain/catalog.services.js';
-import { mark, pillarRow } from '../logo.js';
-import { icon, medallion, hasIcon } from '../icons.js';
+import { mark } from '../logo.js';
+import { icon, hasIcon } from '../icons.js';
 import * as flow from '../../domain/flow.js';
 import * as M from '../../core/money.js';
 import { tier } from '../../domain/trust.js';
 import * as flags from '../../core/flags.js';
 import { trackerFor, trackerIndex, stage, isTerminal } from '../../domain/orders.js';
+import { CANCEL_RULES } from '../../domain/pricing.js';
+import { getPricing } from '../../domain/settings.js';
+import * as gateway from '../../core/gateway.js';
+import * as A from '../../domain/auction.js';
 import * as ask from './ask.js';
+import { SYS_CSS, header, emptyBlock } from './shops.js';
 
 /* the four sections of the neighbourhood, drawn like everything else */
 const GROUP_ICON = { home: 'groupHome', care: 'groupCare', life: 'groupLife', shops: 'groupShops' };
@@ -53,13 +60,10 @@ const services = () => cats().filter(c => c.kind === 'service');
 const retails  = () => cats().filter(c => c.kind === 'retail');
 
 /* ══════════════ WHERE THE CUSTOMER IS ══════════════════════════
-   An area used to be one of twelve words. It is now a place: a label the user
-   recognises AND the coordinates behind it, so a distance is a real distance
-   and SAAHAA works in a town nobody hard-coded.
-
-   We keep writing `area` — the short label — everywhere it was written before,
-   so ctx.myArea(), the matcher's name fallbacks and every seeded record still
-   read exactly what they always read. `loc` is added alongside it. */
+   An area is a place: a label the user recognises AND the coordinates behind
+   it, so a distance is a real distance and SAAHAA works in a town nobody
+   hard-coded. We keep writing `area` — the short label — everywhere it was
+   written before; `loc` is added alongside it. */
 const GUEST_LOC = 'SAAHAA_GUEST_LOC';
 const HYD = { lat: 17.4486, lng: 78.3908 };
 
@@ -104,14 +108,14 @@ export function openPlacePicker() {
 function pickerBody() {
   const cur = myPlace();
   return `
-    <p class="meta" style="margin-bottom:12px">Search any place in the world, use your location, or
+    <p class="tiny muted" style="margin-bottom:12px">Search any place in the world, use your location, or
       tap an area. Everything nearby is measured from here.</p>
 
-    <div class="search">
+    <div class="search" style="border:2px solid var(--color-text);height:48px">
       ${icon('search', { size: 18 })}
       <input id="areaQ" type="search" placeholder="Search a place — area, town or city"
              aria-label="Search for a place">
-      <button class="btn btn--secondary btn--sm" data-act="area.search">Search</button>
+      <button class="btn btn--primary btn--sm" data-act="area.search">Search</button>
     </div>
 
     <div class="row" style="gap:8px;margin-top:8px">
@@ -119,8 +123,8 @@ function pickerBody() {
         ${icon('pin', { size: 14 })} Use my location</button>
     </div>
 
-    <div id="areaMap" style="height:200px;margin-top:10px;border-radius:var(--r-md);overflow:hidden;
-      border:1px solid var(--border);background:var(--surface-2)"></div>
+    <div id="areaMap" style="height:200px;margin-top:10px;overflow:hidden;
+      border:1px solid var(--color-divider);background:var(--surface-2)"></div>
     <p class="micro muted" style="margin-top:6px">Drag the pin, or tap the map, to fix your exact spot.</p>
 
     <div id="areaResults" class="chiprow" style="flex-wrap:wrap;gap:8px;margin-top:10px"></div>
@@ -128,15 +132,15 @@ function pickerBody() {
     <p class="tiny" id="areaLabel" style="margin-top:10px">
       Serving <b>${esc(typeof cur === 'string' ? cur : cur.label)}</b></p>
 
-    <p class="eyebrow" style="margin-top:14px">Hyderabad areas</p>
-    <div class="chiprow" style="flex-wrap:wrap;gap:6px;margin-top:6px">
+    <p class="m-cap" style="margin-top:14px">Hyderabad areas</p>
+    <div class="chiprow" style="flex-wrap:wrap;gap:6px">
       ${AREA_NAMES.map(a => {
         const g = AREA_GEO[a];
         return g ? `<button class="chip${myArea() === a ? ' on' : ''}" data-act="area.choose"
           data-lat="${g[0]}" data-lng="${g[1]}" data-label="${esc(a)}">${esc(a)}</button>` : '';
       }).join('')}
     </div>
-    <div style="height:8px"></div>`;
+    <div style="height:8px"></div>${SYS_CSS}`;
 }
 
 function resultChips() {
@@ -177,7 +181,7 @@ function paintMap() {
   const c = typeof p === 'string' ? (AREA_GEO[p] ? { lat: AREA_GEO[p][0], lng: AREA_GEO[p][1] } : null) : p;
   if (!c) return;
   mapH.pin(c.lat, c.lng, {
-    color: '#E0B558', label: c.label || myArea(), draggable: true,
+    color: '#ec3013', label: c.label || myArea(), draggable: true,
     onMove: pt => pinTo(pt),
   });
   mapH.fit([[c.lat, c.lng]]);
@@ -235,9 +239,9 @@ export function choosePlace(d) {
 
 /* ══════════════ THE HEADER THAT GETS OUT OF THE WAY ═════════════
    Home's header carries four things a customer needs on arrival — where they
-   are, who they are, what SAAHAA is, and the search box — and exactly one
-   thing they need while scanning results: the search box. So on the way down
-   everything but the search folds away; on the way back up it returns.
+   are, who they are, the ask, and the ask box — and exactly one thing they
+   need while scanning results: the box. So on the way down everything but
+   the box folds away; on the way back up it returns.
 
    Hysteresis, not a threshold. A bare `y > 80` toggles twice a frame on a
    trackpad at exactly 80px: the collapse changes the header height, which
@@ -282,10 +286,9 @@ function bestCat(q) {
 }
 
 /* ── supply proof ──────────────────────────────────────────────
-   "from Rs.X" was a floor almost nobody actually pays, so the first real quote
-   felt like bait-and-switch — and it contradicted our own promise that the pro
-   sets the price. Supply proof is true, self-updating and more persuasive: it
-   answers "can I actually get this right now?". */
+   "from Rs.X" was a floor almost nobody actually pays. Supply proof is true,
+   self-updating and more persuasive: it answers "can I actually get this
+   right now?". */
 function supplyLine(c) {
   const st = getState();
   if (c.kind === 'retail') return `${st.shops.filter(x => x.catId === c.id && x.isOpen).length} open now`;
@@ -294,14 +297,12 @@ function supplyLine(c) {
   return online ? `${online} nearby` : pool.length ? `${pool.length} nearby` : 'New here — be first';
 }
 
-/* every tile carries its own contextual accent, taken from the category entry
-   itself — so a new category registered from a new file styles itself */
+/* a category tile: the mockup's bordered box — icon, name, supply line */
 function tileHtml(c, wide = false) {
-  return `<button class="tile${wide ? ' tile--wide' : ''}" data-act="cat.open" data-id="${c.id}"
-      style="--tile-accent:${esc(c.accent || '#C99A5B')}" aria-label="${esc(c.name)}">
-    ${hasIcon(c.id) ? medallion(c.id) : `<span class="med" aria-hidden="true">${esc(c.name[0])}</span>`}
+  return `<button class="tile${wide ? ' tile--wide' : ''}" data-act="cat.open" data-id="${c.id}" aria-label="${esc(c.name)}">
+    <span class="ic" aria-hidden="true">${hasIcon(c.id) ? icon(c.id, { size: 20 }) : esc(c.name[0])}</span>
     <span class="lbl">${esc(c.name)}</span>
-    <span class="from">${esc(supplyLine(c))}</span>
+    <span class="meta">${esc(supplyLine(c))}</span>
   </button>`;
 }
 
@@ -311,49 +312,113 @@ const catGlyph = c => hasIcon(c.id) ? icon(c.id, { size: 14 }) : '';
 
 /* a suggestion chip is a real destination, never a decorative word */
 function smartChip(label, catId, ico) {
-  return `<button class="chip chip--smart" data-act="cat.open" data-id="${catId}">
+  return `<button class="chip" data-act="cat.open" data-id="${catId}">
     <span class="chip__ic" aria-hidden="true">${ico || ''}</span>${esc(label)}</button>`;
 }
 
-/* ── the live order: the loudest thing on the screen ────────── */
+/* ── what is still open from before ──────────────────────────── */
 function liveOrders() {
   // the machine knows which stages are terminal; a hand-kept list missed PARTIAL and REFUNDED
   return myOrders().filter(o => !isTerminal(o.stage) &&
     !['SETTLED', 'R_SETTLED', 'RATED', 'PARTIAL', 'REFUNDED', 'R_REFUNDED'].includes(o.stage));
 }
+function openAsks() {
+  try { return A.myRequests().filter(r => ['bidding', 'awaiting_choice'].includes(r.status)); }
+  catch (e) { return []; }
+}
 
-function activeOrderStrip() {
-  const list = liveOrders();
-  if (!list.length) return '';
-  const o = list[0];
-  const track = trackerFor(o.kind);
-  const idx = trackerIndex(o);
+function orderRow(o, lead = true) {
   const st = stage(o.stage);
-  return `<button class="cmd glass glass--deep rise" data-act="order.open" data-id="${o.id}"
-      style="width:100%;text-align:left;margin-top:var(--sp-6)">
-    <div class="between">
-      <div class="grow">
-        <div class="row" style="gap:8px;align-items:center">
-          <span class="pill pill--live">Live now</span>
-          <span class="meta">${esc(o.kind === 'service' ? 'Service' : 'Delivery')}</span>
-        </div>
-        <b class="cmd__title">${esc(st.label)}</b>
-        <p class="cmd__sub">${esc(o.kind === 'service' ? o.partnerName : o.shopName)}${
-          o.eta ? ` · arriving in ~${o.eta} min` : ''}</p>
-      </div>
-      <span class="btn btn--secondary btn--sm cmd__action">Track</span>
+  const cat = get('category', o.catId);
+  const track = trackerFor(o.kind); const idx = trackerIndex(o);
+  const who = o.kind === 'service' ? o.partnerName : o.shopName;
+  return `<button class="m-row" data-act="order.open" data-id="${esc(o.id)}">
+    <span class="m-lead${lead ? '' : ' m-lead--dim'}" aria-hidden="true"></span>
+    <div class="grow" style="min-width:0">
+      <div class="m-row__t">${esc(o.kind === 'service' ? `${cat.name}${o.sub ? ' · ' + o.sub : ''}` : `${o.lines.length} item${o.lines.length === 1 ? '' : 's'} from ${o.shopName}`)}</div>
+      <div class="m-row__m" style="margin-bottom:0">${esc(who)} · ${esc(st.label.toLowerCase())} · step ${idx + 1} of ${track.length}${o.eta && !isTerminal(o.stage) ? ` · ~${o.eta} min` : ''}</div>
     </div>
-    <div class="mini-track" aria-hidden="true">${
-      track.map((_, i) => `<i class="${i < idx ? 'on' : i === idx ? 'on cur' : ''}"></i>`).join('')}</div>
-    <div class="capsules" style="margin-top:10px">
-      <span class="capsule capsule--info"><span class="capsule__k">Step</span>
-        <span class="capsule__v">${idx + 1} of ${track.length}</span></span>
-      <span class="capsule capsule--gold"><span class="capsule__k">Total</span>
-        <span class="capsule__v num">${M.fmt(o.customerPays)}</span></span>
-      ${list.length > 1 ? `<span class="capsule capsule--soft"><span class="capsule__k">Also live</span>
-        <span class="capsule__v">${list.length - 1} more</span></span>` : ''}
+    <div class="m-row__r"><b class="num">${M.fmt(o.customerPays)}</b></div>
+    <span class="m-row__go" aria-hidden="true">→</span>
+  </button>`;
+}
+function askRow(r) {
+  const cat = get('category', r.catId);
+  const n = A.bidsFor(r.id).length;
+  return `<a class="m-row" href="#/ask/${esc(r.id)}">
+    <span class="m-lead" aria-hidden="true"></span>
+    <div class="grow" style="min-width:0">
+      <div class="m-row__t">${esc(cat.name)}${r.sub ? ` · ${esc(r.sub)}` : ''}</div>
+      <div class="m-row__m" style="margin-bottom:0">${r.status === 'bidding' ? 'Asking workers for rates' : 'Rates are in — pick one'} · ${n} ${n === 1 ? 'reply' : 'replies'}${
+        r.held ? ` · your ${M.fmt(r.held.amount)} stays held` : ''}</div>
+    </div>
+    <span class="m-row__go" aria-hidden="true">→</span>
+  </a>`;
+}
+
+function stillOpen() {
+  const orders = liveOrders();
+  const asks = openAsks();
+  if (!orders.length && !asks.length) return '';
+  return `<div class="sec">
+    <p class="m-cap">Still open from before</p>
+    ${asks.map(askRow).join('')}
+    ${orders.slice(0, 4).map(o => orderRow(o)).join('')}
+    ${orders.length > 4 ? `<button class="more" style="margin-top:10px" data-act="nav.orders">All ${orders.length} live orders →</button>` : ''}
+  </div>`;
+}
+
+/* ── who is open now: named pros and shops, nearest first ──── */
+export function avgOf(p) {
+  const r = p.ratings || [];
+  if (!r.length) return 4.5;
+  return r.reduce((a, x) => a + x.stars, 0) / r.length;
+}
+function proRow(p, km) {
+  const cat = get('category', p.cat) || { name: '' };
+  const t = tier(p.tier);
+  return `<button class="m-row" data-act="pro.open" data-id="${esc(p.id)}">
+    <span class="thumb m-thumb" aria-hidden="true">${hasIcon(p.cat) ? icon(p.cat, { size: 22 }) : esc(p.name[0])}</span>
+    <div class="grow" style="min-width:0">
+      <div class="m-row__t">${esc(p.name)}</div>
+      <div class="m-row__m">${esc(cat.name)} · ${km} km · ~${etaMins(km)} min</div>
+      <div class="m-row__tags"><span class="tag tag-accent">${avgOf(p).toFixed(1)} ★</span>
+        <span class="tag tag-neutral">${t.badge ? esc(t.badge) : `${p.completed | 0} jobs`}</span></div>
     </div>
   </button>`;
+}
+function shopRow(s, km) {
+  const cat = get('category', s.catId) || { name: '' };
+  const n = getState().products.filter(p => p.shopId === s.id && p.active).length;
+  return `<button class="m-row" data-act="shop.open" data-id="${esc(s.id)}">
+    <span class="thumb m-thumb" aria-hidden="true">${hasIcon(s.catId) ? icon(s.catId, { size: 22 }) : esc(s.name[0])}</span>
+    <div class="grow" style="min-width:0">
+      <div class="m-row__t">${esc(s.name)}</div>
+      <div class="m-row__m">${esc(cat.name)} · ${n} items in stock · ${km} km</div>
+      <div class="m-row__tags"><span class="tag tag-accent">${esc(s.ratingAvg)} ★</span>
+        <span class="tag tag-neutral">Delivers · ~${etaMins(km) + (s.prepMins || 20)} min</span></div>
+    </div>
+  </button>`;
+}
+function openNow() {
+  const st = getState();
+  const here = myPlace();
+  const pros = st.partners.filter(p => !p.suspended && p.online !== false && (p.tier | 0) >= 1)
+    .map(p => ({ p, km: kmBetween(here, p.loc || p.area) })).sort((a, b) => a.km - b.km).slice(0, 4);
+  const shops = st.shops.filter(s => s.isOpen && s.status === 'active')
+    .map(s => ({ s, km: kmBetween(here, s.loc || s.area) })).sort((a, b) => a.km - b.km).slice(0, 3);
+  if (!pros.length && !shops.length) return '';
+  return `<div class="sec">
+    <div class="between" style="margin-bottom:8px">
+      <p class="m-cap" style="margin:0">Open now</p>
+      <div class="row" style="gap:14px">
+        <button class="more" data-act="nav.nearby">Map view →</button>
+        <button class="more" data-act="scroll.all">All ${cats().length} categories →</button>
+      </div>
+    </div>
+    ${pros.map(x => proRow(x.p, x.km)).join('')}
+    ${shops.map(x => shopRow(x.s, x.km)).join('')}
+  </div>`;
 }
 
 /* ── search: one query, every surface ──────────────────────── */
@@ -381,160 +446,157 @@ function searchAll(q) {
 function searchResults(q) {
   const r = searchAll(q);
   if (!r.total) return `<div class="empty empty--smart">
-    <div class="em-ico">${mark(84, { detail: true })}</div>
-    <h3>Nothing matched &ldquo;${esc(q)}&rdquo;</h3>
-    <p>These are live in ${esc(myArea())} right now.</p>
+    <div class="em-ico">${mark(40, { detail: true })}</div>
+    <h3 style="font-size:17px">Nothing matched &ldquo;${esc(q)}&rdquo;</h3>
+    <p style="margin-top:6px">These are live in ${esc(myArea())} right now.</p>
     <div class="chiprow" style="justify-content:center;flex-wrap:wrap;margin-top:14px">
       ${services().slice(0, 4).map(c => smartChip(c.name, c.id, catGlyph(c))).join('')}
     </div></div>`;
 
   const st = getState();
+  const here = myPlace();
   const sec = (title, count, body) => `<div class="sec">
-    <div class="hd"><h2 class="h-sec">${esc(title)}</h2><span class="meta">${count}</span></div>${body}</div>`;
+    <div class="between" style="margin-bottom:6px"><p class="m-cap" style="margin:0">${esc(title)}</p><span class="meta">${count}</span></div>${body}</div>`;
 
   return `
   ${r.orderHits.length ? sec('Your orders', r.orderHits.length,
-    r.orderHits.map(o => {
-      const stg = stage(o.stage);
-      return `<button class="cmd" data-act="order.open" data-id="${esc(o.id)}"
-          style="width:100%;text-align:left;margin-bottom:8px">
-        <div class="between"><div class="grow">
-          <b class="cmd__title">${esc(o.kind === 'service' ? o.partnerName : o.shopName)}</b>
-          <p class="cmd__sub">${esc(get('category', o.catId).name)} · ${esc(stg.label)}</p></div>
-          <b class="num">${M.fmt(o.customerPays)}</b></div></button>`;
-    }).join('')) : ''}
+    r.orderHits.map(o => orderRow(o, !isTerminal(o.stage))).join('')) : ''}
 
   ${r.catHits.length ? sec('Services & shops', r.catHits.length,
     `<div class="grid3">${r.catHits.map(c => tileHtml(c)).join('')}</div>`) : ''}
 
   ${r.subHits.length ? sec('Exactly what you need', r.subHits.length,
     `<div class="chiprow" style="flex-wrap:wrap;gap:8px">${r.subHits.map(({ c, s }) =>
-      `<button class="chip chip--smart" data-act="book.sub" data-id="${c.id}" data-sub="${esc(s)}">
+      `<button class="chip" data-act="book.sub" data-id="${c.id}" data-sub="${esc(s)}">
         <span class="chip__ic" aria-hidden="true">${catGlyph(c)}</span>${esc(s)}</button>`).join('')}</div>`) : ''}
 
   ${r.prodHits.length ? sec('On shop shelves', r.prodHits.length,
-    `<div class="grid2">${r.prodHits.map(p => {
+    r.prodHits.map(p => {
       const sh = st.shops.find(x => x.id === p.shopId);
-      return `<button class="cmd" data-act="shop.open" data-id="${esc(p.shopId)}" style="text-align:left">
-        <div class="between"><div class="grow">
-          <b class="cmd__title">${esc(p.name)}</b>
-          <p class="cmd__sub">${esc(sh ? sh.name : 'Shop')} · ${esc(p.unit)}</p></div>
-          <b class="num">${M.fmt(p.price)}</b></div></button>`;
-    }).join('')}</div>`) : ''}
+      return `<button class="m-row" data-act="shop.open" data-id="${esc(p.shopId)}">
+        <div class="grow" style="min-width:0">
+          <div class="m-row__t">${esc(p.name)}</div>
+          <div class="m-row__m" style="margin-bottom:0">${esc(sh ? sh.name : 'Shop')} · ${esc(p.unit)}</div></div>
+        <div class="m-row__r"><b class="num">${M.fmt(p.price)}</b></div>
+        <span class="m-row__go" aria-hidden="true">→</span></button>`;
+    }).join('')) : ''}
 
   ${r.shopHits.length ? sec('Shops near you', r.shopHits.length,
-    r.shopHits.map(s => `<button class="cmd" data-act="shop.open" data-id="${esc(s.id)}"
-        style="width:100%;text-align:left;margin-bottom:8px">
-      <div class="between"><div class="grow">
-        <b class="cmd__title">${esc(s.name)}</b>
-        <p class="cmd__sub">${esc(get('category', s.catId).name)} ·
-          ${ratingStars(s.ratingAvg)} ${s.ratingAvg}</p></div>
-      <span class="pill ${s.isOpen ? 'pill--ok' : 'pill--bad'}">${s.isOpen ? 'Open' : 'Closed'}</span>
-      </div></button>`).join('')) : ''}`;
+    r.shopHits.map(s => shopRow(s, kmBetween(here, s.loc || s.area))).join('')) : ''}`;
 }
 
 /* ── the screen ────────────────────────────────────────────── */
 export function render() {
   const s = me();
   const q = search.trim();
+  const st = getState();
   const cart = flow.getCart();
   const cartCount = cart ? cart.lines.reduce((n, l) => n + l.qty, 0) : 0;
-  const liveCount = liveOrders().length;
+  const liveCount = liveOrders().length + openAsks().length;
   const shopsGroup = GROUPS.find(g => g.id === 'shops');
+  const prosOnline = st.partners.filter(p => !p.suspended && p.online !== false).length;
+  const shopsOpen = st.shops.filter(x => x.isOpen && x.status === 'active').length;
+  const P = getPricing();
 
   /* suggestions when the box is empty: the categories with real supply right
      now, ordered by it — not a hand-written list that can go stale */
   const suggest = services()
-    .map(c => ({ c, n: getState().partners.filter(p => p.cat === c.id && p.online !== false && !p.suspended).length }))
-    .sort((a, b) => b.n - a.n).slice(0, 5).map(x => x.c);
+    .map(c => ({ c, n: st.partners.filter(p => p.cat === c.id && p.online !== false && !p.suspended).length }))
+    .sort((a, b) => b.n - a.n).slice(0, 6).map(x => x.c);
   const recentChips = recent.map(t => ({ t, c: bestCat(t) })).filter(x => x.c);
+  const best = q ? bestCat(q) : null;
 
   // the header is rebuilt by every render; re-apply whatever the scroll
   // position already decided, so a re-render never pops it back open
   setTimeout(applyHdr, 0);
 
   return `
-  <header class="hdr hdr--home on-plum glass glass--deep" style="border-radius:0 0 var(--r-xl) var(--r-xl)">
+  <header class="hdr hdr--home">
     <div class="wrap inner">
-      ${mark(30, { glow: false })}
-      <button class="loc tap grow" data-act="area.pick">
-        <small>Deliver &amp; serve at</small>
-        <b>${esc(myArea())} ▾</b>
+      <button class="loc tap grow" data-act="area.pick" aria-label="Change where you are served">
+        <b style="font:800 17px/1 var(--font-heading)">${esc(myArea())} ▾</b>
+        <small style="font-size:11px;color:var(--ink-3);margin-top:3px">${prosOnline} pros · ${shopsOpen} shops nearby</small>
       </button>
-      <button class="btn btn--ghost tap" data-act="nav.orders" aria-label="Notifications and live orders">
+      <button class="btn btn--ghost tap" data-act="nav.orders" aria-label="Your live orders" style="padding-inline:8px">
         <span style="position:relative;display:grid;place-items:center">
-          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
-            style="display:block"><path d="M18 8a6 6 0 0 0-12 0c0 6-3 7-3 7h18s-3-1-3-7M13.7 20a2 2 0 0 1-3.4 0"/></svg>
-          ${liveCount ? `<span class="fab__count" style="position:absolute;top:-5px;right:-6px">${liveCount}</span>` : ''}
+          ${icon('bell', { size: 20 })}
+          ${liveCount ? `<span class="fab__count" style="position:absolute;top:-6px;right:-8px">${liveCount}</span>` : ''}
         </span>
       </button>
-      <button class="btn btn--ghost tap" data-act="theme.toggle" aria-label="Switch theme">${icon('theme', { size: 20 })}</button>
-      ${s ? `<button class="btn btn--ghost tap" data-act="nav.account" aria-label="Account">
-              <span class="avatar avatar--sm">${esc(s.name[0])}</span></button>`
+      <button class="btn btn--ghost tap" data-act="theme.toggle" aria-label="Switch theme" style="padding-inline:8px">${icon('theme', { size: 20 })}</button>
+      ${s ? `<button class="tap" data-act="nav.account" aria-label="Account"
+              style="width:36px;height:36px;border:1px solid var(--color-divider);display:grid;place-items:center;font:800 12px var(--font-heading)">${esc(s.name[0])}</button>`
            : `<button class="btn btn--secondary btn--sm" data-act="auth.open">Sign in</button>`}
     </div>
 
-    <div class="wrap hero">
-      <p class="eyebrow hdr__fold">${esc(myArea())} · one circle</p>
-      <h1 class="hero__title display hdr__fold">Everything your neighbourhood needs.</h1>
-      <div class="search hero__search">
-        ${icon('search', { size: 20 })}
-        <input id="q" type="search" placeholder="What do you need today?"
-               value="${esc(search)}" data-role="search"
-               aria-label="Search services, shops, products and your orders">
-        ${q ? '<button class="btn btn--ghost btn--sm tap" data-act="search.clear" aria-label="Clear search">✕</button>' : ''}
+    <div class="hero">
+      <div class="m-hero hdr__fold">
+        <div class="m-hero__k">Together, we elevate life</div>
+        <h1 class="hero__title">What do you<br>need today?</h1>
+        <p>${shopsOpen} shop${shopsOpen === 1 ? '' : 's'} and ${prosOnline} pro${prosOnline === 1 ? '' : 's'} in ${esc(myArea())} are listening.</p>
       </div>
-      <p class="tiny hdr__fold" style="opacity:.82;max-width:44ch;margin:8px 4px 0">
-        One search finds people who come to you, shops that deliver to you, and your own orders.</p>
-      ${!q ? `<div class="chiprow hdr__fold" style="margin-top:12px;flex-wrap:wrap">
-        ${recentChips.length
-          ? recentChips.map(x => smartChip(x.t, x.c.id, icon('refresh', { size: 14 }))).join('')
-          : suggest.map(c => smartChip(c.name, c.id, catGlyph(c))).join('')}
-      </div>` : ''}
+      <div class="m-ask">
+        <div class="search hero__search">
+          ${icon('search', { size: 20 })}
+          <input id="q" type="search" placeholder="Fan in the bedroom stopped working…"
+                 value="${esc(search)}" data-role="search"
+                 aria-label="Say what you need — services, shops, products and your orders">
+          ${q ? `<button class="btn btn--ghost btn--sm tap" data-act="search.clear" aria-label="Clear search">${icon('cross', { size: 16 })}</button>` : ''}
+        </div>
+        <div class="hdr__fold">
+          ${best ? `<button class="btn btn--primary btn--block" style="justify-content:flex-start;margin-top:10px"
+              data-act="cat.open" data-id="${best.id}">Send to the circle → ${esc(best.name)}</button>` : ''}
+          ${!q ? `<div class="chiprow" style="margin-top:10px;flex-wrap:wrap">
+            ${recentChips.length
+              ? recentChips.map(x => smartChip(x.t, x.c.id, icon('refresh', { size: 14 }))).join('')
+              : suggest.slice(0, 4).map(c => smartChip(c.name, c.id, catGlyph(c))).join('')}
+          </div>
+          <p class="micro muted" style="margin-top:8px">One search finds people who come to you, shops that deliver to you, and your own orders.</p>` : ''}
+        </div>
+      </div>
     </div>
   </header>
 
   <main class="wrap" id="mainScroll">
     ${q ? `
-      <div class="sec">
-        <div class="hd"><h2 class="h-display">Results for &ldquo;${esc(q)}&rdquo;</h2></div>
+      <div class="sec" style="padding-bottom:0">
+        <h2 class="h-sec">Results for &ldquo;${esc(q)}&rdquo;</h2>
       </div>
       ${searchResults(q)}` : `
 
       <div class="home-lay">
         <div class="home-lay__main">
-          ${activeOrderStrip()}
+          ${stillOpen()}
 
           <div class="sec">
+            <p class="m-cap">Or say it in one tap</p>
             <div class="chiprow" style="flex-wrap:wrap">
-              ${s ? `<button class="chip chip--smart" data-act="nav.orders">
+              ${s ? `<button class="chip" data-act="nav.orders">
                        <span class="chip__ic" aria-hidden="true">${icon('refresh', { size: 14 })}</span>Book again</button>` : ''}
-              <button class="chip chip--smart" data-act="quick.emergency">
+              <button class="chip" data-act="quick.emergency">
                 <span class="chip__ic" aria-hidden="true">${icon('siren', { size: 14 })}</span>Emergency</button>
-              <button class="chip chip--smart" data-act="quick.nearby">
+              <button class="chip" data-act="quick.nearby">
                 <span class="chip__ic" aria-hidden="true">${icon('pin', { size: 14 })}</span>Open now</button>
-              ${cartCount ? `<button class="chip chip--smart on" data-act="nav.cart">
+              <button class="chip" data-act="nav.nearby">
+                <span class="chip__ic" aria-hidden="true">${icon('groupShops', { size: 14 })}</span>Neighbourhood map</button>
+              ${cartCount ? `<button class="chip on" data-act="nav.cart">
                 <span class="chip__ic" aria-hidden="true">${icon('basket', { size: 14 })}</span>Cart · ${cartCount}</button>` : ''}
+              ${suggest.map(c => smartChip(c.name, c.id, catGlyph(c))).join('')}
             </div>
           </div>
 
-          <div class="sec rise rise-2">
-            <div class="hd"><h2 class="h-sec">Most booked near you</h2>
-              <button class="more" data-act="scroll.all">See all ${cats().length}</button></div>
-            <div class="rail">${services().slice(0, 8).map(c => tileHtml(c)).join('')}</div>
-          </div>
+          ${openNow()}
         </div>
 
         <aside class="home-lay__side">
-          <div class="glass glass--gold sec rise rise-3" style="margin-top:var(--sp-6);padding:16px">
-            <p class="eyebrow">Why this circle holds</p>
-            ${pillarRow({ compact: true })}
-            <div class="trustbar on-plum" style="margin-top:14px">
-              <span>${icon('shield', { size: 14 })} Every pro ID-checked</span>
-              <span>${icon('lock', { size: 14 })} Price locked before booking</span>
-              <span>${icon('coin', { size: 14 })} Pros keep 100%</span>
-            </div>
+          <div class="sec">
+            <p class="m-cap">Why this circle holds</p>
+            <ul class="m-steps" style="gap:8px">
+              <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">Every pro ID-checked</span></li>
+              <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">Price locked before you book</span></li>
+              <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">SAAHAA holds the money until you confirm the work</span></li>
+              <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">The pro keeps the whole of their price</span></li>
+            </ul>
           </div>
         </aside>
       </div>
@@ -546,31 +608,30 @@ export function render() {
         const list = services().filter(c => c.group === g.id);
         if (!list.length) return '';
         return `<div class="sec rise rise-${Math.min(5, gi + 2)}">
-          <div class="hd"><h2 class="h-sec" style="display:flex;align-items:center;gap:8px">${icon(GROUP_ICON[g.id] || 'groupHome', { size: 20 })} ${esc(g.label)}</h2>
+          <div class="between" style="margin-bottom:8px">
+            <p class="m-cap" style="margin:0;display:flex;align-items:center;gap:6px">${icon(GROUP_ICON[g.id] || 'groupHome', { size: 14 })} ${esc(g.label)}</p>
             <span class="meta">${list.length} live</span></div>
           <div class="grid3">${list.map(c => tileHtml(c)).join('')}</div></div>`;
       }).join('')}
 
       ${flags.isOn('RETAIL') ? `
       <div class="sec rise rise-5" id="shopsSec">
-        <div class="hd"><h2 class="h-sec" style="display:flex;align-items:center;gap:8px">${icon('groupShops', { size: 20 })} ${
-          esc(shopsGroup ? shopsGroup.label : 'Shops Near You')}</h2>
-          <button class="more" data-act="nav.shops">Browse all</button></div>
-        <p class="meta" style="margin:-8px 0 12px">
+        <div class="between" style="margin-bottom:8px">
+          <p class="m-cap" style="margin:0;display:flex;align-items:center;gap:6px">${icon('groupShops', { size: 14 })} ${
+            esc(shopsGroup ? shopsGroup.label : 'Shops Near You')}</p>
+          <button class="more" data-act="nav.shops">Browse all →</button></div>
+        <p class="tiny muted" style="margin:0 0 10px">
           Kirana, veg, meat, dairy, chemist, water &amp; gas — real shops listing their own products.</p>
         <div class="grid3">${retails().map(c => tileHtml(c)).join('')}</div>
       </div>` : ''}
 
-      <div class="sec cmd glass glass--gold">
-        <div class="cmd__body">
-          <p class="eyebrow">The other side of the circle</p>
-          <b class="cmd__title">Run a shop or work a trade?</b>
-          <p class="cmd__sub">List your services or your products. You keep 100% of a service quote;
-            shops pay 3–5%, not 25%.</p>
-        </div>
-        <div class="cmd__action">
-          <button class="btn btn--primary" data-act="partner.join">Become a SAAHAA partner</button>
-        </div>
+      <div class="sec">
+        <p class="card-kicker">The other side of the circle</p>
+        <h2 class="h-sec" style="margin-top:4px">Run a shop or work a trade?</h2>
+        <p class="tiny muted" style="margin:6px 0 12px;max-width:60ch">List your services or your products. A pro keeps 100% of their quote —
+          SAAHAA's ${esc(P.serviceMarkupPct)}% sits on top and is paid by the customer. A shop pays
+          ${esc(P.retailTakePct)}% of the basket, never more than ${M.fmt(P.retailTakeCapPaise)} an order.</p>
+        <button class="btn btn--primary" data-act="partner.join">List my shop or service →</button>
       </div>
     `}
 
@@ -589,45 +650,315 @@ export function render() {
       </p>
     </div>
   </main>
+  ${SYS_CSS}
   <style>
-    .home-lay{display:block}
-    @media (min-width:1024px){
-      .home-lay{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);
-        gap:var(--sp-6,18px);align-items:start}
-      .home-lay__main{min-width:0}
-      .home-lay__side{position:sticky;top:12px}
+    /* the ask sits at the top of the screen and stays reachable: the header
+       is sticky, and on the way down only the box survives */
+    /* .hdr is display:flex in tokens.css — on Home the location row and the
+       red band are stacked blocks, not two columns, so the flex context must
+       be cancelled here or the hero collapses to a third of the width. */
+    .hdr--home{display:block;position:sticky;top:0;z-index:var(--z-header)}
+    @media (min-width:768px){ .hdr--home{top:calc(var(--topbar-h) + var(--tabs-h))} }
+    .hdr--home .inner{padding:11px var(--gutter)}
+    .hdr--home .hero{padding:0 0 var(--sp-5)}
+    .hdr--home .hero__title{font:800 27px/1.08 var(--font-heading);margin:10px 0 4px}
+    .hdr--home .m-ask{padding:14px var(--gutter) 0}
+    .hdr--home .hero__search{margin-top:0}
+    .hdr--home .loc b{display:block;max-width:46vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    @media (min-width:768px){
+      .hdr--home .inner{padding-left:0;padding-right:0}
+      .hdr--home .m-ask{padding-left:0;padding-right:0}
+      .hdr--home .loc b{max-width:260px}
+      .hdr--home .hero__title{font-size:36px}
     }
 
-    /* a place label is now a real one — "Kondapur, Hyderabad", "Brooklyn, New
-       York City" — so it is allowed one line and no more */
-    .hdr--home .loc b{display:block;max-width:46vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    @media (min-width:768px){ .hdr--home .loc b{max-width:260px} }
-
-    /* THE COLLAPSE. Only transforms, opacity and max-height animate, so the
-       browser never re-lays-out the page mid-scroll. */
+    /* THE COLLAPSE. Only opacity and max-height animate, so the browser never
+       re-lays-out the page mid-scroll. */
     .hdr--home .inner,
     .hdr--home .hdr__fold{
-      max-height:200px;opacity:1;transform:none;
-      transition:max-height var(--dur,.26s) var(--ease-out,ease),
-                 opacity .18s ease, transform .26s ease, margin .26s ease;
+      max-height:420px;opacity:1;
+      transition:max-height .26s ease, opacity .18s ease, padding .26s ease, margin .26s ease;
     }
     .hdr--home .hero{transition:padding .26s ease}
     .hdr--home .hero__search{transition:height .26s ease, margin .26s ease}
     .hdr--home.hdr--compact .inner,
     .hdr--home.hdr--compact .hdr__fold{
-      max-height:0;opacity:0;transform:translateY(-6px);
-      margin-top:0;margin-bottom:0;padding-top:0;padding-bottom:0;
+      max-height:0;opacity:0;margin-top:0;margin-bottom:0;padding-top:0;padding-bottom:0;
       overflow:hidden;pointer-events:none;
     }
-    .hdr--home.hdr--compact .hero{padding-top:2px;padding-bottom:2px}
-    .hdr--home.hdr--compact .hero__search{height:46px;margin-top:0}
-    .hdr--home.hdr--compact .hero__search input{height:44px}
+    .hdr--home.hdr--compact .hero{padding-bottom:8px}
+    .hdr--home.hdr--compact .m-ask{padding-top:8px}
+    .hdr--home.hdr--compact .hero__search{height:44px}
     @media (prefers-reduced-motion: reduce){
       .hdr--home .inner,.hdr--home .hdr__fold,.hdr--home .hero,
-      .hdr--home .hero__search,.hdr--home .hero__search input{transition:none}
+      .hdr--home .hero__search{transition:none}
     }
+    .home-lay__side{margin-top:0}
+    @media (min-width:1024px){ .home-lay__side{position:sticky;top:calc(var(--topbar-h) + var(--tabs-h) + 12px)} }
   </style>`;
 }
+
+/* ══════════════ THE NEIGHBOURHOOD — mockup 7 ════════════════════
+   A map-first browse of what is actually around you: the map fills the top,
+   the search box and the Shops / Pros / Open filters float on it, and the
+   same list rows the rest of the product uses sit underneath.
+
+   The map is only ever touched through the ui/map.js contract (ready, mapInto,
+   pin, circle, fit, geocode, locate) — Leaflet is never imported here.
+
+   Filtering and searching repaint ONLY the chips and the list, never the whole
+   screen: a full ctx.render() would rebuild the map element, tear the tile
+   layer down and steal focus from the search field mid-keystroke. */
+
+let nearQ = '';                       // what is typed in the map's search box
+let nearKind = 'all';                 // 'all' | 'shops' | 'pros'
+let nearOpen = false;                 // "Open" — online pros / open shops only
+let nearMapH = null, nearMapEl = null;
+
+function killNearMap() {
+  if (nearMapH) { nearMapH.destroy(); nearMapH = null; }
+  nearMapEl = null;
+}
+/* a map whose element has left the document is a leaked tile layer */
+function sweepNearMap() {
+  if (nearMapEl && !document.body.contains(nearMapEl)) killNearMap();
+}
+window.addEventListener('hashchange', () => setTimeout(sweepNearMap, 300));
+
+/** Everything on the map, as one list: shops and pros, nearest first. */
+function nearbyItems() {
+  const st = getState();
+  const here = myPlace();
+  const q = nearQ.trim().toLowerCase();
+  const out = [];
+  if (nearKind !== 'pros') {
+    st.shops.filter(s => s.status === 'active').forEach(s => {
+      if (nearOpen && !s.isOpen) return;
+      const cat = get('category', s.catId) || { name: '' };
+      if (q && !(`${s.name} ${cat.name} ${s.area || ''}`.toLowerCase().includes(q))) return;
+      out.push({ kind: 'shop', id: s.id, name: s.name, catId: s.catId, cat, raw: s,
+                 loc: s.loc || s.area, km: kmBetween(here, s.loc || s.area), open: !!s.isOpen });
+    });
+  }
+  if (nearKind !== 'shops') {
+    st.partners.filter(p => !p.suspended && (p.tier | 0) >= 1).forEach(p => {
+      if (nearOpen && p.online === false) return;
+      const cat = get('category', p.cat) || { name: '' };
+      if (q && !(`${p.name} ${cat.name} ${p.area || ''}`.toLowerCase().includes(q))) return;
+      out.push({ kind: 'pro', id: p.id, name: p.name, catId: p.cat, cat, raw: p,
+                 loc: p.loc || p.area, km: kmBetween(here, p.loc || p.area), open: p.online !== false });
+    });
+  }
+  return out.sort((a, b) => a.km - b.km);
+}
+
+/* the coordinates behind a place, or null when all we have is a name */
+function geoOf(loc) {
+  if (loc && loc.lat != null) return { lat: +loc.lat, lng: +loc.lng };
+  const g = AREA_GEO[typeof loc === 'string' ? loc : ''];
+  return g ? { lat: g[0], lng: g[1] } : null;
+}
+
+function nearRow(it) {
+  const act = it.kind === 'shop' ? 'shop.open' : 'pro.open';
+  const line = it.kind === 'shop'
+    ? `${getState().products.filter(p => p.shopId === it.id && p.active).length} items · ${esc(it.cat.name)} · ${it.km} km`
+    : `${esc(it.cat.name)} · ${it.km} km · ~${etaMins(it.km)} min`;
+  const rating = it.kind === 'shop' ? Number(it.raw.ratingAvg) : avgOf(it.raw);
+  return `<button class="m-row" data-act="${act}" data-id="${esc(it.id)}">
+    <span class="thumb m-thumb nb-thumb" aria-hidden="true">${
+      hasIcon(it.catId) ? icon(it.catId, { size: 18 }) : esc((it.name || '?')[0])}</span>
+    <div class="grow" style="min-width:0">
+      <div class="m-row__t">${esc(it.name)}</div>
+      <div class="m-row__m">${line}</div>
+      <div class="m-row__tags">
+        <span class="tag tag-accent">${(rating || 0).toFixed(1)} ★</span>
+        <span class="tag tag-neutral">${it.kind === 'shop'
+          ? (it.open ? 'Open now' : 'Closed')
+          : (it.open ? 'Free now' : 'Offline')}</span>
+      </div>
+    </div>
+    <span class="m-row__go" aria-hidden="true">→</span>
+  </button>`;
+}
+
+function nearChipsHtml() {
+  const c = (key, label, on) => `<button class="chip nb-chip${on ? ' on' : ''}" aria-pressed="${on}"
+    data-near="${key}">${esc(label)}</button>`;
+  return c('shops', 'Shops', nearKind === 'shops') +
+         c('pros', 'Pros', nearKind === 'pros') +
+         c('open', 'Open', nearOpen);
+}
+
+function nearListHtml(items) {
+  if (!items.length) {
+    return emptyBlock(
+      nearQ.trim() ? `Nothing here matches “${nearQ.trim()}”` : 'Nobody is on this map yet',
+      nearQ.trim()
+        ? 'Try a shorter word, or search the box above for a place to move the map.'
+        : `No shops or pros have listed themselves around ${myArea()} so far. Be the first, or move the map somewhere else.`,
+      `<button class="btn btn--secondary" data-act="partner.join">List my shop or service</button>`);
+  }
+  return items.map(nearRow).join('');
+}
+
+/** #/nearby — routed by app.js to home.renderNearby(). */
+export function renderNearby() {
+  sweepNearMap();
+  const items = nearbyItems();
+  const shops = items.filter(i => i.kind === 'shop').length;
+  const pros = items.length - shops;
+  setTimeout(mountNearMap, 0);
+
+  return `
+  ${header('Neighbourhood', `${myArea()} · ${shops} shop${shops === 1 ? '' : 's'} · ${pros} pro${pros === 1 ? '' : 's'}`,
+    `<button class="btn btn--ghost tap" data-act="area.pick" aria-label="Change where you are"
+       style="padding-inline:8px">${icon('pin', { size: 20 })}</button>`)}
+  <main class="wrap nb-wrap">
+    <div class="nb-map">
+      <div id="nearbyMap" class="nb-canvas"></div>
+      <div class="nb-over">
+        <div class="nb-find">
+          <input id="nearbyQ" type="search" value="${esc(nearQ)}" data-near-role="q"
+                 placeholder="Search ${esc(myArea())}" aria-label="Search this neighbourhood, or a place to move the map to">
+          <button class="nb-go" data-near="geo" aria-label="Search for this place on the map">${icon('search', { size: 18 })}</button>
+        </div>
+        <div class="chiprow nb-chips" id="nearbyChips" role="group" aria-label="Filter the map">${nearChipsHtml()}</div>
+      </div>
+      <div class="nb-legend" aria-hidden="true">
+        <span><i class="nb-dot nb-dot--you"></i>You</span>
+        <span><i class="nb-dot nb-dot--pro"></i>Pros</span>
+        <span><i class="nb-dot nb-dot--shop"></i>Shops</span>
+      </div>
+    </div>
+
+    <div class="nb-head">
+      <div style="font:800 14px/1.2 var(--font-heading)">${items.length} near you</div>
+      <button class="more" data-act="nav.shops">All shops →</button>
+    </div>
+    <div id="nearbyList">${nearListHtml(items)}</div>
+
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:16px">
+      <button class="btn btn--secondary" data-act="area.locate">${icon('pin', { size: 14 })} Use my location</button>
+      <button class="btn btn--ghost" data-act="nav.home">Back to home</button>
+    </div>
+    <div style="height:24px"></div>
+  </main>
+  ${SYS_CSS}
+  <style>
+    .nb-wrap{padding-top:0}
+    .nb-map{position:relative;margin:0 calc(-1 * var(--gutter));border-bottom:2px solid var(--color-text)}
+    .nb-canvas{height:min(52vh,420px);min-height:260px;background:var(--surface-2)}
+    .nb-over{position:absolute;left:12px;right:12px;top:12px;z-index:500;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+    .nb-over > *{pointer-events:auto}
+    .nb-find{display:flex;background:var(--bg);border:2px solid var(--color-text)}
+    .nb-find input{flex:1;min-width:0;height:44px;padding:0 12px;font:400 13px/1 var(--font-body);
+      color:var(--ink-1);background:transparent;border:0;outline:none;caret-color:var(--color-accent)}
+    .nb-find input::placeholder{color:var(--ink-3)}
+    .nb-go{width:44px;min-height:44px;flex:none;display:grid;place-items:center;background:var(--color-accent);color:#fff}
+    .nb-chips{flex-wrap:wrap;gap:6px}
+    .nb-chip{min-height:36px;background:var(--bg)}
+    .nb-chip.on{background:var(--color-accent);color:#fff;border-color:var(--color-accent)}
+    /* bottom-right, clear of Leaflet's zoom pair (bottom-left) and its
+       attribution strip (the very bottom of the right edge) */
+    /* The key is fixed to the map's own paper, in both themes: it names the
+       pin colours, and OSM tiles (and therefore the pins) are always light. */
+    .nb-legend{position:absolute;right:12px;bottom:22px;z-index:500;display:flex;gap:10px;
+      background:#f3f2f2;border:1px solid #201e1d;padding:4px 8px;
+      font:600 9px/1.4 var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:#201e1d}
+    .nb-legend span{display:inline-flex;align-items:center;gap:4px}
+    .nb-dot{width:8px;height:8px;display:block}
+    .nb-dot--you{background:#ec3013} .nb-dot--pro{background:#201e1d} .nb-dot--shop{background:#7d7979}
+    .nb-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
+      padding:10px 0;border-bottom:1px solid var(--color-divider)}
+    .nb-thumb{width:44px;height:44px}
+    /* Leaflet's own chrome, brought into the system: zero radius, ink rules,
+       and the zoom pair moved out from under the floating search box. */
+    #nearbyMap .leaflet-top.leaflet-left{top:auto;bottom:4px}
+    #nearbyMap .leaflet-bar,#nearbyMap .leaflet-bar a{border-radius:0}
+    #nearbyMap .leaflet-bar a{color:var(--color-text);border-bottom-color:var(--color-divider)}
+    #nearbyMap .leaflet-control-attribution{font-size:9px;border-radius:0}
+    @media (min-width:768px){ .nb-map{margin:0} .nb-canvas{height:min(56vh,520px)} }
+  </style>`;
+}
+
+async function mountNearMap() {
+  const first = document.getElementById('nearbyMap');
+  if (!first) { killNearMap(); return; }
+  try { await gmap.ready(); }
+  catch (e) {
+    const el = document.getElementById('nearbyMap');
+    if (el) mount(el, '<p class="micro muted" style="padding:14px">The map cannot load right now — ' +
+      'the search box, the filters and the list below all still work.</p>');
+    return;
+  }
+  const el = document.getElementById('nearbyMap');
+  if (!el) { killNearMap(); return; }
+  if (el !== nearMapEl || !nearMapH) {
+    killNearMap();
+    const c = geoOf(myPlace()) || HYD;
+    nearMapH = gmap.mapInto(el, { center: [c.lat, c.lng], zoom: 14 });
+    if (!nearMapH) return;
+    nearMapEl = el;
+  }
+  paintNearMap();
+}
+
+function paintNearMap(fit = true) {
+  if (!nearMapH) return;
+  nearMapH.clear();
+  const pts = [];
+  const you = geoOf(myPlace());
+  if (you) {
+    nearMapH.pin(you.lat, you.lng, { color: gmap.PINS.accent, label: 'You are here' });
+    nearMapH.circle(you.lat, you.lng, 700, { color: gmap.PINS.accent });
+    pts.push([you.lat, you.lng]);
+  }
+  nearbyItems().slice(0, 40).forEach(it => {
+    const g = geoOf(it.loc);
+    if (!g) return;
+    nearMapH.pin(g.lat, g.lng, {
+      color: it.kind === 'pro' ? gmap.PINS.ink : gmap.PINS.neutral,
+      glyph: (it.name || '?')[0], label: `${it.name} · ${it.cat.name} · ${it.km} km`,
+    });
+    pts.push([g.lat, g.lng]);
+  });
+  if (fit && pts.length) nearMapH.fit(pts, 40);
+  nearMapH.invalidate();
+}
+
+/** Repaint the two live parts only — never the map, never the search field. */
+function paintNearby() {
+  const items = nearbyItems();
+  const chips = document.getElementById('nearbyChips');
+  if (chips) mount(chips, nearChipsHtml());
+  const list = document.getElementById('nearbyList');
+  if (list) mount(list, nearListHtml(items));
+  const head = document.querySelector('.nb-head > div');
+  if (head) head.textContent = `${items.length} near you`;
+  paintNearMap(false);
+}
+
+delegate('input', '#nearbyQ', (e, el) => { nearQ = el.value; paintNearby(); });
+delegate('click', '[data-near]', async (e, el) => {
+  const k = el.dataset.near;
+  if (k === 'geo') {
+    const q = nearQ.trim();
+    if (q.length < 3) { toast('Type at least three letters to find a place', 'warn'); return; }
+    if (!nearMapH) { toast('The map is not loaded, so there is nowhere to move to', 'warn'); return; }
+    toast('Looking for that place…');
+    let hit = [];
+    try { hit = await gmap.geocode(q, { limit: 1 }); }
+    catch (err) { toast('Place search is unavailable right now', 'warn'); return; }
+    if (!hit.length) { toast(`Nothing on the map is called “${q}”`, 'warn'); return; }
+    nearMapH.fit([[hit[0].lat, hit[0].lng]]);
+    toast(hit[0].label);
+    return;
+  }
+  if (k === 'open') nearOpen = !nearOpen;
+  else nearKind = nearKind === k ? 'all' : k;
+  paintNearby();
+});
 
 /* ── the booking path, made visible ────────────────────────────
    NEED → SERVICE → DETAILS → MATCH → PRICE → CONFIRM. The customer never
@@ -636,42 +967,41 @@ export function render() {
 const BOOK_STEPS = ['Need', 'Service', 'Details', 'Match', 'Price', 'Confirm'];
 function stepbar(cur) {
   return `<div class="stepbar" role="list" aria-label="Booking steps">${BOOK_STEPS.map((s, i) =>
-    `<span class="stepbar__step ${i < cur ? 'done' : i === cur ? 'cur' : ''}" role="listitem">${esc(s)}</span>`
-  ).join('')}</div>`;
+    `<span class="stepbar__step ${i < cur ? 'done' : i === cur ? 'cur' : ''}" role="listitem" title="${esc(s)}"></span>`
+  ).join('')}</div>
+  <p class="micro muted" style="margin:-6px 0 10px">Step ${Math.min(cur + 1, BOOK_STEPS.length)} of ${BOOK_STEPS.length} · ${esc(BOOK_STEPS[Math.min(cur, BOOK_STEPS.length - 1)])}</p>`;
 }
 
 export function openCategory(catId, sub = null) {
   const c = get('category', catId);
   if (c.kind === 'retail') { ctx.go('shops', catId); return; }
   const m = flow.findMatch(catId, { area: myPlace() });   // coordinates when we have them
-  // The chosen sub-service used to be dropped on the floor: openCategory took
-  // one argument, so the sheet re-rendered byte-identical, mount() skipped the
-  // write, and tapping a chip did nothing visible. It now selects, and it is
-  // threaded all the way into the booking.
+  // The chosen sub-service is threaded all the way into the booking.
   const subs = (c.subs || []).map(s =>
     `<button class="chip${s === sub ? ' on' : ''}" data-act="book.sub" data-id="${catId}"
        data-sub="${esc(s)}" aria-pressed="${s === sub}">${esc(s)}</button>`).join('');
 
   sheet(c.name, `
     ${stepbar(m.hero ? (sub ? 5 : 2) : 2)}
-    <div class="capsules" style="margin:14px 0">
-      <span class="capsule capsule--soft"><span class="capsule__k">Priced</span>
-        <span class="capsule__v">${esc(c.unit)}</span></span>
-      <span class="capsule capsule--info"><span class="capsule__k">Available</span>
-        <span class="capsule__v">${esc(supplyLine(c))}</span></span>
+    <div class="capsules" style="margin:0 0 14px">
+      <span class="capsule"><span class="capsule__k">Priced</span>
+        <span class="capsule__v" style="font-size:16px">${esc(c.unit)}</span></span>
+      <span class="capsule"><span class="capsule__k">Available</span>
+        <span class="capsule__v" style="font-size:16px">${esc(supplyLine(c))}</span></span>
       ${c.warrantyDays ? `<span class="capsule capsule--ok"><span class="capsule__k">Warranty</span>
-        <span class="capsule__v">${c.warrantyDays} days</span></span>` : ''}
+        <span class="capsule__v" style="font-size:16px">${c.warrantyDays} days</span></span>` : ''}
     </div>
-    <p class="meta" style="margin-bottom:12px">${esc(c.blurb || '')}</p>
-    <p class="eyebrow" style="margin-bottom:8px">What exactly do you need?</p>
+    <p class="tiny muted" style="margin-bottom:12px">${esc(c.blurb || '')}</p>
+    <p class="m-cap">What exactly do you need?</p>
     <div class="chiprow" style="flex-wrap:wrap;gap:8px;margin-bottom:18px">${subs}</div>
     ${m.hero ? heroCard(catId, m.hero, sub) : `
-      <div class="empty empty--smart"><h3>No pro free right now</h3>
-      <p>Nobody in ${esc(myArea())} is online for this. Try another area or check back shortly.</p>
+      <div class="empty empty--smart"><h3 style="font-size:17px">No pro free right now</h3>
+      <p style="margin-top:6px">Nobody in ${esc(myArea())} is online for this. Try another area or check back shortly.</p>
       <button class="btn btn--secondary" style="margin-top:12px" data-act="area.pick">Change area</button></div>`}
     ${m.alternates.length ? `
       <button class="btn btn--ghost btn--block" style="margin-top:10px"
         data-act="book.others" data-id="${catId}" data-sub="${esc(sub || '')}">See ${m.alternates.length} other pros</button>` : ''}
+    ${SYS_CSS}
   `);
 }
 
@@ -683,45 +1013,51 @@ function whyRow(p, cat) {
   const near = p.km <= 3;
   const trusted = (p.trust | 0) >= 70;
   const fair = base ? p.ask <= base : false;
-  return `<div class="bestmatch__why capsules">
-    <span class="capsule ${near ? 'capsule--ok' : 'capsule--info'}">
-      <span class="capsule__k">${near ? 'Nearest' : 'Distance'}</span>
-      <span class="capsule__v">${p.km} km</span>
-      <span class="capsule__d">arrives ~${p.eta} min</span></span>
-    <span class="capsule ${trusted ? 'capsule--gold' : 'capsule--soft'}">
-      <span class="capsule__k">${trusted ? 'Most trusted' : 'Trust'}</span>
-      <span class="capsule__v">${p.trust}</span>
-      <span class="capsule__d">${esc((p.band && p.band.label) || tier(p.tier).label)}</span></span>
-    <span class="capsule ${fair ? 'capsule--ok' : 'capsule--warn'}">
-      <span class="capsule__k">${fair ? 'Fair price' : 'Above typical'}</span>
-      <span class="capsule__v num">${M.fmt(p.ask)}</span>
-      <span class="capsule__d">typical ${M.fmt(base)}</span></span>
+  const cell = (k, v, d) => `<div style="padding:8px 0"><div class="m-cap" style="margin:0 0 2px">${esc(k)}</div>
+    <div style="font:800 16px/1.1 var(--font-heading)">${v}</div><div class="micro" style="opacity:.7">${esc(d)}</div></div>`;
+  return `<div class="grid3" style="gap:0;border-top:1px solid color-mix(in srgb,currentColor 30%,transparent);border-bottom:1px solid color-mix(in srgb,currentColor 30%,transparent);margin:12px 0">
+    ${cell(near ? 'Nearest' : 'Distance', `${p.km} km`, `arrives ~${p.eta} min`)}
+    ${cell(trusted ? 'Most trusted' : 'Trust', `${p.trust}`, (p.band && p.band.label) || tier(p.tier).label)}
+    ${cell(fair ? 'Fair price' : 'Above typical', M.fmt(p.ask), `typical ${M.fmt(base)}`)}
   </div>`;
 }
 
+/* the refund rule, read from the engine — never a typed promise */
+function cancelLine() {
+  const before = CANCEL_RULES.BEFORE_ACCEPT, after = CANCEL_RULES.AFTER_ACCEPT_2H, route = CANCEL_RULES.EN_ROUTE;
+  if (before && after && before.refundPct >= 1 && after.refundPct >= 1)
+    return `Full refund if you cancel before the pro sets out${route ? `; ${Math.round(route.refundPct * 100)}% once they are on the way` : ''}.`;
+  return 'See Refunds &amp; cancellation for what comes back if you cancel.';
+}
+
 /* The Locked-Match card — identity proof and price finality fused into one
-   indivisible unit. This is the single most important trust element in the
-   product (V5-B7, confidence 5). */
+   indivisible unit, and the bill the customer is about to pay, line by line.
+   This is the single most important trust element in the product. */
 export function heroCard(catId, p, sub = null) {
   const pv = flow.previewBooking(catId, p);
   const t = tier(p.tier);
+  const q = pv.quote;
+  const pct = Math.round((q.uplift / Math.max(1, q.deal)) * 100);
+  const w = flow.customerWallet();
+  const fromWallet = me() ? Math.min(w.balance, q.customerPays) : 0;
+  const viaGateway = q.customerPays - fromWallet;
+  const kv = (k, v, cls = '') => `<div class="m-kv ${cls}"><span>${k}</span><span class="num">${v}</span></div>`;
   return `
-  <div class="bestmatch glass glass--gold">
+  <div class="bestmatch">
     <div class="row" style="align-items:flex-start">
       <span class="avatar avatar--lg">${esc(p.name[0])}</span>
-      <div class="grow">
+      <div class="grow" style="min-width:0">
         <div class="between">
-          <button class="btn btn--ghost btn--sm" style="padding:0;height:auto;font-size:17px;font-weight:700"
+          <button class="btn btn--ghost btn--sm" style="padding:0;min-height:0;height:auto;font-size:16px;color:inherit"
             data-act="pro.open" data-id="${p.id}">${esc(p.name)} ›</button>
-          <span class="pill pill--gold">Best match</span>
+          <span class="tag tag-accent">Best match</span>
         </div>
         <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
-          ${t.badge ? `<span class="pill pill--ok">✓ ${esc(t.badge)}</span>` : ''}
-          ${p.online !== false ? '<span class="pill pill--live">Free now</span>'
-                               : '<span class="pill pill--soft">Offline</span>'}
-          <span class="pill pill--soft">${p.completed} jobs done</span>
+          ${t.badge ? `<span class="tag">${esc(t.badge)}</span>` : ''}
+          <span class="tag">${p.online !== false ? 'Free now' : 'Offline'}</span>
+          <span class="tag">${p.completed} jobs done</span>
         </div>
-        <p class="meta" style="margin-top:7px">
+        <p class="tiny" style="margin-top:7px;opacity:.8">
           ${ratingStars(avgOf(p))} ${avgOf(p).toFixed(1)} · ${esc(p.area || myArea())}
         </p>
       </div>
@@ -729,54 +1065,45 @@ export function heroCard(catId, p, sub = null) {
 
     ${whyRow(p, pv.cat)}
 
-    <div class="rule" style="margin:14px 0"></div>
+    <p class="m-cap" style="opacity:.8">The bill</p>
+    ${kv(`${esc(p.name.split(' ')[0])}'s price · ${esc(pv.cat.name)}${sub ? ` · ${esc(sub)}` : ''}`, M.fmt(q.deal))}
+    ${kv(`SAAHAA charge · ${pct}% on top, incl. GST`, M.fmt(q.uplift))}
+    ${kv('You pay', M.fmt(q.customerPays), 'm-kv--total')}
+    <p class="tiny" style="margin-top:8px;opacity:.85;line-height:1.5">${esc(p.name)} receives the full ${M.fmt(q.deal)}. SAAHAA's charge is on top and paid by you.
+      The whole ${M.fmt(q.customerPays)} is paid to SAAHAA now and held until you confirm the work — nothing goes to anyone directly.</p>
 
-    <div class="between bestmatch__price">
-      <div><span class="eyebrow">You pay</span>
-        <div class="num-xl num">${M.fmt(pv.quote.customerPays)}</div></div>
-      <div style="text-align:right">
-        <span class="pill pill--ok">Price locked</span>
-        <p class="meta" style="margin-top:5px">Pay after the work</p>
-      </div>
-    </div>
+    <p class="m-cap" style="margin-top:14px;opacity:.8">How you pay</p>
+    ${me() ? `${kv('From your SAAHAA wallet', M.fmt(fromWallet))}${kv(`Via ${esc(gateway.label().split(' — ')[0])}`, M.fmt(viaGateway))}`
+           : '<p class="tiny" style="opacity:.85">Sign in to pay — wallet first, the rest through UPI.</p>'}
 
     ${flags.isOn('SAVINGS_STRIP') ? `
-    <div class="saves">
-      <div class="old"><div class="k">Typical app</div><div class="v num">${M.fmt(pv.compare.typicalApp)}</div></div>
-      <div><div class="k">You pay</div><div class="v num">${M.fmt(pv.compare.youPay)}</div></div>
-      <div class="good"><div class="k">You save</div><div class="v num">${M.fmt(pv.compare.saved)}</div></div>
-    </div>
-    <p class="micro muted" style="margin:-4px 0 12px">
-      * ${esc(pv.compare.assumption)}. ${esc(p.name)} keeps
-      <b>${M.fmt(pv.compare.workerGets)}</b> — ${M.fmt(pv.compare.workerUpside)} more than an app would pay.
-    </p>` : ''}
+    <div style="margin-top:12px;border-top:1px solid color-mix(in srgb,currentColor 30%,transparent);padding-top:8px">
+      ${kv('A typical app would charge', M.fmt(pv.compare.typicalApp))}
+      ${kv('You save', M.fmt(pv.compare.saved))}
+      <p class="micro" style="opacity:.7;margin-top:4px">* ${esc(pv.compare.assumption)}. ${esc(p.name)} keeps
+        <b>${M.fmt(pv.compare.workerGets)}</b> — ${M.fmt(pv.compare.workerUpside)} more than an app would pay.</p>
+    </div>` : ''}
 
-    <details class="expand" style="margin-bottom:14px">
-      <summary class="tiny" style="cursor:pointer;color:var(--accent);font-weight:700">What's included ▾</summary>
-      <p class="meta" style="margin-top:8px">
+    <details class="expand" style="margin:10px 0 14px">
+      <summary class="tiny" style="cursor:pointer;font-weight:700">What's included ▾</summary>
+      <p class="tiny" style="margin-top:8px;opacity:.85">
         ${esc(pv.cat.name)}${sub ? ` · ${esc(sub)}` : ''} · ${esc(pv.cat.unit)} ·
-        about ${pv.cat.workMins} min on site.
-        Platform fee ${M.fmt(pv.quote.platformFee)} + GST ${M.fmt(pv.quote.gst)} is already in the total.
-        The price cannot change without your approval.
+        about ${pv.cat.workMins} min on site. Platform fee ${M.fmt(q.platformFee)} + GST ${M.fmt(q.gst)}
+        is the ${M.fmt(q.uplift)} above. The price cannot change without your approval.
       </p>
     </details>
 
-    <button class="btn btn--primary btn--lg btn--block sheen" data-act="book.confirm"
+    <button class="btn btn--primary btn--lg btn--block" style="justify-content:flex-start" data-act="book.confirm"
             data-id="${catId}" data-pid="${p.id}" data-sub="${esc(sub || '')}">
-      Confirm booking · ${M.fmt(pv.quote.customerPays)}
+      Confirm booking · ${M.fmt(q.customerPays)}
     </button>
+    <p class="micro" style="margin-top:8px;opacity:.75">${cancelLine()}</p>
 
-    ${ask.entryRow(catId, p, pv.quote.deal)}
+    ${ask.entryRow(catId, p, q.deal)}
 
-    <button class="btn btn--ghost btn--block" style="margin-top:6px"
+    <button class="btn btn--ghost btn--block" style="margin-top:6px;color:inherit"
             data-act="book.others" data-id="${catId}" data-sub="${esc(sub || '')}">Someone else</button>
   </div>`;
-}
-
-export function avgOf(p) {
-  const r = p.ratings || [];
-  if (!r.length) return 4.5;
-  return r.reduce((a, x) => a + x.stars, 0) / r.length;
 }
 
 export function showAlternates(catId, sub = null) {
@@ -785,32 +1112,25 @@ export function showAlternates(catId, sub = null) {
   const cat = get('category', catId);
   const base = (cat && cat.base) || 0;
   sheet('Choose your pro', `${stepbar(3)}
-    <p class="meta" style="margin:14px 0">
+    <p class="tiny muted" style="margin:0 0 6px">
       Ranked on trust, distance and a fair price — never on price alone.</p>
     ${list.map((p, i) => {
       const pv = flow.previewBooking(catId, p);
-      return `<button class="cmd${i === 0 ? ' glass glass--gold' : ''}"
-          style="width:100%;text-align:left;margin-bottom:10px"
-          data-act="book.confirm" data-id="${catId}" data-pid="${p.id}" data-sub="${esc(sub || '')}">
-        <div class="row" style="align-items:flex-start">
-          <span class="avatar avatar--md">${esc(p.name[0])}</span>
-          <div class="grow">
-            <div class="between"><b class="cmd__title">${esc(p.name)}</b>
-              ${i === 0 ? '<span class="pill pill--gold">Best match</span>' : ''}</div>
-            <p class="cmd__sub">${ratingStars(avgOf(p))} ${avgOf(p).toFixed(1)} · ${p.km} km ·
-              ~${p.eta} min · ${esc(tier(p.tier).label)}</p>
-            <div class="capsules" style="margin-top:8px">
-              <span class="capsule capsule--info"><span class="capsule__k">Trust</span>
-                <span class="capsule__v">${p.trust}</span></span>
-              <span class="capsule ${base && p.ask <= base ? 'capsule--ok' : 'capsule--soft'}">
-                <span class="capsule__k">Their rate</span>
-                <span class="capsule__v num">${M.fmt(p.ask)}</span></span>
-            </div>
+      return `<button class="m-row" data-act="book.confirm" data-id="${catId}" data-pid="${p.id}" data-sub="${esc(sub || '')}">
+        <span class="avatar avatar--md">${esc(p.name[0])}</span>
+        <div class="grow" style="min-width:0">
+          <div class="m-row__t">${esc(p.name)}</div>
+          <div class="m-row__m">${ratingStars(avgOf(p))} ${avgOf(p).toFixed(1)} · ${p.km} km · ~${p.eta} min · ${esc(tier(p.tier).label)}</div>
+          <div class="m-row__tags">
+            ${i === 0 ? '<span class="tag tag-accent">Best match</span>' : ''}
+            <span class="tag tag-neutral">Trust ${p.trust}</span>
+            <span class="tag ${base && p.ask <= base ? 'tag-neutral' : ''}">Their rate ${M.fmt(p.ask)}</span>
           </div>
-          <div style="text-align:right"><b class="num" style="font-size:19px">${M.fmt(pv.quote.customerPays)}</b>
-            <p class="meta">you pay</p></div>
-        </div></button>`;
-    }).join('') || '<p class="muted">No pros online.</p>'}`);
+        </div>
+        <div class="m-row__r"><b class="num" style="font-size:17px">${M.fmt(pv.quote.customerPays)}</b>
+          <p class="micro muted">you pay</p></div>
+      </button>`;
+    }).join('') || '<p class="muted">No pros online.</p>'}${SYS_CSS}`);
 }
 
 export async function confirmBooking(catId, partnerId, sub) {

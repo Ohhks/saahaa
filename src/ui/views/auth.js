@@ -3,7 +3,7 @@
    Worker / Shop / Professional keeps one auth + wallet + rating spine, and
    lets a kirana owner who also does delivery hold both roles on one number.
 
-   TWO CHANGES THIS RELEASE
+   TWO THINGS THAT DO NOT CHANGE
 
    1. SIGN IN IS MOBILE + PASSWORD. A name is not an identifier — two Ramesh
       Kumars on one street could not both sign in, and nobody remembers whether
@@ -12,20 +12,30 @@
       board), so it is the identity here too. The internal `key` is unchanged,
       so every record that points at it still resolves.
 
-   2. YOU CAN ENROL ANYWHERE ON EARTH. The twelve-area dropdown said, quietly,
-      "this is a Hyderabad toy". Signup now takes a PLACE: search it, drop on
+   2. YOU CAN ENROL ANYWHERE ON EARTH. Signup takes a PLACE: search it, drop on
       it, or let the device say where you are — and the Hyderabad areas remain
       as one-tap chips for the people who prefer them. We store
       `loc {lat, lng, label}` AND `area = label`, so every existing read of
-      `area` keeps working while every distance can now be a real one. */
+      `area` keeps working while every distance can now be a real one.
+
+   MODERNIST 8.0 — the mockup's WHICH SIDE ARE YOU ON is the sign-up entry:
+   an accent block with the wordmark and "Together, we elevate life", three
+   big choice rows, and the honest cost lines (₹0 to list · what an order
+   costs · what an aggregator takes). The numbers are the engine's
+   (pricing.liveMarkup, settings.getPricing, pricing.AGG_COMMISSION). Then
+   the same forms, in .field language. A shop's form IS the mockup's SHOP
+   SETUP screen: name, what you sell, where it is, then "Next — add your
+   stock", which drops the owner into the console with the ready list. */
 
 import { mount, esc, toast } from '../dom.js';
-import { liveMarkup } from '../../domain/pricing.js';
+import { liveMarkup, AGG_COMMISSION } from '../../domain/pricing.js';
+import { getPricing } from '../../domain/settings.js';
 import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, dispatch, saveSession } from '../../core/ctx.js';
 import { sha256 } from '../../core/crypto.js';
 import { nid } from '../../core/id.js';
 import { toPaise } from '../../core/money.js';
+import * as M from '../../core/money.js';
 import { live } from '../../core/registry.js';
 import { AREA_NAMES, AREA_GEO } from '../../domain/match.js';
 import { mark, pillarRow } from '../logo.js';
@@ -52,39 +62,58 @@ let suHits = [];          // last geocode results
 let mapH = null, mapEl = null;
 const HYD = { lat: 17.4486, lng: 78.3908 };
 
+const authCSS = `<style>
+  .au{max-width:560px}
+  .au__hdr.apphdr{padding-left:var(--gutter);padding-right:var(--gutter)}
+  .au__hero{background:var(--color-accent);color:var(--accent-on-fill);padding:26px var(--gutter) 22px}
+  .au__hero .wm{color:inherit;font:800 11px/1 var(--font-heading);letter-spacing:.2em;opacity:.85}
+  .au__hero h1{font:800 32px/1.06 var(--font-heading);margin:14px 0 8px;letter-spacing:-.02em}
+  .au__hero p{font-size:13px;opacity:.92;max-width:28ch}
+  .au__side{display:block;width:100%;text-align:left;padding:16px 14px 16px 12px;border-bottom:1px solid var(--color-divider);border-left:4px solid transparent;color:inherit}
+  .au__side[aria-pressed="true"]{background:var(--color-neutral-100);border-left-color:var(--color-accent)}
+  :root[data-theme="dark"] .au__side[aria-pressed="true"]{background:var(--surface-2)}
+  .au__side b{font:800 18px/1.15 var(--font-heading);display:block} .au__side span{font-size:12.5px;color:var(--ink-3);display:block;margin-top:5px}
+  .au__cost{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:8px 0;border-bottom:1px solid var(--color-divider)}
+  .au__cost:last-child{border-bottom:0}
+  .au__form{padding:16px 0} .au__form .field{margin-bottom:14px}
+  .au__step{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:14px 0 6px;border-top:2px solid var(--color-divider)}
+  .au__step b{font:800 17px/1.2 var(--font-heading)} .au__step span{font:600 11px/1 var(--font-body);color:var(--ink-3)}
+  .au__map{height:160px;border:2px solid var(--color-text);overflow:hidden;background:var(--surface-3);margin-top:8px}
+  .au__foot{padding:12px 0;border-top:2px solid var(--color-divider);margin-top:8px}
+  .au__foot .btn-primary{width:100%;justify-content:flex-start}
+  .au__links{font-size:12px;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:6px 14px;padding:16px 0}
+  .au__links a{color:inherit}
+  @media (min-width:768px){ .au__hdr.apphdr{padding-left:var(--sp-8);padding-right:var(--sp-8)} .au__hero{padding-left:var(--sp-8);padding-right:var(--sp-8)} }
+  @media (min-width:1024px){ .au__hdr.apphdr{padding-left:var(--sp-10);padding-right:var(--sp-10)} .au__hero{padding-left:var(--sp-10);padding-right:var(--sp-10)}
+    .au{max-width:1100px} .au__two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--sp-10);align-items:start} }
+</style>`;
+
 export function render() {
-  const html = `
-  <header class="hdr on-plum" style="border-radius:0 0 var(--r-xl) var(--r-xl)">
-    <div class="wrap inner">
-      <button class="btn btn--ghost tap" data-act="nav.home" aria-label="Back">←</button>
-      <div class="grow" style="text-align:center">${mark(34, { glow: false })}</div>
-      <span style="width:44px"></span>
-    </div>
-    <div class="wrap" style="text-align:center;padding-bottom:8px">
-      <div class="wordmark" style="font-size:22px">SAAHAA</div>
-      <p class="micro muted" style="letter-spacing:.14em;margin-top:4px">TOGETHER, WE ELEVATE LIFE</p>
-    </div>
+  const html = `${authCSS}
+  <header class="apphdr au__hdr">
+    <button class="btn btn-ghost tap" style="min-width:44px" data-act="nav.home" aria-label="Back">${icon('back', { size: 18 })}</button>
+    <div class="grow"><span class="wordmark">SAAHAA</span></div>
+    <button class="btn btn-ghost" data-act="auth.tab" data-tab="${tab === 'login' ? 'signup' : 'login'}">${tab === 'login' ? 'Create account' : 'Sign in'}</button>
   </header>
 
-  <main class="wrap" style="max-width:560px">
-    <div class="chiprow" style="margin:var(--sp-7) 0">
-      <button class="chip ${tab === 'login' ? 'on' : ''}" data-act="auth.tab" data-tab="login">Sign in</button>
-      <button class="chip ${tab === 'signup' ? 'on' : ''}" data-act="auth.tab" data-tab="signup">Create account</button>
-    </div>
+  ${tab === 'signup' ? `<div class="au__hero">
+    <span class="wm">SAAHAA</span>
+    <h1>Together,<br>we elevate life</h1>
+    <p>One circle for every service and every shop in your neighbourhood.</p>
+  </div>` : ''}
 
+  <main class="wrap au" style="padding-top:0">
     ${tab === 'login' ? loginForm() : signupForm()}
 
-    <div style="text-align:center;margin-top:var(--sp-7)">
-      <button class="btn btn--ghost btn--sm" data-act="nav.admin">Owner? Admin console</button>
+    <div class="au__links">
+      <button class="btn btn-ghost btn--sm" style="padding:0" data-act="nav.admin">Owner? Admin console</button>
+      <a href="#/legal/terms">Terms</a>
+      <a href="#/legal/privacy">Privacy</a>
+      <a href="#/legal/refunds">Refunds</a>
+      <a href="#/legal/contact">Contact</a>
+      <a href="#/legal/about">About</a>
     </div>
-    <p class="micro muted" style="text-align:center;margin-top:var(--sp-5)">
-      <a class="micro muted" href="#/legal/terms">Terms</a> ·
-      <a class="micro muted" href="#/legal/privacy">Privacy</a> ·
-      <a class="micro muted" href="#/legal/refunds">Refunds</a> ·
-      <a class="micro muted" href="#/legal/contact">Contact</a> ·
-      <a class="micro muted" href="#/legal/about">About</a>
-    </p>
-    <div style="height:60px"></div>
+    <div style="height:40px"></div>
   </main>`;
   // the map lives in the markup we just built, so it can only be created once
   // the shell has mounted it
@@ -94,13 +123,36 @@ export function render() {
 
 function loginForm() {
   return `
-  <div class="field"><input id="lgMobile" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel"><label>10-digit mobile</label></div>
-  <div class="field"><input id="lgPass" type="password" placeholder=" " autocomplete="current-password"><label>Password</label></div>
-  <!-- Sign-in is mobile + password. This field is retired, not renamed: the id
-       stays so the UI contract guard can see it was not silently dropped. -->
-  <button class="btn btn--primary btn--lg btn--block" data-act="auth.login">Sign in</button>
-  <p class="micro muted" style="text-align:center;margin-top:12px">
-    Your number is your account. Nothing else to remember.</p>`;
+  <div class="au__step" style="border-top:0"><b>Sign in</b><span>Your number is your account</span></div>
+  <div class="au__form">
+    <div class="field"><input id="lgMobile" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel"><label>10-digit mobile</label></div>
+    <div class="field"><input id="lgPass" type="password" placeholder=" " autocomplete="current-password"><label>Password</label></div>
+    <!-- Sign-in is mobile + password. This field is retired, not renamed: the id
+         stays so the UI contract guard can see it was not silently dropped. -->
+  </div>
+  <div class="au__foot"><button class="btn btn-primary btn--lg" data-act="auth.login">Sign in</button>
+    <p class="micro muted" style="margin-top:10px">Nothing else to remember. New here? <button class="more" data-act="auth.tab" data-tab="signup">Create an account</button></p></div>`;
+}
+
+/* ── which side are you on ────────────────────────────────────
+   Three rows, one honest line each, then the cost lines. Every number is
+   read from the engine, never typed here. */
+function sideRows() {
+  const pct = Math.round(liveMarkup() * 100);
+  const P = getPricing();
+  const rows = [
+    ['customer', 'I need something done', 'Find pros and shops near you. Always free — no markup on their prices.'],
+    ['partner',  'I offer a service',     `Quote jobs, keep 100% of your price. SAAHAA's ${pct}% is added on top and paid by the customer.`],
+    ['shop',     'I run a shop',          `A storefront with your stock, live today. ${P.retailTakePct}% an order, capped at ${M.fmt(P.retailTakeCapPaise)}. No yearly plan.`],
+  ];
+  return `<div>
+    ${rows.map(([r, t, s]) => `<button class="au__side tap" type="button" aria-pressed="${role === r ? 'true' : 'false'}" data-act="auth.role" data-role="${r}"><b>${esc(t)}</b><span>${esc(s)}</span></button>`).join('')}
+    <div style="padding:10px 0 4px">
+      <div class="au__cost"><span class="muted">Cost to list</span><strong>₹0</strong></div>
+      <div class="au__cost"><span class="muted">Cost per order</span><strong>${role === 'shop' ? `${P.retailTakePct}%, capped ${M.fmt(P.retailTakeCapPaise)}` : role === 'partner' ? `₹0 — the customer pays ${pct}% on top` : '₹0'}</strong></div>
+      <div class="au__cost"><span class="muted">Typical aggregator</span><strong class="em">${Math.round(AGG_COMMISSION * 100)}%</strong></div>
+    </div>
+  </div>`;
 }
 
 /* ── the place step ────────────────────────────────────────────
@@ -109,39 +161,30 @@ function loginForm() {
    real coordinates (match.AREA_GEO). */
 function placeStep() {
   return `
-  <div class="card" style="background:var(--surface-2);margin-bottom:var(--sp-6);padding:14px">
-    <p class="eyebrow">Where are you based?</p>
-    <p class="micro muted" style="margin-top:4px">Any street, town or city in the world. This is where
-      SAAHAA measures distance from — it is never shown to strangers as an address.</p>
-
-    <div class="search" style="margin-top:10px">
-      ${icon('search', { size: 18 })}
-      <input id="suPlaceQ" type="search" placeholder="Search a place — area, town or city"
-             aria-label="Search for your place">
-      <button class="btn btn--secondary btn--sm" data-act="auth.geocode">Search</button>
+  <div class="field">
+    <div>
+      <div class="search" style="margin-top:2px">
+        ${icon('search', { size: 18 })}
+        <input id="suPlaceQ" type="search" placeholder="Search a place — area, town or city"
+               aria-label="Search for your place">
+        <button class="btn btn-secondary btn--sm" data-act="auth.geocode">Search</button>
+      </div>
+      <div class="row" style="gap:8px;margin-top:8px">
+        <button class="btn btn-ghost btn--sm" style="padding-left:0" data-act="auth.locate">${icon('pin', { size: 14 })} Use my location</button>
+      </div>
+      <div id="suMap" class="au__map"></div>
+      <p class="micro muted" style="margin-top:6px">Drag the pin, or tap the map, to fix your exact spot. We use it to show you to people nearby — it is never shown as an address.</p>
+      <div id="suResults" class="chiprow" style="flex-wrap:wrap;gap:8px;margin-top:10px">${resultChips()}</div>
+      <p class="tiny" id="suPlaceLabel" style="margin-top:10px">${placeLine()}</p>
+      <span class="eyebrow" style="display:block;margin-top:12px">Or a Hyderabad area</span>
+      <div class="chiprow" style="flex-wrap:wrap;gap:6px;margin-top:6px">
+        ${AREA_NAMES.map(a => quickChip(a)).join('')}
+      </div>
+      <!-- the chosen place's short label, so every existing read of "area"
+           (search copy, matcher fallbacks, the pro's public page) still works -->
+      <input id="suArea" type="hidden" value="${esc(suPlace ? suPlace.label : '')}">
     </div>
-
-    <div class="row" style="gap:8px;margin-top:8px">
-      <button class="btn btn--ghost btn--sm" data-act="auth.locate">
-        ${icon('pin', { size: 14 })} Use my location</button>
-    </div>
-
-    <div id="suMap" style="height:200px;margin-top:10px;border-radius:var(--r-md);overflow:hidden;
-      border:1px solid var(--border);background:var(--surface-3)"></div>
-    <p class="micro muted" style="margin-top:6px">Drag the pin, or tap the map, to fix your exact spot.</p>
-
-    <div id="suResults" class="chiprow" style="flex-wrap:wrap;gap:8px;margin-top:10px">${resultChips()}</div>
-
-    <p class="tiny" id="suPlaceLabel" style="margin-top:10px">${placeLine()}</p>
-
-    <p class="eyebrow" style="margin-top:12px">Or a Hyderabad area</p>
-    <div class="chiprow" style="flex-wrap:wrap;gap:6px;margin-top:6px">
-      ${AREA_NAMES.map(a => quickChip(a)).join('')}
-    </div>
-
-    <!-- the chosen place's short label, so every existing read of "area"
-         (search copy, matcher fallbacks, the pro's public page) still works -->
-    <input id="suArea" type="hidden" value="${esc(suPlace ? suPlace.label : '')}">
+    <label>Where ${role === 'shop' ? 'the shop is' : 'you are based'}</label>
   </div>`;
 }
 
@@ -165,41 +208,44 @@ function placeLine() {
 }
 
 function signupForm() {
+  const pct = Math.round(liveMarkup() * 100);
+  const P = getPricing();
+  const title = role === 'shop' ? 'Your shop' : role === 'partner' ? 'Your trade' : 'Your account';
+  const step = role === 'shop' ? 'Setup · then add your stock' : role === 'partner' ? 'Setup · then 7 verification steps' : 'One step';
   return `
-  <div class="chiprow" style="margin-bottom:var(--sp-6)">
-    ${[['customer', `${icon('person', { size: 15 })} I need services`], ['partner', `${icon('repair', { size: 15 })} I do a trade`], ['shop', `${icon('kirana', { size: 15 })} I run a shop`]]
-      .map(([r, l]) => `<button class="chip ${role === r ? 'on' : ''}" data-act="auth.role" data-role="${r}" style="gap:7px">${l}</button>`).join('')}
-  </div>
+  <div class="au__two">
+    ${sideRows()}
+    <div>
+      <div class="au__step"><b>${title}</b><span>${step}</span></div>
+      <div class="au__form">
+        <div class="field"><input id="suName" placeholder=" " autocomplete="name"><label>${role === 'shop' ? 'Shop name' : 'Full name'}</label></div>
+        <div class="field"><input id="suMobile" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel"><label>10-digit mobile</label></div>
+        <div class="field"><input id="suPass" type="password" placeholder=" " autocomplete="new-password"><label>Create a password (8+ characters)</label></div>
 
-  <div class="field"><input id="suName" placeholder=" " autocomplete="name"><label>${role === 'shop' ? 'Shop name' : 'Full name'}</label></div>
-  <div class="field"><input id="suMobile" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel"><label>10-digit mobile</label></div>
-  <div class="field"><input id="suPass" type="password" placeholder=" " autocomplete="new-password"><label>Create a password</label></div>
-  <p class="micro muted" style="margin:-8px 0 16px">At least 8 characters.</p>
+        ${role === 'partner' ? `
+          <div class="field">
+            <select id="suCat">${svcCats().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
+            <label>What do you do?</label>
+          </div>
+          <div class="field"><input id="suAsk" inputmode="numeric" placeholder=" "><label>Your typical price (₹)</label></div>
+          <p class="micro muted" style="margin:-6px 0 14px">You keep <b>100%</b> of this. SAAHAA's ${pct}% is added on top of it, paid by the customer.</p>` : ''}
 
-  ${placeStep()}
+        ${role === 'shop' ? `
+          <div class="field">
+            <select id="suCat">${retCats().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
+            <label>What you sell</label>
+          </div>
+          <p class="micro muted" style="margin:-6px 0 14px">Next you pick your stock from our ready list — about six seconds an item. SAAHAA takes ${P.retailTakePct}% an order, capped at ${M.fmt(P.retailTakeCapPaise)}, never ${Math.round(AGG_COMMISSION * 100)}%.</p>` : ''}
 
-  ${role === 'partner' ? `
-    <div class="field">
-      <select id="suCat">${svcCats().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
-      <label>What do you do?</label>
+        ${placeStep()}
+      </div>
+      <div class="au__foot">
+        <button class="btn btn-primary btn--lg" data-act="auth.signup">
+          ${role === 'shop' ? 'Next — add your stock' : role === 'partner' ? 'Next — get verified' : 'Create my account'}</button>
+        <p class="micro muted" style="margin-top:10px">One account per mobile number. ₹0 to join, ever.</p>
+      </div>
     </div>
-    <div class="field"><input id="suAsk" inputmode="numeric" placeholder=" "><label>Your typical price (₹)</label></div>
-    <p class="tiny muted" style="margin:-4px 0 16px">
-      You keep <b>100%</b> of this. SAAHAA's ${Math.round(liveMarkup() * 100)}% is added on top of it, paid by the customer.</p>` : ''}
-
-  ${role === 'shop' ? `
-    <div class="field">
-      <select id="suCat">${retCats().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
-      <label>Shop type</label>
-    </div>
-    <p class="tiny muted" style="margin:-4px 0 16px">
-      Next you'll add products by tapping them from our ready-made list — about six seconds each.
-      SAAHAA takes 3–5%, not 25%.</p>` : ''}
-
-  <button class="btn btn--primary btn--lg btn--block" data-act="auth.signup">
-    Create ${role === 'shop' ? 'shop' : role} account</button>
-  <p class="micro muted" style="text-align:center;margin-top:12px">
-    One account per mobile number.</p>`;
+  </div>`;
 }
 
 /* ── the map, wired through ui/map.js and nothing else ────────── */
@@ -233,7 +279,7 @@ function paintMap() {
   mapH.clear();
   if (!suPlace) return;
   mapH.pin(suPlace.lat, suPlace.lng, {
-    color: '#E0B558', label: suPlace.label, draggable: true,
+    color: '#ec3013', label: suPlace.label, draggable: true,
     onMove: p => setPlaceFrom(p),
   });
   mapH.fit([[suPlace.lat, suPlace.lng]]);

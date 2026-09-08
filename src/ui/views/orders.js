@@ -1,13 +1,15 @@
 /* SAAHAA · ui/views/orders.js — order list, live tracker, OTP, evidence,
    chat and the 3-tap dispute.
 
-   OPEN CIRCLE · LIVING GLASS. One rule governs this screen: nobody should ever
-   have to hunt for the status. The current stage is the hero — named, timed,
-   and pinned above everything else — and the one thing you can do about it
-   sits immediately under it as a single command card. Everything behind that
-   (the bill, the messages, the history) folds away until asked for.
+   MODERNIST. The mockup's 1c "Order tracking": the order number and shop
+   line in the header, the map, the person-on-the-way line, the stepped
+   timeline with times, and the items / delivery / total block. The service
+   order carries the same hierarchy; the ratings panel is 1d "Ratings &
+   reviews". One rule governs this screen: nobody should ever have to hunt for
+   the status, and the one thing you can do about it sits right under it.
 
-   The stage labels are the machine's own. They are never renamed here. */
+   The stage labels are the machine's own. They are never renamed here. Every
+   rupee is the order's: deal, platformFee, gst, deliveryFee, customerPays. */
 
 import { mount, esc, sheet, closeSheet, toast, clockTime, timeAgo } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
@@ -19,7 +21,8 @@ import * as gmap from '../map.js';
 import * as flow from '../../domain/flow.js';
 import * as M from '../../core/money.js';
 import * as gateway from '../../core/gateway.js';
-import { header, emptyBlock } from './shops.js';
+import { getPricing } from '../../domain/settings.js';
+import { header, emptyBlock, SYS_CSS } from './shops.js';
 
 /* How the order was paid. EVERYONE PAYS SAAHAA: the wallet is drawn first
    and only the shortfall is collected through the gateway. Orders written
@@ -28,20 +31,19 @@ function paidWith(o) {
   if (o.paidFromWallet == null && o.collected == null) return 'Paid via UPI';
   const parts = [];
   if (o.paidFromWallet > 0) parts.push(`${M.fmt(o.paidFromWallet)} from wallet`);
-  if (o.collected > 0) parts.push(`${M.fmt(o.collected)} via ${gateway.label()}`);
+  if (o.collected > 0) parts.push(`${M.fmt(o.collected)} via ${gateway.label().split(' — ')[0]}`);
   return parts.length ? parts.join(' · ') : 'Nothing collected yet';
 }
 
+/* a short, readable order number: the tail of the engine's id */
+const orderNo = o => '#' + String(o.id || '').replace(/^ord[_-]?/i, '').slice(-6).toUpperCase();
+
 /* ══════════════ THE MAP ON A LIVE ORDER ════════════════════════
    "3 km away" is a number. A customer waiting at their door wants to know
-   WHERE — and a pro on the way wants to see the same picture, so neither of
-   them is describing a landmark down a phone line.
-
-   Customer gold, pro violet, shop teal — the same three colours the rest of
-   the product uses for those three people. The line between them is dashed
-   because it is a distance, not a route: we do not have turn-by-turn and we
-   will not draw a road we cannot promise. */
-const PIN = { customer: '#E0B558', partner: '#7C3AED', shop: '#14B8A6' };
+   WHERE — and a pro on the way wants to see the same picture. Customer in
+   the accent, the other side in ink. The line between them is dashed because
+   it is a distance, not a route. */
+const PIN = { customer: '#ec3013', partner: '#201e1d', shop: '#201e1d' };
 let openMapId = null;                 // which order has its map card open
 const maps = new Map();               // element id → { el, h }
 
@@ -73,19 +75,11 @@ function mapCard(o, { interactive = true, id = 'orderMap' } = {}) {
   const km = kmBetween(e.cust, e.them);
   const eta = etaMins(km);
   const plotted = !!(geoOf(e.cust) && geoOf(e.them));
-  return `<div class="card glass" style="padding:12px;margin-top:12px">
-    <div class="between" style="margin-bottom:8px">
-      <span class="eyebrow">On the map</span>
-      <span class="meta">${km} km apart · ~${eta} min</span>
-    </div>
-    <div id="${id}" style="height:220px;border-radius:var(--r-md);overflow:hidden;
-      border:1px solid var(--border);background:var(--surface-2)"></div>
-    <div class="row" style="gap:12px;margin-top:8px;flex-wrap:wrap">
-      <span class="micro muted"><b style="color:${PIN.customer}">●</b> You · ${esc(nameOf(e.cust))}</span>
-      <span class="micro muted"><b style="color:${e.colour}">●</b> ${esc(e.role)} · ${esc(nameOf(e.them))}</span>
-    </div>
-    ${plotted ? '' : `<p class="micro muted" style="margin-top:6px">
-      One of these is an area name with no coordinates yet, so the distance is an estimate.</p>`}
+  return `<div style="${interactive ? 'margin:0 calc(-1 * var(--gutter));' : ''}border-bottom:2px solid var(--color-text);position:relative">
+    <div id="${id}" style="height:${interactive ? 200 : 160}px;overflow:hidden;background:var(--surface-2)"></div>
+    <span style="position:absolute;left:12px;bottom:10px;background:var(--surface);border:2px solid var(--color-text);padding:5px 9px;font:800 10px/1 var(--font-heading);letter-spacing:.06em;text-transform:uppercase">${esc(e.name)} · ${km} km · ~${eta} min</span>
+    <span style="position:absolute;right:12px;top:10px;background:var(--color-accent);color:#fff;padding:5px 9px;font:800 10px/1 var(--font-heading);letter-spacing:.06em;text-transform:uppercase">You · ${esc(nameOf(e.cust))}</span>
+    ${plotted ? '' : `<p class="micro muted" style="padding:6px var(--gutter)">One of these is an area name with no coordinates yet, so the distance is an estimate.</p>`}
   </div>`;
 }
 
@@ -121,7 +115,7 @@ async function mountMap(orderId, id, interactive) {
   const pts = [];
   if (A) { h.pin(A.lat, A.lng, { color: PIN.customer, label: 'You', glyph: 'Y' }); pts.push([A.lat, A.lng]); }
   if (B) { h.pin(B.lat, B.lng, { color: e.colour, label: e.name, glyph: e.role[0] }); pts.push([B.lat, B.lng]); }
-  if (pts.length === 2) h.line(pts, { color: e.colour, dashed: true });
+  if (pts.length === 2) h.line(pts, { color: PIN.customer, dashed: true });
   h.fit(pts, 46);
   h.invalidate();
 }
@@ -135,9 +129,9 @@ function sweepMaps() {
   for (const [id, rec] of [...maps]) if (!document.body.contains(rec.el)) kill(id);
 }
 
-const TONE_BADGE = { ok:'badge--ok', info:'badge--info', warn:'badge--warn', bad:'badge--bad', soft:'badge--soft' };
-const TONE_PILL  = { ok:'pill--ok', info:'pill--info', warn:'pill--warn', bad:'pill--bad', soft:'pill--soft' };
+const TONE_TAG = { ok:'tag-neutral', info:'tag-neutral', warn:'tag-accent-2', bad:'tag-accent', soft:'' };
 
+/* ── the list ──────────────────────────────────────────────── */
 export function renderList() {
   sweepMaps();
   const list = myOrders();
@@ -151,63 +145,57 @@ export function renderList() {
   const liveList = list.filter(o => !isTerminal(o.stage));
   const past = list.filter(o => isTerminal(o.stage));
 
-  const row = o => {
+  const row = (o, live) => {
     const st = stage(o.stage);
     const cat = get('category', o.catId);
     const track = trackerFor(o.kind); const idx = trackerIndex(o);
-    const running = !isTerminal(o.stage);
-    return `<button class="cmd${running ? ' glass glass--deep' : ''}"
-        style="width:100%;text-align:left;margin:10px 0" data-act="order.open" data-id="${esc(o.id)}">
-      <div class="between">
-        <div class="grow">
-          <div class="row" style="gap:8px;align-items:center">
-            <span aria-hidden="true" style="display:inline-flex">${hasIcon(cat.id) ? icon(cat.id, { size: 18 }) : icon('box', { size: 18 })}</span>
-            ${running ? '<span class="pill pill--live">Live</span>' : ''}
-            <span class="pill ${TONE_PILL[st.tone] || 'pill--soft'}">${esc(st.short)}</span>
-          </div>
-          <b class="cmd__title">${esc(o.kind === 'service' ? cat.name : o.shopName)}</b>
-          <p class="cmd__sub">
-            ${esc(o.kind === 'service' ? o.partnerName : `${o.lines.length} items`)} · ${timeAgo(o.createdAt)}
-          </p>
-        </div>
-        <div style="text-align:right">
-          <span class="badge ${TONE_BADGE[st.tone] || 'badge--soft'}">${esc(st.short)}</span>
-          <b class="num" style="display:block;margin-top:6px">${M.fmt(o.customerPays)}</b>
+    const title = o.kind === 'service' ? `${cat.name}${o.sub ? ' · ' + o.sub : ''}` : `${o.lines.length} item${o.lines.length === 1 ? '' : 's'} from ${o.shopName}`;
+    const who = o.kind === 'service' ? o.partnerName : o.shopName;
+    return `<button class="m-row" data-act="order.open" data-id="${esc(o.id)}">
+      <span class="m-lead${live ? '' : ' m-lead--dim'}" aria-hidden="true"></span>
+      <div class="grow" style="min-width:0">
+        <div class="m-row__t">${esc(title)}</div>
+        <div class="m-row__m">${esc(who)} · ${esc(st.label.toLowerCase())}${live ? ` · step ${idx + 1} of ${track.length}` : ''} · ${timeAgo(o.createdAt)}</div>
+        <div class="m-row__tags">
+          <span class="tag ${TONE_TAG[st.tone] || ''}">${esc(st.short)}</span>
+          <span class="tag" style="background:transparent;border-color:var(--color-divider)">${orderNo(o)}</span>
         </div>
       </div>
-      <div class="mini-track" aria-hidden="true">${
-        track.map((_, i) => `<i class="${i < idx ? 'on' : i === idx ? 'on cur' : ''}"></i>`).join('')}</div>
+      <div class="m-row__r"><b class="num">${M.fmt(o.customerPays)}</b></div>
+      <span class="m-row__go" aria-hidden="true">→</span>
     </button>`;
   };
 
   return `${header('Your orders', `${list.length} total`)}
   <main class="wrap">
     ${liveList.length ? `<div class="sec rise">
-      <div class="hd"><h2 class="h-sec">Happening now</h2>
+      <div class="between" style="margin-bottom:4px"><p class="m-cap" style="margin:0">Happening now</p>
         <span class="meta">${liveList.length}</span></div>
-      ${liveList.map(row).join('')}</div>` : ''}
+      ${liveList.map(o => row(o, true)).join('')}</div>` : ''}
     ${past.length ? `<div class="sec rise rise-2">
-      <div class="hd"><h2 class="h-sec">${liveList.length ? 'Earlier' : 'All orders'}</h2>
+      <div class="between" style="margin-bottom:4px"><p class="m-cap" style="margin:0">${liveList.length ? 'Earlier' : 'All orders'}</p>
         <span class="meta">${past.length}</span></div>
-      ${past.map(row).join('')}</div>` : ''}
+      ${past.map(o => row(o, false)).join('')}</div>` : ''}
     <div style="height:40px"></div>
-  </main>`;
+  </main>${SYS_CSS}`;
 }
 
 /* ── the live timeline ─────────────────────────────────────────
    trackerFor() supplies the stages and their labels. This renders them and
    nothing else: no renaming, no collapsing, no inventing a step the machine
-   does not have. */
+   does not have. Done and current are filled squares; pending is an outline. */
 function timeline(o, track, idx) {
-  return `<ol class="timeline" aria-label="Progress">
+  const who = o.kind === 'service' ? o.partnerName : o.shopName;
+  return `<ol class="m-steps" aria-label="Progress">
     ${track.map((sg, i) => {
       const cls = i < idx ? 'done' : i === idx ? 'cur' : 'pend';
       const hit = (o.history || []).find(h => h.stage === sg.id);
-      return `<li class="timeline__node ${cls}"${i === idx ? ' aria-current="step"' : ''}>
-        <span class="timeline__dot" aria-hidden="true">${i < idx ? '✓' : i + 1}</span>
-        ${i < track.length - 1 ? '<span class="timeline__bar" aria-hidden="true"></span>' : ''}
-        <span class="timeline__label"><b>${esc(sg.label)}</b>
-          <span class="meta">${hit ? clockTime(hit.at) : i === idx ? 'now' : ''}</span></span>
+      const when = hit ? clockTime(hit.at) : i === idx ? 'now' : '';
+      const detail = i === 0 && who ? who : sg.owner === 'customer' ? 'yours to do' : sg.owner === 'system' ? 'SAAHAA' : '';
+      return `<li class="m-step ${cls}"${i === idx ? ' aria-current="step"' : ''}>
+        <span class="m-step__dot" aria-hidden="true"></span>
+        <span class="grow"><span class="m-step__t" style="display:block">${esc(sg.label)}</span>
+          <span class="m-step__m">${[when, detail].filter(Boolean).map(esc).join(' · ')}</span></span>
       </li>`;
     }).join('')}
   </ol>`;
@@ -231,6 +219,8 @@ export function renderDetail(orderId) {
      Coordinates are better and they are current. */
   const km = kmBetween(ends.cust, ends.them);
   const showMap = openMapId === o.id;
+  const who = o.kind === 'service' ? o.partnerName : o.shopName;
+  const placed = clockTime(o.createdAt);
 
   sweepMaps();
   setTimeout(() => {
@@ -238,153 +228,219 @@ export function renderDetail(orderId) {
     if (document.getElementById('jobMap')) mountMap(o.id, 'jobMap', false); else kill('jobMap');
   }, 0);
 
+  const pct = o.deal ? Math.round(((o.platformFee | 0) + (o.gst | 0)) / o.deal * 100) : 0;
+
   return `
-  ${header(o.kind === 'service' ? cat.name : o.shopName, st.label)}
+  ${header(`Order ${orderNo(o)}`, `${who} · placed ${placed}`)}
   <main class="wrap">
 
-    <!-- STATUS IS THE HERO. Nothing above it, nothing competing with it. -->
-    <div class="cmd glass glass--deep rise" style="margin-top:var(--sp-6)">
-      <div class="row" style="gap:8px;align-items:center">
-        ${running ? '<span class="pill pill--live">Live</span>' : ''}
-        <span class="pill ${TONE_PILL[st.tone] || 'pill--soft'}">${esc(st.short)}</span>
-        <span class="meta">Step ${idx + 1} of ${track.length}</span>
+    ${showMap ? mapCard(o) : ''}
+
+    <!-- STATUS IS THE HERO. The person on the way, the stage, the one thing to do. -->
+    <div class="row" style="gap:10px;padding:12px 0;border-bottom:2px solid var(--color-divider)">
+      <span class="thumb m-thumb" style="width:40px;height:40px" aria-hidden="true">${hasIcon(cat.id) ? icon(cat.id, { size: 18 }) : icon('box', { size: 18 })}</span>
+      <div class="grow" style="min-width:0">
+        <div style="font:800 13.5px/1.2 var(--font-heading)">${esc(who)} · ${esc(st.label.toLowerCase())}</div>
+        <div style="font-size:11px;color:var(--ink-3);margin-top:2px">${running
+          ? `${km} km away · ~${o.eta || etaMins(km)} min · step ${idx + 1} of ${track.length}`
+          : `${esc(st.short)} · ${timeAgo(o.createdAt)}`}</div>
       </div>
-      <b class="cmd__title h-display" style="display:block;margin-top:8px">${esc(st.label)}</b>
-      <p class="cmd__sub">${esc(o.kind === 'service' ? o.partnerName : o.shopName)}
-        · ${km} km · ${o.eta || etaMins(km)} min away</p>
-      <div class="row" style="gap:8px;margin-top:10px">
-        <button class="btn btn--secondary btn--sm" data-act="order.map" data-id="${esc(o.id)}"
-          aria-pressed="${showMap}">${icon('pin', { size: 14 })} ${showMap ? 'Hide map' : 'Map'}</button>
-      </div>
-      ${showMap ? mapCard(o) : ''}
-      <div class="capsules" style="margin-top:12px">
-        <span class="capsule capsule--gold"><span class="capsule__k">You pay${o.provisional ? ' (est.)' : ''}</span>
-          <span class="capsule__v num">${M.fmt(o.customerPays)}</span></span>
-        <span class="capsule capsule--soft"><span class="capsule__k">Placed</span>
-          <span class="capsule__v">${timeAgo(o.createdAt)}</span></span>
-        ${o.otp && running && isCustomer ? `<span class="capsule capsule--info"><span class="capsule__k">Your code</span>
-          <span class="capsule__v num">${esc(o.otp)}</span></span>` : ''}
-      </div>
-      <p class="micro muted" style="margin-top:8px">${esc(paidWith(o))}</p>
-      ${o.saved ? `<p class="tiny" style="margin-top:12px;color:var(--accent)">
-        ✦ You saved ${M.fmt(o.saved)} versus a commission app — and your pro was paid more.</p>` : ''}
+      <button class="btn btn--secondary btn--sm tap" data-act="order.map" data-id="${esc(o.id)}"
+        aria-pressed="${showMap}" style="font-size:11px;letter-spacing:.04em;min-height:44px">${showMap ? 'HIDE MAP' : 'MAP'}</button>
     </div>
 
-    <div class="ord-lay">
-      <div class="ord-lay__track">
-        <div class="sec rise rise-2"><div class="hd"><h2 class="h-sec">Progress</h2></div>
+    ${o.otp && running && isCustomer && o.stage !== 'ARRIVED' && o.stage !== 'R_PICKUP_READY' ? `
+      <div class="between" style="padding:9px 0;border-bottom:1px solid var(--color-divider)">
+        <span class="tiny muted">Your 4-digit code — share it only at the door</span>
+        <b class="num" style="font-size:17px;letter-spacing:.14em">${esc(o.otp)}</b></div>` : ''}
+
+    <div class="m-two">
+      <div>
+        <div class="sec">
+          <p class="m-cap">Progress</p>
           ${timeline(o, track, idx)}
         </div>
+
+        ${actionPanel(o, { isCustomer, isPartner, isShop })}
       </div>
 
-      <div class="ord-lay__side">
-        ${actionPanel(o, { isCustomer, isPartner, isShop })}
-
+      <div>
         ${o.kind === 'service' ? `
-          <div class="sec rise rise-3"><div class="hd"><h2 class="h-sec">Bill</h2></div>
-            <details class="expand card" open>
-              <summary class="between" style="cursor:pointer;list-style:none">
-                <b>Total${o.provisional ? ' (est.)' : ''}</b>
-                <b class="num" style="font-size:19px">${M.fmt(o.customerPays)}</b></summary>
-              <div class="rule" style="margin:12px 0"></div>
-              <div class="moneyflow">
-                ${billRow(esc(cat.name) + ' · ' + esc(o.sub || cat.unit), o.deal, false, 'state--released')}
-                ${billRow('Platform fee', o.platformFee, false, 'state--pending')}
-                ${billRow('GST @18% on the fee', o.gst, false, 'state--pending')}
-              </div>
-              <div class="rule" style="margin:10px 0"></div>
-              ${billRow('<b>You pay</b>', o.customerPays, true)}
-              <p class="micro muted" style="margin-top:10px">
-                ${esc(o.partnerName)} receives the full ${M.fmt(o.deal)}.
-                SAAHAA never takes a cut of their quote.
-              </p>
-            </details>
+          <div class="sec">
+            <p class="m-cap">The bill</p>
+            <div class="m-kv"><span>${esc(cat.name)} · ${esc(o.sub || cat.unit)} — ${esc(o.partnerName)}'s price</span><span class="num">${M.fmt(o.deal)}</span></div>
+            <div class="m-kv"><span class="muted">SAAHAA charge · ${pct}% on top</span><span class="num">${M.fmt(o.platformFee)}</span></div>
+            <div class="m-kv"><span class="muted">GST on that charge</span><span class="num">${M.fmt(o.gst)}</span></div>
+            <div class="m-kv m-kv--total"><span>You pay${o.provisional ? ' (est.)' : ''}</span><span class="num">${M.fmt(o.customerPays)}</span></div>
+            <p class="micro muted" style="margin-top:8px">${esc(paidWith(o))}. ${esc(o.partnerName)} receives the full ${M.fmt(o.deal)} —
+              SAAHAA holds it until you confirm the work and never takes a cut of their quote.</p>
+            ${o.saved ? `<p class="micro" style="margin-top:6px;color:var(--color-accent)">You saved ${M.fmt(o.saved)} against a commission app — and your pro was paid more.</p>` : ''}
           </div>` : `
-          <div class="sec rise rise-3"><div class="hd"><h2 class="h-sec">Items</h2></div>
-            <details class="expand card" open>
-              <summary class="between" style="cursor:pointer;list-style:none">
-                <b>${o.lines.length} item${o.lines.length === 1 ? '' : 's'}${o.provisional ? ' (est.)' : ''}</b>
-                <b class="num" style="font-size:19px">${M.fmt(o.customerPays)}</b></summary>
-              <div class="rule" style="margin:12px 0"></div>
-              <div class="moneyflow">
-                ${o.lines.map(l => billRow(`${esc(l.name)} × ${l.qty}${l.variableWeight ? ' (est.)' : ''}`,
-                                           l.unitPrice * l.qty)).join('')}
-                ${billRow('Delivery', o.deliveryFee, false, 'state--pending')}
-              </div>
-              <div class="rule" style="margin:10px 0"></div>
-              ${billRow('<b>Total</b>', o.customerPays, true)}
-            </details>
+          <div class="sec">
+            <p class="m-cap">${o.lines.length} item${o.lines.length === 1 ? '' : 's'}${o.provisional ? ' · est. until weighed' : ''}</p>
+            ${o.lines.map(l => `<div class="m-kv"><span>${esc(l.name)} × ${l.qty}${l.variableWeight ? ' (est.)' : ''}${
+              l.status === 'unavailable' ? ' <span class="tag tag-accent">refunded</span>' : l.status === 'substituted' ? ' <span class="tag tag-neutral">similar</span>' : ''}</span>
+              <span class="num">${M.fmt(l.unitPrice * l.qty)}</span></div>`).join('')}
+            <div class="m-kv"><span class="muted">Delivery${o.mode === 'pickup' ? ' · pickup' : ''}</span><span class="num">${o.deliveryFee ? M.fmt(o.deliveryFee) : 'Free'}</span></div>
+            <div class="m-kv m-kv--total"><span>Total${o.provisional ? ' (est.)' : ''}</span><span class="num">${M.fmt(o.customerPays)}</span></div>
+            <p class="micro muted" style="margin-top:8px">${esc(paidWith(o))}. Held by SAAHAA until you confirm the delivery; an item the shop could not supply comes back to your wallet.</p>
           </div>`}
 
-        <div class="sec rise rise-4"><div class="hd"><h2 class="h-sec">Messages</h2>
-          ${chats.length ? `<span class="meta">${chats.length}</span>` : ''}</div>
-          <div class="card" style="max-height:230px;overflow-y:auto">
-            ${chats.length ? chats.map(m => `<div style="margin-bottom:10px">
-              <b class="tiny">${esc(m.name)}</b> <span class="micro muted">${clockTime(m.ts)}</span>
-              <p class="tiny">${esc(m.text)}</p>
-              ${m.flagged ? '<p class="micro" style="color:var(--warn)">Contact details hidden — keep payments in SAAHAA.</p>' : ''}
+        <div class="sec">
+          <div class="between" style="margin-bottom:6px"><p class="m-cap" style="margin:0">Messages</p>
+            <button class="more tap" data-act="nav.chat" data-id="${esc(o.id)}"
+              style="min-height:44px;padding-inline:2px">${chats.length ? `Open all ${chats.length} →` : `Message ${esc((who || '').split(' ')[0])} →`}</button></div>
+          <div style="max-height:230px;overflow-y:auto;display:flex;flex-direction:column;gap:8px">
+            ${chats.length ? chats.slice(-4).map(m => `<div class="msg${s && m.name === s.name ? ' mine' : ''}">
+              <span class="micro" style="display:block;opacity:.7">${esc(m.name)} · ${clockTime(m.ts)}</span>
+              ${esc(m.text)}
+              ${m.flagged ? '<span class="micro" style="display:block;margin-top:4px;opacity:.8">Contact details hidden — keep payments in SAAHAA.</span>' : ''}
             </div>`).join('') : '<p class="tiny muted">No messages yet.</p>'}
           </div>
-          ${/* sendChat returns early with no session, so the composer silently did
-               nothing for a guest deep-linking an order. */
-            (isCustomer || isPartner || isShop) ? `
-          <div class="row" style="margin-top:10px">
-            <input id="chatIn" class="grow" placeholder="Type a message"
-              style="height:44px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--r-pill);
-                     background:var(--surface-2);color:var(--ink-1);font-size:15px">
-            <button class="btn btn--secondary" data-act="chat.send" data-id="${o.id}">Send</button>
+          ${(isCustomer || isPartner || isShop) ? `
+          <div class="row" style="margin-top:10px;gap:0;border:1px solid var(--color-divider)">
+            <input id="chatIn" class="grow" placeholder="Message"
+              style="height:44px;padding:0 12px;border:0;background:var(--surface);color:var(--ink-1);font-size:14px;min-width:0">
+            <button class="btn btn--primary" style="min-height:44px;padding-inline:14px" data-act="chat.send" data-id="${o.id}" aria-label="Send">↑</button>
           </div>` : '<p class="micro muted" style="margin-top:10px">Sign in to reply.</p>'}
         </div>
 
-        ${/* raiseDispute guards on canTransition, so at a stage with no DISPUTED
-              exit it created the dispute record and toasted "your money is frozen"
-              while leaving the order flowing — and admin's Resolve then failed on
-              the illegal transition. Offer the button only where it can act, and
-              only to someone with standing in the order. */
-          (isCustomer || isPartner || isShop) && canTransition(o.stage, 'DISPUTED') ? `
-        <button class="btn btn--ghost btn--block" style="margin-top:20px;color:var(--danger)"
+        ${(isCustomer || isPartner || isShop) && canTransition(o.stage, 'DISPUTED') ? `
+        <button class="btn btn--ghost btn--block" style="margin-top:12px;color:var(--danger)"
           data-act="dispute.open" data-id="${o.id}">Report an issue</button>` : ''}
       </div>
     </div>
     <div style="height:40px"></div>
-  </main>
-  <style>
-    .ord-lay{display:block}
-    @media (min-width:1024px){
-      .ord-lay{display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,1.5fr);
-        gap:var(--sp-6,18px);align-items:start}
-      .ord-lay__track{position:sticky;top:12px}
-      .ord-lay__side{min-width:0}
-    }
-  </style>`;
+  </main>${SYS_CSS}`;
 }
 
-/* Money never mixes. Each row can carry its own escrow state chip so the
-   customer's payment, the platform's fee and the pro's earnings are never
-   read as one undifferentiated number. */
-function billRow(label, paise, strong, state) {
-  return `<div class="between" style="margin-bottom:8px">
-    <span class="${strong ? '' : 'tiny muted'}">${label}${
-      state && !strong ? ` <span class="${state}"></span>` : ''}</span>
-    <b class="num" style="${strong ? 'font-size:19px' : 'font-size:14px'}">${M.fmt(paise || 0)}</b></div>`;
+/* ══════════════ 6 · CHAT WITH THE PRO ═══════════════════════════
+   The mockup's chat screen, on the engine's own thread. The header carries
+   who you are talking to and where the job has got to; the thread is grouped
+   by day; the JOB CONFIRMED card is the order itself, drawn from its stored
+   numbers so it can never disagree with the bill; the composer is the one
+   `chatIn` field app.js already reads.
+
+   flow.sendChat() masks phone numbers and UPI ids before the message is ever
+   stored. That masking is shown, never undone — the line under a masked
+   message says why, because a customer who cannot see the reason assumes a
+   bug rather than a rule. */
+
+const dayKey = ts => new Date(ts).toDateString();
+function dayLabel(ts) {
+  const k = dayKey(ts), today = dayKey(Date.now());
+  if (k === today) return 'Today';
+  if (k === dayKey(Date.now() - 86400000)) return 'Yesterday';
+  return new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
+
+/* what was agreed, in the order's own money — never a typed percentage */
+function jobCard(o, cat) {
+  const P = getPricing();
+  const title = o.kind === 'service'
+    ? `${cat.name}${o.sub ? ' · ' + o.sub : ''}`
+    : `${(o.lines || []).length} item${(o.lines || []).length === 1 ? '' : 's'} from ${o.shopName || ''}`;
+  const pct = o.deal ? Math.round(((o.platformFee | 0) + (o.gst | 0)) / o.deal * 100) : P.serviceMarkupPct;
+  return `<div class="ch-job">
+    <p class="m-cap" style="margin:0">Job confirmed</p>
+    <b>${esc(title)} · ${M.fmt(o.kind === 'service' ? o.deal : o.customerPays)}</b>
+    <p class="micro muted" style="margin:4px 0 0">${o.kind === 'service'
+      ? `${esc(o.partnerName || '')} keeps the full ${M.fmt(o.deal)}. You pay ${M.fmt(o.customerPays)} — SAAHAA's ${pct}% sits on top of the quote and is held until you confirm the work.`
+      : `You pay ${M.fmt(o.customerPays)}, held by SAAHAA until you confirm the delivery. SAAHAA's charge on a shop order comes out of the shop's side, not your basket.`}</p>
+  </div>`;
+}
+
+export function renderChat(orderId) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o) return renderList();
+  const s = me();
+  const cat = get('category', o.catId);
+  const st = stage(o.stage);
+  const who = (o.kind === 'service' ? o.partnerName : o.shopName) || 'SAAHAA';
+  const msgs = getState().chats[o.id] || [];
+  const isCustomer = !!(s && o.customerKey === s.key);
+  const isPartner = !!(s && s.role === 'partner' && getState().partners.some(p => p.userKey === s.key && p.id === o.partnerId));
+  const isShop = !!(s && s.role === 'shop' && getState().shops.some(x => x.ownerKey === s.key && x.id === o.shopId));
+  const canPost = isCustomer || isPartner || isShop;
+
+  /* a thread is read from the bottom */
+  setTimeout(() => { const el = document.getElementById('chatThread'); if (el) el.scrollTop = el.scrollHeight; }, 0);
+
+  let last = '';
+  const thread = msgs.map(m => {
+    const k = dayKey(m.ts);
+    const rule = k === last ? '' : `<div class="ch-day">${esc(dayLabel(m.ts))}</div>`;
+    last = k;
+    return `${rule}<div class="msg${s && m.name === s.name ? ' mine' : ''}">
+      <span class="micro" style="display:block;opacity:.7">${esc(m.name)} · ${clockTime(m.ts)}</span>
+      ${esc(m.text)}
+      ${m.flagged ? '<span class="micro" style="display:block;margin-top:4px;opacity:.85">Contact details hidden — keep the job and the payment inside SAAHAA and you are both covered.</span>' : ''}
+    </div>`;
+  }).join('');
+
+  return `${CHAT_CSS}
+  <header class="apphdr ch-hdr">
+    <button class="btn btn-ghost tap" style="min-width:44px" data-act="nav.back" aria-label="Back">${icon('back', { size: 18 })}</button>
+    <span class="thumb" style="width:34px;height:34px;display:grid;place-items:center;color:var(--ink-3)" aria-hidden="true">${
+      hasIcon(cat.id) ? icon(cat.id, { size: 16 }) : icon('chat', { size: 16 })}</span>
+    <div class="grow" style="min-width:0">
+      <div class="ch-who">${esc(who)}</div>
+      <div class="ch-state">${esc(st.label)} · ${M.fmt(o.kind === 'service' ? o.deal : o.customerPays)} · ${esc(clockTime(o.createdAt))}</div>
+    </div>
+    <button class="btn btn-secondary" style="flex:none" data-act="order.open" data-id="${esc(o.id)}">Order</button>
+  </header>
+
+  <main class="wrap ch-wrap">
+    <div id="chatThread" class="ch-thread">
+      ${jobCard(o, cat)}
+      ${thread || `<p class="tiny muted" style="text-align:center;margin:auto 0">No messages yet. Say what you need — ${esc(who.split(' ')[0])} sees it straight away.</p>`}
+    </div>
+
+    ${canPost ? `<div class="ch-bar">
+      <input id="chatIn" class="grow ch-in" placeholder="Message ${esc(who.split(' ')[0])}" aria-label="Message ${esc(who)}">
+      <button class="btn btn--primary ch-send" data-act="chat.send" data-id="${esc(o.id)}" aria-label="Send">↑</button>
+    </div>
+    <p class="micro muted ch-foot">Phone numbers and payment ids are hidden automatically. Keep the money in SAAHAA:
+      it is held until you confirm the work, and it is the only thing a dispute can be settled from.</p>`
+    : `<p class="micro muted ch-foot">${s ? 'This thread belongs to the customer and the pro on this order.' : 'Sign in to reply.'}</p>`}
+    <div style="height:20px"></div>
+  </main>${SYS_CSS}`;
+}
+
+const CHAT_CSS = `<style>
+  .ch-hdr .ch-who{font:800 14px/1.15 var(--font-heading);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ch-hdr .ch-state{font-size:10.5px;line-height:1.3;color:var(--color-accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ch-wrap{display:flex;flex-direction:column;padding-top:0}
+  .ch-thread{display:flex;flex-direction:column;gap:10px;min-height:52vh;
+    margin:0 calc(-1 * var(--gutter));padding:12px var(--gutter);background:var(--bg-sunken)}
+  .ch-thread .msg{background:var(--surface);border:1px solid var(--color-divider)}
+  .ch-thread .msg.mine{background:var(--color-text);color:var(--color-bg);border-color:var(--color-text)}
+  .ch-day{align-self:center;font:600 9.5px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);padding:2px 0}
+  .ch-job{align-self:stretch;border:2px solid var(--color-text);background:var(--surface);padding:10px}
+  .ch-job b{display:block;font:800 14px/1.25 var(--font-heading);margin-top:4px}
+  .ch-bar{position:sticky;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));z-index:var(--z-sticky);
+    display:flex;gap:0;margin-top:auto;border:2px solid var(--color-divider);background:var(--bg)}
+  .ch-in{min-height:44px;padding:0 12px;border:0;background:var(--surface);color:var(--ink-1);font-size:14px;min-width:0;
+    caret-color:var(--color-accent)}
+  .ch-send{min-height:44px;min-width:52px;padding-inline:14px;font:800 15px/1 var(--font-heading)}
+  .ch-foot{margin-top:10px}
+  @media (min-width:768px){ .ch-bar{bottom:0}
+    .ch-thread{min-height:58vh;margin:12px 0 0;padding:14px;border:1px solid var(--color-divider)} }
+  @media (min-width:1024px){ .ch-thread .msg{max-width:60%} }
+</style>`;
 
 /* the one panel that changes with role + stage — everything derived, no switch
    on a hard-coded id list */
 function actionPanel(o, r) {
   const s = o.stage;
   const B = (act, label, cls = 'btn--primary') =>
-    `<button class="btn ${cls} btn--lg btn--block cmd__action" data-act="${act}" data-id="${o.id}">${label}</button>`;
+    `<button class="btn ${cls} btn--lg btn--block" style="justify-content:flex-start" data-act="${act}" data-id="${o.id}">${label}</button>`;
 
   if (r.isPartner) {
-    // MATCHING -> ASSIGNED used to happen ONLY inside a 900ms setTimeout in
-    // bookService. A reload inside that window stranded the order forever with
-    // no legal move but cancel. The pro can now accept it themselves.
     if (s === 'MATCHING')    return panel('New job for you', B('stage.accept', 'Accept this job'));
     if (s === 'ASSIGNED')    return panel('Head to the customer', B('stage.enroute', 'Start travelling'));
     /* The pro is travelling to a place, not to a word. The same map the
-       customer is looking at, without the controls — a job card is not a place
-       to go exploring. */
+       customer is looking at, without the controls. */
     if (s === 'EN_ROUTE')    return panel('Arrived?',
       `${mapCard(o, { interactive: false, id: 'jobMap' })}
        <div style="height:12px"></div>${B('stage.arrived', "I've arrived")}`);
@@ -392,7 +448,7 @@ function actionPanel(o, r) {
       ${mapCard(o, { interactive: false, id: 'jobMap' })}
       <div style="height:12px"></div>
       <div class="otp-row" style="justify-content:center;margin-bottom:14px">
-        ${[0,1,2,3].map(i => `<input id="otp${i}" inputmode="numeric" maxlength="1" data-role="otp">`).join('')}
+        ${[0,1,2,3].map(i => `<input id="otp${i}" inputmode="numeric" maxlength="1" data-role="otp" class="input" style="width:56px">`).join('')}
       </div>${B('otp.submit', 'Verify & start work')}`);
     if (s === 'IN_PROGRESS') return panel('Photo evidence is required before payout', `
       ${o.stake ? `<p class="tiny" style="margin-bottom:10px"><span class="state state--held">${M.fmt(o.stake.need)} locked</span>
@@ -403,8 +459,6 @@ function actionPanel(o, r) {
       </div>
       <p class="tiny muted" style="margin-bottom:12px">${(o.evidence || []).length} photo(s) attached</p>
       ${(o.evidence || []).length
-        // markDone refuses without evidence anyway; an enabled button that only
-        // fails on tap teaches the pro nothing about why.
         ? B('stage.done', 'Mark work finished')
         : `<button class="btn btn--primary btn--lg btn--block" disabled
              style="opacity:.5;cursor:not-allowed">Add a photo first</button>`}`);
@@ -420,26 +474,28 @@ function actionPanel(o, r) {
     if (s === 'WORK_DONE') return panel('Work finished — confirm to release payment', `
       ${(o.evidence || []).length ? `<p class="tiny muted" style="margin-bottom:12px">
         ${(o.evidence || []).map(e => esc(e.label)).join(' · ')} photo attached</p>` : ''}
-      <div class="capsules" style="margin-bottom:12px">
-        <span class="capsule capsule--info"><span class="capsule__k">Held in escrow</span>
-          <span class="capsule__v num">${M.fmt(o.deal)}</span>
-          <span class="capsule__d state--held">not yet released</span></span>
-      </div>
+      <div class="m-kv" style="margin-bottom:10px"><span>Held by SAAHAA for ${esc(o.partnerName)}</span>
+        <span><b class="num">${M.fmt(o.deal)}</b> <span class="state state--held">not yet released</span></span></div>
       ${B('release.full', `Confirm & release ${M.fmt(o.deal)}`)}
       <button class="btn btn--ghost btn--block" style="margin-top:8px;color:var(--danger)"
         data-act="dispute.open" data-id="${o.id}">Something was wrong</button>`);
-    /* Every service order dead-ended at SETTLED: nothing in the app targeted
-       RATED, so partner/rate and review/add were never dispatched, trust
-       scores could never move on real work, and the admin's review moderation
-       list was permanently empty. This panel is the missing terminal step. */
-    if ((s === 'SETTLED' || s === 'PARTIAL') && !o.rated) return panel('How did it go?', `
-      <p class="tiny muted" style="margin-bottom:12px">Your rating is what decides who gets recommended next.</p>
-      <div class="row" style="gap:8px;justify-content:center">
-        ${[1,2,3,4,5].map(n => `<button class="btn btn--ghost" style="font-size:24px;padding:6px 10px"
-          data-act="rate.submit" data-id="${o.id}" data-stars="${n}" aria-label="${n} stars">★</button>`).join('')}
+    /* 1d RATINGS & REVIEWS. Tapping a star posts the rating; the engine stores
+       stars only, so there are no "what was good" chips and no text box —
+       a control that goes nowhere is not drawn. */
+    if ((s === 'SETTLED' || s === 'PARTIAL') && !o.rated) {
+      const cat = get('category', o.catId);
+      const done = (o.history || []).find(h => h.stage === 'WORK_DONE');
+      return panel('How did it go?', `
+      <div style="font:800 19px/1.2 var(--font-heading)">${esc(o.partnerName)} did ${esc((o.sub || cat.name).toLowerCase())} for ${M.fmt(o.deal)}</div>
+      <p class="tiny muted" style="margin-top:5px">${done ? `Finished ${timeAgo(done.at)}` : 'Paid & settled'} · your rating decides who gets recommended next.</p>
+      <div class="m-stars" style="margin-top:14px" role="group" aria-label="Rate from 1 to 5 stars">
+        ${[1,2,3,4,5].map(n => `<button data-act="rate.submit" data-id="${o.id}" data-stars="${n}" aria-label="${n} star${n === 1 ? '' : 's'}">★</button>`).join('')}
       </div>
-      <button class="btn btn--ghost btn--block btn--sm" style="margin-top:10px"
-        data-act="rate.skip" data-id="${o.id}">Skip</button>`);
+      <p class="micro muted" style="margin-top:6px">Tap a star to post your review.</p>
+      <div class="row" style="gap:8px;margin-top:14px">
+        <button class="btn btn--secondary" data-act="rate.skip" data-id="${o.id}">Skip</button>
+      </div>`);
+    }
     if (s === 'R_DELIVERED') return panel('Delivered — confirm', `${B('retail.settle', 'Confirm delivery')}
       <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--danger)"
         data-act="retail.return" data-id="${o.id}">Something was wrong — return this order</button>`);
@@ -448,7 +504,7 @@ function actionPanel(o, r) {
       <div style="text-align:center" class="num num-xl">${esc(o.otp)}</div>
       ${B('retail.collected', 'I have collected it')}`);
     if (s === 'R_SUB_PENDING') return panel('The shop needs your call', `
-      ${(o.lines || []).filter(l => l.status === 'asking').map(l => `<div class="card glass" style="padding:12px;margin-bottom:8px">
+      ${(o.lines || []).filter(l => l.status === 'asking').map(l => `<div class="card" style="padding:12px;margin-bottom:8px">
         <b class="tiny">${esc(l.name)}</b><p class="micro muted">${esc(l.qty)} × ${M.fmt(l.unitPrice)} · not in stock right now</p>
         <div class="row" style="gap:8px;margin-top:8px">
           <button class="btn btn--secondary btn--sm grow" data-act="retail.sub" data-id="${o.id}" data-line="${l.lineId}" data-choice="similar">Similar brand is fine</button>
@@ -462,15 +518,12 @@ function actionPanel(o, r) {
   }
 
   if (r.isShop) {
-    // Same stranding bug as MATCHING: R_PLACED -> R_ACCEPTED only ever
-    // happened in a 1100ms timer, and the shop console promises an accept step
-    // that did not exist.
     if (s === 'R_PLACED')   return panel('New order', B('stage.accept', 'Accept order'));
     if (s === 'R_ACCEPTED') return panel('Pack this order', B('stage.picking', 'Start packing'));
     if (s === 'R_PICKING')  return panel('Weigh and pack', `
       ${(o.lines || []).map(l => `<div class="between" style="padding:6px 0;border-bottom:1px solid var(--hairline)">
         <span class="tiny">${esc(l.name)} <span class="micro muted">× ${esc(l.qty)}</span>
-          ${l.status === 'unavailable' ? '<span class="pill pill--bad">Refunded</span>' : l.status === 'substituted' ? '<span class="pill pill--info">Similar</span>' : ''}</span>
+          ${l.status === 'unavailable' ? '<span class="tag tag-accent">Refunded</span>' : l.status === 'substituted' ? '<span class="tag tag-neutral">Similar</span>' : ''}</span>
         ${['unavailable', 'substituted'].includes(l.status) ? '' : `<button class="btn btn--ghost btn--sm" data-act="retail.out"
           data-id="${o.id}" data-line="${l.lineId}">Not in stock</button>`}</div>`).join('')}
       <div style="height:10px"></div>${B('stage.packed', 'Weighed & packed')}`);
@@ -485,25 +538,23 @@ function actionPanel(o, r) {
   }
   return '';
 }
-const panel = (title, body) => `<div class="sec rise rise-2"><div class="cmd glass glass--gold">
-  <p class="eyebrow">What happens next</p>
-  <b class="cmd__title" style="display:block;margin-bottom:12px">${esc(title)}</b>${body}</div></div>`;
+/* the "what happens next" block: a strong moment, so it is ink-inverted */
+const panel = (title, body) => `<div class="sec"><div class="on-plum" style="padding:14px">
+  <p class="m-cap" style="color:color-mix(in srgb,var(--color-bg) 70%,transparent)">What happens next</p>
+  <b style="display:block;font:800 17px/1.2 var(--font-heading);margin-bottom:12px">${esc(title)}</b>${body}</div></div>`;
 
 /* ── dispute: 3 taps ───────────────────────────────────────── */
 export function openDispute(orderId) {
   sheet('Report an issue', `
-    <p class="meta" style="margin-bottom:14px">Pick what went wrong. Your money freezes immediately.</p>
-    <div class="capsules" style="margin-bottom:14px">
-      <span class="capsule capsule--warn"><span class="capsule__k">Your money</span>
-        <span class="capsule__v state--held">frozen on tap</span></span>
-    </div>
+    <p class="tiny muted" style="margin-bottom:14px">Pick what went wrong. Your money freezes immediately.</p>
+    <p class="m-note" style="margin-bottom:14px">Your money is <b>frozen on tap</b> and stays with SAAHAA until the owner has read both sides.</p>
     <div class="chiprow" style="flex-wrap:wrap;gap:8px">
-      ${flow.DISPUTE_REASONS.map(r => `<button class="chip chip--smart" data-act="dispute.pick"
+      ${flow.DISPUTE_REASONS.map(r => `<button class="chip" data-act="dispute.pick"
         data-id="${orderId}" data-reason="${esc(r)}">${esc(r)}</button>`).join('')}
     </div>
     <p class="micro muted" style="margin-top:16px">
       Most issues are settled within 24 hours. If your pro never arrived and no start code was
-      entered, you are refunded in full automatically.</p>`);
+      entered, you are refunded in full automatically.</p>${SYS_CSS}`);
 }
 export function submitDispute(orderId, reason) {
   flow.raiseDispute(orderId, reason, '');
@@ -515,7 +566,6 @@ export function openCancel(orderId) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return;
   const rule = o.stage === 'MATCHING' ? 'BEFORE_ACCEPT' : o.stage === 'EN_ROUTE' ? 'EN_ROUTE' : 'AFTER_ACCEPT_2H';
-  const split = flow.money ? null : null;
   sheet('Cancel booking?', `
     <p>${rule === 'BEFORE_ACCEPT' ? 'No pro has accepted yet — you get a full refund.'
         : rule === 'EN_ROUTE' ? 'Your pro is already travelling. They keep a small travel compensation.'

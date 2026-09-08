@@ -2,6 +2,8 @@
    Everything else returns HTML strings. Swapping renderers later touches
    this file alone. */
 
+import { icon } from './icons.js';
+
 export const $  = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
@@ -85,7 +87,9 @@ export function toast(msg, tone = '') {
     document.body.appendChild(toastEl);
   }
   toastEl.textContent = msg;
-  toastEl.style.borderLeftColor = tone ? `var(--${tone})` : 'var(--accent)';
+  /* the tone is a CLASS, not an inline colour: tokens.css owns .toast.danger
+     and .toast.warn, and only it knows what red means in each theme. */
+  toastEl.className = `toast${tone ? ' ' + tone : ''}`;
   toastEl.setAttribute('role', tone === 'danger' ? 'alert' : 'status');
   toastEl.classList.add('on');
   clearTimeout(toastTimer);
@@ -96,9 +100,11 @@ export function toast(msg, tone = '') {
    createElement so nothing here is a string of markup. */
 export function stickyToast(title, body, onTap) {
   const el = document.createElement('button');
-  el.className = 'toast on';
+  /* .toast--sticky is the token that moves it to the TOP of the screen — the
+     bottom slot belongs to the tab bar, and this one waits for a tap. */
+  el.className = 'toast toast--sticky on';
   el.setAttribute('role', 'status');
-  el.style.cssText = 'pointer-events:auto;cursor:pointer;text-align:left;border-left-color:var(--accent)';
+  el.style.cssText = 'pointer-events:auto;text-align:left';
   const b = document.createElement('b'); b.textContent = title;
   const s = document.createElement('span'); s.style.cssText = 'display:block;opacity:.85'; s.textContent = body;
   el.append(b, s);
@@ -123,10 +129,14 @@ export function sheet(title, bodyHtml, opts = {}) {
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetEl.classList.contains('on')) closeSheet(); });
   }
   onClose = opts.onClose || null;
+  /* The sheet's own header: title on the left, close on the right, a 2px rule
+     under both. `shd` is kept for anything that looks it up; the flat system
+     gives it no shadow. */
   sheetEl.innerHTML = `<div class="grab"></div>
-    <div class="shd"><h3>${esc(title)}</h3>
-      <button class="btn btn--ghost tap" data-act="sheet.close" aria-label="Close">✕</button></div>
-    <div class="sbody">${bodyHtml}</div>`;
+    <div class="shd sheet__hd" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;box-shadow:none;border-bottom:2px solid var(--color-divider);margin-bottom:var(--sp-5)">
+      <h3 style="margin-bottom:var(--sp-4)">${esc(title)}</h3>
+      <button class="btn tap" data-act="sheet.close" aria-label="Close">${icon('cross', { size: 18 })}</button></div>
+    <div class="sbody" style="padding:0">${bodyHtml}</div>`;
   // The open is deferred a frame for the slide-in. A close arriving inside
   // that frame used to be undone by the pending callback, re-opening a sheet
   // the app had already dismissed — so the handle is cancellable.

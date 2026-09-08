@@ -6,10 +6,13 @@
    every number on them is READ from the engine, never typed here: the refund
    table is CANCEL_RULES, the charges are getPricing(), the company details
    are CONTACT, and the sandbox banner is gateway.isSandbox(). If the owner
-   pushes a new dial, the page changes with it; the page cannot lie. */
+   pushes a new dial, the page changes with it; the page cannot lie.
+
+   MODERNIST. A reading column in the system: the segmented page nav as
+   .seg, 2px rules between sections, h2 section heads, the table in .table. */
 
 import { esc } from '../dom.js';
-import { header } from './shops.js';
+import { header, SYS_CSS } from './shops.js';
 import * as gateway from '../../core/gateway.js';
 import { CONTACT } from '../../core/config.js';
 import { CANCEL_RULES } from '../../domain/pricing.js';
@@ -40,8 +43,8 @@ const ul = items => `<ul class="tiny lg-list">${items.map(i => `<li>${i}</li>`).
 
 /* the segmented nav: plain hash links, so it works with no JS at all */
 function nav(page) {
-  return `<nav class="seg lg-nav" aria-label="Legal pages">
-    ${PAGES.map(id => `<a class="seg__btn" href="#/legal/${id}"
+  return `<nav class="seg seg--block lg-nav" aria-label="Legal pages">
+    ${PAGES.map(id => `<a class="seg__btn${id === page ? ' on' : ''}" href="#/legal/${id}"
         ${id === page ? 'aria-current="page" aria-selected="true"' : ''}>${esc(SHORT[id])}</a>`).join('')}
   </nav>`;
 }
@@ -49,7 +52,7 @@ function nav(page) {
 /* the honest banner: shown only while the rail is the sandbox */
 function banner() {
   if (!gateway.isSandbox()) return '';
-  return `<p id="legalBanner" class="tiny lg-banner" role="status">
+  return `<p id="legalBanner" class="m-note lg-banner" role="status">
     <b>Payments are in sandbox:</b> no real money moves yet. (${esc(gateway.label())})
   </p>`;
 }
@@ -98,7 +101,7 @@ function terms() {
       'Interfere with the service, other users’ data or the ledger.',
     ])),
     sec('Disputes and suspension', p(`Raise a problem within 48 hours of the job from the order
-      screen (My SAAHAA → Needs you). The owner reads both sides and decides: a full release, a
+      screen (You → Needs you). The owner reads both sides and decides: a full release, a
       full refund, or a partial refund with the professional paid for the part that was done;
       SAAHAA’s own charge shrinks in the same proportion. An account that breaks these terms or is
       reasonably believed to be used for fraud may be suspended or removed; money already held for
@@ -137,7 +140,7 @@ function privacy() {
     sec('Third parties that necessarily receive something', ul([
       'Map tiles come from OpenStreetMap and place search from Nominatim. When you search a place, the text you typed and the coordinates you look at are sent to them. No order id or account detail goes with it.',
       'When the Razorpay rail is live, Razorpay receives what it needs to take a payment: the amount, an order reference, and whatever you type into its checkout. Until then, payments are a sandbox and nothing leaves this site.',
-      'Web fonts are loaded from Google Fonts, which sees your IP address as any font server would.',
+      'The typeface is served from this site; no font server sees your visit.',
     ])),
     sec('How long, and how to delete', p(`We keep account and order data for as long as the account
       exists, and ledger entries for as long as the law requires a business to keep its books.
@@ -162,11 +165,11 @@ function refunds() {
       r.credit ? `+ ${M.fmt(r.credit)} credit to you` : '',
       r.workerFee ? `${M.fmt(r.workerFee)} charged to the pro` : '',
     ].filter(Boolean).join(' · ');
-    return `<tr data-rule="${esc(id)}" style="border-top:1px solid var(--hairline)">
-      <td style="padding:8px">${esc(r.label)}</td>
-      <td class="num" style="padding:8px;text-align:right">${pctOf(r.refundPct)}</td>
-      <td class="num" style="padding:8px;text-align:right">${pctOf(r.workerPct)}</td>
-      <td class="muted" style="padding:8px">${esc(extra) || '—'}</td>
+    return `<tr data-rule="${esc(id)}">
+      <td>${esc(r.label)}</td>
+      <td class="num">${pctOf(r.refundPct)}</td>
+      <td class="num">${pctOf(r.workerPct)}</td>
+      <td class="muted">${esc(extra) || '—'}</td>
     </tr>`;
   }).join('');
   return [
@@ -174,13 +177,13 @@ function refunds() {
       share of what you paid; the professional’s share is a share of their quote. Whatever is left
       stays with SAAHAA as the cancellation charge. These rows are read from the same rules the
       app uses; they cannot differ from what you are actually refunded.`) +
-      `<div class="lg-tablewrap" style="overflow-x:auto">
-      <table id="refundTable" class="tiny" style="width:100%;border-collapse:collapse;min-width:420px">
+      `<div class="lg-tablewrap tablewrap">
+      <table id="refundTable" class="table tiny" style="min-width:420px">
         <thead><tr>
-          <th class="eyebrow" style="text-align:left;padding:8px">When</th>
-          <th class="eyebrow" style="text-align:right;padding:8px">Refund to you</th>
-          <th class="eyebrow" style="text-align:right;padding:8px">Pro keeps</th>
-          <th class="eyebrow" style="text-align:left;padding:8px">Also</th>
+          <th>When</th>
+          <th class="num">Refund to you</th>
+          <th class="num">Pro keeps</th>
+          <th>Also</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`),
@@ -196,7 +199,7 @@ function refunds() {
       within 5–7 working days; UPI refunds are usually faster. While payments are in sandbox,
       no real money has moved, so nothing real is refunded.`)),
     sec('Problems with finished work', p(`If the work was done badly or not at all, do not confirm
-      it. Raise a dispute from the order within 48 hours (My SAAHAA → Needs you). The owner
+      it. Raise a dispute from the order within 48 hours (You → Needs you). The owner
       reads both sides and decides on a full or partial refund. A partial refund pays the
       professional only for the part that was done, and SAAHAA’s own charge shrinks in the same
       proportion.`)),
@@ -210,7 +213,7 @@ function refunds() {
 function contact() {
   const row = (k, v) => `<div class="between lg-kv"><span class="muted">${esc(k)}</span><span id="ct-${k.toLowerCase().replace(/[^a-z]+/g, '-')}" style="text-align:right">${v}</span></div>`;
   return [
-    sec('The company', `<div class="card" style="padding:var(--sp-5) var(--sp-6)">
+    sec('The company', `<div class="lg-card">
       ${row('Legal name', value(CONTACT.legalName))}
       ${row('Email', CONTACT.email ? `<a href="mailto:${esc(CONTACT.email)}">${esc(CONTACT.email)}</a>` : value(''))}
       ${row('Phone', CONTACT.phone ? `<a href="tel:${esc(CONTACT.phone)}">${esc(CONTACT.phone)}</a>` : value(''))}
@@ -219,7 +222,7 @@ function contact() {
       ${row('City', value(CONTACT.city))}
     </div>` + p(`<span class="muted">A field marked “not yet set” is filled the day the entity is
       registered. We never print a placeholder value.</span>`)),
-    sec('A problem with an order', p(`Sign in and open <b>My SAAHAA → Needs you</b>. Every open
+    sec('A problem with an order', p(`Sign in and open <b>You → Needs you</b>. Every open
       order, dispute and refund is there, and that is where the owner sees it first. It is faster
       than email because it carries the order, the photos and the chat with it, so nothing has to
       be explained twice. Use it for a wrong charge, a professional who did not arrive, a shop that
@@ -285,31 +288,33 @@ export function render(page = 'terms') {
   <main class="wrap lg-page" id="legalPage" data-page="${id}">
     ${banner()}
     ${nav(id)}
+    <p class="card-kicker" style="margin-top:var(--sp-8)">Last updated ${esc(UPDATED)}</p>
     <h1 class="lg-h1">${esc(TITLES[id])}</h1>
-    <p class="micro muted">Last updated ${esc(UPDATED)}</p>
     ${BODY[id]()}
     <p class="micro muted lg-foot">
       ${PAGES.map(x => `<a class="micro muted" href="#/legal/${x}">${esc(SHORT[x])}</a>`).join(' · ')}
     </p>
     <div style="height:80px"></div>
   </main>
+  ${SYS_CSS}
   <style>
-    .lg-page{padding-bottom:var(--sp-9)}
-    .lg-banner{margin:var(--sp-6) 0 0;padding:10px 14px;border-radius:var(--r-md);
-      background:var(--warn-soft);color:var(--warn);border:1px solid transparent}
-    .lg-nav{display:flex;margin:var(--sp-6) 0 var(--sp-8);width:100%}
-    .lg-nav .seg__btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
-    .lg-h1{font-size:var(--fs-xl,24px);line-height:1.2;margin-bottom:var(--sp-2)}
-    .lg-sec{margin-top:var(--sp-8)}
-    .lg-sec h2{font-size:var(--fs-md,16px);margin-bottom:var(--sp-4)}
-    .lg-sec p,.lg-list li{color:var(--ink-2);overflow-wrap:anywhere}
+    .lg-page{padding-bottom:var(--sp-9);max-width:760px}
+    .lg-banner{margin:var(--sp-6) 0 0}
+    .lg-nav{display:flex;margin:var(--sp-6) 0 0;width:100%}
+    .lg-nav .seg__btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:inherit;flex:1;padding:9px 6px}
+    .lg-nav .seg__btn.on{color:#fff}
+    .lg-h1{font:800 var(--fs-2xl)/var(--lh-2xl) var(--font-heading);letter-spacing:-.015em;margin:4px 0 var(--sp-4)}
+    .lg-sec{margin-top:var(--sp-6);padding-top:var(--sp-6);border-top:2px solid var(--color-divider)}
+    .lg-sec h2{font:800 var(--fs-lg)/var(--lh-lg) var(--font-heading);margin-bottom:var(--sp-4)}
+    .lg-sec p,.lg-list li{color:var(--ink-2);overflow-wrap:anywhere;font-size:14px;line-height:1.55}
     .lg-sec p + p{margin-top:var(--sp-4)}
     .lg-list{margin:0;padding-left:1.2em}
     .lg-list li{margin:0 0 var(--sp-3)}
-    .lg-tablewrap{margin-top:var(--sp-5);border:1px solid var(--border);border-radius:var(--r-md)}
-    .lg-kv{gap:var(--sp-5);padding:6px 0;font-size:var(--fs-cap);overflow-wrap:anywhere}
-    .lg-kv + .lg-kv{border-top:1px solid var(--hairline)}
-    .lg-foot{margin-top:var(--sp-9);text-align:center}
+    .lg-tablewrap{margin-top:var(--sp-5)}
+    .lg-card{border-top:2px solid var(--color-divider);border-bottom:2px solid var(--color-divider);padding:var(--sp-3) 0}
+    .lg-kv{gap:var(--sp-5);padding:8px 0;font-size:13px;overflow-wrap:anywhere}
+    .lg-kv + .lg-kv{border-top:1px solid var(--color-divider)}
+    .lg-foot{margin-top:var(--sp-9)}
     .lg-foot a,.lg-sec a{color:var(--brand-text)}
   </style>`;
 }
