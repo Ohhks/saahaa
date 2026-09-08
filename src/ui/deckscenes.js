@@ -146,6 +146,10 @@ const SCENES = {
   async 'c13-track-map'(){ const { o } = await bookWithHero('plumbing'); flow.advance(o.id, 'EN_ROUTE'); ctx.go('order', o.id);
     await sleep(300); orders.toggleMap(o.id); await sleep(2500); scrollTo('#orderMap'); },
   async 'c15-wallet'() { login(CUSTOMER); await flow.customerTopUp(50000); ctx.go('account'); await sleep(400); scrollTo('[data-act="cwallet.topup"]'); },
+  async 'c16-nearby'() { login(CUSTOMER); ctx.go('nearby'); await sleep(2600); },
+  async 'c17-chat'()   { const { o, partner: pr } = await bookWithHero('plumbing'); flow.advance(o.id, 'EN_ROUTE');
+    flow.sendChat(o.id, 'On my way — about 10 minutes.'); await sleep(200);
+    login(CUSTOMER); flow.sendChat(o.id, 'Thanks. Gate code is 4471.'); ctx.go('chat', o.id); await sleep(600); },
   async 'c14-place'()  { login(CUSTOMER); ctx.go('home'); await sleep(300); home.openPlacePicker(); await sleep(2500); },
 
   /* ── partner ──────────────────────────────────────────────── */

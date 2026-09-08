@@ -2,7 +2,7 @@
   "title": "SAAHAA — how it works",
   "name": "How SAAHAA Works",
   "subtitle": "One circle for every service and every shop in your neighbourhood. Locally, professionally.",
-  "date": "v7.0.0 · Self-running · September 2026",
+  "date": "v8.0.0 · Modernist · September 2026",
   "sections": [
     {
       "id": "customer",
@@ -23,6 +23,16 @@
           "title": "Your place — anywhere in the world",
           "caption": "Search any address (OpenStreetMap), use the device's location, or drag the pin. Enrolment and service are no longer bounded by a list of Hyderabad areas; the old names still resolve.",
           "image": "docs/deck/c14-place.png"
+        },
+        {
+          "title": "The neighbourhood",
+          "caption": "The shops and pros around you as pins, not a list to scroll. Search re-centres the map; the filters move the pins and the rows together.",
+          "image": "docs/deck/c16-nearby.png"
+        },
+        {
+          "title": "The thread with your pro",
+          "caption": "The conversation an order already carried, given a screen: the job's own money in a confirmed-job card, and phone numbers and UPI ids masked by the platform, with the reason said out loud.",
+          "image": "docs/deck/c17-chat.png"
         },
         {
           "title": "Search is the front door",

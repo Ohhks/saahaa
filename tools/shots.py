@@ -41,7 +41,12 @@ if want:
     scenes = [s for s in scenes if any(s.startswith(w) for w in want)]
 
 def size(scene):
-    return (1440, 900) if (DESKTOP or scene.startswith('a')) else (390, 844)
+    # Chrome enforces a MINIMUM window width (~522 here): ask for 390 and it lays
+    # out at 504 CSS px and crops the image to 390, silently cutting the right of
+    # every phone screen (the five-tab bar came out with four). So shoot the phone
+    # at the floor and keep the phone's aspect — still the mobile layout, because
+    # the breakpoint is 768, just not a lie about its width.
+    return (1440, 900) if (DESKTOP or scene.startswith('a')) else (522, 1130)
 
 ok = 0
 for scene in scenes:
@@ -50,6 +55,10 @@ for scene in scenes:
     w, h = size(scene)
     out = os.path.join(DECK, scene + ('-d' if DESKTOP and not scene.startswith('a') else '') + '.png')
     cmd = [CHROME, '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--disable-extensions', '--force-prefers-reduced-motion',
+           # Pin the scale, or Windows' 125% display scaling leaks in: the page lays
+           # out ~487 CSS px wide and the 390 px image is a CROP of it (the 5-tab bar
+           # showed four tabs). One flag makes the capture the width it claims.
+           '--force-device-scale-factor=1',
            f'--window-size={w},{h}', '--virtual-time-budget=30000', f'--user-data-dir={prof}',
            f'--screenshot={out}', f'{URL}/?shot={scene}&demo=1']
     t = time.time()
