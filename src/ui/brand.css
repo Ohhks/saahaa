@@ -1,175 +1,75 @@
-/* SAAHAA · ui/brand.css — the welcome splash, the emblem's motion, pillars,
-   and the home hero band. Companion to tokens.css v3.0 "OPEN CIRCLE ·
-   LIVING GLASS"; every colour here comes from a token defined there.
+/* SAAHAA · ui/brand.css — the welcome splash, the emblem's motion, the
+   pillars. Companion to tokens.css v8.0 "MODERNIST": light ground, the
+   wordmark in Archivo 800, one red rule, no blur, no gradients. The screen is
+   interactive from 700ms. Every colour comes from a token in tokens.css.
 
-   Timeline follows the design ballot exactly: the screen is INTERACTIVE from
-   900ms even though it keeps settling until ~2050ms.
+   NAME COLLISION, HANDLED HERE: the splash trust markers have been
+   `.pillars > .pill` since v1 and `.pill` is also the global status chip;
+   `.pillars .pill` resets everything a status pill would bring. */
 
-   ONE NAME COLLISION, HANDLED HERE
-   The splash trust markers have been `.pillars > .pill` since v1. v3.0's
-   class contract also needs a global `.pill` status chip. `.pillars .pill`
-   (0,2,0) wins on every property it declares, but a status pill also brings
-   height, padding, background, border, radius, uppercase, and a ::before
-   dot — none of which `.pillars .pill` used to declare, so all seven would
-   have leaked into the splash. §"pillars" below therefore resets them
-   explicitly. Renaming was the other option and was rejected: four agents
-   are writing views against the contract right now, and `.pill` is the name
-   in the contract. */
-
-/* ── emblem ─────────────────────────────────────────────────── */
+/* ── emblem (the SVG mark keeps its draw-in; it is used small, in ink) ── */
 .mk{overflow:visible}
-.mk-glow{transform-origin:100px 100px}
-.mk--anim .mk-band{
-  stroke-dasharray:var(--circ,402) !important;stroke-dashoffset:var(--circ,402);
-  animation:mkdraw 700ms var(--ease-in-out) 120ms forwards}
+.mk-glow{display:none}
+.mk--anim .mk-band{stroke-dasharray:var(--circ,402) !important;stroke-dashoffset:var(--circ,402);animation:mkdraw 600ms var(--ease-in-out) 80ms forwards}
 @keyframes mkdraw{to{stroke-dashoffset:0}}
-/* the OUTER g keeps its SVG placement transform untouched; only the inner
-   wrapper is animated, so figures can never drift off the ring */
-.mk--anim .mk-figs > g > .figw{opacity:0;transform-origin:0 -8px;
-  animation:mkfig 260ms var(--ease-back) forwards}
-@keyframes mkfig{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:scale(1)}}
-.mk--anim .mk-core{opacity:0;animation:fadein 300ms var(--ease-emph) 900ms forwards}
-.mk--anim .mk-glow{opacity:0;animation:fadein 300ms linear 620ms forwards,mkbreath 4200ms var(--ease-in-out) 920ms infinite}
+.mk--anim .mk-figs > g > .figw{opacity:0;transform-origin:0 -8px;animation:mkfig 220ms var(--ease-std) forwards}
+@keyframes mkfig{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+.mk--anim .mk-core{opacity:0;animation:fadein 260ms var(--ease-emph) 700ms forwards}
 @keyframes fadein{to{opacity:1}}
-@keyframes mkbreath{0%,100%{opacity:.7}50%{opacity:1}}
-
-/* the figure stagger — 12 slots at 34ms */
-.mk--anim .mk-figs > g:nth-child(1) > .figw{animation-delay:200ms}
-.mk--anim .mk-figs > g:nth-child(2) > .figw{animation-delay:234ms}
-.mk--anim .mk-figs > g:nth-child(3) > .figw{animation-delay:268ms}
-.mk--anim .mk-figs > g:nth-child(4) > .figw{animation-delay:302ms}
-.mk--anim .mk-figs > g:nth-child(5) > .figw{animation-delay:336ms}
-.mk--anim .mk-figs > g:nth-child(6) > .figw{animation-delay:370ms}
-.mk--anim .mk-figs > g:nth-child(7) > .figw{animation-delay:404ms}
-.mk--anim .mk-figs > g:nth-child(8) > .figw{animation-delay:438ms}
-.mk--anim .mk-figs > g:nth-child(9) > .figw{animation-delay:472ms}
-.mk--anim .mk-figs > g:nth-child(10) > .figw{animation-delay:506ms}
-.mk--anim .mk-figs > g:nth-child(11) > .figw{animation-delay:540ms}
-.mk--anim .mk-figs > g:nth-child(12) > .figw{animation-delay:574ms}
+.mk--anim .mk-figs > g:nth-child(1) > .figw{animation-delay:160ms} .mk--anim .mk-figs > g:nth-child(2) > .figw{animation-delay:190ms}
+.mk--anim .mk-figs > g:nth-child(3) > .figw{animation-delay:220ms} .mk--anim .mk-figs > g:nth-child(4) > .figw{animation-delay:250ms}
+.mk--anim .mk-figs > g:nth-child(5) > .figw{animation-delay:280ms} .mk--anim .mk-figs > g:nth-child(6) > .figw{animation-delay:310ms}
+.mk--anim .mk-figs > g:nth-child(7) > .figw{animation-delay:340ms} .mk--anim .mk-figs > g:nth-child(8) > .figw{animation-delay:370ms}
+.mk--anim .mk-figs > g:nth-child(9) > .figw{animation-delay:400ms} .mk--anim .mk-figs > g:nth-child(10) > .figw{animation-delay:430ms}
+.mk--anim .mk-figs > g:nth-child(11) > .figw{animation-delay:460ms} .mk--anim .mk-figs > g:nth-child(12) > .figw{animation-delay:490ms}
 
 /* ── splash ─────────────────────────────────────────────────── */
-.splash{
-  position:fixed;inset:0;z-index:var(--z-splash);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:0;padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);
-  text-align:center;overflow:hidden;
-  animation:spbg 380ms var(--ease-emph) both;
-}
+.splash{position:fixed;inset:0;z-index:var(--z-splash);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);
+  text-align:center;overflow:hidden;background:var(--bg);color:var(--ink-1);animation:spbg 240ms var(--ease-emph) both}
 @keyframes spbg{from{opacity:0}to{opacity:1}}
-.splash::before{
-  content:"";position:absolute;inset:-10%;pointer-events:none;
-  background:radial-gradient(60% 45% at 50% 34%,rgba(212,162,74,.10),transparent 70%);
-  animation:spzoom 380ms var(--ease-emph) both}
-@keyframes spzoom{from{transform:scale(1.06)}to{transform:scale(1)}}
-.splash.out{animation:spout 320ms var(--ease-exit) forwards}
-@keyframes spout{to{opacity:0;transform:scale(1.045)}}
-
-.splash .sp-inner{position:relative;z-index:1;display:flex;flex-direction:column;
-  align-items:center;max-width:340px;width:100%}
-.splash .sp-mark{margin-bottom:28px;opacity:0;
-  animation:spmark 640ms var(--ease-emph) 260ms forwards}
-@keyframes spmark{from{opacity:0;transform:scale(.88) rotate(-6deg)}to{opacity:1;transform:none}}
-
-.splash .sp-wm{font-family:var(--font-display);font-weight:700;font-size:var(--fs-4xl);
-  line-height:var(--lh-4xl);text-transform:uppercase;
-  background:var(--gold-grad);-webkit-background-clip:text;background-clip:text;color:transparent;
-  letter-spacing:.42em;text-indent:.42em;filter:blur(6px);opacity:0;
-  animation:spwm 340ms var(--ease-emph) 840ms forwards}
-@keyframes spwm{to{opacity:1;letter-spacing:var(--ls-brand);text-indent:var(--ls-brand);filter:blur(0)}}
-
-.splash .sp-rule{display:flex;align-items:center;justify-content:center;gap:8px;
-  margin:10px 0;width:88px;opacity:0;animation:fadein 1ms 1120ms forwards}
-.splash .sp-rule i{height:1px;flex:1;background:linear-gradient(90deg,transparent,var(--gold-500));
-  transform:scaleX(0);transform-origin:right;animation:sprule 240ms var(--ease-emph) 1120ms forwards}
-.splash .sp-rule i + i{background:linear-gradient(90deg,var(--gold-500),transparent);transform-origin:left}
-.splash .sp-rule b{width:5px;height:5px;background:var(--gold-400);transform:rotate(45deg) scale(0);
-  animation:spdia 200ms var(--ease-back) 1280ms forwards}
+.splash.out{animation:spout 220ms var(--ease-exit) forwards}
+@keyframes spout{to{opacity:0}}
+.splash .sp-inner{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;max-width:352px;width:100%}
+.splash .sp-mark{margin-bottom:22px;opacity:0;animation:sprise 360ms var(--ease-emph) 120ms forwards;color:var(--ink-1)}
+.splash .sp-mark svg{width:72px;height:72px}
+.splash .sp-wm{font:800 56px/1 var(--font-heading);letter-spacing:.06em;text-indent:.06em;text-transform:uppercase;color:var(--ink-1);
+  opacity:0;animation:sprise 300ms var(--ease-emph) 360ms forwards}
+.splash .sp-rule{display:flex;align-items:center;justify-content:center;margin:14px 0 12px;width:120px;opacity:0;animation:fadein 1ms 560ms forwards}
+.splash .sp-rule i{height:3px;flex:1;background:var(--color-accent);transform:scaleX(0);transform-origin:left;animation:sprule 240ms var(--ease-emph) 560ms forwards}
+.splash .sp-rule i + i{transform-origin:right} .splash .sp-rule b{display:none}
 @keyframes sprule{to{transform:scaleX(1)}}
-@keyframes spdia{to{transform:rotate(45deg) scale(1)}}
+.splash .sp-tag{font:600 11px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);opacity:0;animation:sprise 240ms var(--ease-emph) 640ms forwards}
+@keyframes sprise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.splash .pillars{margin-top:36px}
+.splash .sp-cta{margin-top:40px;width:100%;max-width:300px;opacity:0;animation:sprise 240ms var(--ease-emph) 900ms forwards}
+.splash .sp-guest{margin-top:14px;background:none;border:0;color:var(--ink-3);font:600 13px/1 var(--font-body);text-decoration:underline;text-underline-offset:4px;
+  opacity:0;animation:fadein 200ms 1000ms forwards;padding:10px;min-height:44px}
+.splash .sp-credo{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 24px);font:800 10px/1 var(--font-body);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-3);opacity:0;animation:fadein 200ms 1000ms forwards}
+.splash .sp-ver{position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:16px;font-size:10px;color:var(--ink-4);letter-spacing:.06em}
 
-.splash .sp-tag{font-size:var(--fs-cap);letter-spacing:var(--ls-widest);text-transform:uppercase;
-  color:var(--ink-2);font-weight:var(--fw-semi);opacity:0;
-  animation:sprise 260ms var(--ease-emph) 1180ms forwards}
-@keyframes sprise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-
-.splash .pillars{margin-top:40px}
-.splash .sp-cta{margin-top:44px;width:100%;max-width:280px;opacity:0;
-  animation:sprise 280ms var(--ease-emph) 1720ms forwards}
-.splash .sp-guest{margin-top:14px;background:none;border:0;color:var(--ink-3);
-  font-size:13px;font-weight:var(--fw-semi);text-decoration:underline;text-underline-offset:4px;
-  opacity:0;animation:fadein 200ms 1860ms forwards;padding:8px}
-.splash .sp-credo{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 24px);
-  font-size:10px;letter-spacing:var(--ls-brand);text-transform:uppercase;color:var(--ink-4);
-  font-weight:var(--fw-bold);opacity:0;animation:fadein 200ms 1860ms forwards}
-.splash .sp-ver{position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:16px;
-  font-size:10px;color:var(--ink-4);letter-spacing:.06em}
-
-/* returning-visit flash — 900ms, no CTA */
-.splash--flash .sp-wm{animation:spwmf 360ms var(--ease-emph) 200ms forwards}
-@keyframes spwmf{to{opacity:.9;letter-spacing:var(--ls-brand);text-indent:var(--ls-brand);filter:blur(0)}}
-.splash--flash .sp-mark{animation:spmark 260ms var(--ease-emph) 0ms forwards}
-.splash--flash{animation:spbg 200ms linear both,spout 280ms var(--ease-exit) 620ms forwards}
+/* returning-visit flash — 700ms, no CTA */
+.splash--flash .sp-wm{animation:sprise 240ms var(--ease-emph) 80ms forwards}
+.splash--flash .sp-mark{animation:sprise 200ms var(--ease-emph) 0ms forwards}
+.splash--flash{animation:spbg 160ms linear both,spout 220ms var(--ease-exit) 520ms forwards}
 
 /* ── pillars ────────────────────────────────────────────────── */
 .pillars{display:flex;align-items:flex-start;justify-content:center;gap:6px;width:100%}
-/* the reset described in the header: everything a status .pill would bring */
-.pillars .pill{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;
-  height:auto;min-height:0;padding:0;background:none;border:0;border-radius:0;
-  color:inherit;font:inherit;letter-spacing:normal;text-transform:none;
-  white-space:normal;vertical-align:baseline;box-shadow:none;
-  opacity:0;animation:sprise 240ms var(--ease-emph) forwards}
-.pillars .pill::before{content:none;display:none}
-.splash .pillars .pill:nth-child(1){animation-delay:1360ms}
-.splash .pillars .pill:nth-child(2){animation-delay:1440ms}
-.splash .pillars .pill:nth-child(3){animation-delay:1520ms}
-.splash .pillars .pill:nth-child(4){animation-delay:1600ms}
-.splash .pillars .pill:nth-child(5){animation-delay:1680ms}
-.pillars .plbl{font-size:9px;letter-spacing:var(--ls-wider);text-transform:uppercase;
-  color:var(--ink-3);font-weight:var(--fw-bold);white-space:nowrap}
-.pillars--c{justify-content:flex-start;overflow-x:auto;scrollbar-width:none;
-  scroll-snap-type:x proximity;padding:2px 0;
-  /* fixed-width items must scroll, not widen the page: five pillars are wider
-     than a 360px phone and would otherwise force horizontal body scroll */
-  margin:0 calc(var(--gutter) * -1);padding-inline:var(--gutter)}
-.pillars--c::-webkit-scrollbar{display:none}
-.pillars--c .pill{opacity:1;animation:none;flex-direction:row;gap:6px;
-  padding:10px 12px;border:1px solid var(--accent-border);border-radius:var(--r-md);
-  flex:0 0 auto;background:transparent;scroll-snap-align:start}
-.pillars--c .plbl{font-size:10px}
+.pillars .pill{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:auto;min-height:0;padding:0;background:none;border:0;border-radius:0;
+  color:inherit;font:inherit;letter-spacing:normal;text-transform:none;white-space:normal;vertical-align:baseline;box-shadow:none;opacity:0;animation:sprise 220ms var(--ease-emph) forwards}
+.pillars .pill::before{display:none}
+.pillars .pill:nth-child(1){animation-delay:700ms} .pillars .pill:nth-child(2){animation-delay:740ms} .pillars .pill:nth-child(3){animation-delay:780ms}
+.pillars .pill:nth-child(4){animation-delay:820ms} .pillars .pill:nth-child(5){animation-delay:860ms}
+.pillars .pill .ic{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--color-text);color:var(--ink-1)}
+.pillars .pill .ic svg{width:16px;height:16px}
+.pillars .pill .lbl{font:600 9px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.pillars--c .pill .ic{border-color:var(--color-divider)}
 
-/* ── plum hero band used on the home screen ──────────────────
-   Kept under its original name so any view still emitting `.herostrip
-   .on-plum` renders correctly. New work should use `.hero` (tokens.css §18),
-   which is the deep-plum atmospheric surface; .herostrip is the bright-violet
-   band and is now the compact variant of the same idea. */
-.herostrip{margin:0 calc(var(--gutter) * -1);padding:var(--sp-7) var(--gutter) var(--sp-8);
-  border-radius:0 0 var(--r-2xl) var(--r-2xl);position:relative;overflow:hidden}
-/* the same implied open circle the .hero draws, at band scale */
-.herostrip::after{content:"";position:absolute;right:-70px;top:-80px;width:220px;height:220px;
-  border-radius:50%;pointer-events:none;border:1px solid rgba(255,244,216,.18)}
-.herostrip > *{position:relative;z-index:1}
-.herostrip .hs-mark{position:absolute;right:-30px;top:-24px;opacity:.10;pointer-events:none;z-index:0}
-.herostrip h1{font-size:var(--fs-xl);line-height:var(--lh-xl);margin-bottom:6px}
-.herostrip p{font-size:var(--fs-sm);color:var(--ink-2);max-width:30ch}
-@media (min-width:768px){
-  .herostrip{margin:0;border-radius:var(--r-2xl);padding:var(--sp-8) var(--sp-9)}
-  .herostrip h1{font-size:var(--fs-2xl);line-height:var(--lh-2xl)}
+/* ── the home hero band ─────────────────────────────────────── */
+.herostrip{border-bottom:2px solid var(--color-divider)}
+
+@media (prefers-reduced-motion:reduce){
+  .splash *,.mk--anim *{animation-duration:.01ms!important;animation-delay:0ms!important}
+  .splash .sp-mark,.splash .sp-wm,.splash .sp-tag,.splash .sp-cta,.splash .sp-guest,.splash .sp-credo,.splash .sp-rule,.pillars .pill{opacity:1;transform:none}
 }
-
-/* ── splash on the deep ground ───────────────────────────────
-   The splash element already carries .on-plum, so it keeps that scope's
-   white/#FBE8B8 token set; only the GROUND changes, from the bright violet
-   band to the deep atmospheric plum. That is not cosmetic — it retires a
-   real contrast bug. `.sp-wm` paints the full metallic --gold-grad, whose
-   darkest stop is #B07F32. On violet-600 that stop measures 1.61 and the
-   bottom third of the letterforms genuinely vanished; on this ground it
-   measures 4.84, so the whole sweep is finally legible as drawn.
-   Everything else re-measured on the darkest stop #1B0B3A and on the
-   brightest bloom (#4F229E): white 18.9 → 10.2, #FBE8B8 14.3 → 8.4,
-   #C4B5FD 9.27 → 5.30. All AA. */
-.splash{background:var(--plum-atmos)}
-.splash .sp-tag{color:var(--gold-200)}
-/* --plum-400 measured only 3.62 against the bottom bloom, so the two quiet
-   lines at the foot of the screen step up one stop to --plum-300 */
-.splash .sp-guest,.splash .sp-credo{color:var(--plum-300)}
-.splash .pillars--c .pill{border-color:rgba(244,214,142,.34)}

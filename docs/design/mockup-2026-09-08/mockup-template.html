@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="fd2ac416-960c-4109-8695-87a31c2dd933"></script>
+
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics=""><meta name="design_doc_mode" content="canvas">
+<style>/* Modernist — design-system tokens and component classes. This file is the source of truth for the system's look; retune it here and see readme.md. */
+/* vietnamese */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("a0945f97-2d9b-4fc8-9636-01d4a1fb76e6") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("bfceaba4-9101-4abe-82cf-0f1396c2c97b") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("526703e9-da69-46b2-a022-76046165a8ad") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("a0945f97-2d9b-4fc8-9636-01d4a1fb76e6") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("bfceaba4-9101-4abe-82cf-0f1396c2c97b") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("526703e9-da69-46b2-a022-76046165a8ad") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 800;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("a0945f97-2d9b-4fc8-9636-01d4a1fb76e6") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 800;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("bfceaba4-9101-4abe-82cf-0f1396c2c97b") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 800;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("526703e9-da69-46b2-a022-76046165a8ad") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+
+:root {
+  --color-bg: #f3f2f2;
+  --color-surface: #eae9e9;
+  --color-text: #201e1d;
+  --color-accent: #ec3013;
+  --color-accent-2: #e15b47;
+  --color-divider: color-mix(in srgb, #201e1d 40%, transparent);
+
+  /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the
+     same step of any role matches the others in visual value. */
+  --color-neutral-100: #f8f4f4;
+  --color-neutral-200: #eae7e7;
+  --color-neutral-300: #d7d3d3;
+  --color-neutral-400: #bab6b6;
+  --color-neutral-500: #9b9797;
+  --color-neutral-600: #7d7979;
+  --color-neutral-700: #605d5d;
+  --color-neutral-800: #444141;
+  --color-neutral-900: #2d2b2b;
+
+  --color-accent-100: #fff2ef;
+  --color-accent-200: #ffe0d9;
+  --color-accent-300: #ffc4b8;
+  --color-accent-400: #ff9783;
+  --color-accent-500: #ff563c;
+  --color-accent-600: #dd2b0f;
+  --color-accent-700: #ae1800;
+  --color-accent-800: #7c1405;
+  --color-accent-900: #4d170e;
+
+  --color-accent-2-100: #fff2ef;
+  --color-accent-2-200: #ffe0da;
+  --color-accent-2-300: #ffc4b9;
+  --color-accent-2-400: #ff9784;
+  --color-accent-2-500: #ef6853;
+  --color-accent-2-600: #c94b39;
+  --color-accent-2-700: #9e3526;
+  --color-accent-2-800: #71261b;
+  --color-accent-2-900: #471d16;
+
+  --font-heading: "Archivo", system-ui, sans-serif;
+  --font-heading-weight: 800;
+  --font-body: "Archivo", system-ui, sans-serif;
+
+  --space-1: 4.0px;
+  --space-2: 8.0px;
+  --space-3: 12.0px;
+  --space-4: 16.0px;
+  --space-6: 24.0px;
+  --space-8: 32.0px;
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+
+  /* Elevation — derived from the ground: soft ink-tinted shadows on a
+     light theme, a hairline edge + ambient darkness on a dark one. */
+  --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+h1, h2, h3, h4 { font-family: var(--font-heading); font-weight: var(--font-heading-weight); }
+
+.grayscale{filter:grayscale(1) contrast(1.08)}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Components — built with the tokens above. Plain CSS
+   on plain HTML: no JavaScript, no build step. Each class is documented in
+   readme.md and demonstrated in foundations/ and components/.
+   ══════════════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-size: 15px; line-height: 1.55; font-weight: 400; }
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 var(--space-2);
+}
+h1 { font-size: 42px; }
+h2 { font-size: 32px; }
+h3 { font-size: 25px; }
+h4 { font-size: 20px; }
+h5 { font-size: 16px; }
+h6 { font-size: 13px; }
+h6 { letter-spacing: 0.08em; text-transform: uppercase; }
+p { margin: 0 0 var(--space-3); }
+a { color: var(--color-accent); text-underline-offset: 3px; }
+img { display: block; max-width: 100%; }
+figure { margin: 0; }
+figcaption {
+  font-size: 11px; margin-top: var(--space-1);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.text-muted { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+
+/* — rules — */
+.hr {
+  height: 2px; border: 0; margin: var(--space-4) 0;
+  background: var(--color-divider);
+}
+
+/* — buttons — */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  cursor: pointer; text-decoration: none;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 14px; line-height: 1.2; color: var(--color-text); /* matches the .input's 14px —
+     the pair sits side by side in sign-up rows */
+  background: transparent; border: 1px solid transparent;
+  padding: var(--space-2) calc(var(--space-3) * 1.2);
+  border-radius: var(--radius-md);
+}
+.btn svg { display: block; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--color-accent); color: var(--color-bg); }
+.btn-primary:hover { background: var(--color-accent-600); }
+.btn-primary:active { background: var(--color-accent-700); }
+.btn-secondary { border-color: var(--color-divider); }
+.btn-secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.btn-secondary:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+.btn-ghost { color: var(--color-accent); padding-inline: var(--space-1); }
+.btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.btn-ghost:active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
+.btn-icon { width: 36px; height: 36px; padding: 0; }
+.btn-block { width: 100%; margin-top: var(--space-2); justify-content: flex-start; text-align: left; }
+
+/* — forms — */
+.field > label {
+  display: block; font-size: 12px; margin-bottom: 5px;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.input {
+  width: 100%; min-height: 36px; padding: 6px 10px; font: inherit;
+  font-size: 14px; color: var(--color-text); caret-color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
+textarea.input { min-height: 90px; resize: vertical; }
+.radio { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
+.radio input, .seg-opt input {
+  position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
+}
+.radio .dot {
+  width: 16px; height: 16px; flex: none; border-radius: 50%;
+  border: 1.5px solid var(--color-divider);
+}
+.radio:hover .dot { border-color: var(--color-accent); }
+.radio input:checked + .dot {
+  border-color: var(--color-accent); background: var(--color-accent);
+  box-shadow: inset 0 0 0 4px var(--color-bg);
+}
+.radio input:focus-visible + .dot { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.seg {
+  display: inline-flex; overflow: hidden;
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.seg-opt {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; font-size: 13px; cursor: pointer;
+}
+.seg-opt + .seg-opt { border-left: 1px solid var(--color-divider); }
+.seg-opt:has(input:checked) { background: var(--color-accent); color: var(--color-bg); }
+.seg-opt:not(:has(input:checked)):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.seg-opt:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+
+/* — cards — */
+.card {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface);
+}
+.card-kicker { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent); }
+.card-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 17px; line-height: 1.2;
+}
+.card-body { margin: 0; font-size: 13px; opacity: 0.8; flex: 1; }
+.card-meta {
+  display: flex; align-items: center; gap: 6px; font-size: 11px;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+.elev-sm { box-shadow: var(--shadow-sm); }
+.elev-md { box-shadow: var(--shadow-md); }
+.elev-lg { box-shadow: var(--shadow-lg); }
+
+/* — tags — */
+.tag {
+  display: inline-flex; align-items: center; font-size: 11px;
+  letter-spacing: 0.02em; padding: 3px 10px;
+  border-radius: calc(var(--radius-md) * 0.75);
+}
+.tag-accent { background: var(--color-accent-100); color: var(--color-accent-800); }
+.tag-accent-2 { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
+.tag-neutral { background: var(--color-neutral-100); color: var(--color-neutral-800); }
+.tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
+
+/* — navigation — */
+.nav {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 2px solid var(--color-divider);
+}
+.nav-brand {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 18px; margin-right: auto;
+}
+.nav a { color: inherit; text-decoration: none; font-size: 14px; }
+.nav a:hover, .nav a[aria-current='page'] { color: var(--color-accent); }
+
+/* — tables — */
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th {
+  text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  padding: var(--space-2); border-bottom: 2px solid var(--color-divider);
+}
+.table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+}
+.table tbody tr:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
+
+/* — dialog — */
+.dialog-backdrop {
+  position: fixed; inset: 0; display: grid; place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-neutral-900) 50%, transparent);
+}
+.dialog {
+  width: min(440px, 100%); display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4); border-radius: var(--radius-lg);
+  background: var(--color-surface); box-shadow: var(--shadow-lg);
+}
+.dialog-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 20px;
+}
+.dialog-body { font-size: 14px; opacity: 0.85; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
+
+</style>
+<script src="1bb05229-b14c-4b70-8ede-d6ff4aca4561"></script>
+<style>
+body{margin:0;background:var(--color-bg)}
+a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
+.dv-turn{padding:40px 44px 32px;border-bottom:2px solid var(--color-divider);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:var(--color-text);color:var(--color-bg);text-decoration:none}
+.dv-tname{font:800 13px/1.2 var(--font-heading);letter-spacing:.04em;text-transform:uppercase}
+.dv-opts{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:color-mix(in srgb,var(--color-text) 10%,transparent);color:var(--color-text);text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11.5px/1.3 var(--font-body);color:color-mix(in srgb,var(--color-text) 60%,transparent)}
+.dv-opt:target .dv-oid{background:var(--color-accent);color:var(--color-bg)}
+.dv-next{margin:24px 0 0;font:12px/1.6 var(--font-body);color:color-mix(in srgb,var(--color-text) 55%,transparent)}
+.screens{display:flex;gap:18px;align-items:flex-start}
+.scr{display:flex;flex-direction:column;gap:7px}
+.cap{margin:0;font:600 9.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 50%,transparent)}
+.ph{width:352px;height:740px;background:#fff;border:2px solid var(--color-text);display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-md);font-family:var(--font-body);font-size:13px;color:var(--color-text)}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;font:600 9.5px/1 var(--font-body);letter-spacing:.08em;background:var(--color-text);color:var(--color-bg)}
+.phbody{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.apphdr{display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:2px solid var(--color-divider)}
+.sec{padding:12px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:10px;padding:11px 12px;border-bottom:1px solid var(--color-divider);align-items:flex-start}
+.thumb{width:52px;height:52px;flex:none;background:var(--color-neutral-300);border:1px solid var(--color-divider)}
+.tabbar{display:grid;grid-template-columns:repeat(5,1fr);border-top:2px solid var(--color-divider);background:var(--color-neutral-100)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 0 11px;font:600 8.5px/1 var(--font-body);letter-spacing:.07em;color:var(--color-neutral-600)}
+.tab[data-on]{color:var(--color-accent)}
+.tab svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7}
+.brief{padding:44px;max-width:1100px}
+.brief h1{font-size:48px;margin:0 0 6px}
+.brief h3{margin-top:28px}
+.brief p{max-width:64ch;font-size:14.5px}
+.brief li{font-size:14.5px;margin-bottom:6px;max-width:64ch}
+</style></helmet>
+
+<section class="brief">
+<div style="display:flex;align-items:baseline;gap:14px">
+<h1>SAAHAA</h1>
+<span style="font:800 12px/1 var(--font-heading);letter-spacing:.18em;color:var(--color-accent)">TOGETHER, WE ELEVATE LIFE</span>
+</div>
+<hr class="hr">
+<h3>What I understood</h3>
+<p>Every small shop and independent pro has to hand a large slice of each order to an aggregator, or pay a developer and a yearly plan to be online at all. SAAHAA puts them online for free and charges only when an order lands — roughly a seventh of what running a conventional storefront costs. One circle: customers, service pros, and neighbourhood shops.</p>
+<h3>Assumptions I made</h3>
+<ul>
+<li>Mobile-first product. Every app screen here is drawn at 352×740 — a real phone canvas, 44px minimum touch targets.</li>
+<li>Two supply sides in one app, one shell: <strong>Pro</strong> (quotes jobs, e.g. an electrician) and <strong>Shop</strong> (sells stock, e.g. a hardware store). Customers see both in one feed.</li>
+<li>International audience, so copy is plain English, currency shown as a neutral symbol, and no market-specific payment rails are assumed.</li>
+<li>Copy is written by me and plausible — replace it with your real strings before this goes anywhere near build.</li>
+</ul>
+<h3>Design context</h3>
+<p>Built on the <strong>Modernist</strong> system bound to this project: Archivo throughout, one red accent on a light ground, zero corner radius, 2px rules doing the organising. Note the tension with your logo, which is deep purple and gold — that's a luxury register, this is a utilitarian one. I've kept the system, because it's the attached one, and because a flat high-contrast interface is the right call for shopkeepers on cheap phones in bad light. Say the word and I'll explore a purple/gold variant.</p>
+<p>The live site renders through JavaScript, and the codebase folder you attached isn't reachable from my side, so these screens are drawn from your brief rather than from your existing UI. If you can paste screenshots of the current app I'll match its structure.</p>
+<h3>What follows</h3>
+<p><a href="#1a">1a</a>, <a href="#1b">1b</a> and <a href="#1c">1c</a> are three navigation models for the customer app — the one decision that changes everything downstream. Then <a href="#1d">1d</a> the customer flow end to end, <a href="#1e">1e</a> the pro app, <a href="#1f">1f</a> the shop dashboard, <a href="#1g">1g</a> onboarding, and <a href="#1h">1h</a> the public landing page.</p>
+</section>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Navigation models — customer app</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Bottom tabs — the by-the-book model. Five destinations, browse-led.</div>
+<div class="screens">
+
+<div class="scr"><p class="cap">Home</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="flex:1"><div style="font:800 17px/1 var(--font-heading)">Kondapur</div><div style="font-size:11px;color:var(--color-neutral-600)">42 pros · 118 shops nearby</div></div><div style="width:36px;height:36px;border:1px solid var(--color-divider);display:grid;place-items:center;font:800 12px var(--font-heading)">KM</div></div>
+<div style="padding:12px;border-bottom:2px solid var(--color-divider)"><div style="display:flex;border:1px solid var(--color-divider)"><div style="flex:1;padding:10px 12px;font-size:13px;color:var(--color-neutral-600)">Search a service or shop</div><div style="width:44px;background:var(--color-accent);color:#fff;display:grid;place-items:center;font:800 13px var(--font-heading)">⌕</div></div></div>
+<div class="sec" style="border-bottom:2px solid var(--color-divider)">
+<p class="cap">Need it done today</p>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+<div style="border:1px solid var(--color-divider);padding:10px 8px;font:600 11px/1.3 var(--font-body)">Electrician</div>
+<div style="border:1px solid var(--color-divider);padding:10px 8px;font:600 11px/1.3 var(--font-body)">Plumber</div>
+<div style="border:1px solid var(--color-divider);padding:10px 8px;font:600 11px/1.3 var(--font-body)">Cleaning</div>
+<div style="border:1px solid var(--color-divider);padding:10px 8px;font:600 11px/1.3 var(--font-body)">Groceries</div>
+<div style="border:1px solid var(--color-divider);padding:10px 8px;font:600 11px/1.3 var(--font-body)">Tailor</div>
+<div style="border:1px solid var(--color-divider);padding:10px 8px;font:600 11px/1.3 var(--font-body)">Repairs</div>
+</div>
+</div>
+<div style="padding:12px 12px 6px"><p class="cap">Open now</p></div>
+<div class="row"><div class="thumb"></div><div style="flex:1"><div style="font:800 14px/1.2 var(--font-heading)">Rao Electricals</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin:3px 0 6px">Wiring, fans, inverters · 0.8 km</div><div style="display:flex;gap:6px"><span class="tag tag-accent">4.9 ★</span><span class="tag tag-neutral">Free quote</span></div></div></div>
+<div class="row"><div class="thumb"></div><div style="flex:1"><div style="font:800 14px/1.2 var(--font-heading)">Sunrise Hardware</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin:3px 0 6px">1,240 items in stock · 1.2 km</div><div style="display:flex;gap:6px"><span class="tag tag-accent">4.7 ★</span><span class="tag tag-neutral">Delivers</span></div></div></div>
+<div class="row" style="border-bottom:0"><div class="thumb"></div><div style="flex:1"><div style="font:800 14px/1.2 var(--font-heading)">Meera Tailors</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin:3px 0 6px">Alterations, blouses · 0.4 km</div><div style="display:flex;gap:6px"><span class="tag tag-accent">5.0 ★</span><span class="tag tag-neutral">2-day</span></div></div></div>
+</div>
+<div class="tabbar">
+<div class="tab" data-on=""><svg sc-camel-view-box="0 0 24 24"><path d="M3 10 12 3l9 7v11H3z"></path></svg>Home</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="M16 16l5 5"></path></svg>Search</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>Orders</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"></path></svg>Chat</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg>You</div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Search &amp; filters</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="font:800 15px var(--font-heading)">←</div><div style="flex:1;border:1px solid var(--color-divider);padding:8px 10px;font-size:13px">electrician</div></div>
+<div style="display:flex;gap:6px;padding:10px 12px;overflow:hidden;border-bottom:1px solid var(--color-divider)">
+<span style="background:var(--color-accent);color:#fff;padding:5px 10px;font:600 11px var(--font-body);white-space:nowrap">Open now</span>
+<span style="border:1px solid var(--color-divider);padding:5px 10px;font:600 11px var(--font-body);white-space:nowrap">Under 2 km</span>
+<span style="border:1px solid var(--color-divider);padding:5px 10px;font:600 11px var(--font-body);white-space:nowrap">4.5+</span>
+<span style="border:1px solid var(--color-divider);padding:5px 10px;font:600 11px var(--font-body);white-space:nowrap">Price</span>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:2px solid var(--color-divider);font-size:11.5px;color:var(--color-neutral-600)"><span>23 pros in Kondapur</span><span style="font-weight:600;color:var(--color-text)">Nearest ▾</span></div>
+<div class="row"><div class="thumb"></div><div style="flex:1"><div style="font:800 14px/1.2 var(--font-heading)">Rao Electricals</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin:3px 0 6px">Visit fee waived · 0.8 km · 12 min</div><div style="display:flex;gap:6px"><span class="tag tag-accent">4.9 ★</span><span class="tag tag-neutral">311 jobs</span></div></div></div>
+<div class="row"><div class="thumb"></div><div style="flex:1"><div style="font:800 14px/1.2 var(--font-heading)">Vinay Kumar</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin:3px 0 6px">Independent · 1.1 km · 18 min</div><div style="display:flex;gap:6px"><span class="tag tag-accent">4.8 ★</span><span class="tag tag-neutral">Licensed</span></div></div></div>
+<div class="row"><div class="thumb"></div><div style="flex:1"><div style="font:800 14px/1.2 var(--font-heading)">Sri Sai Electrical Works</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin:3px 0 6px">Team of 4 · 1.9 km · 25 min</div><div style="display:flex;gap:6px"><span class="tag tag-accent">4.6 ★</span><span class="tag tag-neutral">Emergency</span></div></div></div>
+<div class="row"><div class="thumb"></div><div style="flex:1"><div style="font:800 14px/1.2 var(--font-heading)">Habeeb Wiring Co.</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin:3px 0 6px">Since 1998 · 2.0 km · 30 min</div><div style="display:flex;gap:6px"><span class="tag tag-accent">4.5 ★</span><span class="tag tag-neutral">Cash ok</span></div></div></div>
+<div style="margin-top:auto;padding:12px;border-top:2px solid var(--color-divider)"><button class="btn btn-primary btn-block" style="justify-content:flex-start">Describe the job instead →</button></div>
+</div>
+<div class="tabbar">
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M3 10 12 3l9 7v11H3z"></path></svg>Home</div>
+<div class="tab" data-on=""><svg sc-camel-view-box="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="M16 16l5 5"></path></svg>Search</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>Orders</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"></path></svg>Chat</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg>You</div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Service detail</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div style="height:150px;background:var(--color-neutral-300);border-bottom:2px solid var(--color-divider);display:grid;place-items:center;font:600 10px/1 ui-monospace,monospace;letter-spacing:.1em;color:var(--color-neutral-700)">SHOP PHOTO</div>
+<div style="padding:12px;border-bottom:2px solid var(--color-divider)">
+<div style="font:800 22px/1.1 var(--font-heading)">Rao Electricals</div>
+<div style="font-size:12px;color:var(--color-neutral-600);margin:5px 0 9px">Wiring · Fans · Inverters · Kondapur, 0.8 km</div>
+<div style="display:flex;gap:6px"><span class="tag tag-accent">4.9 ★ 311 jobs</span><span class="tag tag-neutral">Open until 8pm</span></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:2px solid var(--color-divider);text-align:left">
+<div style="padding:10px 12px;border-right:1px solid var(--color-divider)"><div style="font:800 16px var(--font-heading)">12 min</div><div style="font-size:10px;color:var(--color-neutral-600)">RESPONSE</div></div>
+<div style="padding:10px 12px;border-right:1px solid var(--color-divider)"><div style="font:800 16px var(--font-heading)">Free</div><div style="font-size:10px;color:var(--color-neutral-600)">QUOTE</div></div>
+<div style="padding:10px 12px"><div style="font:800 16px var(--font-heading)">9 yrs</div><div style="font-size:10px;color:var(--color-neutral-600)">TRADING</div></div>
+</div>
+<div class="sec" style="border-bottom:2px solid var(--color-divider)">
+<p class="cap">Rate card</p>
+<div style="display:flex;justify-content:space-between;font-size:13px"><span>Fan installation</span><strong>₹350</strong></div>
+<div style="display:flex;justify-content:space-between;font-size:13px"><span>Switchboard repair</span><strong>₹450</strong></div>
+<div style="display:flex;justify-content:space-between;font-size:13px"><span>Full-house rewiring</span><strong>On quote</strong></div>
+<div style="font-size:11px;color:var(--color-neutral-600)">Rao sets these prices. SAAHAA adds nothing to them.</div>
+</div>
+<div class="sec">
+<p class="cap">Recent reviews</p>
+<div style="font-size:12.5px;line-height:1.5">“Came within the hour, fixed two points, charged exactly what he quoted.”</div>
+<div style="font-size:11px;color:var(--color-neutral-600)">Anita S. · 4 days ago · 5 ★</div>
+</div>
+<div style="margin-top:auto;display:flex;gap:8px;padding:12px;border-top:2px solid var(--color-divider)">
+<button class="btn btn-secondary" style="flex:none">Chat</button>
+<button class="btn btn-primary" style="flex:1;justify-content:flex-start">Request a quote</button>
+</div>
+</div>
+</div></div>
+
+</div></div>
+
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Ask-first — no browse. You state the need, the circle answers. Two tabs only.</div>
+<div class="screens">
+
+<div class="scr"><p class="cap">Home — the ask</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div style="background:var(--color-accent);color:#fff;padding:20px 14px 18px">
+<div style="font:800 10px/1 var(--font-heading);letter-spacing:.18em;opacity:.85">TOGETHER, WE ELEVATE LIFE</div>
+<div style="font:800 27px/1.08 var(--font-heading);margin:10px 0 4px">What do you<br>need today?</div>
+<div style="font-size:12.5px;opacity:.9">118 shops and 42 pros in Kondapur are listening.</div>
+</div>
+<div style="padding:14px 12px;border-bottom:2px solid var(--color-divider)">
+<div style="border:2px solid var(--color-text);padding:12px;min-height:92px;font-size:14px;color:var(--color-neutral-600)">Fan in the bedroom stopped working…</div>
+<div style="display:flex;gap:8px;margin-top:10px">
+<div style="flex:1;border:1px solid var(--color-divider);padding:9px;font:600 11px var(--font-body);text-align:left">◕ Photo</div>
+<div style="flex:1;border:1px solid var(--color-divider);padding:9px;font:600 11px var(--font-body);text-align:left">⏺ Voice</div>
+<div style="flex:1;border:1px solid var(--color-divider);padding:9px;font:600 11px var(--font-body);text-align:left">☉ Location</div>
+</div>
+<button class="btn btn-primary btn-block" style="justify-content:flex-start;padding:12px">Send to the circle →</button>
+</div>
+<div style="padding:12px 12px 6px"><p class="cap">Still open from before</p></div>
+<div class="row"><div style="width:4px;align-self:stretch;background:var(--color-accent)"></div><div style="flex:1"><div style="font:800 13.5px/1.2 var(--font-heading)">Leaking kitchen tap</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:3px">3 quotes in · lowest ₹300</div></div><div style="font:800 13px var(--font-heading);color:var(--color-accent)">→</div></div>
+<div class="row"><div style="width:4px;align-self:stretch;background:var(--color-neutral-400)"></div><div style="flex:1"><div style="font:800 13.5px/1.2 var(--font-heading)">2 kg tomatoes, 1 kg onion</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:3px">Sunrise Grocers · out for delivery</div></div><div style="font:800 13px var(--font-heading)">→</div></div>
+<div style="padding:12px"><p class="cap" style="margin-bottom:8px">Or say it in one tap</p><div style="display:flex;flex-wrap:wrap;gap:7px">
+<span style="border:1px solid var(--color-divider);padding:7px 11px;font:600 11.5px var(--font-body)">Gas cylinder</span>
+<span style="border:1px solid var(--color-divider);padding:7px 11px;font:600 11.5px var(--font-body)">AC service</span>
+<span style="border:1px solid var(--color-divider);padding:7px 11px;font:600 11.5px var(--font-body)">Ironing</span>
+<span style="border:1px solid var(--color-divider);padding:7px 11px;font:600 11.5px var(--font-body)">Milk daily</span>
+<span style="border:1px solid var(--color-divider);padding:7px 11px;font:600 11.5px var(--font-body)">Carpenter</span>
+</div></div>
+</div>
+<div class="tabbar" style="grid-template-columns:1fr 1fr">
+<div class="tab" data-on="" style="flex-direction:row;gap:7px;font-size:11px"><svg sc-camel-view-box="0 0 24 24"><path d="M12 4v16M4 12h16"></path></svg>ASK</div>
+<div class="tab" style="flex-direction:row;gap:7px;font-size:11px"><svg sc-camel-view-box="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>MY ORDERS</div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Quotes arriving</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="font:800 15px var(--font-heading)">←</div><div style="flex:1"><div style="font:800 15px/1.15 var(--font-heading)">Bedroom fan not working</div><div style="font-size:11px;color:var(--color-neutral-600)">Sent 14 min ago · 3 of 8 replied</div></div></div>
+<div style="padding:10px 12px;background:var(--color-accent-100);border-bottom:2px solid var(--color-divider);font-size:11.5px;color:var(--color-accent-800)">Every price below is the pro's own. You pay them directly.</div>
+<div style="padding:12px;border-bottom:1px solid var(--color-divider)">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+<div><div style="font:800 15px/1.2 var(--font-heading)">Rao Electricals</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">4.9 ★ · 0.8 km · can come by 11:30</div></div>
+<div style="text-align:right"><div style="font:800 21px/1 var(--font-heading)">₹350</div><div style="font-size:10px;color:var(--color-neutral-600)">incl. parts</div></div>
+</div>
+<div style="font-size:12.5px;margin:9px 0 10px;line-height:1.5">Sounds like a capacitor. I'll carry a spare, replace on the spot.</div>
+<div style="display:flex;gap:8px"><button class="btn btn-primary" style="flex:1;justify-content:flex-start">Accept</button><button class="btn btn-secondary" style="flex:none">Ask</button></div>
+</div>
+<div style="padding:12px;border-bottom:1px solid var(--color-divider)">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+<div><div style="font:800 15px/1.2 var(--font-heading)">Vinay Kumar</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">4.8 ★ · 1.1 km · today after 4pm</div></div>
+<div style="text-align:right"><div style="font:800 21px/1 var(--font-heading)">₹300</div><div style="font-size:10px;color:var(--color-neutral-600)">+ parts</div></div>
+</div>
+<div style="font-size:12.5px;margin:9px 0 10px;line-height:1.5">Will check the regulator too, no extra charge.</div>
+<div style="display:flex;gap:8px"><button class="btn btn-primary" style="flex:1;justify-content:flex-start">Accept</button><button class="btn btn-secondary" style="flex:none">Ask</button></div>
+</div>
+<div style="padding:12px">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+<div><div style="font:800 15px/1.2 var(--font-heading)">Sri Sai Electrical</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">4.6 ★ · 1.9 km · tomorrow morning</div></div>
+<div style="text-align:right"><div style="font:800 21px/1 var(--font-heading)">₹280</div><div style="font-size:10px;color:var(--color-neutral-600)">+ parts</div></div>
+</div>
+</div>
+<div style="margin-top:auto;padding:12px;border-top:2px solid var(--color-divider);font-size:11.5px;color:var(--color-neutral-600)">5 more pros are still preparing quotes. Nothing expires — take your time.</div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Chat with the pro</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="font:800 15px var(--font-heading)">←</div><div class="thumb" style="width:34px;height:34px"></div><div style="flex:1"><div style="font:800 14px/1.15 var(--font-heading)">Rao Electricals</div><div style="font-size:10.5px;color:var(--color-accent)">Accepted · ₹350 · today 11:30</div></div><div style="font:800 16px var(--font-heading)">☏</div></div>
+<div style="flex:1;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--color-neutral-100);overflow:hidden">
+<div style="align-self:center;font:600 9.5px var(--font-body);letter-spacing:.1em;color:var(--color-neutral-600)">TODAY</div>
+<div style="align-self:flex-start;max-width:78%;background:#fff;border:1px solid var(--color-divider);padding:9px 11px;font-size:12.5px">Photo received. Is the fan making a humming sound?</div>
+<div style="align-self:flex-end;max-width:78%;background:var(--color-text);color:#fff;padding:9px 11px;font-size:12.5px">Yes, humming but not spinning.</div>
+<div style="align-self:flex-start;max-width:78%;background:#fff;border:1px solid var(--color-divider);padding:9px 11px;font-size:12.5px">Capacitor then. ₹350 all in, I'll be there by 11:30.</div>
+<div style="align-self:center;width:100%;border:2px solid var(--color-text);background:#fff;padding:10px"><div style="font:600 9.5px var(--font-body);letter-spacing:.1em;color:var(--color-neutral-600)">JOB CONFIRMED</div><div style="font:800 14px var(--font-heading);margin-top:4px">Fan repair · ₹350 · Pay after work</div></div>
+<div style="align-self:flex-end;max-width:78%;background:var(--color-text);color:#fff;padding:9px 11px;font-size:12.5px">Gate code is 4471.</div>
+</div>
+<div style="display:flex;border-top:2px solid var(--color-divider)"><div style="flex:1;padding:12px;font-size:13px;color:var(--color-neutral-600)">Message</div><div style="width:52px;background:var(--color-accent);color:#fff;display:grid;place-items:center;font:800 15px var(--font-heading)">↑</div></div>
+</div>
+</div></div>
+
+</div></div>
+
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Map-first — the neighbourhood as the interface. Best for shops and stock, weakest for quotes.</div>
+<div class="screens">
+
+<div class="scr"><p class="cap">Neighbourhood</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div style="position:relative;flex:1;background:var(--color-neutral-200);overflow:hidden">
+<svg sc-camel-view-box="0 0 352 520" sc-camel-preserve-aspect-ratio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;display:block"><defs><pattern id="saParkA" width="8" height="8" sc-camel-pattern-units="userSpaceOnUse" sc-camel-pattern-transform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#201e1d" stroke-opacity=".28" stroke-width="1"></line></pattern></defs>
+<rect width="352" height="520" fill="#d7d3d3"></rect>
+<g fill="#201e1d" fill-opacity=".13"><rect x="12" y="16" width="58" height="52"></rect><rect x="76" y="16" width="22" height="52"></rect><rect x="12" y="128" width="52" height="46"></rect><rect x="68" y="128" width="28" height="46"></rect><rect x="12" y="186" width="84" height="62"></rect><rect x="12" y="292" width="46" height="100"></rect><rect x="64" y="292" width="32" height="58"></rect><rect x="12" y="434" width="80" height="66"></rect><rect x="132" y="16" width="62" height="44"></rect><rect x="202" y="16" width="36" height="60"></rect><rect x="132" y="128" width="50" height="52"></rect><rect x="190" y="140" width="48" height="40"></rect><rect x="132" y="292" width="106" height="56"></rect><rect x="132" y="358" width="58" height="38"></rect><rect x="132" y="434" width="96" height="56"></rect><rect x="268" y="16" width="70" height="48"></rect><rect x="268" y="292" width="74" height="52"></rect><rect x="268" y="358" width="40" height="38"></rect><rect x="268" y="434" width="66" height="56"></rect></g>
+<rect x="264" y="120" width="88" height="126" fill="#eae7e7"></rect><rect x="264" y="120" width="88" height="126" fill="url(#saParkA)"></rect>
+<g fill="#f8f4f4"><rect x="0" y="94" width="352" height="22"></rect><rect x="0" y="258" width="352" height="16"></rect><rect x="0" y="404" width="352" height="16"></rect><rect x="100" y="0" width="22" height="520"></rect><rect x="244" y="0" width="14" height="520"></rect><polygon points="0,330 0,314 352,178 352,196"></polygon></g>
+<g stroke="#201e1d" stroke-opacity=".38" stroke-width="1"><path d="M0 94h352M0 116h352M0 258h352M0 274h352M0 404h352M0 420h352"></path><path d="M100 0v520M122 0v520M244 0v520M258 0v520"></path><path d="M0 314 352 178M0 330 352 196"></path></g>
+<g stroke="#201e1d" stroke-opacity=".45"><line x1="0" y1="105" x2="352" y2="105" stroke-width="1" stroke-dasharray="9 7"></line></g>
+<g stroke="#201e1d" stroke-opacity=".3" stroke-width="3" stroke-dasharray="1 9"><line x1="14" y1="0" x2="96" y2="196"></line></g>
+<g fill="#201e1d" fill-opacity=".6" font-family="Archivo, sans-serif" font-size="8" font-weight="600" letter-spacing="1.4"><text x="12" y="90">GACHIBOWLI MAIN ROAD</text><text x="12" y="254">5TH LANE</text><text x="12" y="400">MARKET STREET</text><text x="96" y="200" transform="rotate(-90 96 200)">TEMPLE ROAD</text><text x="240" y="470" transform="rotate(-90 240 470)">NALA LANE</text><text x="270" y="140" font-size="7.5">KONDAPUR PARK</text><text x="196" y="236" transform="rotate(-21 196 236)">BYPASS</text></g></svg>
+<div style="position:absolute;left:12px;right:12px;top:12px;display:flex;background:#fff;border:2px solid var(--color-text)"><div style="flex:1;padding:10px 12px;font-size:13px;color:var(--color-neutral-600)">Search Kondapur</div><div style="width:42px;background:var(--color-accent);color:#fff;display:grid;place-items:center;font:800 13px var(--font-heading)">⌕</div></div>
+<div style="position:absolute;left:12px;top:62px;display:flex;gap:6px"><span style="background:var(--color-accent);color:#fff;padding:5px 10px;font:600 11px var(--font-body)">Shops</span><span style="background:#fff;border:1px solid var(--color-text);padding:5px 10px;font:600 11px var(--font-body)">Pros</span><span style="background:#fff;border:1px solid var(--color-text);padding:5px 10px;font:600 11px var(--font-body)">Open</span></div>
+<div style="position:absolute;left:48px;top:196px"><div style="background:var(--color-accent);color:#fff;padding:5px 9px;font:800 11px var(--font-heading);box-shadow:var(--shadow-sm)">Sunrise Hardware</div><div style="width:2px;height:12px;background:var(--color-accent);margin-left:9px"></div><div style="width:9px;height:9px;background:var(--color-accent);border:2px solid #fff;margin-left:5px"></div></div>
+<div style="position:absolute;left:168px;top:126px"><div style="background:var(--color-text);color:#fff;padding:5px 9px;font:800 11px var(--font-heading)">Meera Tailors</div><div style="width:2px;height:10px;background:var(--color-text);margin-left:9px"></div><div style="width:8px;height:8px;background:var(--color-text);border:2px solid #fff;margin-left:5px"></div></div>
+<div style="position:absolute;left:206px;top:300px"><div style="background:var(--color-text);color:#fff;padding:5px 9px;font:800 11px var(--font-heading)">Rao Electricals</div><div style="width:2px;height:10px;background:var(--color-text);margin-left:9px"></div><div style="width:8px;height:8px;background:var(--color-text);border:2px solid #fff;margin-left:5px"></div></div>
+<div style="position:absolute;left:34px;top:346px"><div style="background:var(--color-text);color:#fff;padding:5px 9px;font:800 11px var(--font-heading)">Amma’s Kitchen</div><div style="width:2px;height:10px;background:var(--color-text);margin-left:9px"></div><div style="width:8px;height:8px;background:var(--color-text);border:2px solid #fff;margin-left:5px"></div></div>
+<div style="position:absolute;left:132px;top:236px;width:56px;height:56px;border:1px dashed var(--color-accent);background:color-mix(in srgb,var(--color-accent) 12%,transparent)"></div>
+<div style="position:absolute;left:152px;top:256px;width:16px;height:16px;border:4px solid var(--color-accent);background:#fff"></div>
+<div style="position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;border:2px solid var(--color-text);background:#fff"><div style="padding:6px 10px;font:800 14px var(--font-heading);border-bottom:1px solid var(--color-divider)">+</div><div style="padding:6px 10px;font:800 14px var(--font-heading)">−</div></div>
+<div style="position:absolute;left:12px;bottom:12px;background:#fff;border:1px solid var(--color-text);padding:4px 8px;font:800 9px var(--font-heading);letter-spacing:.08em">200 M</div>
+</div>
+<div style="border-top:2px solid var(--color-text);background:#fff">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px"><div style="font:800 14px var(--font-heading)">14 open near you</div><div style="font:600 11.5px var(--font-body);color:var(--color-accent)">List view</div></div>
+<div class="row" style="border-top:1px solid var(--color-divider)"><div class="thumb" style="width:44px;height:44px"></div><div style="flex:1"><div style="font:800 13.5px/1.2 var(--font-heading)">Sunrise Hardware</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">1,240 items · delivers in 30 min</div></div><div style="font:800 13px var(--font-heading);color:var(--color-accent)">→</div></div>
+<div class="row" style="border-bottom:0"><div class="thumb" style="width:44px;height:44px"></div><div style="flex:1"><div style="font:800 13.5px/1.2 var(--font-heading)">Amma’s Kitchen</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">Tiffin · 4.9 ★ · 0.3 km</div></div><div style="font:800 13px var(--font-heading);color:var(--color-accent)">→</div></div>
+</div>
+</div>
+<div class="tabbar" style="grid-template-columns:repeat(4,1fr)">
+<div class="tab" data-on=""><svg sc-camel-view-box="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>Map</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M12 4v16M4 12h16"></path></svg>Ask</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>Orders</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg>You</div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Shop storefront</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="font:800 15px var(--font-heading)">←</div><div style="flex:1"><div style="font:800 15px/1.15 var(--font-heading)">Sunrise Hardware</div><div style="font-size:10.5px;color:var(--color-neutral-600)">Open · 1.2 km · delivers in 30 min</div></div><div style="font:800 15px var(--font-heading)">♡</div></div>
+<div style="display:flex;gap:6px;padding:10px 12px;border-bottom:2px solid var(--color-divider);overflow:hidden">
+<span style="background:var(--color-accent);color:#fff;padding:5px 10px;font:600 11px var(--font-body);white-space:nowrap">All</span>
+<span style="border:1px solid var(--color-divider);padding:5px 10px;font:600 11px var(--font-body);white-space:nowrap">Electrical</span>
+<span style="border:1px solid var(--color-divider);padding:5px 10px;font:600 11px var(--font-body);white-space:nowrap">Paint</span>
+<span style="border:1px solid var(--color-divider);padding:5px 10px;font:600 11px var(--font-body);white-space:nowrap">Tools</span>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr">
+<div style="border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider);padding:10px"><div style="height:78px;background:var(--color-neutral-300);border:1px solid var(--color-divider)"></div><div style="font:800 12.5px/1.25 var(--font-heading);margin:8px 0 3px">LED bulb 9W, pack of 4</div><div style="font-size:11px;color:var(--color-neutral-600)">In stock · 40 left</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:7px"><strong style="font:800 15px var(--font-heading)">₹240</strong><span style="border:1px solid var(--color-text);padding:3px 9px;font:800 11px var(--font-heading)">ADD</span></div></div>
+<div style="border-bottom:1px solid var(--color-divider);padding:10px"><div style="height:78px;background:var(--color-neutral-300);border:1px solid var(--color-divider)"></div><div style="font:800 12.5px/1.25 var(--font-heading);margin:8px 0 3px">Copper wire 1.5mm, 90m</div><div style="font-size:11px;color:var(--color-neutral-600)">In stock · 12 left</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:7px"><strong style="font:800 15px var(--font-heading)">₹1,180</strong><span style="border:1px solid var(--color-text);padding:3px 9px;font:800 11px var(--font-heading)">ADD</span></div></div>
+<div style="border-right:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider);padding:10px"><div style="height:78px;background:var(--color-neutral-300);border:1px solid var(--color-divider)"></div><div style="font:800 12.5px/1.25 var(--font-heading);margin:8px 0 3px">Ceiling fan capacitor</div><div style="font-size:11px;color:var(--color-neutral-600)">In stock · 60 left</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:7px"><strong style="font:800 15px var(--font-heading)">₹90</strong><span style="background:var(--color-accent);color:#fff;padding:3px 9px;font:800 11px var(--font-heading)">2 − +</span></div></div>
+<div style="border-bottom:1px solid var(--color-divider);padding:10px"><div style="height:78px;background:var(--color-neutral-300);border:1px solid var(--color-divider)"></div><div style="font:800 12.5px/1.25 var(--font-heading);margin:8px 0 3px">Wall putty 5 kg</div><div style="font-size:11px;color:var(--color-neutral-600)">2 days · on order</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:7px"><strong style="font:800 15px var(--font-heading)">₹420</strong><span style="border:1px solid var(--color-divider);color:var(--color-neutral-600);padding:3px 9px;font:800 11px var(--font-heading)">ADD</span></div></div>
+</div>
+<div style="margin-top:auto;border-top:2px solid var(--color-text);display:flex;align-items:center;padding:10px 12px;gap:10px;background:var(--color-neutral-100)"><div style="flex:1"><div style="font:800 14px var(--font-heading)">2 items · ₹180</div><div style="font-size:10.5px;color:var(--color-neutral-600)">Free delivery over ₹500</div></div><button class="btn btn-primary">Checkout</button></div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Order tracking</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="font:800 15px var(--font-heading)">←</div><div style="flex:1"><div style="font:800 15px/1.15 var(--font-heading)">Order #SA-4471</div><div style="font-size:10.5px;color:var(--color-neutral-600)">Sunrise Hardware · placed 9:12</div></div></div>
+<div style="height:176px;position:relative;border-bottom:2px solid var(--color-text);overflow:hidden">
+<svg sc-camel-view-box="0 0 352 176" sc-camel-preserve-aspect-ratio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;display:block"><defs><pattern id="saParkB" width="8" height="8" sc-camel-pattern-units="userSpaceOnUse" sc-camel-pattern-transform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#201e1d" stroke-opacity=".28" stroke-width="1"></line></pattern></defs>
+<rect width="352" height="176" fill="#d7d3d3"></rect>
+<g fill="#201e1d" fill-opacity=".13"><rect x="10" y="10" width="54" height="38"></rect><rect x="70" y="10" width="28" height="38"></rect><rect x="144" y="10" width="64" height="38"></rect><rect x="214" y="10" width="38" height="38"></rect><rect x="290" y="10" width="52" height="38"></rect><rect x="10" y="96" width="48" height="70"></rect><rect x="144" y="96" width="70" height="42"></rect><rect x="290" y="96" width="52" height="70"></rect></g>
+<rect x="220" y="96" width="56" height="70" fill="#eae7e7"></rect><rect x="220" y="96" width="56" height="70" fill="url(#saParkB)"></rect>
+<g fill="#f8f4f4"><rect x="0" y="56" width="352" height="32"></rect><rect x="104" y="0" width="34" height="176"></rect><rect x="258" y="88" width="26" height="88"></rect></g>
+<g stroke="#201e1d" stroke-opacity=".38" stroke-width="1"><path d="M0 56h352M0 88h352M104 0v176M138 0v176M258 88v88M284 88v88"></path></g>
+<line x1="0" y1="72" x2="352" y2="72" stroke="#201e1d" stroke-opacity=".4" stroke-width="1" stroke-dasharray="9 7"></line>
+<g fill="#201e1d" fill-opacity=".55" font-family="Archivo, sans-serif" font-size="8" font-weight="600" letter-spacing="1.4"><text x="10" y="52">GACHIBOWLI MAIN ROAD</text><text x="100" y="172" transform="rotate(-90 100 172)">TEMPLE ROAD</text></g>
+<path d="M40 150 L40 118 L121 118 L121 72 L232 72 L232 40" fill="none" stroke="#fff" stroke-width="9"></path>
+<path d="M40 150 L40 118 L121 118 L121 72 L232 72 L232 40" fill="none" stroke="#ec3013" stroke-width="4"></path>
+<g><rect x="33" y="143" width="14" height="14" fill="#fff" stroke="#201e1d" stroke-width="3"></rect><rect x="224" y="32" width="16" height="16" fill="#ec3013" stroke="#fff" stroke-width="3"></rect></g>
+<g transform="translate(112 100)"><rect x="0" y="0" width="18" height="18" fill="#ec3013"></rect><path d="M4 12h10M4 6h6" stroke="#fff" stroke-width="1.6"></path></g></svg>
+<div style="position:absolute;left:12px;bottom:10px;background:#fff;border:2px solid var(--color-text);padding:5px 9px;font:800 10px var(--font-heading);letter-spacing:.06em">KIRAN · 8 MIN AWAY</div>
+<div style="position:absolute;right:12px;top:10px;background:var(--color-accent);color:#fff;padding:5px 9px;font:800 10px var(--font-heading);letter-spacing:.06em">YOUR FLAT</div>
+</div>
+<div style="padding:12px;border-bottom:2px solid var(--color-divider);display:flex;align-items:center;gap:10px"><div class="thumb" style="width:40px;height:40px"></div><div style="flex:1"><div style="font:800 13.5px var(--font-heading)">Kiran · on the way</div><div style="font-size:11px;color:var(--color-neutral-600)">Arriving in 8 minutes</div></div><div style="border:1px solid var(--color-text);padding:7px 10px;font:800 11px var(--font-heading)">CALL</div></div>
+<div class="sec">
+<div style="display:flex;gap:12px"><div style="width:12px;height:12px;background:var(--color-accent);margin-top:3px"></div><div><div style="font:800 13px var(--font-heading)">Order accepted</div><div style="font-size:11px;color:var(--color-neutral-600)">9:12 · Sunrise Hardware</div></div></div>
+<div style="display:flex;gap:12px"><div style="width:12px;height:12px;background:var(--color-accent);margin-top:3px"></div><div><div style="font:800 13px var(--font-heading)">Packed</div><div style="font-size:11px;color:var(--color-neutral-600)">9:26 · 2 items</div></div></div>
+<div style="display:flex;gap:12px"><div style="width:12px;height:12px;background:var(--color-accent);margin-top:3px"></div><div><div style="font:800 13px var(--font-heading)">Out for delivery</div><div style="font-size:11px;color:var(--color-neutral-600)">9:34 · Kiran, shop staff</div></div></div>
+<div style="display:flex;gap:12px"><div style="width:12px;height:12px;border:2px solid var(--color-neutral-400);margin-top:3px"></div><div><div style="font:800 13px var(--font-heading);color:var(--color-neutral-600)">Delivered</div><div style="font-size:11px;color:var(--color-neutral-600)">Pay cash or on app</div></div></div>
+</div>
+<div style="margin-top:auto;padding:12px;border-top:2px solid var(--color-divider);background:var(--color-neutral-100)"><div style="display:flex;justify-content:space-between;font-size:12.5px"><span>Items</span><span>₹180</span></div><div style="display:flex;justify-content:space-between;font-size:12.5px"><span>Delivery</span><span>₹20</span></div><div style="display:flex;justify-content:space-between;font:800 15px var(--font-heading);margin-top:6px;padding-top:6px;border-top:1px solid var(--color-divider)"><span>Total</span><span>₹200</span></div></div>
+</div>
+</div></div>
+
+</div></div>
+
+</div>
+<p class="dv-next">Try next: “go with <a class="dv-oid" href="#1b">1b</a> and draw the rest of the flow” · “merge <a class="dv-oid" href="#1a">1a</a>'s tabs with <a class="dv-oid" href="#1b">1b</a>'s home” · “now the pro app and shop dashboard” · “try it in the logo's purple and gold”</p>
+</section>
+
+<section class="dv-turn" id="t1b">
+<div class="dv-thd"><a class="dv-tid" href="#t1b">1</a><span class="dv-tname">The rest of the product — drawn on <a class="dv-oid" href="#1b">1b</a>'s ask-first shell</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Customer — the parts the nav models didn't cover</div>
+<div class="screens">
+
+<div class="scr"><p class="cap">Request a job</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="font:800 15px var(--font-heading)">←</div><div style="flex:1;font:800 15px var(--font-heading)">Describe the job</div><div style="font:600 11px var(--font-body);color:var(--color-neutral-600)">Step 2 of 3</div></div>
+<div style="height:3px;background:var(--color-neutral-300)"><div style="width:66%;height:3px;background:var(--color-accent)"></div></div>
+<div class="sec" style="gap:16px">
+<div class="field"><label>What needs doing</label><div class="input" style="min-height:74px;padding:10px;color:var(--color-text)">Bedroom ceiling fan hums but doesn't spin. Started yesterday.</div></div>
+<div><p class="cap" style="margin-bottom:7px">Photos — helps pros quote accurately</p><div style="display:flex;gap:8px"><div style="width:62px;height:62px;background:var(--color-neutral-300);border:1px solid var(--color-divider)"></div><div style="width:62px;height:62px;background:var(--color-neutral-300);border:1px solid var(--color-divider)"></div><div style="width:62px;height:62px;border:1px dashed var(--color-neutral-500);display:grid;place-items:center;font:800 18px var(--font-heading);color:var(--color-neutral-600)">+</div></div></div>
+<div class="field"><label>When</label><div class="seg" style="width:100%"><label class="seg-opt" style="flex:1"><input type="radio" name="when" checked="">Today</label><label class="seg-opt" style="flex:1"><input type="radio" name="when">Tomorrow</label><label class="seg-opt" style="flex:1"><input type="radio" name="when">Pick date</label></div></div>
+<div class="field"><label>Where</label><div class="input" style="display:flex;justify-content:space-between;align-items:center;color:var(--color-text)"><span>Flat 302, Aparna Cyber Life</span><span style="font-size:11px;color:var(--color-accent);font-weight:600">Change</span></div></div>
+<div class="field"><label>Budget you have in mind (optional)</label><div class="input" style="color:var(--color-neutral-600)">₹ — leave blank to see open quotes</div></div>
+</div>
+<div style="margin-top:auto;padding:12px;border-top:2px solid var(--color-divider)"><div style="font-size:11.5px;color:var(--color-neutral-600);margin-bottom:8px">Goes to 8 electricians within 2 km. No charge to you, ever.</div><button class="btn btn-primary btn-block" style="justify-content:flex-start;padding:12px">Send to the circle →</button></div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Booking &amp; payment</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="font:800 15px var(--font-heading)">←</div><div style="flex:1;font:800 15px var(--font-heading)">Confirm booking</div></div>
+<div style="padding:14px 12px;border-bottom:2px solid var(--color-divider)"><div style="display:flex;gap:11px;align-items:center"><div class="thumb" style="width:46px;height:46px"></div><div><div style="font:800 15px/1.2 var(--font-heading)">Rao Electricals</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:2px">Fan repair · today, 11:30–12:00</div></div></div></div>
+<div class="sec" style="border-bottom:2px solid var(--color-divider)">
+<div style="display:flex;justify-content:space-between;font-size:13px"><span>Labour (Rao's price)</span><span>₹260</span></div>
+<div style="display:flex;justify-content:space-between;font-size:13px"><span>Capacitor</span><span>₹90</span></div>
+<div style="display:flex;justify-content:space-between;font:800 17px var(--font-heading);padding-top:9px;border-top:1px solid var(--color-divider)"><span>You pay</span><span>₹350</span></div>
+<div style="background:var(--color-accent-100);color:var(--color-accent-800);padding:9px 10px;font-size:11.5px;line-height:1.5">Rao receives all ₹350. SAAHAA's 3% comes out of our side of the deal, not his quote.</div>
+</div>
+<div class="sec">
+<p class="cap">Pay how you like</p>
+<label class="radio" style="padding:9px 0"><input type="radio" name="pay" checked=""><span class="dot"></span><span><strong style="font-family:var(--font-heading)">Cash after the work</strong><br><span style="font-size:11px;color:var(--color-neutral-600)">Most common. Nothing held now.</span></span></label>
+<label class="radio" style="padding:9px 0;border-top:1px solid var(--color-divider)"><input type="radio" name="pay"><span class="dot"></span><span><strong style="font-family:var(--font-heading)">UPI / card now</strong><br><span style="font-size:11px;color:var(--color-neutral-600)">Released to Rao when you mark it done.</span></span></label>
+<label class="radio" style="padding:9px 0;border-top:1px solid var(--color-divider)"><input type="radio" name="pay"><span class="dot"></span><span><strong style="font-family:var(--font-heading)">Split with a neighbour</strong><br><span style="font-size:11px;color:var(--color-neutral-600)">Share a link, both pay a half.</span></span></label>
+</div>
+<div style="margin-top:auto;padding:12px;border-top:2px solid var(--color-divider)"><button class="btn btn-primary btn-block" style="justify-content:flex-start;padding:12px">Confirm — today 11:30</button><div style="font-size:11px;color:var(--color-neutral-600);margin-top:8px">Free to cancel until the pro sets out.</div></div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Ratings &amp; reviews</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="font:800 15px var(--font-heading)">✕</div><div style="flex:1;font:800 15px var(--font-heading)">How did it go?</div></div>
+<div style="padding:16px 12px;border-bottom:2px solid var(--color-divider)"><div style="font:800 19px/1.2 var(--font-heading)">Rao fixed your fan for ₹350</div><div style="font-size:12px;color:var(--color-neutral-600);margin-top:5px">Finished 24 minutes ago</div><div style="display:flex;gap:9px;margin-top:14px;font-size:33px;line-height:1;color:var(--color-accent)"><span>★</span><span>★</span><span>★</span><span>★</span><span style="color:var(--color-neutral-400)">★</span></div></div>
+<div class="sec" style="border-bottom:2px solid var(--color-divider)"><p class="cap">What was good?</p><div style="display:flex;flex-wrap:wrap;gap:7px">
+<span style="background:var(--color-accent);color:#fff;padding:7px 11px;font:600 11.5px var(--font-body)">On time</span>
+<span style="border:1px solid var(--color-divider);padding:7px 11px;font:600 11.5px var(--font-body)">Fair price</span>
+<span style="background:var(--color-accent);color:#fff;padding:7px 11px;font:600 11.5px var(--font-body)">Clean work</span>
+<span style="border:1px solid var(--color-divider);padding:7px 11px;font:600 11.5px var(--font-body)">Explained well</span>
+<span style="border:1px solid var(--color-divider);padding:7px 11px;font:600 11.5px var(--font-body)">Polite</span>
+</div></div>
+<div class="sec"><div class="field"><label>Anything to add (optional)</label><div class="input" style="min-height:70px;padding:10px;color:var(--color-neutral-600)">A sentence helps the next neighbour decide.</div></div><label class="radio"><input type="checkbox" style="position:absolute;opacity:0"><span class="dot"></span><span style="font-size:12.5px">Save Rao to my regulars</span></label></div>
+<div style="margin-top:auto;padding:12px;border-top:2px solid var(--color-divider);display:flex;gap:8px"><button class="btn btn-secondary" style="flex:none">Skip</button><button class="btn btn-primary" style="flex:1;justify-content:flex-start">Post review</button></div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Profile / settings</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div style="padding:16px 12px;border-bottom:2px solid var(--color-divider);display:flex;gap:12px;align-items:center"><div style="width:52px;height:52px;background:var(--color-text);color:#fff;display:grid;place-items:center;font:800 18px var(--font-heading)">KM</div><div><div style="font:800 18px/1.15 var(--font-heading)">Kavya M.</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:3px">+91 98··· ··471 · Kondapur</div></div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:2px solid var(--color-divider)">
+<div style="padding:11px 12px;border-right:1px solid var(--color-divider)"><div style="font:800 17px var(--font-heading)">31</div><div style="font-size:10px;color:var(--color-neutral-600)">ORDERS</div></div>
+<div style="padding:11px 12px;border-right:1px solid var(--color-divider)"><div style="font:800 17px var(--font-heading)">6</div><div style="font-size:10px;color:var(--color-neutral-600)">REGULARS</div></div>
+<div style="padding:11px 12px"><div style="font:800 17px var(--font-heading)">₹0</div><div style="font-size:10px;color:var(--color-neutral-600)">FEES PAID</div></div>
+</div>
+<div style="padding:12px 12px 6px"><p class="cap">My regulars</p></div>
+<div style="display:flex;gap:8px;padding:0 12px 12px;border-bottom:2px solid var(--color-divider)"><div style="width:56px"><div class="thumb" style="width:56px;height:56px"></div><div style="font:600 9.5px/1.3 var(--font-body);margin-top:4px">Rao Elec.</div></div><div style="width:56px"><div class="thumb" style="width:56px;height:56px"></div><div style="font:600 9.5px/1.3 var(--font-body);margin-top:4px">Sunrise</div></div><div style="width:56px"><div class="thumb" style="width:56px;height:56px"></div><div style="font:600 9.5px/1.3 var(--font-body);margin-top:4px">Amma’s</div></div><div style="width:56px"><div class="thumb" style="width:56px;height:56px"></div><div style="font:600 9.5px/1.3 var(--font-body);margin-top:4px">Meera</div></div></div>
+<div><div class="row" style="justify-content:space-between;align-items:center"><span style="font-weight:600">Addresses</span><span style="color:var(--color-neutral-600)">3 saved ›</span></div>
+<div class="row" style="justify-content:space-between;align-items:center"><span style="font-weight:600">Payment methods</span><span style="color:var(--color-neutral-600)">UPI, cash ›</span></div>
+<div class="row" style="justify-content:space-between;align-items:center"><span style="font-weight:600">Language</span><span style="color:var(--color-neutral-600)">English ›</span></div>
+<div class="row" style="justify-content:space-between;align-items:center"><span style="font-weight:600">Notifications</span><span style="color:var(--color-neutral-600)">On ›</span></div>
+<div class="row" style="justify-content:space-between;align-items:center"><span style="font-weight:600;color:var(--color-accent)">List my shop or service</span><span style="color:var(--color-accent)">›</span></div></div>
+</div>
+</div></div>
+
+</div></div>
+
+<div class="dv-opt" id="1e"><div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Pro app — leads, quoting, earnings. Same shell, dark status strip to signal “working side”.</div>
+<div class="screens">
+
+<div class="scr"><p class="cap">Leads</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA · PRO</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr" style="background:var(--color-text);color:#fff;border-bottom:0"><div style="flex:1"><div style="font:800 16px/1.1 var(--font-heading)">Rao Electricals</div><div style="font-size:11px;opacity:.75">Accepting jobs · 2 km radius</div></div><div style="width:38px;height:20px;background:var(--color-accent);position:relative"><div style="position:absolute;right:2px;top:2px;width:16px;height:16px;background:#fff"></div></div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:2px solid var(--color-divider)">
+<div style="padding:11px 12px;border-right:1px solid var(--color-divider)"><div style="font:800 18px var(--font-heading)">6</div><div style="font-size:10px;color:var(--color-neutral-600)">NEW LEADS</div></div>
+<div style="padding:11px 12px;border-right:1px solid var(--color-divider)"><div style="font:800 18px var(--font-heading)">3</div><div style="font-size:10px;color:var(--color-neutral-600)">TODAY’S JOBS</div></div>
+<div style="padding:11px 12px"><div style="font:800 18px var(--font-heading);color:var(--color-accent)">64%</div><div style="font-size:10px;color:var(--color-neutral-600)">WIN RATE</div></div>
+</div>
+<div style="padding:12px 12px 6px;display:flex;justify-content:space-between;align-items:baseline"><p class="cap">Open requests near you</p><span style="font:600 11px var(--font-body);color:var(--color-accent)">Filter</span></div>
+<div style="padding:12px;border-top:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)">
+<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font:800 14.5px/1.2 var(--font-heading)">Ceiling fan hums, won't spin</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:4px">0.8 km · today · 2 photos · 8 pros invited</div></div><span class="tag tag-accent">14 min</span></div>
+<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary" style="flex:1;justify-content:flex-start">Quote ₹…</button><button class="btn btn-secondary" style="flex:none">Pass</button></div>
+</div>
+<div style="padding:12px;border-bottom:1px solid var(--color-divider)">
+<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font:800 14.5px/1.2 var(--font-heading)">3 new plug points, kitchen</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:4px">1.4 km · this week · budget ₹2,000</div></div><span class="tag tag-neutral">1 hr</span></div>
+<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary" style="flex:1;justify-content:flex-start">Quote ₹…</button><button class="btn btn-secondary" style="flex:none">Pass</button></div>
+</div>
+<div style="padding:12px">
+<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font:800 14.5px/1.2 var(--font-heading)">Inverter not charging</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:4px">1.9 km · tomorrow · 5 pros invited</div></div><span class="tag tag-neutral">3 hr</span></div>
+</div>
+<div class="tabbar" style="grid-template-columns:repeat(4,1fr);margin-top:auto">
+<div class="tab" data-on=""><svg sc-camel-view-box="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>LEADS</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><rect x="4" y="5" width="16" height="15"></rect><path d="M4 10h16M9 3v4M15 3v4"></path></svg>JOBS</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path></svg>EARNINGS</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg>SHOP</div>
+</div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Quote builder</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA · PRO</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="font:800 15px var(--font-heading)">←</div><div style="flex:1;font:800 15px var(--font-heading)">Your quote</div><span class="tag tag-accent">7 pros bidding</span></div>
+<div style="padding:11px 12px;background:var(--color-neutral-100);border-bottom:2px solid var(--color-divider);font-size:12px;line-height:1.5">“Bedroom ceiling fan hums but doesn't spin. Started yesterday.”<div style="display:flex;gap:8px;margin-top:9px"><div style="width:50px;height:50px;background:var(--color-neutral-300);border:1px solid var(--color-divider)"></div><div style="width:50px;height:50px;background:var(--color-neutral-300);border:1px solid var(--color-divider)"></div></div></div>
+<div class="sec" style="border-bottom:2px solid var(--color-divider)">
+<p class="cap">Line items</p>
+<div style="display:flex;gap:8px"><div class="input" style="flex:1">Labour — capacitor swap</div><div class="input" style="width:82px">260</div></div>
+<div style="display:flex;gap:8px"><div class="input" style="flex:1">Capacitor 2.5 µF</div><div class="input" style="width:82px">90</div></div>
+<div style="font:600 12px var(--font-body);color:var(--color-accent)">+ Add line</div>
+</div>
+<div class="sec" style="border-bottom:2px solid var(--color-divider)">
+<div style="display:flex;justify-content:space-between;font:800 20px var(--font-heading)"><span>Your price</span><span>₹350</span></div>
+<div style="display:flex;justify-content:space-between;font-size:12.5px"><span class="text-muted">SAAHAA fee (3%)</span><span class="text-muted">₹10.50</span></div>
+<div style="display:flex;justify-content:space-between;font:800 15px var(--font-heading);padding-top:8px;border-top:1px solid var(--color-divider)"><span>You keep</span><span style="color:var(--color-accent)">₹339.50</span></div>
+<div style="font-size:11px;color:var(--color-neutral-600)">Charged only because this job landed. No monthly plan, no listing fee.</div>
+</div>
+<div class="sec">
+<div class="field"><label>When can you go?</label><div class="seg" style="width:100%"><label class="seg-opt" style="flex:1"><input type="radio" name="pw" checked="">Within 2 hr</label><label class="seg-opt" style="flex:1"><input type="radio" name="pw">Today</label><label class="seg-opt" style="flex:1"><input type="radio" name="pw">Pick slot</label></div></div>
+<div class="field"><label>Note to the customer</label><div class="input" style="min-height:56px;padding:9px;color:var(--color-text)">Sounds like a capacitor. I'll carry a spare and replace on the spot.</div></div>
+</div>
+<div style="margin-top:auto;padding:12px;border-top:2px solid var(--color-divider)"><button class="btn btn-primary btn-block" style="justify-content:flex-start;padding:12px">Send quote — ₹350</button></div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Earnings</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA · PRO</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="flex:1;font:800 16px var(--font-heading)">Earnings</div><div class="seg"><label class="seg-opt"><input type="radio" name="per">Week</label><label class="seg-opt"><input type="radio" name="per" checked="">Month</label></div></div>
+<div style="padding:14px 12px;border-bottom:2px solid var(--color-divider)"><div style="font:600 10px var(--font-body);letter-spacing:.1em;color:var(--color-neutral-600)">SEPTEMBER · YOU KEPT</div><div style="font:800 40px/1 var(--font-heading);margin:7px 0 5px">₹48,610</div><div style="font-size:12px;color:var(--color-neutral-600)">from ₹50,113 quoted · fees ₹1,503 (3%)</div>
+<div style="display:flex;align-items:flex-end;gap:5px;height:74px;margin-top:14px">
+<div style="flex:1;height:38%;background:var(--color-neutral-400)"></div><div style="flex:1;height:52%;background:var(--color-neutral-400)"></div><div style="flex:1;height:44%;background:var(--color-neutral-400)"></div><div style="flex:1;height:70%;background:var(--color-neutral-400)"></div><div style="flex:1;height:61%;background:var(--color-neutral-400)"></div><div style="flex:1;height:88%;background:var(--color-accent)"></div><div style="flex:1;height:100%;background:var(--color-accent)"></div>
+</div>
+<div style="display:flex;justify-content:space-between;font:600 9.5px var(--font-body);color:var(--color-neutral-600);margin-top:5px"><span>MAR</span><span>APR</span><span>MAY</span><span>JUN</span><span>JUL</span><span>AUG</span><span>SEP</span></div>
+</div>
+<div style="padding:12px;border-bottom:2px solid var(--color-divider);background:var(--color-accent-100)"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font:800 15px var(--font-heading);color:var(--color-accent-800)">₹12,240 payable Friday</div><div style="font-size:11px;color:var(--color-accent-800);opacity:.8">HDFC ····4471 · weekly, automatic</div></div><span style="font:600 11px var(--font-body);color:var(--color-accent-800)">Change</span></div></div>
+<div style="padding:12px 12px 6px"><p class="cap">Recent jobs</p></div>
+<div style="padding:0 12px"><sc-raw-table class="table"><sc-raw-thead><sc-raw-tr><sc-raw-th>Job</sc-raw-th><sc-raw-th style="text-align:right">Quoted</sc-raw-th><sc-raw-th style="text-align:right">Kept</sc-raw-th></sc-raw-tr></sc-raw-thead><sc-raw-tbody>
+<sc-raw-tr><sc-raw-td>Fan repair · Kavya M.</sc-raw-td><sc-raw-td style="text-align:right">350</sc-raw-td><sc-raw-td style="text-align:right">339</sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>Rewiring · Flat 12B</sc-raw-td><sc-raw-td style="text-align:right">8,400</sc-raw-td><sc-raw-td style="text-align:right">8,148</sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>Inverter fit · Habeeb</sc-raw-td><sc-raw-td style="text-align:right">2,100</sc-raw-td><sc-raw-td style="text-align:right">2,037</sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>Plug points · Sneha R.</sc-raw-td><sc-raw-td style="text-align:right">1,650</sc-raw-td><sc-raw-td style="text-align:right">1,600</sc-raw-td></sc-raw-tr>
+</sc-raw-tbody></sc-raw-table></div>
+<div class="tabbar" style="grid-template-columns:repeat(4,1fr);margin-top:auto">
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>LEADS</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><rect x="4" y="5" width="16" height="15"></rect><path d="M4 10h16M9 3v4M15 3v4"></path></svg>JOBS</div>
+<div class="tab" data-on=""><svg sc-camel-view-box="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path></svg>EARNINGS</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg>SHOP</div>
+</div>
+</div>
+</div></div>
+
+</div></div>
+
+<div class="dv-opt" id="1f"><div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Shop dashboard — stock and orders on a phone, because that's what a shopkeeper has in hand</div>
+<div class="screens">
+
+<div class="scr"><p class="cap">Today</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA · SHOP</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr" style="background:var(--color-text);color:#fff;border-bottom:0"><div style="flex:1"><div style="font:800 16px/1.1 var(--font-heading)">Sunrise Hardware</div><div style="font-size:11px;opacity:.75">Open · delivering · 1,240 items live</div></div><div style="border:1px solid #fff;padding:5px 9px;font:800 10px var(--font-heading)">CLOSE</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr">
+<div style="padding:12px;border-right:1px solid var(--color-divider);border-bottom:2px solid var(--color-divider)"><div style="font:800 26px/1 var(--font-heading)">₹9,840</div><div style="font-size:10px;color:var(--color-neutral-600);margin-top:4px">SALES TODAY</div></div>
+<div style="padding:12px;border-bottom:2px solid var(--color-divider)"><div style="font:800 26px/1 var(--font-heading)">₹295</div><div style="font-size:10px;color:var(--color-neutral-600);margin-top:4px">FEES TODAY (3%)</div></div>
+</div>
+<div style="padding:12px 12px 6px;display:flex;justify-content:space-between;align-items:baseline"><p class="cap">Orders needing you</p><span class="tag tag-accent">4 new</span></div>
+<div class="row" style="align-items:center"><div style="flex:1"><div style="font:800 13.5px/1.2 var(--font-heading)">#SA-4471 · ₹200</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">2 items · delivery · Kavya M., 1.2 km</div></div><button class="btn btn-primary" style="flex:none">Accept</button></div>
+<div class="row" style="align-items:center"><div style="flex:1"><div style="font:800 13.5px/1.2 var(--font-heading)">#SA-4470 · ₹1,180</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">1 item · pickup · Rao Electricals</div></div><button class="btn btn-primary" style="flex:none">Accept</button></div>
+<div class="row" style="align-items:center"><div style="flex:1"><div style="font:800 13.5px/1.2 var(--font-heading)">#SA-4468 · ₹420</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">Packed · waiting for Kiran</div></div><span style="font:600 11px var(--font-body);color:var(--color-neutral-600)">Track</span></div>
+<div style="padding:12px 12px 6px"><p class="cap">Wants attention</p></div>
+<div class="row" style="align-items:center"><div style="width:4px;align-self:stretch;background:var(--color-accent)"></div><div style="flex:1"><div style="font:800 13px/1.2 var(--font-heading)">Copper wire 1.5mm — 12 left</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">Sells 9 a week</div></div><span style="font:600 11px var(--font-body);color:var(--color-accent)">Restock</span></div>
+<div class="row" style="align-items:center;border-bottom:0"><div style="width:4px;align-self:stretch;background:var(--color-neutral-400)"></div><div style="flex:1"><div style="font:800 13px/1.2 var(--font-heading)">3 customers asked for cement</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">You don't list it yet</div></div><span style="font:600 11px var(--font-body);color:var(--color-accent)">Add</span></div>
+<div class="tabbar" style="grid-template-columns:repeat(4,1fr);margin-top:auto">
+<div class="tab" data-on=""><svg sc-camel-view-box="0 0 24 24"><path d="M3 10 12 3l9 7v11H3z"></path></svg>TODAY</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><rect x="4" y="4" width="16" height="16"></rect><path d="M4 9h16"></path></svg>ITEMS</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>ORDERS</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path></svg>MONEY</div>
+</div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Listings</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA · SHOP</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="flex:1;font:800 16px var(--font-heading)">Items</div><button class="btn btn-primary" style="flex:none">+ Add item</button></div>
+<div style="display:flex;gap:6px;padding:10px 12px;border-bottom:2px solid var(--color-divider);overflow:hidden">
+<span style="background:var(--color-accent);color:#fff;padding:5px 10px;font:600 11px var(--font-body);white-space:nowrap">All 1,240</span>
+<span style="border:1px solid var(--color-divider);padding:5px 10px;font:600 11px var(--font-body);white-space:nowrap">Low 18</span>
+<span style="border:1px solid var(--color-divider);padding:5px 10px;font:600 11px var(--font-body);white-space:nowrap">Hidden 6</span>
+</div>
+<div class="row" style="align-items:center"><div class="thumb" style="width:44px;height:44px"></div><div style="flex:1"><div style="font:800 13px/1.2 var(--font-heading)">LED bulb 9W, pack of 4</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">₹240 · 40 in stock</div></div><div style="width:34px;height:18px;background:var(--color-accent);position:relative"><div style="position:absolute;right:2px;top:2px;width:14px;height:14px;background:#fff"></div></div></div>
+<div class="row" style="align-items:center"><div class="thumb" style="width:44px;height:44px"></div><div style="flex:1"><div style="font:800 13px/1.2 var(--font-heading)">Copper wire 1.5mm, 90m</div><div style="font-size:11px;color:var(--color-accent);margin-top:3px">₹1,180 · only 12 left</div></div><div style="width:34px;height:18px;background:var(--color-accent);position:relative"><div style="position:absolute;right:2px;top:2px;width:14px;height:14px;background:#fff"></div></div></div>
+<div class="row" style="align-items:center"><div class="thumb" style="width:44px;height:44px"></div><div style="flex:1"><div style="font:800 13px/1.2 var(--font-heading)">Ceiling fan capacitor</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">₹90 · 60 in stock</div></div><div style="width:34px;height:18px;background:var(--color-accent);position:relative"><div style="position:absolute;right:2px;top:2px;width:14px;height:14px;background:#fff"></div></div></div>
+<div class="row" style="align-items:center"><div class="thumb" style="width:44px;height:44px"></div><div style="flex:1"><div style="font:800 13px/1.2 var(--font-heading)">Wall putty 5 kg</div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:3px">₹420 · out of stock</div></div><div style="width:34px;height:18px;background:var(--color-neutral-400);position:relative"><div style="position:absolute;left:2px;top:2px;width:14px;height:14px;background:#fff"></div></div></div>
+<div style="padding:14px 12px;border-top:2px solid var(--color-divider);border-bottom:2px solid var(--color-divider);background:var(--color-neutral-100)">
+<p class="cap" style="margin-bottom:8px">Add without typing</p>
+<div style="display:flex;gap:8px"><div style="flex:1;border:1px solid var(--color-text);padding:12px 10px;font:800 11.5px var(--font-heading);text-align:left">SCAN<br>BARCODE</div><div style="flex:1;border:1px solid var(--color-text);padding:12px 10px;font:800 11.5px var(--font-heading);text-align:left">PHOTO OF<br>THE SHELF</div><div style="flex:1;border:1px solid var(--color-text);padding:12px 10px;font:800 11.5px var(--font-heading);text-align:left">IMPORT<br>PRICE LIST</div></div>
+</div>
+<div style="padding:12px;font-size:11.5px;color:var(--color-neutral-600)">A photo of a shelf becomes draft listings you confirm. Nothing goes live until you say so.</div>
+<div class="tabbar" style="grid-template-columns:repeat(4,1fr);margin-top:auto">
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M3 10 12 3l9 7v11H3z"></path></svg>TODAY</div>
+<div class="tab" data-on=""><svg sc-camel-view-box="0 0 24 24"><rect x="4" y="4" width="16" height="16"></rect><path d="M4 9h16"></path></svg>ITEMS</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>ORDERS</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path></svg>MONEY</div>
+</div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Money &amp; fees</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA · SHOP</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="flex:1;font:800 16px var(--font-heading)">Money</div><div class="seg"><label class="seg-opt"><input type="radio" name="sp">Week</label><label class="seg-opt"><input type="radio" name="sp" checked="">Month</label></div></div>
+<div style="padding:14px 12px;border-bottom:2px solid var(--color-divider)"><div style="font:600 10px var(--font-body);letter-spacing:.1em;color:var(--color-neutral-600)">SEPTEMBER · SETTLED TO YOU</div><div style="font:800 38px/1 var(--font-heading);margin:7px 0 5px">₹2,84,120</div><div style="font-size:12px;color:var(--color-neutral-600)">on ₹2,92,907 of orders</div></div>
+<div style="border-bottom:2px solid var(--color-divider)">
+<div style="display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--color-divider);font-size:13px"><span>Orders</span><span>₹2,92,907</span></div>
+<div style="display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--color-divider);font-size:13px"><span>SAAHAA fee · 3%</span><span>− ₹8,787</span></div>
+<div style="display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--color-divider);font-size:13px"><span>Listing fee</span><span>₹0</span></div>
+<div style="display:flex;justify-content:space-between;padding:10px 12px;font-size:13px"><span>Yearly plan</span><span>₹0</span></div>
+</div>
+<div style="padding:14px 12px;background:var(--color-accent);color:#fff;border-bottom:2px solid var(--color-divider)"><div style="font:800 10px var(--font-heading);letter-spacing:.14em;opacity:.85">WHAT AN AGGREGATOR WOULD HAVE TAKEN</div><div style="font:800 30px/1 var(--font-heading);margin:8px 0 6px">₹73,227</div><div style="font-size:12px;opacity:.92">at 25%. You kept ₹64,440 more this month.</div></div>
+<div style="padding:12px 12px 6px"><p class="cap">Payouts</p></div>
+<div style="padding:0 12px"><sc-raw-table class="table"><sc-raw-thead><sc-raw-tr><sc-raw-th>Date</sc-raw-th><sc-raw-th>To</sc-raw-th><sc-raw-th style="text-align:right">Amount</sc-raw-th></sc-raw-tr></sc-raw-thead><sc-raw-tbody>
+<sc-raw-tr><sc-raw-td>Sep 5</sc-raw-td><sc-raw-td>ICICI ··7712</sc-raw-td><sc-raw-td style="text-align:right">₹68,410</sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>Aug 29</sc-raw-td><sc-raw-td>ICICI ··7712</sc-raw-td><sc-raw-td style="text-align:right">₹71,980</sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>Aug 22</sc-raw-td><sc-raw-td>ICICI ··7712</sc-raw-td><sc-raw-td style="text-align:right">₹66,120</sc-raw-td></sc-raw-tr>
+</sc-raw-tbody></sc-raw-table></div>
+<div class="tabbar" style="grid-template-columns:repeat(4,1fr);margin-top:auto">
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M3 10 12 3l9 7v11H3z"></path></svg>TODAY</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><rect x="4" y="4" width="16" height="16"></rect><path d="M4 9h16"></path></svg>ITEMS</div>
+<div class="tab"><svg sc-camel-view-box="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>ORDERS</div>
+<div class="tab" data-on=""><svg sc-camel-view-box="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path></svg>MONEY</div>
+</div>
+</div>
+</div></div>
+
+</div></div>
+
+<div class="dv-opt" id="1g"><div class="dv-olabel"><a class="dv-oid" href="#1g">1g</a>Onboarding — a shop must be live in under three minutes, with no typing it can avoid</div>
+<div class="screens">
+
+<div class="scr"><p class="cap">Which side are you on</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div style="background:var(--color-accent);color:#fff;padding:26px 16px 22px;flex:none">
+<div style="font:800 11px/1 var(--font-heading);letter-spacing:.2em;opacity:.85">SAAHAA</div>
+<div style="font:800 32px/1.06 var(--font-heading);margin:14px 0 8px">Together,<br>we elevate life</div>
+<div style="font-size:13px;opacity:.92;max-width:26ch">One circle for every service and every shop in your neighbourhood.</div>
+</div>
+<div class="sec" style="gap:0;padding:0">
+<div style="padding:16px 14px;border-bottom:1px solid var(--color-divider)"><div style="font:800 18px/1.15 var(--font-heading)">I need something done</div><div style="font-size:12.5px;color:var(--color-neutral-600);margin-top:5px">Find pros and shops near you. Always free.</div></div>
+<div style="padding:16px 14px;border-bottom:1px solid var(--color-divider);background:var(--color-neutral-100)"><div style="font:800 18px/1.15 var(--font-heading)">I offer a service</div><div style="font-size:12.5px;color:var(--color-neutral-600);margin-top:5px">Quote jobs, keep your own prices. 3% only when a job lands.</div></div>
+<div style="padding:16px 14px;border-bottom:2px solid var(--color-divider)"><div style="font:800 18px/1.15 var(--font-heading)">I run a shop</div><div style="font-size:12.5px;color:var(--color-neutral-600);margin-top:5px">A storefront with your stock, live today. No yearly plan.</div></div>
+</div>
+<div style="padding:14px;margin-top:auto"><div style="display:flex;justify-content:space-between;font-size:12px;padding:8px 0;border-bottom:1px solid var(--color-divider)"><span class="text-muted">Cost to list</span><strong>₹0</strong></div><div style="display:flex;justify-content:space-between;font-size:12px;padding:8px 0;border-bottom:1px solid var(--color-divider)"><span class="text-muted">Cost per order</span><strong>3–5%</strong></div><div style="display:flex;justify-content:space-between;font-size:12px;padding:8px 0"><span class="text-muted">Typical aggregator</span><strong style="color:var(--color-accent)">25%</strong></div></div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">Shop setup</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div class="apphdr"><div style="font:800 15px var(--font-heading)">←</div><div style="flex:1;font:800 15px var(--font-heading)">Your shop</div><div style="font:600 11px var(--font-body);color:var(--color-neutral-600)">2 of 4</div></div>
+<div style="height:3px;background:var(--color-neutral-300)"><div style="width:50%;height:3px;background:var(--color-accent)"></div></div>
+<div class="sec" style="gap:16px">
+<div class="field"><label>Shop name</label><div class="input" style="color:var(--color-text)">Sunrise Hardware</div></div>
+<div class="field"><label>What you sell</label><div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:2px">
+<span style="background:var(--color-accent);color:#fff;padding:7px 11px;font:600 11.5px var(--font-body)">Hardware</span>
+<span style="background:var(--color-accent);color:#fff;padding:7px 11px;font:600 11.5px var(--font-body)">Electrical</span>
+<span style="border:1px solid var(--color-divider);padding:7px 11px;font:600 11.5px var(--font-body)">Paint</span>
+<span style="border:1px solid var(--color-divider);padding:7px 11px;font:600 11.5px var(--font-body)">Plumbing</span>
+<span style="border:1px solid var(--color-divider);padding:7px 11px;font:600 11.5px var(--font-body)">Tools</span>
+</div></div>
+<div class="field"><label>Where it is</label><div style="height:116px;border:2px solid var(--color-text);position:relative;overflow:hidden"><svg sc-camel-view-box="0 0 328 116" sc-camel-preserve-aspect-ratio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;display:block"><rect width="328" height="116" fill="#d7d3d3"></rect><g fill="#201e1d" fill-opacity=".13"><rect x="8" y="8" width="52" height="30"></rect><rect x="66" y="8" width="26" height="30"></rect><rect x="128" y="8" width="58" height="30"></rect><rect x="236" y="8" width="56" height="30"></rect><rect x="8" y="74" width="52" height="34"></rect><rect x="128" y="74" width="44" height="34"></rect><rect x="236" y="74" width="56" height="34"></rect></g><g fill="#f8f4f4"><rect x="0" y="44" width="328" height="24"></rect><rect x="98" y="0" width="24" height="116"></rect><rect x="200" y="0" width="30" height="116"></rect></g><g stroke="#201e1d" stroke-opacity=".38" stroke-width="1"><path d="M0 44h328M0 68h328M98 0v116M122 0v116M200 0v116M230 0v116"></path></g><line x1="0" y1="56" x2="328" y2="56" stroke="#201e1d" stroke-opacity=".4" stroke-width="1" stroke-dasharray="9 7"></line><g fill="#201e1d" fill-opacity=".55" font-family="Archivo, sans-serif" font-size="8" font-weight="600" letter-spacing="1.4"><text x="8" y="40">MARKET STREET</text></g><circle cx="164" cy="56" r="30" fill="#ec3013" fill-opacity=".14" stroke="#ec3013" stroke-opacity=".5" stroke-dasharray="5 5"></circle><rect x="155" y="47" width="18" height="18" fill="#ec3013" stroke="#fff" stroke-width="3"></rect></svg><div style="position:absolute;right:8px;bottom:8px;background:#fff;border:1px solid var(--color-text);padding:4px 8px;font:800 9px var(--font-heading);letter-spacing:.06em;white-space:nowrap">300 M RANGE</div></div><div style="font-size:11px;color:var(--color-neutral-600);margin-top:5px">Drag the pin. We use it to show you to people nearby.</div></div>
+<div class="field"><label>Open hours</label><div style="display:flex;gap:8px"><div class="input" style="flex:1;color:var(--color-text)">9:00 am</div><div class="input" style="flex:1;color:var(--color-text)">8:00 pm</div></div><label class="radio" style="margin-top:8px"><input type="checkbox"><span class="dot"></span><span style="font-size:12.5px">Same every day</span></label></div>
+</div>
+<div style="margin-top:auto;padding:12px;border-top:2px solid var(--color-divider);display:flex;gap:8px"><button class="btn btn-secondary" style="flex:none">Back</button><button class="btn btn-primary" style="flex:1;justify-content:flex-start">Next — add your stock</button></div>
+</div>
+</div></div>
+
+<div class="scr"><p class="cap">You're live</p><div class="ph">
+<div class="sb"><span>9:41</span><span>SAAHAA</span><span>100%</span></div>
+<div class="phbody">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:20px 16px;gap:18px">
+<div style="width:56px;height:56px;background:var(--color-accent);color:#fff;display:grid;place-items:center;font:800 26px var(--font-heading)">✓</div>
+<div><div style="font:800 30px/1.06 var(--font-heading)">Sunrise Hardware<br>is live in Kondapur</div><div style="font-size:13px;color:var(--color-neutral-600);margin-top:10px;line-height:1.6">1,240 items imported from your price list. 118 people searched for hardware here last week.</div></div>
+<div style="border:2px solid var(--color-text);padding:14px"><div class="cap" style="margin-bottom:9px">Your public storefront</div><div style="font:600 12.5px var(--font-body);word-break:break-all">saahaa.com/sunrise‑hardware</div><div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-secondary" style="flex:1;justify-content:flex-start">Copy link</button><button class="btn btn-secondary" style="flex:1;justify-content:flex-start">Share on WhatsApp</button></div></div>
+<div style="display:flex;justify-content:space-between;font-size:12px;padding-top:12px;border-top:1px solid var(--color-divider)"><span class="text-muted">You paid to get here</span><strong>₹0</strong></div>
+</div>
+<div style="padding:12px;border-top:2px solid var(--color-divider)"><button class="btn btn-primary btn-block" style="justify-content:flex-start;padding:12px">Open my dashboard →</button></div>
+</div>
+</div></div>
+
+</div></div>
+
+<div class="dv-opt" id="1h"><div class="dv-olabel"><a class="dv-oid" href="#1h">1h</a>Public landing page — the fee argument carries the page, poster-style close</div>
+<div style="width:1080px;border:2px solid var(--color-text);background:#fff;box-shadow:var(--shadow-md);overflow:hidden;font-family:var(--font-body)">
+<div class="nav" style="border-bottom:2px solid var(--color-text)"><span class="nav-brand">SAAHAA</span><a href="#1h">For shops</a><a href="#1h">For pros</a><a href="#1h">Pricing</a><a href="#1h">How it works</a><button class="btn btn-primary" style="margin-left:8px">List your shop free</button></div>
+<div style="display:grid;grid-template-columns:1.35fr 1fr;border-bottom:2px solid var(--color-text)">
+<div style="padding:52px 44px 44px;border-right:2px solid var(--color-text)">
+<div style="font:800 11px/1 var(--font-heading);letter-spacing:.2em;color:var(--color-accent)">TOGETHER, WE ELEVATE LIFE</div>
+<h1 style="font-size:66px;line-height:.98;margin:20px 0 18px;letter-spacing:-.02em">Your shop online.<br>Nothing upfront.<br>3% when you sell.</h1>
+<p style="font-size:17px;max-width:46ch;color:var(--color-neutral-800)">Every service and every shop in one circle. Pros keep the full price they quote. Shops pay a per-order fee, not a quarter of the bill and not a yearly plan.</p>
+<div style="display:flex;gap:10px;margin-top:24px"><button class="btn btn-primary" style="padding:13px 20px;font-size:15px">List your shop — free</button><button class="btn btn-secondary" style="padding:13px 20px;font-size:15px">Find a pro near me</button></div>
+<div style="font-size:12.5px;color:var(--color-neutral-600);margin-top:14px">No card. No developer. Live the same day.</div>
+</div>
+<div style="background:var(--color-neutral-300);display:grid;place-items:center;min-height:400px;font:600 10px/1 ui-monospace,monospace;letter-spacing:.12em;color:var(--color-neutral-700)" class="grayscale">SHOPKEEPER PHOTOGRAPH — B&amp;W</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid var(--color-text)">
+<div style="padding:22px 20px;border-right:1px solid var(--color-divider)"><div style="font:800 34px/1 var(--font-heading)">3–5%</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:6px">PER ORDER, SHOPS</div></div>
+<div style="padding:22px 20px;border-right:1px solid var(--color-divider)"><div style="font:800 34px/1 var(--font-heading)">100%</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:6px">OF THE QUOTE, PROS</div></div>
+<div style="padding:22px 20px;border-right:1px solid var(--color-divider)"><div style="font:800 34px/1 var(--font-heading)">₹0</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:6px">TO LIST, EVER</div></div>
+<div style="padding:22px 20px"><div style="font:800 34px/1 var(--font-heading)">1/7</div><div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:6px">THE COST OF A WEBSITE</div></div>
+</div>
+<div style="padding:40px 44px;border-bottom:2px solid var(--color-text)">
+<h2 style="font-size:36px;margin:0 0 26px">The maths every shopkeeper already knows</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border:2px solid var(--color-text)">
+<div style="padding:26px;border-right:2px solid var(--color-text)"><div class="cap" style="margin-bottom:12px">On an aggregator, ₹1,00,000 of orders</div><div style="font:800 46px/1 var(--font-heading);color:var(--color-neutral-600)">₹75,000</div><div style="font-size:13px;color:var(--color-neutral-700);margin-top:10px">reaches you. ₹25,000 goes to commission — plus the yearly plan you pay whether you sell or not.</div></div>
+<div style="padding:26px;background:var(--color-accent);color:#fff"><div style="font:600 9.5px/1 ui-monospace,monospace;letter-spacing:.1em;opacity:.85;margin-bottom:12px">ON SAAHAA, ₹1,00,000 OF ORDERS</div><div style="font:800 46px/1 var(--font-heading)">₹97,000</div><div style="font-size:13px;margin-top:10px;opacity:.95">reaches you. ₹3,000 in per-order fees, nothing else. No plan, no listing charge, no setup.</div></div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:2px solid var(--color-text)">
+<div style="padding:34px 28px;border-right:1px solid var(--color-divider)"><div class="cap">01</div><h4 style="margin:12px 0 8px;font-size:22px">Say what you do</h4><p style="font-size:14px;color:var(--color-neutral-700);margin:0">Name, area, hours, and what you sell. Photograph a shelf or send your price list — we turn it into listings you approve.</p></div>
+<div style="padding:34px 28px;border-right:1px solid var(--color-divider)"><div class="cap">02</div><h4 style="margin:12px 0 8px;font-size:22px">Neighbours find you</h4><p style="font-size:14px;color:var(--color-neutral-700);margin:0">You appear in searches, on the map, and in the requests people post. Your prices, your slots, your rules.</p></div>
+<div style="padding:34px 28px"><div class="cap">03</div><h4 style="margin:12px 0 8px;font-size:22px">Pay only on orders</h4><p style="font-size:14px;color:var(--color-neutral-700);margin:0">Fee comes out per completed order. Weekly payout to your bank. Stop any time and keep your storefront link.</p></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid var(--color-text)">
+<div style="padding:40px 44px;border-right:2px solid var(--color-text)"><div class="cap">FOR PROS</div><h3 style="font-size:30px;margin:12px 0 10px">You set the price. All of it is yours.</h3><p style="font-size:14.5px;color:var(--color-neutral-700)">Jobs near you arrive with photos and a description. Quote in two taps, chat, get paid in cash or on the app. Your rating travels with you.</p><button class="btn btn-secondary" style="margin-top:8px">Start taking jobs</button></div>
+<div style="padding:40px 44px"><div class="cap">FOR CUSTOMERS</div><h3 style="font-size:30px;margin:12px 0 10px">One place for the whole neighbourhood.</h3><p style="font-size:14.5px;color:var(--color-neutral-700)">Post what you need and let nearby pros answer, or order from the shop down the road. No markup added to their prices.</p><button class="btn btn-secondary" style="margin-top:8px">Browse near me</button></div>
+</div>
+<div style="background:var(--color-accent);color:#fff;padding:64px 44px;border-bottom:2px solid var(--color-text)">
+<div style="font:800 54px/1.04 var(--font-heading);max-width:22ch;letter-spacing:-.02em">One circle.<br>One purpose.</div>
+<p style="font-size:17px;max-width:44ch;margin:20px 0 26px;opacity:.95">Care. Protect. Serve. Build. Elevate. Whatever you do in this neighbourhood, it belongs here.</p>
+<button class="btn" style="background:#fff;color:var(--color-accent);padding:14px 22px;font-size:15px">Join SAAHAA — free</button>
+</div>
+<div style="display:flex;gap:36px;padding:26px 44px;font-size:12.5px;color:var(--color-neutral-700)"><span class="nav-brand" style="margin:0;font-size:15px">SAAHAA</span><a href="#1h">Pricing</a><a href="#1h">For shops</a><a href="#1h">For pros</a><a href="#1h">Support</a><span style="margin-left:auto">© 2026 SAAHAA</span></div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Try next: “make the landing page mobile too” · “add the pro's job-in-progress screen” · “replace my copy in <a class="dv-oid" href="#1h">1h</a>” · “show <a class="dv-oid" href="#1f">1f</a> as a desktop dashboard”</p>
+</section></x-dc>
+
+
+</body></html>
