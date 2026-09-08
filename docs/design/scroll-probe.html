@@ -1,0 +1,51 @@
+<!doctype html><meta charset=utf-8><title>scroll probe</title>
+<!-- SAAHAA · the home header's collapse, tested in a real engine.
+
+     The header is sticky and folds to just the search bar on the way down.
+     It once used a 12px hysteresis and animated max-height/padding/margin, so
+     ordinary scroll wobble flipped it constantly and every flip re-laid-out the
+     page: the "buffering while scrolling". This page proves it does not.
+
+     Run it (the dev server must be up on 8772):
+
+       chrome --headless=new --disable-gpu --hide-scrollbars --window-size=900,900          --virtual-time-budget=40000 --user-data-dir=<tmp> --dump-dom          http://127.0.0.1:8772/docs/design/scroll-probe.html
+
+     Expect: flips 1 · wobbleFlips 0 · afterUp.compact false · atTop.compact false.
+     Not shipped — nothing under docs/ is deployed (tools/build.py --site). -->
+<style>html,body{margin:0}iframe{width:420px;height:760px;border:0}</style>
+<div id=out>running…</div>
+<iframe id=f src="/index.html?demo=1&probe=1"></iframe>
+<script>
+const log=[];
+const done=t=>{document.getElementById('out').textContent='RESULT '+JSON.stringify(t);document.title='done';};
+window.addEventListener('load',async()=>{
+  const f=document.getElementById('f'), w=f.contentWindow, d=f.contentDocument;
+  await new Promise(r=>setTimeout(r,3500));
+  const sp=d.querySelector('.splash'); if(sp) sp.remove();
+  d.documentElement.style.scrollBehavior='auto';   // harness: land the scroll at once, do not animate it
+  const hdr=()=>d.querySelector('.hdr--home');
+  const compact=()=>!!(hdr()&&hdr().classList.contains('hdr--compact'));
+  const to=async y=>{ w.scrollTo(0,y); w.dispatchEvent(new Event('scroll')); await new Promise(r=>setTimeout(r,40)); };
+  if(!hdr()) return done({error:'no header'});
+  await to(900);
+  const diag={scrollY:w.scrollY, docTop:d.documentElement.scrollTop, bodyTop:d.body.scrollTop,
+    docH:d.documentElement.scrollHeight, iframeH:w.innerHeight,
+    hdrPos:w.getComputedStyle(hdr()).position, cls:hdr().className};
+  await to(0);
+  // 1 · a steady scroll down must collapse it exactly once
+  let flips=0,prev=compact();
+  for(let y=0;y<=900;y+=30){ await to(y); if(compact()!==prev){flips++;prev=compact();} }
+  const afterDown={compact:compact(),flips};
+  // 2 · trackpad wobble at depth: +-20px must NOT flip it
+  let wobbleFlips=0; prev=compact();
+  for(const y of [900,880,900,885,905,890,900,882,901]){ await to(y); if(compact()!==prev){wobbleFlips++;prev=compact();} }
+  // 3 · a deliberate scroll up must bring it back
+  const upTrace=[];
+  for(let y=900;y>=700;y-=20){ await to(y); upTrace.push(y+':'+(compact()?'C':'e')); }
+  const afterUp={compact:compact(),upTrace};
+  // 4 · back to the top is always expanded
+  await to(0);
+  const topTrace='0:'+(compact()?'C':'e')+' y='+w.scrollY;
+  done({topTrace,diag,afterDown,wobbleFlips,afterUp,atTop:{compact:compact()}});
+});
+</script>

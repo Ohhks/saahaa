@@ -24,7 +24,7 @@
    Flow panel on the dashboard exists so that separation is the first thing
    the owner sees, not a footnote. */
 
-import { mount, esc, toast, timeAgo, clockTime, sheet, closeSheet, $ } from '../dom.js';
+import { mount, esc, toast, timeAgo, clockTime, sheet, closeSheet, delegate, $ } from '../dom.js';
 import { icon } from '../icons.js';
 import { ctx, getState, dispatch } from '../../core/ctx.js';
 import { get, namespaces, count } from '../../core/registry.js';
@@ -50,12 +50,16 @@ import * as gateway from '../../core/gateway.js';
 import { paymentsConfig, setPaymentsConfig, clearPaymentsConfig } from '../../core/config.js';
 import { quoteService, quoteRetail, GST_RATE } from '../../domain/pricing.js';
 import { geoOf } from '../../domain/match.js';
+import * as ID from '../../domain/identity.js';
 import * as gmap from '../map.js';
 
 let section = 'dash';
 let testResult = null, chainResult = null;
 /* FLOW: which role is being watched, and whose journey is open. */
 let flowRole = 'all', flowPick = null;
+/* FLOW SEARCH: a name, a mobile, an area — or the account code a caller reads
+   out. Purely a filter over rows already computed; it writes nothing. */
+let flowQuery = '';
 /* MAP: the live Leaflet handle and the element it was built into. */
 let mapHandle = null, mapEl = null, mapForce = false;
 export const setSection = s => { section = s; };
@@ -175,6 +179,16 @@ const facts = parts => `<div class="ad-facts">
   ${parts.filter(Boolean).map(p => `<span class="chip chip--smart">${p}</span>`).join('')}</div>`;
 
 const empty = msg => `<div class="empty"><p class="tiny muted">${esc(msg)}</p></div>`;
+
+/* ── the account code, on every row that names a person ────────
+   C20262001 / P20262001 / S20262001 is what the caller reads out. It is not a
+   secret, so it is printed whole; an account too old to carry one shows an
+   em dash rather than an empty cell the owner has to interpret. */
+const codeOf = u => (u && ID.isCode(u.code)) ? ID.normaliseCode(u.code) : '';
+const codeCell = u => { const c = codeOf(u); return c ? `<b class="num">${esc(c)}</b>` : '<span class="muted">—</span>'; };
+/** partner row -> the user account behind it */
+const userOfPartner = (st, p) => st.users.find(u => u.key === p.userKey)
+  || st.users.find(u => u.partnerId === p.id) || null;
 
 const secHead = (title, right = '') =>
   `<div class="hd"><h2 class="h-sec">${esc(title)}</h2>${right}</div>`;
@@ -587,7 +601,8 @@ function approvals(st) {
       return cmd({
         tone: next === 3 ? '' : 'card--gold',
         title: `${esc(p.name)}`,
-        sub: `${esc(get('category', p.cat).name)} · ${esc(p.area)} · ${esc(tier(p.tier).label)} · trust ${t.score}`,
+        /* the code first: it is what the owner will say on the phone */
+        sub: `${(u => u ? `<b class="num">${esc(u)}</b> · ` : '')(codeOf(userOfPartner(st, p)))}${esc(get('category', p.cat).name)} · ${esc(p.area)} · ${esc(tier(p.tier).label)} · trust ${t.score}`,
         right: pill(t.band.label, t.band.tone),
         facts: evidence,
         actions: `<button class="btn btn--primary btn--sm grow" data-act="admin.approve" data-id="${p.id}" data-tier="${next}">Approve → ${esc(tier(next).label)}</button>
@@ -599,15 +614,17 @@ function approvals(st) {
 
   <div class="ad-split">
   <div class="sec">${secHead(`Self-verifying now · ${inProgress.length}`)}
-    ${table(['Pro', 'Trade', ['Done', 'num'], 'Next step'], inProgress.map(p => { const r = V.readiness(p); return `<tr>
+    ${table(['Pro', 'ID', 'Trade', ['Done', 'num'], 'Next step'], inProgress.map(p => { const r = V.readiness(p); return `<tr>
       <td class="nowrap"><b>${esc(p.name)}</b></td>
+      <td class="nowrap">${codeCell(userOfPartner(st, p))}</td>
       <td>${esc(get('category', p.cat).name)}</td>
       <td class="num">${r.pct}%</td>
       <td>${esc(r.next ? r.next.title : '—')}</td></tr>`; }).join(''), 'Nobody mid-way.')}</div>
 
   <div class="sec" style="border-top:0">${secHead(`Shop applications · ${shops.length}`)}
-    ${table(['Shop', 'Area', 'Status'], shops.map(s => `<tr>
+    ${table(['Shop', 'Owner ID', 'Area', 'Status'], shops.map(s => `<tr>
       <td class="nowrap"><b>${esc(s.name)}</b></td>
+      <td class="nowrap">${codeCell(st.users.find(u => u.key === s.ownerKey) || st.users.find(u => u.shopId === s.id))}</td>
       <td>${esc(s.area)}</td>
       <td>${pill(s.status, 'warn')}</td></tr>`).join(''), 'No shops waiting.')}</div>
   </div>`;
@@ -796,10 +813,11 @@ function people(st) {
 
   <div class="sec">${secHead(`Pros · ${st.partners.length}`,
       `<span class="avatars">${st.partners.slice(0, 6).map(p => avatar(p.name)).join('')}</span>`)}
-    ${table(['Pro', 'Trade', ['Jobs', 'num'], 'Area', 'Tier', 'Trust', ''], st.partners.map(p => {
+    ${table(['Pro', 'ID', 'Trade', ['Jobs', 'num'], 'Area', 'Tier', 'Trust', ''], st.partners.map(p => {
       const t = trustScore(p);
       return `<tr>
         <td class="nowrap"><b>${esc(p.name)}</b>${p.suspended ? '<span class="sub">suspended</span>' : ''}</td>
+        <td class="nowrap">${codeCell(userOfPartner(st, p))}</td>
         <td>${esc(get('category', p.cat).name)}<span class="sub">${(p.vouches || []).length} vouch${(p.vouches || []).length === 1 ? '' : 'es'}${(p.tier | 0) >= 3 && p.tier3At
           ? ` · checked ${esc(new Date(p.tier3At).toLocaleDateString('en-IN'))}` : ''}</span></td>
         <td class="num">${p.completed}</td>
@@ -815,8 +833,9 @@ function people(st) {
     }).join(''), 'No pros yet.')}</div>
 
   <div class="sec">${secHead(`Customers · ${customers.length}`)}
-    ${table(['Customer', 'Mobile', 'Area'], customers.map(u => `<tr>
+    ${table(['Customer', 'ID', 'Mobile', 'Area'], customers.map(u => `<tr>
       <td class="nowrap"><b>${esc(u.name)}</b></td>
+      <td class="nowrap">${codeCell(u)}</td>
       <td class="nowrap muted">${esc(u.mobile)}</td>
       <td>${esc(u.area)}</td></tr>`).join(''), 'No customers yet.')}</div>`;
 }
@@ -834,6 +853,11 @@ function people(st) {
 const ROLE_CHIPS = [['all', 'Everyone'], ['customer', 'Customers'], ['partner', 'Pros'], ['shop', 'Shop owners']];
 const ROLE_LABEL = { customer: 'Customer', partner: 'Pro', shop: 'Shop owner' };
 const FLOW_ROWS = 60, FLOW_EVENTS = 40;
+
+/* The flow search is a delegated listener, not a registered action: it filters
+   rows that are already computed and writes nothing to the store. mount()
+   keeps the caret where the owner left it. */
+delegate('input', '#adFlowQ', (e, el) => { flowQuery = el.value; flowPick = null; ctx.render(); });
 
 /* Who an in-flight order is waiting on, in the owner's words. The stage machine
    names an owner for every stage, so a stalled order is always stalled AT
@@ -859,8 +883,22 @@ function flowRows(st) {
   const put = (m, k, o) => { if (!k) return; if (!m.has(k)) m.set(k, []); m.get(k).push(o); };
   st.orders.forEach(o => { put(byCustomer, o.customerKey, o); put(byPartner, o.partnerId, o); put(byShop, o.shopId, o); });
 
+  /* "C2026 2001" typed with a space is the same code; a mobile is matched on
+     its digits. Everything else is a plain case-insensitive substring. */
+  const q = flowQuery.trim().toLowerCase();
+  const qCode = ID.normaliseCode(flowQuery);
+  const qDigits = flowQuery.replace(/\D/g, '');
+  const hit = u => {
+    if (!q) return true;
+    const c = codeOf(u);
+    if (c && qCode && c.includes(qCode)) return true;
+    if (qDigits.length >= 3 && String(u.mobile || '').includes(qDigits)) return true;
+    return `${u.name || ''} ${u.area || ''} ${(u.loc && u.loc.label) || ''} ${u.role || ''}`.toLowerCase().includes(q);
+  };
+
   return st.users
     .filter(u => flowRole === 'all' || u.role === flowRole)
+    .filter(hit)
     .map(u => {
       const p = u.role === 'partner' ? st.partners.find(x => x.userKey === u.key || x.id === u.partnerId) : null;
       const sh = u.role === 'shop' ? st.shops.find(x => x.ownerKey === u.key || x.id === u.shopId) : null;
@@ -895,7 +933,7 @@ function flowRows(st) {
         : `${orders.length} order${orders.length === 1 ? '' : 's'} · spent ${M.fmt(spend)}`;
 
       const live = !!(latest && !stage(latest.stage).terminal);
-      return { key: u.key, name: u.name, role: u.role, place, step, seen, orders, counts, live, hold: live ? holdOf(latest) : null };
+      return { key: u.key, name: u.name, code: codeOf(u), role: u.role, place, step, seen, orders, counts, live, hold: live ? holdOf(latest) : null };
     })
     .sort((a, b) => b.seen - a.seen)
     .slice(0, FLOW_ROWS);
@@ -914,7 +952,7 @@ function flowTimeline(row) {
   evs.sort((a, b) => b.ts - a.ts);
   const list = evs.slice(0, FLOW_EVENTS);
   if (!list.length) return empty('Nothing recorded for this person yet.');
-  return `<div class="eyebrow" style="margin-bottom:var(--sp-4)">${esc(row.name)} — the whole journey</div>
+  return `<div class="eyebrow" style="margin-bottom:var(--sp-4)">${esc(row.name)}${row.code ? ' · ' + esc(row.code) : ''} — the whole journey</div>
     ${table(['When', 'Event', 'Detail'], list.map(e => `<tr>
       <td class="nowrap">${esc(clockTime(e.ts))}<span class="sub">${esc(timeAgo(e.ts))}</span></td>
       <td class="nowrap"><b>${esc(e.title)}</b></td>
@@ -928,7 +966,7 @@ function flowRow(row) {
   return `<tr class="${open ? 'on' : ''}">
     <td><button class="ad-rowbtn" aria-expanded="${open ? 'true' : 'false'}"
         data-act="admin.flow.pick" data-key="${esc(row.key)}">
-        <b>${esc(row.name)}</b><span class="sub">${esc(ROLE_LABEL[row.role] || row.role)}</span></button></td>
+        <b>${esc(row.name)}</b><span class="sub">${esc(ROLE_LABEL[row.role] || row.role)}${row.code ? ' · ' + esc(row.code) : ''}</span></button></td>
     <td>${esc(row.place)}</td>
     <td>${esc(row.step)}${row.live ? ' <span class="pill pill--live">in flight</span>' : ''}
       ${row.hold ? `<span class="sub">Held by <b>${esc(row.hold.who)}</b> · ${M.fmt(row.hold.money)} on this order${row.hold.next.length ? ` → ${esc(row.hold.next.join(' / '))}` : ''}</span>` : ''}</td>
@@ -951,8 +989,15 @@ function flowBlock(st) {
           data-act="admin.flow.filter" data-role="${k}">${esc(l)}</button>`).join('')}
       </div>
     </div>
+    <div class="search" style="margin-bottom:var(--sp-5)">
+      ${icon('search', { size: 16 })}
+      <input id="adFlowQ" type="search" value="${esc(flowQuery)}" autocomplete="off"
+        placeholder="Name, mobile, area — or the ID they read out (C20262001)"
+        aria-label="Find a person by name, mobile, area or SAAHAA ID">
+    </div>
     ${table(['Who', 'Where', 'Step', 'Seen', 'Spent / earned'], rows.map(r => flowRow(r)).join(''),
-      flowRole === 'all' ? 'Nobody has signed up yet.' : 'Nobody in that role yet.')}
+      flowQuery.trim() ? `Nobody matches “${flowQuery.trim()}”.`
+        : flowRole === 'all' ? 'Nobody has signed up yet.' : 'Nobody in that role yet.')}
     ${rows.length >= FLOW_ROWS ? `<p class="micro muted" style="margin-top:var(--sp-4)">Showing the ${FLOW_ROWS} most recently active.</p>` : ''}
   </div>`;
 }

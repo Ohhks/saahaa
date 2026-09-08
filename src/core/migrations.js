@@ -6,6 +6,7 @@
    The self-test suite asserts exactly that against fixtures. */
 
 import { registerMigration } from './migrate.js';
+import { backfillCodes } from '../domain/identity.js';
 import { defaultState } from '../domain/state.js';
 import { toPaise } from './money.js';
 import { depthRoster } from '../domain/seed.depth.js';
@@ -174,6 +175,20 @@ registerMigration({
     next.settings = { ...st, automation: st.automation && typeof st.automation === 'object' ? st.automation : null };
     next.partners = (old.partners || []).map(p => ({ ...p, vouches: Array.isArray(p.vouches) ? p.vouches : [],
                                                      tier3At: p.tier3At || ((p.tier | 0) >= 3 ? (p.verifiedAt || old.createdAt || 0) : 0) }));
+    return next;
+  },
+});
+
+/* v9 -> v10 · every account gets a code a person can say out loud
+   (domain/identity.js): C20262001 for a customer, P… for a pro, S… for a shop
+   owner. Existing accounts keep the internal `key` that orders, partner rows
+   and ledger legs point at — only the code is new, assigned oldest first so
+   the sequence follows the order people actually joined. */
+registerMigration({
+  from: 9, to: 10, label: 'v9 -> v10 (account codes)',
+  up(old) {
+    const next = { ...old, schemaVersion: 10 };
+    next.users = backfillCodes(old.users || []);
     return next;
   },
 });

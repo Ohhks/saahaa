@@ -27,7 +27,8 @@
    SETUP screen: name, what you sell, where it is, then "Next — add your
    stock", which drops the owner into the console with the ready list. */
 
-import { mount, esc, toast } from '../dom.js';
+import { mount, esc, toast, sheet } from '../dom.js';
+import * as ID from '../../domain/identity.js';
 import { liveMarkup, AGG_COMMISSION } from '../../domain/pricing.js';
 import { getPricing } from '../../domain/settings.js';
 import { icon, hasIcon } from '../icons.js';
@@ -123,9 +124,11 @@ export function render() {
 
 function loginForm() {
   return `
-  <div class="au__step" style="border-top:0"><b>Sign in</b><span>Your number is your account</span></div>
+  <div class="au__step" style="border-top:0"><b>Sign in</b><span>Your number, or your SAAHAA ID</span></div>
   <div class="au__form">
-    <div class="field"><input id="lgMobile" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel"><label>10-digit mobile</label></div>
+    <div class="field"><input id="lgMobile" inputmode="text" maxlength="12" placeholder=" " autocomplete="username" autocapitalize="characters"><label>Mobile number or SAAHAA ID</label></div>
+    <p class="micro muted" style="margin:-8px 0 14px">A SAAHAA ID — <b class="num">C20262001</b>, <b class="num">P20262001</b>, <b class="num">S20262001</b> —
+      opens the account it names. Your mobile number works just as well; if it carries two accounts we ask which one.</p>
     <div class="field"><input id="lgPass" type="password" placeholder=" " autocomplete="current-password"><label>Password</label></div>
     <!-- Sign-in is mobile + password. This field is retired, not renamed: the id
          stays so the UI contract guard can see it was not silently dropped. -->
@@ -242,7 +245,9 @@ function signupForm() {
       <div class="au__foot">
         <button class="btn btn-primary btn--lg" data-act="auth.signup">
           ${role === 'shop' ? 'Next — add your stock' : role === 'partner' ? 'Next — get verified' : 'Create my account'}</button>
-        <p class="micro muted" style="margin-top:10px">One account per mobile number. ₹0 to join, ever.</p>
+        <p class="micro muted" style="margin-top:10px">One ${esc((ID.ROLE_LABEL[role] || 'account').toLowerCase())} account per mobile number —
+          the same number can hold a customer account <i>and</i> a pro account, each with its own password, wallet and history.
+          You get a SAAHAA ID (${role === 'shop' ? 'S' : role === 'partner' ? 'P' : 'C'}2026&hellip;) the moment this is done. ₹0 to join, ever.</p>
       </div>
     </div>
   </div>`;
@@ -344,19 +349,36 @@ export function choosePlace(d) {
 /* ── handlers ──────────────────────────────────────────────── */
 const val = id => (document.getElementById(id) || {}).value || '';
 
-export async function doLogin() {
-  const mobile = normaliseMobile(val('lgMobile')), pw = val('lgPass');
-  if (!mobile) { toast('Enter your 10-digit mobile', 'danger'); return; }
+export async function doLogin(pickedKey = null) {
+  const typed = val('lgMobile').trim(), pw = val('lgPass');
+  if (!typed) { toast('Enter your mobile number or your SAAHAA ID', 'danger'); return; }
+
+  /* A code names ONE account; a number may now carry several — a plumber who
+     also buys groceries holds a C... and a P.... Both resolve here. */
+  const r = ID.resolve(typed, getState().users);
+  if (r.kind === 'unknown') { toast('That is not a 10-digit number or a SAAHAA ID', 'danger'); return; }
+
   /* Unlimited guesses against a 4-digit-thinking population is not a login
-     form, it is a doorway. core/security.js keeps the count. */
-  const gate = loginGate(mobile);
+     form, it is a doorway. core/security.js keeps the count, against the
+     NUMBER behind whatever was typed, so a code cannot be used to dodge it. */
+  const gateKey = r.mobile || (r.matches[0] && normaliseMobile(r.matches[0].mobile)) || typed;
+  const gate = loginGate(gateKey);
   if (gate.blocked) {
     toast(`Too many attempts — try again in ${Math.ceil(gate.waitMs / 1000)}s`, 'danger'); return;
   }
-  /* The number is the identity. The internal key is untouched — every order,
-     partner and shop record still points at it. */
-  const u = getState().users.find(x => normaliseMobile(x.mobile) === mobile);
-  if (!u) { noteLoginFail(mobile); toast('No account on that number — create one first', 'danger'); return; }
+
+  if (!r.matches.length) {
+    noteLoginFail(gateKey);
+    toast(r.kind === 'code' ? 'No account with that ID' : 'No account on that number — create one first', 'danger');
+    return;
+  }
+  /* Two accounts on one number: ask which, rather than guessing. The password
+     is checked after the choice, so this reveals only what the person typing
+     already knows — that this number is here. */
+  if (r.matches.length > 1 && !pickedKey) { pickAccount(r.matches); return; }
+  const u = pickedKey ? r.matches.find(x => x.key === pickedKey) : r.matches[0];
+  if (!u) { toast('Pick which account to open', 'warn'); return; }
+  const mobile = normaliseMobile(u.mobile);
   const h = await sha256(pw);
   if (u.pass && u.pass !== h) {
     const f = noteLoginFail(mobile);
@@ -365,9 +387,57 @@ export async function doLogin() {
   }
   noteLoginOk(mobile);
   saveSession({ ...u });          // survives a refresh and a PWA relaunch
-  audit.record('user.login', { key: u.key, role: u.role }, u.key);
+  audit.record('user.login', { key: u.key, code: u.code || null, role: u.role }, u.key);
   toast(`Welcome back, ${u.name.split(' ')[0]}`);
   ctx.go(u.role === 'partner' ? 'partner' : u.role === 'shop' ? 'shopadmin' : 'home');
+}
+
+/* One number, more than one account. A sheet, so the password typed
+   underneath survives the choice — picking is not re-typing. */
+export function pickAccount(matches) {
+  sheet('Which account?', `
+    <p class="tiny muted" style="margin-bottom:12px">This number has ${matches.length} accounts on it. They keep separate wallets,
+      separate histories and separate passwords &mdash; the password you typed opens whichever you pick.</p>
+    ${matches.map(u => `
+      <button class="m-row" style="width:100%;text-align:left" data-act="auth.pick" data-key="${esc(u.key)}">
+        <span class="thumb m-thumb" aria-hidden="true">${icon(u.role === 'partner' ? 'navEarn' : u.role === 'shop' ? 'groupShops' : 'person', { size: 18 })}</span>
+        <span class="grow" style="min-width:0">
+          <b style="display:block">${esc(ID.ROLE_LABEL[u.role] || 'Account')}${u.name ? ' \u00b7 ' + esc(u.name) : ''}</b>
+          <small class="num" style="letter-spacing:.08em">${esc(ID.normaliseCode(u.code || ''))}</small>
+        </span>
+        <span aria-hidden="true">&rarr;</span>
+      </button>`).join('')}`);
+}
+
+/* \u2500\u2500 the one moment they will write it down \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+   Sign-up is finished and the person is already inside; this sheet rides on
+   top of the destination and says, plainly, what their account is called. The
+   code is NOT a secret \u2014 printed whole, never masked. Nothing here changes
+   what doSignup did: the account is announced, not created.
+
+   The Copy button carries the class `idcopy`; ui/views/account.js registers
+   the single delegated listener for it, so no new registered action exists. */
+export function announceNewId(user) {
+  const code = ID.normaliseCode((user && user.code) || '');
+  if (!ID.isCode(code)) return;
+  const word = (ID.ROLE_LABEL[user.role] || 'Account').toLowerCase();
+  const first = String(user.name || '').split(' ')[0];
+  sheet('Your SAAHAA ID', `
+    <p class="tiny muted" style="margin-bottom:14px">Welcome${first ? ', ' + esc(first) : ''}. This is what your ${esc(word)} account is called.</p>
+    <div style="display:flex;align-items:center;gap:10px;padding:12px;border:2px solid var(--color-text);background:var(--color-surface)">
+      <span style="flex:1;min-width:0">
+        <span class="meta" style="display:block">Your ${esc(word)} ID</span>
+        <b class="num" style="display:block;margin-top:2px;font:800 24px/1.1 var(--font-heading);letter-spacing:.1em;-webkit-user-select:all;user-select:all">${esc(code)}</b>
+      </span>
+      <button type="button" class="btn btn-secondary btn--sm idcopy tap" data-code="${esc(code)}"
+        style="flex:none" aria-label="Copy your ${esc(word)} ID, ${esc(code)}">Copy</button>
+    </div>
+    <p class="micro muted" style="margin-top:12px">Write it down. Sign in with it or with your mobile number &mdash; either works.
+      It is a name, not a secret: it says who you are, your password proves it.</p>
+    <p class="micro muted" style="margin-top:8px">This number can also hold ${user.role === 'customer'
+      ? 'a pro account, if you want to work as well as book'
+      : 'a customer account, for when you are the one buying'} &mdash; a separate account, with its own password, wallet and history.</p>
+    <button class="btn btn-primary btn--block" style="margin-top:16px" data-act="sheet.close">Got it</button>`);
 }
 
 export async function doSignup() {
@@ -379,18 +449,22 @@ export async function doSignup() {
 
   const loc = { lat: suPlace.lat, lng: suPlace.lng, label: suPlace.label };
   const area = suPlace.label;
-  const key = (name + '|' + mobile).toLowerCase();
-  /* One account per number. The key still carries the name, but the NUMBER is
-     what sign-in resolves, so two accounts on one number would be one of them
-     permanently unreachable. */
-  if (getState().users.some(u => normaliseMobile(u.mobile) === mobile)) {
-    toast('That mobile already has an account — sign in instead', 'danger'); return;
+  /* One account per number PER ROLE. The same person may hold a customer
+     account and a pro account on one number; what they may not hold is two of
+     the same kind. The code is the key for accounts opened from here on —
+     name+mobile was the old key, and it collided the moment one person
+     wanted both. */
+  const clash = ID.accountsOn(mobile, getState().users).find(u => u.role === role);
+  if (clash) {
+    toast(`This number already has a ${(ID.ROLE_LABEL[role] || role).toLowerCase()} account (${clash.code || 'existing'}) \u2014 sign in instead`, 'danger');
+    return;
   }
-  if (getState().users.some(u => u.key === key)) { toast('That account already exists — sign in', 'danger'); return; }
+  const key = ID.nextCode(role, getState().users);
+  const code = key;
 
   const pass = await sha256(pw);
   const id = nid('u');
-  const user = { key, id, name, mobile, role, pass, area, loc, tier: 1, createdAt: Date.now() };
+  const user = { key, code, id, name, mobile, role, pass, area, loc, tier: 1, createdAt: Date.now() };
 
   if (role === 'partner') {
     const pid = nid('p');
@@ -427,6 +501,9 @@ export async function doSignup() {
   if (role === 'partner') { toast(`Welcome, ${name.split(' ')[0]}. Ten minutes and you are earning.`); ctx.go('onboard'); }
   else if (role === 'shop') { toast('Your shop is live — add products'); ctx.go('shopadmin'); }
   else { toast(`Welcome, ${name.split(' ')[0]}`); ctx.go('home'); }
+  /* AFTER the navigation, never before: go() closes any open sheet, so the
+     announcement has to ride on top of the screen they landed on. */
+  announceNewId(user);
 }
 
 export function logout() {

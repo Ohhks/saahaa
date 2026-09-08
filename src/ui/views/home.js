@@ -245,11 +245,23 @@ export function choosePlace(d) {
 
    Hysteresis, not a threshold. A bare `y > 80` toggles twice a frame on a
    trackpad at exactly 80px: the collapse changes the header height, which
-   changes the scroll position, which uncollapses it. Direction is latched at
-   the reversal point and a move of 12px is required to act on it. */
-const COLLAPSE_AT = 80, TRAVEL = 12, TOP = 24;
-let hdrY = 0, hdrDir = 0, hdrAnchor = 0, hdrCompact = false;
+   changes the scroll position, which uncollapses it.
 
+   TRAVEL was 12px, which is inside the noise of a single trackpad flick and a
+   phone's momentum scroll — so the header collapsed and expanded over and over
+   while you scrolled, and every flip resized a sticky header and re-laid-out
+   everything under it. That is the stutter. It now takes a deliberate gesture
+   in one direction, and the collapse waits until the folding part is a screen
+   behind you, so the snap is never something you are looking at. */
+const COLLAPSE_AT = 220, TRAVEL = 72, TOP = 24;
+let hdrY = 0, hdrDir = 0, hdrAnchor = 0, hdrCompact = false;
+let hdrEl = null;
+
+/* Deliberately synchronous. Reading scrollY inside a scroll handler costs
+   nothing — the browser has just computed it — and the only write is a class
+   toggle that happens when the state actually changes. Deferring this to
+   requestAnimationFrame would make the header depend on a frame ever arriving,
+   which is not true in every context the app runs in. */
 function onHdrScroll() {
   const y = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
   const d = y - hdrY;
@@ -265,8 +277,12 @@ function onHdrScroll() {
   applyHdr();
 }
 function applyHdr() {
-  const el = document.querySelector('.hdr--home');
-  if (el) el.classList.toggle('hdr--compact', hdrCompact);
+  /* cached: querySelector on every scroll event is work for nothing, and the
+     class is only written when it differs, so no style invalidation either */
+  if (!hdrEl || !hdrEl.isConnected) hdrEl = document.querySelector('.hdr--home');
+  if (!hdrEl) return;
+  if (hdrEl.classList.contains('hdr--compact') !== hdrCompact)
+    hdrEl.classList.toggle('hdr--compact', hdrCompact);
 }
 window.addEventListener('scroll', onHdrScroll, { passive: true });
 
@@ -672,20 +688,17 @@ export function render() {
       .hdr--home .hero__title{font-size:36px}
     }
 
-    /* THE COLLAPSE. Only opacity and max-height animate, so the browser never
-       re-lays-out the page mid-scroll. */
+    /* THE COLLAPSE. The old rule animated max-height, padding and margin —
+       all of them LAYOUT properties — on a sticky header, so for 260ms after
+       every flip the browser re-laid-out the whole page, frame after frame.
+       The folding parts are now simply not there when compact: one reflow per
+       gesture instead of sixteen, and nothing to animate mid-scroll. The
+       search bar, which is what stays, keeps its own transition because it
+       only ever changes its own box. */
     .hdr--home .inner,
-    .hdr--home .hdr__fold{
-      max-height:420px;opacity:1;
-      transition:max-height .26s ease, opacity .18s ease, padding .26s ease, margin .26s ease;
-    }
-    .hdr--home .hero{transition:padding .26s ease}
-    .hdr--home .hero__search{transition:height .26s ease, margin .26s ease}
+    .hdr--home .hdr__fold{ opacity:1 }
     .hdr--home.hdr--compact .inner,
-    .hdr--home.hdr--compact .hdr__fold{
-      max-height:0;opacity:0;margin-top:0;margin-bottom:0;padding-top:0;padding-bottom:0;
-      overflow:hidden;pointer-events:none;
-    }
+    .hdr--home.hdr--compact .hdr__fold{ display:none }
     .hdr--home.hdr--compact .hero{padding-bottom:8px}
     .hdr--home.hdr--compact .m-ask{padding-top:8px}
     .hdr--home.hdr--compact .hero__search{height:44px}

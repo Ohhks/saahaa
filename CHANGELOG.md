@@ -6,6 +6,49 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [8.1.0] — 2026-09-09 — "Two doors, one person"
+
+### Added
+- **Every account has an ID a person can say out loud.** `C20262001` for a
+  customer, `P20262001` for a pro, `S20262001` for a shop owner — the letter
+  says what the account is for, then the year it was opened, then a sequence
+  from 2001, counted per role. It is not a secret: it identifies, the password
+  authenticates (`src/domain/identity.js`).
+- **One person, one number, two accounts.** A plumber who also buys groceries
+  no longer has to choose. The rule moved from *one account per number* to
+  *one account per number per role*: a customer account and a pro account can
+  sit on the same mobile, each with its own password, wallet and history, and
+  they never mix because they were never the same account. Trying to open a
+  second account of the SAME kind is refused, naming the one that exists.
+- **Sign in with either.** The field takes a mobile number or an ID. A number
+  carrying two accounts opens a chooser rather than guessing; a code goes
+  straight in. The rate limiter still counts against the NUMBER behind
+  whatever was typed, so an ID cannot be used to dodge it.
+
+### Fixed
+- **The home screen stuttered while scrolling.** The collapsing header used a
+  12px hysteresis — inside the noise of a single trackpad flick — so ordinary
+  scrolling flipped it open and shut repeatedly, and each flip animated
+  `max-height`, `padding` and `margin` on a *sticky* header, re-laying-out the
+  whole page for 260ms at a time. It now takes a deliberate 72px gesture, the
+  collapse waits until the folding part is a screen behind you, and nothing
+  about it animates layout: one reflow per gesture instead of sixteen. The
+  rules were also declared twice, in `tokens.css` and in the view, with
+  different durations; there is now one set. Proved in a real engine by
+  `docs/design/scroll-probe.html` — one flip on a steady scroll, zero on
+  wobble.
+- Every phone screenshot in the deck had been cropped for months: Chrome floors
+  its window width at ~504 CSS px, so captures asking for 390 were silently
+  cut — the five-tab bar came out with four. `tools/shots.py` shoots at the
+  floor.
+
+### Changed
+- Schema v10: accounts that predate codes are assigned one, oldest first, per
+  role. Internal keys are NOT rewritten — every order, partner row and ledger
+  leg still points where it did. Accounts opened from now on use their code as
+  their key, which is what stops two accounts on one number from colliding
+  (the old key was name+mobile, identical for both).
+
 ## [8.0.0] — 2026-09-08 — "Modernist"
 
 A whole-surface redesign. Every screen was rebuilt to the Modernist mockup —

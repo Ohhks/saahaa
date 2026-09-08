@@ -21,6 +21,7 @@
 
 import { esc, sheet, closeSheet, toast, ratingStars, timeAgo } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
+import * as ID from '../../domain/identity.js';
 import { ctx, getState, dispatch, me, myPartner, myShop, myOrders } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
 import { stage } from '../../domain/orders.js';
@@ -57,6 +58,10 @@ const consoleCSS = `<style>
   .con__hdr .brandline{opacity:.72;display:block}
   .con__hdr .name{font:800 17px/1.1 var(--font-heading);display:block;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .con__hdr .sub{font-size:11px;opacity:.75;display:block;margin-top:3px}
+  /* the account's own name on the strip: a label and a code, quiet, never a badge */
+  .con__id{display:flex;align-items:baseline;gap:6px;margin-top:4px}
+  .con__id .meta{color:inherit;opacity:.68}
+  .con__id b{font:800 12px/1 var(--font-heading);letter-spacing:.1em}
   .con__hdr .btn-outline{border:1px solid currentColor;color:inherit;min-height:44px;padding:6px 10px;font:800 10px/1 var(--font-heading);letter-spacing:.06em;text-transform:uppercase}
   @media (min-width:768px){ .con__hdr{padding-left:var(--sp-8);padding-right:var(--sp-8)} }
   @media (min-width:1024px){ .con__hdr{padding-left:var(--sp-10);padding-right:var(--sp-10)} }
@@ -114,6 +119,16 @@ const capsule = (k, v, d = '', tone = '') =>
 
 /** A money state chip. Escrow, released and paid-to-bank never share a row. */
 const money = (state, label) => `<span class="pill state--${state}">${esc(label)}</span>`;
+
+/* The signed-in account's code — C/P/S + year + sequence. The session is a
+   copy taken at sign-in, so the live row wins; an account without one (a very
+   old store, before the backfill) simply shows nothing. */
+function codeOfMe() {
+  const s = me();
+  if (!s) return '';
+  const row = (getState().users || []).find(u => u.key === s.key) || s;
+  return ID.isCode(row.code) ? ID.normaliseCode(row.code) : '';
+}
 
 const kick = (title, right = '') => `<div class="kick"><span class="eyebrow">${esc(title)}</span>${right}</div>`;
 
@@ -447,6 +462,9 @@ export function renderPartner() {
   const ready = readiness(p).canWork;
   const gate = blocker(p);
   const counts = { leads: open.length, jobs: inbox.length };
+  /* The pro's own account code (P2026….). Read from the live user row, not
+     the partner row: the code belongs to the account, not to the trade. */
+  const proCode = codeOfMe();
 
   const body =
       proTab === 'jobs'     ? proJobs(inbox)
@@ -459,6 +477,7 @@ export function renderPartner() {
     <div class="grow" style="min-width:0">
       <span class="brandline">SAAHAA · PRO</span>
       <b class="name">${esc(p.name)}</b>
+      ${proCode ? `<span class="con__id"><span class="meta">Pro ID</span><b>${esc(proCode)}</b></span>` : ''}
       <span class="sub">${offline ? 'Not accepting jobs · requests will not reach this phone'
         : ready ? `Accepting jobs · ${auction.waveRadiusKm(0)}–${auction.waveRadiusKm(2)} km radius · ${esc(p.area)}`
         : `${esc(cat.name)} · verification pending`}</span>
@@ -536,11 +555,14 @@ export function renderShopAdmin() {
     :                           shopToday(s, orders, items, cat);
 
   const modeWord = s.deliveryMode === 'pickup_only' ? 'pickup only' : 'delivering';
+  /* the shop OWNER's account code (S2026….) — the person, not the storefront */
+  const shopCode = codeOfMe();
   return `${consoleCSS}
   <header class="apphdr on-plum con__hdr">
     <div class="grow" style="min-width:0">
       <span class="brandline">SAAHAA · SHOP</span>
       <b class="name">${esc(s.name)}</b>
+      ${shopCode ? `<span class="con__id"><span class="meta">Shop ID</span><b>${esc(shopCode)}</b></span>` : ''}
       <span class="sub">${s.isOpen ? `Open · ${modeWord} · ${liveItems} item${liveItems === 1 ? '' : 's'} live` : `Closed · customers cannot order · ${items.length} items listed`}</span>
     </div>
     <button class="btn-outline tap" type="button" data-act="shop.toggle">${s.isOpen ? 'Close' : 'Open'}</button>

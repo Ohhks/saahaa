@@ -33,6 +33,7 @@ import './core/selftests.js';
 import './core/selftests.money.js';
 import './core/selftests.security.js';
 import './core/selftests.auto.js';
+import './core/selftests.identity.js';
 
 /* ui */
 import { mount, action, initActions, toast, sheet, closeSheet, esc, stickyToast } from './ui/dom.js';
@@ -346,6 +347,7 @@ function wireActions() {
   A('auth.tab',   d => { auth.setAuthTab(d.tab); render(); });
   A('auth.role',  d => { auth.setAuthRole(d.role); render(); });
   A('auth.login', () => auth.doLogin());
+  A('auth.pick',  d => { closeSheet(); auth.doLogin(d.key); });   // one number, two accounts: which one
   A('auth.signup',() => auth.doSignup());
   A('auth.logout',() => auth.logout());
 

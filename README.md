@@ -46,6 +46,22 @@ wipe a device on purpose: **Admin → System & audit → Fresh start** — type
 FRESH, re-enter the password; a snapshot is taken first, the credential and
 the dials are kept, and the counts are audited.
 
+## Accounts and IDs
+
+Every account carries an ID: **`C20262001`** for a customer, **`P20262001`** for
+a pro, **`S20262001`** for a shop owner — what the account is for, the year it
+was opened, then a sequence. It is a name, not a password: it identifies, the
+password authenticates.
+
+**One person may hold more than one account on the same number.** A pro who also
+buys groceries has a `C…` and a `P…`, each with its own password, wallet and
+history. What they cannot have is two accounts of the same kind. Sign-in takes
+either a mobile number or an ID; a number holding two accounts asks which one.
+
+Accounts that existed before IDs keep their internal key — every order, partner
+row and ledger leg still points where it did — and were assigned an ID by
+migration, oldest first. See `src/domain/identity.js`.
+
 ## Signing in as the owner
 
 The admin username is **`siidhartha12`**. The password is the owner's own and

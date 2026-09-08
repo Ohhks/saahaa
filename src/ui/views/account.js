@@ -14,8 +14,9 @@
    balance, held for orders, refunds and goodwill credits are four separate
    things. */
 
-import { esc, ratingStars, timeAgo, clockTime, delegate } from '../dom.js';
+import { esc, ratingStars, timeAgo, clockTime, delegate, toast } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
+import * as ID from '../../domain/identity.js';
 import { getState, me, myArea, myOrders } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
 import * as M from '../../core/money.js';
@@ -54,6 +55,38 @@ delegate('input', '#cwAmt', (e, el) => {
   const paise = Math.round((Number(el.value) || 0) * 100);
   ['cwAdd', 'cwOut'].forEach(id => { const b = document.getElementById(id); if (b) b.dataset.amt = paise > 0 ? String(paise) : ''; });
 });
+
+/* ── the account's own name ─────────────────────────────────────
+   `user.code` (C20262001 / P20262001 / S20262001) is what a person reads out
+   on the phone. It is NOT a secret — it identifies, the password
+   authenticates — so it is printed in full, never masked.
+
+   Copying it needs no new registered action: app.js routes [data-act], and
+   this is a plain delegated listener in the UI layer, the same way
+   home.js listens on #nearbyQ. Nothing is written, nothing is dispatched. */
+delegate('click', '.idcopy', async (e, el) => {
+  const code = el.dataset.code || '';
+  if (!code) return;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(code);
+    else throw new Error('no clipboard');
+    toast(`${code} copied`);
+  } catch (err) {
+    /* a browser that refuses the clipboard still lets a person read it: select
+       the code so one keystroke takes it */
+    const t = el.closest('.m-id') && el.closest('.m-id').querySelector('.m-id__c');
+    if (t && window.getSelection) {
+      const r = document.createRange(); r.selectNodeContents(t);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    }
+    toast('Select and copy — your browser blocked the clipboard', 'warn');
+  }
+});
+
+/* Switching accounts goes through the ordinary sign-in screen (auth.open),
+   because the other account has its own password. The tab is nudged to
+   "login" first so the person lands on the form they need. */
+delegate('click', '.idswitch', () => { auth.setAuthTab('login'); });
 
 const liveOf = orders => orders.filter(o => !isTerminal(o.stage));
 const heldOf = orders => orders.filter(o => !isTerminal(o.stage) &&
@@ -157,6 +190,37 @@ export function render() {
   const mobile = String(s.mobile || '');
   const maskedMobile = mobile.length >= 4 ? `${mobile.slice(0, 2)}··· ··${mobile.slice(-3)}` : mobile;
 
+  /* WHO THIS ACCOUNT IS. The session is a copy taken at sign-in, so the live
+     row wins: an account that was given its code by the backfill still shows
+     it here without a re-login. */
+  const users = st.users || [];
+  const meRow = users.find(u => u.key === s.key) || s;
+  const myCode = ID.isCode(meRow.code) ? ID.normaliseCode(meRow.code) : '';
+  const roleWord = (ID.ROLE_LABEL[meRow.role || s.role] || 'Account').toLowerCase();
+  /* The same number may carry a second account — one person, a customer side
+     and a pro side, never mixed. */
+  const others = ID.accountsOn(s.mobile, users).filter(u => u.key !== s.key && ID.isCode(u.code));
+
+  const idBlock = myCode ? `
+    <div class="m-id">
+      <span class="grow" style="min-width:0">
+        <span class="meta" style="display:block">Your ${esc(roleWord)} ID</span>
+        <b class="m-id__c num">${esc(myCode)}</b>
+      </span>
+      <button type="button" class="btn btn--secondary btn--sm idcopy tap" data-code="${esc(myCode)}"
+        aria-label="Copy your ${esc(roleWord)} ID, ${esc(myCode)}">Copy</button>
+    </div>
+    <p class="micro muted" style="margin-top:6px">Sign in with this ID or with your mobile number — either one works.
+      It is a name, not a secret: your password is the secret.</p>` : '';
+
+  const otherBlock = others.length ? `
+    <div class="m-alt">
+      <p class="tiny" style="margin:0">You also have ${others.map(u =>
+        `a ${esc(ID.ROLE_LABEL[u.role] || 'Account')} account (<b class="num">${esc(u.code)}</b>)`).join(' and ')} on this number.</p>
+      <p class="micro muted" style="margin:6px 0 10px">Separate wallet, separate history, separate password — signing in to it asks for that account's own password.</p>
+      <button type="button" class="btn btn--secondary btn--sm idswitch tap" data-act="auth.open">Switch account ${icon('forward', { size: 14 })}</button>
+    </div>` : '';
+
   const orderRow = o => {
     const stg = stage(o.stage);
     const cat = get('category', o.catId);
@@ -176,13 +240,17 @@ export function render() {
   ${header('You', s.mobile || '')}
   <main class="wrap">
 
-    <div class="row" style="gap:12px;padding:16px 0;border-bottom:2px solid var(--color-divider)">
-      <span class="avatar" style="width:52px;height:52px;font-size:18px">${esc((s.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase())}</span>
-      <div class="grow" style="min-width:0">
-        <div style="font:800 18px/1.15 var(--font-heading)">${esc(s.name)}</div>
-        <div style="font-size:11.5px;color:var(--ink-3);margin-top:3px">${maskedMobile ? `${esc(maskedMobile)} · ` : ''}${esc(s.area || myArea())}</div>
+    <div style="padding:16px 0;border-bottom:2px solid var(--color-divider)">
+      <div class="row" style="gap:12px">
+        <span class="avatar" style="width:52px;height:52px;font-size:18px">${esc((s.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase())}</span>
+        <div class="grow" style="min-width:0">
+          <div style="font:800 18px/1.15 var(--font-heading)">${esc(s.name)}</div>
+          <div style="font-size:11.5px;color:var(--ink-3);margin-top:3px">${maskedMobile ? `${esc(maskedMobile)} · ` : ''}${esc(s.area || myArea())}</div>
+        </div>
+        ${liveList.length ? `<span class="tag tag-accent">${liveList.length} live</span>` : ''}
       </div>
-      ${liveList.length ? `<span class="tag tag-accent">${liveList.length} live</span>` : ''}
+      ${idBlock}
+      ${otherBlock}
     </div>
 
     <div class="capsules" style="grid-template-columns:repeat(3,1fr);gap:0;border-bottom:2px solid var(--color-divider)">
@@ -298,6 +366,13 @@ export function render() {
   ${SYS_CSS}
   <style>
     .m-chev{transform:rotate(-90deg)}
+    /* the account's own name — printed, never masked, never shouted */
+    .m-id{display:flex;align-items:center;gap:10px;margin-top:14px;padding:10px 12px;
+      border:2px solid var(--color-text);background:var(--color-surface)}
+    .m-id__c{display:block;margin-top:2px;font:800 19px/1.1 var(--font-heading);letter-spacing:.08em;
+      overflow:hidden;text-overflow:ellipsis;-webkit-user-select:all;user-select:all}
+    .m-id .btn{flex:none}
+    .m-alt{margin-top:12px;padding:10px 12px;background:var(--surface-2);border-left:4px solid var(--color-accent)}
     .capsules button.capsule{cursor:pointer} .capsules button.capsule:hover .capsule__v{color:var(--color-accent)}
     .m-regs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
     .m-reg{flex:none;width:64px;background:none;border:0;padding:0;text-align:left;color:inherit;cursor:pointer;min-height:44px}

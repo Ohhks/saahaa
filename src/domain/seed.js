@@ -49,6 +49,7 @@ const SHOPS = [
 ];
 
 import { depthRoster } from './seed.depth.js';
+import { backfillCodes } from './identity.js';
 
 const jitter = (base, lo, hi) => Math.round(base * (lo + Math.random() * (hi - lo)));
 
@@ -128,6 +129,12 @@ export async function buildSeed(opts = {}) {
       });
     });
   });
+
+  /* Every account carries the code a person reads out (domain/identity.js).
+     The demo roster gets them the same way a real signup does, so the IDs on
+     screen in a walkthrough are the IDs the product actually issues. */
+  const coded = backfillCodes(users, now);
+  users.length = 0; users.push(...coded);
 
   const admin = bootstrapCredential() || await makeCredential(DEMO_PASSWORD);   // demo data, real credential
   // stamped so a device that later boots WITHOUT ?demo=1 can recognise and drop the roster (domain/fresh.js)
