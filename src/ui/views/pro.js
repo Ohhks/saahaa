@@ -164,7 +164,7 @@ export function render(id) {
     <div class="pro__bar">
       ${mine ? `<button class="btn btn-primary btn--lg" data-act="pro.share" data-id="${p.id}">Share my page</button>`
              : `<button class="btn btn-secondary" style="flex:none" data-act="pro.share" data-id="${p.id}" aria-label="Share">${icon('share', { size: 18 })}</button>
-                <button class="btn btn-primary btn--lg" data-act="cat.open" data-id="${p.cat}">Book ${esc(first)} · ${esc(cat.name)}</button>`}
+                <button class="btn btn-primary btn--lg" data-act="cat.open" data-id="${p.cat}" data-pid="${p.id}">Book ${esc(first)} · ${esc(cat.name)}</button>`}
     </div>
   </main>`;
 }

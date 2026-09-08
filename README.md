@@ -30,6 +30,7 @@ browser keep stale modules after an update.)
 | App | <http://localhost:8772> |
 | Self-tests | <http://localhost:8772/?selftest=1> |
 | Admin | <http://localhost:8772/#/admin> |
+| Neighbourhood (map) | <http://localhost:8772/#/nearby> |
 | Example roster (local only) | <http://localhost:8772/?demo=1> |
 | Single-file build | `python tools/build.py` → `dist/saahaa.html` |
 
@@ -73,6 +74,14 @@ what client-side auth can and cannot do.
 
 ## What is in here
 
+- **The Modernist design.** Archivo (vendored — no CDN), a light paper ground
+  with ink text, one red accent spent only on primary actions and live state,
+  zero corner radius, and 1–2px rules doing the organising instead of shadows.
+  The working side — pro, shop, admin — carries the same system on a dark ink
+  strip. 44px touch targets throughout, because the people using it are often
+  outdoors on a cheap phone. The drawing it was built from is kept in
+  `docs/design/mockup-2026-09-08/`; the rules are in
+  `docs/design/DESIGN-SPEC.md`; the system itself is `src/ui/tokens.css`.
 - **Maps are real.** OpenStreetMap tiles for the map, Nominatim for geocoding
   and reverse geocoding, and Leaflet **vendored under `/vendor/leaflet`** — no
   CDN, because the CSP allows scripts from `self` only and a tradesperson's

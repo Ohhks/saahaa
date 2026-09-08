@@ -194,7 +194,7 @@ function waiting(req) {
         <i style="position:absolute;left:33%;top:-4px;width:2px;height:14px;background:var(--color-text);opacity:.5"></i></div>
       <div class="between" style="margin-top:6px">
         <span class="micro muted">${mmss(elapsed)} elapsed</span>
-        <span class="micro muted">${replies ? `${replies} ${replies === 1 ? 'reply' : 'replies'}` : 'most people get 3 rates in about 4 minutes'} · usually done by 4:00</span>
+        <span class="micro muted">${replies ? `${replies} ${replies === 1 ? 'reply' : 'replies'}` : `most people get 3 rates in about ${Math.round(total / 3 / 60000)} minutes`} · usually done by ${mmss(total / 3)}</span>
       </div>
     </div>
 

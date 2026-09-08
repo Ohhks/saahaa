@@ -525,7 +525,7 @@ export function render() {
       </button>
       <button class="btn btn--ghost tap" data-act="theme.toggle" aria-label="Switch theme" style="padding-inline:8px">${icon('theme', { size: 20 })}</button>
       ${s ? `<button class="tap" data-act="nav.account" aria-label="Account"
-              style="width:36px;height:36px;border:1px solid var(--color-divider);display:grid;place-items:center;font:800 12px var(--font-heading)">${esc(s.name[0])}</button>`
+              style="width:44px;height:44px;border:1px solid var(--color-divider);display:grid;place-items:center;font:800 12px var(--font-heading)">${esc(s.name[0])}</button>`
            : `<button class="btn btn--secondary btn--sm" data-act="auth.open">Sign in</button>`}
     </div>
 
@@ -857,7 +857,7 @@ export function renderNearby() {
     .nb-find input::placeholder{color:var(--ink-3)}
     .nb-go{width:44px;min-height:44px;flex:none;display:grid;place-items:center;background:var(--color-accent);color:#fff}
     .nb-chips{flex-wrap:wrap;gap:6px}
-    .nb-chip{min-height:36px;background:var(--bg)}
+    .nb-chip{min-height:44px;background:var(--bg)}
     .nb-chip.on{background:var(--color-accent);color:#fff;border-color:var(--color-accent)}
     /* bottom-right, clear of Leaflet's zoom pair (bottom-left) and its
        attribution strip (the very bottom of the right edge) */
@@ -972,17 +972,22 @@ function stepbar(cur) {
   <p class="micro muted" style="margin:-6px 0 10px">Step ${Math.min(cur + 1, BOOK_STEPS.length)} of ${BOOK_STEPS.length} · ${esc(BOOK_STEPS[Math.min(cur, BOOK_STEPS.length - 1)])}</p>`;
 }
 
-export function openCategory(catId, sub = null) {
+export function openCategory(catId, sub = null, pinnedId = null) {
   const c = get('category', catId);
   if (c.kind === 'retail') { ctx.go('shops', catId); return; }
   const m = flow.findMatch(catId, { area: myPlace() });   // coordinates when we have them
+  /* A control that NAMES a pro must book that pro. Arriving from someone's own
+     page pins them as the hero; the matcher's pick is the fallback, and an
+     unbookable pin (suspended, gone) falls back rather than dead-ends. */
+  const pinned = pinnedId ? getState().partners.find(x => x.id === pinnedId && !x.suspended) : null;
+  const hero = pinned || m.hero;
   // The chosen sub-service is threaded all the way into the booking.
   const subs = (c.subs || []).map(s =>
     `<button class="chip${s === sub ? ' on' : ''}" data-act="book.sub" data-id="${catId}"
-       data-sub="${esc(s)}" aria-pressed="${s === sub}">${esc(s)}</button>`).join('');
+       data-sub="${esc(s)}"${pinned ? ` data-pid="${esc(pinned.id)}"` : ''} aria-pressed="${s === sub}">${esc(s)}</button>`).join('');
 
   sheet(c.name, `
-    ${stepbar(m.hero ? (sub ? 5 : 2) : 2)}
+    ${stepbar(hero ? (sub ? 5 : 2) : 2)}
     <div class="capsules" style="margin:0 0 14px">
       <span class="capsule"><span class="capsule__k">Priced</span>
         <span class="capsule__v" style="font-size:16px">${esc(c.unit)}</span></span>
@@ -994,7 +999,7 @@ export function openCategory(catId, sub = null) {
     <p class="tiny muted" style="margin-bottom:12px">${esc(c.blurb || '')}</p>
     <p class="m-cap">What exactly do you need?</p>
     <div class="chiprow" style="flex-wrap:wrap;gap:8px;margin-bottom:18px">${subs}</div>
-    ${m.hero ? heroCard(catId, m.hero, sub) : `
+    ${hero ? heroCard(catId, hero, sub) : `
       <div class="empty empty--smart"><h3 style="font-size:17px">No pro free right now</h3>
       <p style="margin-top:6px">Nobody in ${esc(myArea())} is online for this. Try another area or check back shortly.</p>
       <button class="btn btn--secondary" style="margin-top:12px" data-act="area.pick">Change area</button></div>`}
@@ -1048,7 +1053,7 @@ export function heroCard(catId, p, sub = null) {
       <span class="avatar avatar--lg">${esc(p.name[0])}</span>
       <div class="grow" style="min-width:0">
         <div class="between">
-          <button class="btn btn--ghost btn--sm" style="padding:0;min-height:0;height:auto;font-size:16px;color:inherit"
+          <button class="btn btn--ghost btn--sm" style="padding:0;min-height:44px;height:auto;font-size:16px;color:inherit"
             data-act="pro.open" data-id="${p.id}">${esc(p.name)} ›</button>
           <span class="tag tag-accent">Best match</span>
         </div>

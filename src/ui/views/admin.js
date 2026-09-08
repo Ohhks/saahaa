@@ -113,7 +113,7 @@ const ADMIN_CSS = `<style>
   .ad .table tr.tot:hover td{background:transparent}
   .ad .table tr.detail td{background:var(--surface-2);padding:var(--sp-5)}
   .ad .table tr.detail:hover td{background:var(--surface-2)}
-  .ad-rowbtn{display:block;width:100%;text-align:left;padding:0;background:none;border:0;color:inherit;cursor:pointer;font:inherit;min-height:32px}
+  .ad-rowbtn{display:block;width:100%;text-align:left;padding:0;background:none;border:0;color:inherit;cursor:pointer;font:inherit;min-height:44px}
   .ad-rowbtn b{display:block}
   .ad-mapbox{border:2px solid var(--color-text);background:var(--surface-2)}
   #adminMap{height:320px}
@@ -379,9 +379,9 @@ function liveMap(st) {
     <div class="ad-mapbox">
       <div id="adminMap"></div>
       <div class="ad-legend">
-        ${legendDot(PIN_ORDER, `${liveOrders.length} order(s) in flight`)}
-        ${legendDot(PIN_PARTNER, `${online.length} pro(s) online`)}
-        ${legendDot(PIN_SHOP, `${st.shops.length} shop(s)`)}
+        ${legendDot(PIN_ORDER, `${liveOrders.length} order${liveOrders.length === 1 ? '' : 's'} in flight`)}
+        ${legendDot(PIN_PARTNER, `${online.length} pro${online.length === 1 ? '' : 's'} online`)}
+        ${legendDot(PIN_SHOP, `${st.shops.length} shop${st.shops.length === 1 ? '' : 's'}`)}
       </div>
     </div>
     <p class="micro muted" style="margin-top:var(--sp-4)">
@@ -716,7 +716,7 @@ function escrow(st) {
     sub: `${esc(o.customerName)} · ${esc(stage(o.stage).label)} · ${esc(timeAgo(o.stageTs))}`,
     right: tierPill(o.escrowTier),
     facts: facts([
-      `${(o.evidence || []).length} photo(s)`,
+      `${(o.evidence || []).length} photo${(o.evidence || []).length === 1 ? '' : 's'}`,
       o.otpVerified ? 'OTP verified' : 'no OTP',
       esc((ESCROW[o.escrowTier || 'STANDARD'] || {}).label || ''),
     ]),
@@ -774,7 +774,7 @@ function disputes(st) {
       sub: `${esc(o.customerName || '')} vs ${esc(o.partnerName || o.shopName || '')} · ${esc(timeAgo(d.openedAt))}`,
       right: pill(`${Math.round(ageH)}h`, ageH > 24 ? 'bad' : 'warn'),
       facts: facts([
-        `${(o.evidence || []).length} photo(s)`,
+        `${(o.evidence || []).length} photo${(o.evidence || []).length === 1 ? '' : 's'}`,
         o.otpVerified ? 'start code verified' : 'NO start code',
         o.customerPays != null ? `escrowed ${M.fmt(o.customerPays)}` : '',
       ]),
@@ -800,7 +800,7 @@ function people(st) {
       const t = trustScore(p);
       return `<tr>
         <td class="nowrap"><b>${esc(p.name)}</b>${p.suspended ? '<span class="sub">suspended</span>' : ''}</td>
-        <td>${esc(get('category', p.cat).name)}<span class="sub">${(p.vouches || []).length} vouch(es)${(p.tier | 0) >= 3 && p.tier3At
+        <td>${esc(get('category', p.cat).name)}<span class="sub">${(p.vouches || []).length} vouch${(p.vouches || []).length === 1 ? '' : 'es'}${(p.tier | 0) >= 3 && p.tier3At
           ? ` · checked ${esc(new Date(p.tier3At).toLocaleDateString('en-IN'))}` : ''}</span></td>
         <td class="num">${p.completed}</td>
         <td>${esc(p.area)}</td>
@@ -888,11 +888,11 @@ function flowRows(st) {
       const place = (u.loc && u.loc.label) || (p && p.area) || (sh && sh.area) || u.area || '—';
 
       const counts = u.role === 'partner'
-        ? `${(p && p.completed) || 0} jobs · ${((p && p.vouches) || []).length} vouch(es) · earned ${M.fmt(earned)}${
+        ? `${(p && p.completed) || 0} jobs · ${((p && p.vouches) || []).length} vouch${((p && p.vouches) || []).length === 1 ? '' : 'es'} · earned ${M.fmt(earned)}${
             p && (p.tier | 0) >= 3 && p.tier3At ? ` · checked ${new Date(p.tier3At).toLocaleDateString('en-IN')}` : ''}`
         : u.role === 'shop'
-        ? `${orders.length} order(s) · earned ${M.fmt(earned)}`
-        : `${orders.length} order(s) · spent ${M.fmt(spend)}`;
+        ? `${orders.length} order${orders.length === 1 ? '' : 's'} · earned ${M.fmt(earned)}`
+        : `${orders.length} order${orders.length === 1 ? '' : 's'} · spent ${M.fmt(spend)}`;
 
       const live = !!(latest && !stage(latest.stage).terminal);
       return { key: u.key, name: u.name, role: u.role, place, step, seen, orders, counts, live, hold: live ? holdOf(latest) : null };
@@ -1284,7 +1284,7 @@ function payoutQueue(st) {
   const total = rows.reduce((n, [, v]) => n + v.amt, 0);
   return `<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:var(--sp-5)">
       <span class="state state--pending">Pending payout · ${M.fmt(total)}</span>
-      ${pill(`${rows.length} payee(s)`, 'soft')}
+      ${pill(`${rows.length} payee${rows.length === 1 ? '' : 's'}`, 'soft')}
     </div>
     ${table(['Payee', ['Orders', 'num'], ['Owed', 'num'], 'Status', ''], rows.map(([who, v]) => `<tr>
       <td class="nowrap"><b>${esc(who)}</b></td>
@@ -1422,7 +1422,7 @@ function freshCard(st) {
         `${c.products} listings`, `${c.orders} orders`, `${c.ledger} ledger entries`,
       ])}
       ${residue > 0 ? `<p class="tiny" style="color:var(--warn)">
-        ${residue} example record(s) from the demo roster are on this device. They will be removed on the
+        ${residue} example record${residue === 1 ? '' : 's'} from the demo roster are on this device. They will be removed on the
         next boot without <span class="num">?demo=1</span> whether or not you press this.</p>` : ''}
       <div class="ad-g2" style="align-items:end;margin-top:var(--sp-4)">
         <div class="field" style="margin:0">
@@ -1460,7 +1460,7 @@ function paymentsCard() {
 }
 
 /* ── handlers ──────────────────────────────────────────────── */
-export async function runTests() { testResult = await selftest.runAll(); toast(testResult.failed ? `${testResult.failed} test(s) failed` : 'All tests passed'); ctx.render(); }
+export async function runTests() { testResult = await selftest.runAll(); toast(testResult.failed ? `${testResult.failed} test${testResult.failed === 1 ? '' : 's'} failed` : 'All tests passed'); ctx.render(); }
 export async function doVerifyChain() { chainResult = await verifyChain(getState().ledger); toast(chainResult.ok ? 'Ledger intact' : `Broken at block ${chainResult.at}`); ctx.render(); }
 export function toggleFlag(name) { flags.set(name, !flags.get(name)); audit.record(audit.ACTIONS.FLAG_TOGGLE, { name, value: flags.get(name) }, 'admin'); ctx.render(); }
 export function approve(id, target) {

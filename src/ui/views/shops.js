@@ -99,10 +99,10 @@ export const SYS_CSS = `<style>
   .m-prod__price{display:flex;flex-direction:column;gap:4px;min-width:0}
   .m-prod__was{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--ink-3);flex-wrap:wrap}
   .m-prod__was .tag{padding:2px 6px;font-size:10px}
-  .m-add{border:1px solid var(--color-text);padding:0 9px;min-height:36px;min-width:44px;font:800 11px/1 var(--font-heading);color:var(--ink-1)}
+  .m-add{border:1px solid var(--color-text);padding:0 9px;min-height:44px;min-width:44px;font:800 11px/1 var(--font-heading);color:var(--ink-1)}
   .m-add:disabled{border-color:var(--color-divider);color:var(--ink-3);opacity:1}
-  .m-qty{display:inline-flex;align-items:center;background:var(--color-accent);color:#fff;font:800 12px/1 var(--font-heading);min-height:36px}
-  .m-qty button{color:inherit;min-width:36px;min-height:36px;font:800 15px/1 var(--font-heading)} .m-qty b{padding:0 2px}
+  .m-qty{display:inline-flex;align-items:center;background:var(--color-accent);color:#fff;font:800 12px/1 var(--font-heading);min-height:44px}
+  .m-qty button{color:inherit;min-width:44px;min-height:44px;font:800 15px/1 var(--font-heading)} .m-qty b{padding:0 2px}
   .m-two{display:block} @media (min-width:1024px){ .m-two{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:var(--sp-9);align-items:start} .m-two > *{min-width:0} }
   .m-stars{display:flex;gap:6px} .m-stars button{font-size:33px;line-height:1;color:var(--color-neutral-400);min-width:44px;min-height:44px}
   .m-stars button:hover,.m-stars button:focus-visible{color:var(--color-accent)}
@@ -344,7 +344,7 @@ export function renderCart() {
           <p class="m-cap" style="margin:8px 0 6px">If it is out of stock</p>
           <div class="chiprow" style="flex-wrap:wrap">
             ${['similar','call','refund'].map(pol => `
-              <button class="chip ${l.subPolicy === pol ? 'on' : ''}" style="min-height:32px;font-size:11.5px" aria-pressed="${l.subPolicy === pol}"
+              <button class="chip ${l.subPolicy === pol ? 'on' : ''}" style="min-height:44px;font-size:11.5px" aria-pressed="${l.subPolicy === pol}"
                 data-act="cart.sub" data-id="${l.lineId}" data-pol="${pol}">
                 ${pol === 'similar' ? 'Similar brand OK' : pol === 'call' ? 'Ask me' : 'Just refund'}
               </button>`).join('')}

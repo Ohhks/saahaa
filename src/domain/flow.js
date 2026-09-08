@@ -69,7 +69,8 @@ export async function customerTopUp(paise) {
 export async function customerWithdraw(paise) {
   const s = me(); if (!s) return null;
   const amt = M.int(paise), w = customerWallet(s.key);
-  if (amt < 1000 || amt > w.balance) { toast(`You can take out up to ${M.fmt(w.balance)}`, 'warn'); return null; }
+  if (amt < 1000) { toast('The smallest take-out is ₹10', 'warn'); return null; }
+  if (amt > w.balance) { toast(`You can take out up to ${M.fmt(w.balance)}`, 'warn'); return null; }
   const r = await gateway.payout({ paise: amt, purpose: 'refund-out', key: s.key, upi: s.upi || (getState().users.find(u => u.key === s.key) || {}).upi || '' });
   if (!r.ok) { toast('Could not send that right now', 'danger'); return null; }
   await ledger('WITHDRAW', amt, acct.customer(s.key), acct.world(), { via: r.via, ref: r.ref });
@@ -704,6 +705,11 @@ export function sendChat(orderId, text) {
   if (flagged) { audit.record('fraud.offplatform', { orderId, by: s.key }); toast('Phone numbers and payment IDs are hidden — keep payments in SAAHAA so both sides stay protected.', 'warn'); }
   return msg;
 }
-const maskContact = t => t.replace(/\b\d{10}\b/g, '••••••••••').replace(/@(ok|ybl|paytm|upi|axl)\w*/gi, '@•••');
+/* What the screens promise is masked, masked. The e-mail rule runs FIRST:
+   the UPI rule would otherwise eat the domain and leave the name readable. */
+const maskContact = t => t
+  .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '•••@•••')
+  .replace(/\b\d{10}\b/g, '••••••••••')
+  .replace(/@(ok|ybl|paytm|upi|axl)\w*/gi, '@•••');
 
 export { trustScore, rankShops, quoteService, compareWithApps, M as money };

@@ -254,8 +254,8 @@ function wireActions() {
   A('search.clear', () => { home.setSearch(''); render(); });
 
   /* catalog + booking */
-  A('cat.open',      d => home.openCategory(d.id));
-  A('book.sub',      d => home.openCategory(d.id, d.sub));   // the chosen sub used to be dropped
+  A('cat.open',      d => home.openCategory(d.id, null, d.pid || null));   // d.pid: booking a NAMED pro books that pro
+  A('book.sub',      d => home.openCategory(d.id, d.sub, d.pid || null));  // the chosen sub used to be dropped
   A('book.others',   d => home.showAlternates(d.id, d.sub || null));
   A('book.confirm',  d => home.confirmBooking(d.id, d.pid, d.sub));
   A('quick.emergency', () => { home.setSearch('repair'); render(); toast('Showing urgent-capable trades'); });

@@ -11,7 +11,7 @@
    The stage labels are the machine's own. They are never renamed here. Every
    rupee is the order's: deal, platformFee, gst, deliveryFee, customerPays. */
 
-import { mount, esc, sheet, closeSheet, toast, clockTime, timeAgo } from '../dom.js';
+import { mount, esc, sheet, closeSheet, toast, clockTime, timeAgo, delegate } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, me, myArea, myOrders } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
@@ -34,6 +34,18 @@ function paidWith(o) {
   if (o.collected > 0) parts.push(`${M.fmt(o.collected)} via ${gateway.label().split(' — ')[0]}`);
   return parts.length ? parts.join(' · ') : 'Nothing collected yet';
 }
+
+/* Sending a message re-renders the whole screen, so `dom.mount`'s focus
+   restore cannot help: the element that had focus was the SEND button, not
+   the composer, and the composer therefore came back blurred — one message
+   per keyboard-open. This puts the caret back where the typist left it.
+   Nothing about the action changes; app.js still owns `chat.send`. */
+delegate('click', '[data-act="chat.send"]', () => {
+  setTimeout(() => {
+    const el = document.getElementById('chatIn');
+    if (el && document.activeElement !== el) el.focus({ preventScroll: true });
+  }, 0);
+});
 
 /* a short, readable order number: the tail of the engine's id */
 const orderNo = o => '#' + String(o.id || '').replace(/^ord[_-]?/i, '').slice(-6).toUpperCase();
@@ -75,10 +87,16 @@ function mapCard(o, { interactive = true, id = 'orderMap' } = {}) {
   const km = kmBetween(e.cust, e.them);
   const eta = etaMins(km);
   const plotted = !!(geoOf(e.cust) && geoOf(e.them));
+  /* "You" is whoever is holding the phone. On the pro's job panel the accent
+     badge is the customer they are travelling to, not the pro. */
+  const s = me();
+  const mine = !!(s && s.role !== 'customer' && o.customerKey !== s.key);
+  const theirs = mine ? `${esc(o.customerName || 'Customer')} · ${esc(nameOf(e.cust))}` : `${esc(e.name)} · ${km} km · ~${eta} min`;
+  const yours  = mine ? `You · ${esc(nameOf(e.them))} · ${km} km` : `You · ${esc(nameOf(e.cust))}`;
   return `<div style="${interactive ? 'margin:0 calc(-1 * var(--gutter));' : ''}border-bottom:2px solid var(--color-text);position:relative">
     <div id="${id}" style="height:${interactive ? 200 : 160}px;overflow:hidden;background:var(--surface-2)"></div>
-    <span style="position:absolute;left:12px;bottom:10px;background:var(--surface);border:2px solid var(--color-text);padding:5px 9px;font:800 10px/1 var(--font-heading);letter-spacing:.06em;text-transform:uppercase">${esc(e.name)} · ${km} km · ~${eta} min</span>
-    <span style="position:absolute;right:12px;top:10px;background:var(--color-accent);color:#fff;padding:5px 9px;font:800 10px/1 var(--font-heading);letter-spacing:.06em;text-transform:uppercase">You · ${esc(nameOf(e.cust))}</span>
+    <span style="position:absolute;left:12px;bottom:10px;background:var(--surface);border:2px solid var(--color-text);padding:5px 9px;font:800 10px/1 var(--font-heading);letter-spacing:.06em;text-transform:uppercase">${theirs}</span>
+    <span style="position:absolute;right:12px;top:10px;background:var(--color-accent);color:#fff;padding:5px 9px;font:800 10px/1 var(--font-heading);letter-spacing:.06em;text-transform:uppercase">${yours}</span>
     ${plotted ? '' : `<p class="micro muted" style="padding:6px var(--gutter)">One of these is an area name with no coordinates yet, so the distance is an estimate.</p>`}
   </div>`;
 }
@@ -219,7 +237,14 @@ export function renderDetail(orderId) {
      Coordinates are better and they are current. */
   const km = kmBetween(ends.cust, ends.them);
   const showMap = openMapId === o.id;
-  const who = o.kind === 'service' ? o.partnerName : o.shopName;
+  /* Whoever is reading, the header names the OTHER side. A pro opening their
+     own job was being shown their own name and, below, "You pay ₹217" —
+     the customer's voice, on the worker's screen. */
+  const theOther = (isPartner || isShop) ? (o.customerName || 'Your customer')
+    : (o.kind === 'service' ? o.partnerName : o.shopName);
+  const who = theOther;
+  const payer = (isPartner || isShop) ? 'The customer pays' : 'You pay';
+  const confirms = (isPartner || isShop) ? 'the customer confirms' : 'you confirm';
   const placed = clockTime(o.createdAt);
 
   sweepMaps();
@@ -249,7 +274,7 @@ export function renderDetail(orderId) {
         aria-pressed="${showMap}" style="font-size:11px;letter-spacing:.04em;min-height:44px">${showMap ? 'HIDE MAP' : 'MAP'}</button>
     </div>
 
-    ${o.otp && running && isCustomer && o.stage !== 'ARRIVED' && o.stage !== 'R_PICKUP_READY' ? `
+    ${o.otp && running && isCustomer && !o.otpVerified && o.stage !== 'ARRIVED' && o.stage !== 'R_PICKUP_READY' ? `
       <div class="between" style="padding:9px 0;border-bottom:1px solid var(--color-divider)">
         <span class="tiny muted">Your 4-digit code — share it only at the door</span>
         <b class="num" style="font-size:17px;letter-spacing:.14em">${esc(o.otp)}</b></div>` : ''}
@@ -271,10 +296,11 @@ export function renderDetail(orderId) {
             <div class="m-kv"><span>${esc(cat.name)} · ${esc(o.sub || cat.unit)} — ${esc(o.partnerName)}'s price</span><span class="num">${M.fmt(o.deal)}</span></div>
             <div class="m-kv"><span class="muted">SAAHAA charge · ${pct}% on top</span><span class="num">${M.fmt(o.platformFee)}</span></div>
             <div class="m-kv"><span class="muted">GST on that charge</span><span class="num">${M.fmt(o.gst)}</span></div>
-            <div class="m-kv m-kv--total"><span>You pay${o.provisional ? ' (est.)' : ''}</span><span class="num">${M.fmt(o.customerPays)}</span></div>
+            <div class="m-kv m-kv--total"><span>${payer}${o.provisional ? ' (est.)' : ''}</span><span class="num">${M.fmt(o.customerPays)}</span></div>
             <p class="micro muted" style="margin-top:8px">${esc(paidWith(o))}. ${esc(o.partnerName)} receives the full ${M.fmt(o.deal)} —
-              SAAHAA holds it until you confirm the work and never takes a cut of their quote.</p>
-            ${o.saved ? `<p class="micro" style="margin-top:6px;color:var(--color-accent)">You saved ${M.fmt(o.saved)} against a commission app — and your pro was paid more.</p>` : ''}
+              SAAHAA holds it until ${confirms} the work and never takes a cut of their quote.</p>
+            ${o.saved && !(isPartner || isShop) ? `<p class="micro" style="margin-top:6px;color:var(--color-accent)">You saved ${M.fmt(o.saved)} against a commission app — and your pro was paid more.</p>` : ''}
+            ${o.saved && (isPartner || isShop) ? `<p class="micro" style="margin-top:6px;color:var(--color-accent)">You keep the whole ${M.fmt(o.deal)}. SAAHAA's charge was paid on top, by the customer.</p>` : ''}
           </div>` : `
           <div class="sec">
             <p class="m-cap">${o.lines.length} item${o.lines.length === 1 ? '' : 's'}${o.provisional ? ' · est. until weighed' : ''}</p>
@@ -283,7 +309,7 @@ export function renderDetail(orderId) {
               <span class="num">${M.fmt(l.unitPrice * l.qty)}</span></div>`).join('')}
             <div class="m-kv"><span class="muted">Delivery${o.mode === 'pickup' ? ' · pickup' : ''}</span><span class="num">${o.deliveryFee ? M.fmt(o.deliveryFee) : 'Free'}</span></div>
             <div class="m-kv m-kv--total"><span>Total${o.provisional ? ' (est.)' : ''}</span><span class="num">${M.fmt(o.customerPays)}</span></div>
-            <p class="micro muted" style="margin-top:8px">${esc(paidWith(o))}. Held by SAAHAA until you confirm the delivery; an item the shop could not supply comes back to your wallet.</p>
+            <p class="micro muted" style="margin-top:8px">${esc(paidWith(o))}. Held by SAAHAA until ${confirms} the delivery; an item the shop could not supply comes back to ${(isPartner || isShop) ? "the customer's" : 'your'} wallet.</p>
           </div>`}
 
         <div class="sec">
@@ -294,7 +320,7 @@ export function renderDetail(orderId) {
             ${chats.length ? chats.slice(-4).map(m => `<div class="msg${s && m.name === s.name ? ' mine' : ''}">
               <span class="micro" style="display:block;opacity:.7">${esc(m.name)} · ${clockTime(m.ts)}</span>
               ${esc(m.text)}
-              ${m.flagged ? '<span class="micro" style="display:block;margin-top:4px;opacity:.8">Contact details hidden — keep payments in SAAHAA.</span>' : ''}
+              ${m.flagged ? '<span class="micro" style="display:block;margin-top:4px;opacity:.8">Phone numbers and payment ids hidden — keep payments in SAAHAA.</span>' : ''}
             </div>`).join('') : '<p class="tiny muted">No messages yet.</p>'}
           </div>
           ${(isCustomer || isPartner || isShop) ? `
@@ -335,7 +361,7 @@ function dayLabel(ts) {
 }
 
 /* what was agreed, in the order's own money — never a typed percentage */
-function jobCard(o, cat) {
+function jobCard(o, cat, mine = false) {
   const P = getPricing();
   const title = o.kind === 'service'
     ? `${cat.name}${o.sub ? ' · ' + o.sub : ''}`
@@ -345,8 +371,8 @@ function jobCard(o, cat) {
     <p class="m-cap" style="margin:0">Job confirmed</p>
     <b>${esc(title)} · ${M.fmt(o.kind === 'service' ? o.deal : o.customerPays)}</b>
     <p class="micro muted" style="margin:4px 0 0">${o.kind === 'service'
-      ? `${esc(o.partnerName || '')} keeps the full ${M.fmt(o.deal)}. You pay ${M.fmt(o.customerPays)} — SAAHAA's ${pct}% sits on top of the quote and is held until you confirm the work.`
-      : `You pay ${M.fmt(o.customerPays)}, held by SAAHAA until you confirm the delivery. SAAHAA's charge on a shop order comes out of the shop's side, not your basket.`}</p>
+      ? `${esc(o.partnerName || '')} keeps the full ${M.fmt(o.deal)}. ${mine ? 'The customer pays' : 'You pay'} ${M.fmt(o.customerPays)} — SAAHAA's ${pct}% sits on top of the quote and is held until ${mine ? 'the customer confirms' : 'you confirm'} the work.`
+      : `${mine ? 'The customer pays' : 'You pay'} ${M.fmt(o.customerPays)}, held by SAAHAA until ${mine ? 'they confirm' : 'you confirm'} the delivery. SAAHAA's charge on a shop order comes out of the shop's side, not the basket.`}</p>
   </div>`;
 }
 
@@ -356,12 +382,14 @@ export function renderChat(orderId) {
   const s = me();
   const cat = get('category', o.catId);
   const st = stage(o.stage);
-  const who = (o.kind === 'service' ? o.partnerName : o.shopName) || 'SAAHAA';
   const msgs = getState().chats[o.id] || [];
   const isCustomer = !!(s && o.customerKey === s.key);
   const isPartner = !!(s && s.role === 'partner' && getState().partners.some(p => p.userKey === s.key && p.id === o.partnerId));
   const isShop = !!(s && s.role === 'shop' && getState().shops.some(x => x.ownerKey === s.key && x.id === o.shopId));
   const canPost = isCustomer || isPartner || isShop;
+  /* a thread has two ends: whoever is reading, the header names the other */
+  const who = ((isPartner || isShop) ? o.customerName
+    : (o.kind === 'service' ? o.partnerName : o.shopName)) || 'SAAHAA';
 
   /* a thread is read from the bottom */
   setTimeout(() => { const el = document.getElementById('chatThread'); if (el) el.scrollTop = el.scrollHeight; }, 0);
@@ -374,7 +402,7 @@ export function renderChat(orderId) {
     return `${rule}<div class="msg${s && m.name === s.name ? ' mine' : ''}">
       <span class="micro" style="display:block;opacity:.7">${esc(m.name)} · ${clockTime(m.ts)}</span>
       ${esc(m.text)}
-      ${m.flagged ? '<span class="micro" style="display:block;margin-top:4px;opacity:.85">Contact details hidden — keep the job and the payment inside SAAHAA and you are both covered.</span>' : ''}
+      ${m.flagged ? '<span class="micro" style="display:block;margin-top:4px;opacity:.85">Phone numbers and payment ids hidden — keep the job and the payment inside SAAHAA and you are both covered.</span>' : ''}
     </div>`;
   }).join('');
 
@@ -392,7 +420,7 @@ export function renderChat(orderId) {
 
   <main class="wrap ch-wrap">
     <div id="chatThread" class="ch-thread">
-      ${jobCard(o, cat)}
+      ${jobCard(o, cat, isPartner || isShop)}
       ${thread || `<p class="tiny muted" style="text-align:center;margin:auto 0">No messages yet. Say what you need — ${esc(who.split(' ')[0])} sees it straight away.</p>`}
     </div>
 
@@ -457,7 +485,7 @@ function actionPanel(o, r) {
         <button class="btn btn--secondary grow" data-act="ev.add" data-id="${o.id}" data-label="Before">${icon('camera', { size: 16 })} Before</button>
         <button class="btn btn--secondary grow" data-act="ev.add" data-id="${o.id}" data-label="After">${icon('camera', { size: 16 })} After</button>
       </div>
-      <p class="tiny muted" style="margin-bottom:12px">${(o.evidence || []).length} photo(s) attached</p>
+      <p class="tiny muted" style="margin-bottom:12px">${(o.evidence || []).length} photo${(o.evidence || []).length === 1 ? '' : 's'} attached</p>
       ${(o.evidence || []).length
         ? B('stage.done', 'Mark work finished')
         : `<button class="btn btn--primary btn--lg btn--block" disabled

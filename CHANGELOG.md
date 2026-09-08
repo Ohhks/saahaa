@@ -6,6 +6,58 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [8.0.0] — 2026-09-08 — "Modernist"
+
+A whole-surface redesign. Every screen was rebuilt to the Modernist mockup —
+and nothing the product *does* changed. The contract check
+(`tools/guard-ui.mjs`) is what made that safe: every `data-act`, element id and
+export had to survive the repaint, so the behaviour could not drift while the
+paint changed.
+
+### Added
+- **The Modernist design system** (`src/ui/tokens.css`, rebuilt): Archivo,
+  vendored — no CDN; a light paper ground (`#f3f2f2`) with ink text
+  (`#201e1d`); one red accent (`#ec3013`) spent only on primary actions and
+  live state; **zero corner radius anywhere**; 1–2px rules doing the
+  organising instead of shadows; 44px minimum on every interactive control.
+  The file carries two layers — the mockup's own component classes
+  (`.btn-primary` `.tag-accent` `.apphdr` `.tabbar`/`.tab` `.sec` `.thumb`
+  `.seg` `.table` `.field`/`.input`) and every legacy class the views still
+  used, restyled to the system — so no screen could look foreign mid-rebuild.
+  Dark theme is the same system inverted and stayed correct throughout.
+- **`#/nearby` — the neighbourhood.** The mockup's map-first browse: the shops
+  and pros around you as pins over OpenStreetMap, a search that geocodes and
+  re-centres, Shops / Pros / Open filters that move the pins and the list
+  together, and an honest empty state on a store with nothing in it yet.
+- **`#/chat/<order>` — the thread with the pro.** The conversation an order
+  already carried, given a screen: grouped by day, the job's own money in a
+  confirmed-job card, and the contact-masking `domain/flow.js` performs made
+  visible and explained rather than silently applied.
+- **The quote builder states the money truth**, and it moves with the slider:
+  what the pro keeps (100%), what SAAHAA adds on top, and what the customer
+  therefore pays — every figure read live from the dials.
+
+### Changed
+- All twelve views rebuilt in the system; `views/earn.js`, the one view never
+  converted in the first pass, rewritten from its old vocabulary.
+- Leaflet is skinned to the system (`ui/map.js`) — until now its popups and
+  controls rendered in Helvetica with rounded corners, the only un-designed
+  surface in the product. The colour whitelist and escaping are untouched.
+- The admin console stopped hand-rolling a second dark treatment and uses the
+  system's ink strip; its money blocks are real tables; the GST figure it
+  printed is now read from `GST_RATE`.
+- Toast, sticky toast, sheet and splash defects fixed (an "update ready"
+  notice used to sit under the tab bar).
+
+### Kept, deliberately
+- **The economics.** The mockup's sample copy shows a 3% fee taken from the
+  pro's side. The shipped model — decided in v6.6.0 and built through v7.1 —
+  is **8% laid on top of the worker's quote, paid by the customer, worker
+  keeps 100%**, with the ledger, treasury, GST split and legal pages resting
+  on it. The look came from the mockup; the money did not. No view hard-codes
+  a percentage: every figure is read from `domain/settings.js`, so the owner's
+  dials remain the only place a rate can move.
+
 ## [7.1.0] — 2026-09-07 — "Ready for the rail"
 
 The release that makes the day the Razorpay account exists a one-line switch.

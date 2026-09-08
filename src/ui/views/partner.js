@@ -57,7 +57,7 @@ const consoleCSS = `<style>
   .con__hdr .brandline{opacity:.72;display:block}
   .con__hdr .name{font:800 17px/1.1 var(--font-heading);display:block;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .con__hdr .sub{font-size:11px;opacity:.75;display:block;margin-top:3px}
-  .con__hdr .btn-outline{border:1px solid currentColor;color:inherit;min-height:36px;padding:6px 10px;font:800 10px/1 var(--font-heading);letter-spacing:.06em;text-transform:uppercase}
+  .con__hdr .btn-outline{border:1px solid currentColor;color:inherit;min-height:44px;padding:6px 10px;font:800 10px/1 var(--font-heading);letter-spacing:.06em;text-transform:uppercase}
   @media (min-width:768px){ .con__hdr{padding-left:var(--sp-8);padding-right:var(--sp-8)} }
   @media (min-width:1024px){ .con__hdr{padding-left:var(--sp-10);padding-right:var(--sp-10)} }
   /* .workspace zeroes .wrap's side padding, so a .bleed child pulled by the
@@ -80,7 +80,7 @@ const consoleCSS = `<style>
   .utabs button[aria-selected="true"]{color:var(--color-accent);border-bottom-color:var(--color-accent)}
   .utabs .n{font-size:10px;padding:2px 5px;background:var(--color-neutral-200);color:var(--color-neutral-800)}
   .subtabs{display:flex;gap:6px;padding:10px 0;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--color-divider)} .subtabs::-webkit-scrollbar{display:none}
-  .subtabs button{padding:6px 10px;font:600 11px/1 var(--font-body);white-space:nowrap;border:1px solid var(--color-divider);min-height:36px}
+  .subtabs button{padding:6px 10px;font:600 11px/1 var(--font-body);white-space:nowrap;border:1px solid var(--color-divider);min-height:44px}
   .subtabs button[aria-selected="true"]{background:var(--color-accent);color:var(--accent-on-fill);border-color:var(--color-accent)}
   .lrow{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid var(--color-divider);align-items:flex-start;width:100%;text-align:left;color:inherit}
   .lrow--c{align-items:center} .lrow--col{flex-direction:column;gap:0}
@@ -774,7 +774,7 @@ export function openPicker() {
         <div class="grow" style="min-width:0"><b style="font:800 14px/1.2 var(--font-heading)">${esc(sc.name)}</b>
           <p class="micro muted">${esc(sc.aisle)} · ${esc(sc.unit)}${sc.mrp ? ` · MRP ${M.fmt(sc.mrp)}` : ''}</p></div>
         <b class="num tiny" style="flex:none">${M.fmt(sc.price)}</b>
-        <button class="btn btn-primary btn--sm" style="flex:none;min-height:40px" data-act="pick.add" data-ref="${sc.refId}">Add</button>
+        <button class="btn btn-primary btn--sm" style="flex:none;min-height:44px" data-act="pick.add" data-ref="${sc.refId}">Add</button>
       </div>`).join('') || '<p class="muted tiny">Nothing left to add here.</p>'}
   `, { noFocus: true });
 }
