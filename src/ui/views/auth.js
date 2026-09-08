@@ -83,7 +83,7 @@ const authCSS = `<style>
   .au__foot{padding:12px 0;border-top:2px solid var(--color-divider);margin-top:8px}
   .au__foot .btn-primary{width:100%;justify-content:flex-start}
   .au__links{font-size:12px;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:6px 14px;padding:16px 0}
-  .au__links a{color:inherit}
+  .au__links a{color:inherit;display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}
   @media (min-width:768px){ .au__hdr.apphdr{padding-left:var(--sp-8);padding-right:var(--sp-8)} .au__hero{padding-left:var(--sp-8);padding-right:var(--sp-8)} }
   @media (min-width:1024px){ .au__hdr.apphdr{padding-left:var(--sp-10);padding-right:var(--sp-10)} .au__hero{padding-left:var(--sp-10);padding-right:var(--sp-10)}
     .au{max-width:1100px} .au__two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--sp-10);align-items:start} }
@@ -417,6 +417,23 @@ export function pickAccount(matches) {
 
    The Copy button carries the class `idcopy`; ui/views/account.js registers
    the single delegated listener for it, so no new registered action exists. */
+/* The line under the ID that tells a person what else this number holds. If a
+   second account already exists it is NAMED, with its code, rather than
+   offered as a possibility — the sheet must never invite someone to open an
+   account they already have. */
+function siblingLine(user) {
+  const others = ID.accountsOn(user && user.mobile, getState().users)
+    .filter(u => u.key !== user.key && ID.isCode(u.code));
+  if (others.length) {
+    const list = others.map(u => `a ${esc((ID.ROLE_LABEL[u.role] || 'Account').toLowerCase())} account (<b class="num">${esc(ID.normaliseCode(u.code))}</b>)`).join(' and ');
+    return `This number also holds ${list} &mdash; separate account, separate password, separate wallet and history. They never mix.`;
+  }
+  const could = user.role === 'customer'
+    ? 'a pro account, if you want to work as well as book'
+    : 'a customer account, for when you are the one buying';
+  return `This number can also hold ${could} &mdash; a separate account, with its own password, wallet and history.`;
+}
+
 export function announceNewId(user) {
   const code = ID.normaliseCode((user && user.code) || '');
   if (!ID.isCode(code)) return;
@@ -434,9 +451,7 @@ export function announceNewId(user) {
     </div>
     <p class="micro muted" style="margin-top:12px">Write it down. Sign in with it or with your mobile number &mdash; either works.
       It is a name, not a secret: it says who you are, your password proves it.</p>
-    <p class="micro muted" style="margin-top:8px">This number can also hold ${user.role === 'customer'
-      ? 'a pro account, if you want to work as well as book'
-      : 'a customer account, for when you are the one buying'} &mdash; a separate account, with its own password, wallet and history.</p>
+    <p class="micro muted" style="margin-top:8px">${siblingLine(user)}</p>
     <button class="btn btn-primary btn--block" style="margin-top:16px" data-act="sheet.close">Got it</button>`);
 }
 

@@ -958,7 +958,7 @@ function flowTimeline(row) {
       <td class="nowrap"><b>${esc(e.title)}</b></td>
       <td class="tiny muted">${e.body ? esc(e.body) : ''}</td></tr>`).join(''))}
     <p class="micro muted" style="margin-top:var(--sp-4)">${evs.length > FLOW_EVENTS
-      ? `Newest ${FLOW_EVENTS} of ${evs.length} events.` : `${evs.length} event(s), newest first.`}</p>`;
+      ? `Newest ${FLOW_EVENTS} of ${evs.length} events.` : `${evs.length} ${evs.length === 1 ? 'event' : 'events'}, newest first.`}</p>`;
 }
 
 function flowRow(row) {

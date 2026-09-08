@@ -566,8 +566,9 @@ async function boot() {
      app without it drops the example roster before anything else happens —
      the owner's credential and dials stay (domain/fresh.js). */
   const demoMode = new URLSearchParams(location.search).get('demo') === '1' || !!new URLSearchParams(location.search).get('shot');
+  let purged = false;
   { const cleaned = fresh.purgeIfDemoResidue(store.getState(), demoMode);
-    if (cleaned !== store.getState()) { store.replaceState(cleaned, 'demo-purge'); persist.flush(persist.KEYS.state); console.info('[saahaa] demo roster removed — production starts empty'); } }
+    if (cleaned !== store.getState()) { store.replaceState(cleaned, 'demo-purge'); persist.flush(persist.KEYS.state); purged = true; console.info('[saahaa] demo roster removed — production starts empty'); } }
 
   if (!store.getState().seeded) {
     /* Production starts EMPTY. The demo seed (example customers, pros, shops,
@@ -614,6 +615,12 @@ async function boot() {
     if (selfNav) { selfNav = false; return; }   // our own echo: go() already rendered
     closeSheet(); applyHash(); render();
   });
+
+  /* The purge above is all-or-nothing on purpose: an order or a ledger leg
+     pointing at an example account cannot be left dangling. That means an
+     account signed up by hand DURING a ?demo=1 session goes with the roster,
+     which is right for a demo phone and baffling if nobody says so. */
+  if (purged) setTimeout(() => toast('Example data removed — this device is a fresh install now', 'warn'), 400);
 
   ctx.ready = true;
   /* ?shot=<scene> — the presentation capture switch. A dev-only module that
