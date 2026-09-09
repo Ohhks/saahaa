@@ -6,6 +6,56 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [8.3.0] — 2026-09-09 — "What we say we do"
+
+An audit of the product from three angles — is it satisfying, does it serve the
+people it is for, and does it keep its word about their data — and the repairs
+that came out of it.
+
+### Fixed — privacy
+- **A pro's verification selfie was published on their public page.** The
+  ladder asked for a photograph to prove who somebody is, and the app then
+  showed it to everyone, while the privacy page promised a customer "never"
+  sees a pro's selfie. `partner.selfie` is now private and separate from
+  `partner.photo`, the face a pro chooses to trade under; publishing one is a
+  deliberate, separate tap.
+- **A phone number written the way people write it was not masked.** The chat
+  rule was `\d{10}`, so "98765 43210" went through in the clear, unflagged
+  and unaudited, while the screen said contact details were hidden. Ten digits
+  with anything between them now count, "+91" included — and ordinary
+  sentences with numbers in them are still left alone.
+- Map pin labels were escaped twice, printing `Ram &amp;amp; Co`; a colour went
+  raw into a style attribute; the CSP still permitted a font host the product
+  stopped using when Archivo was vendored.
+- **Every claim on the legal pages was checked against the code**, and the ones
+  that had quietly become false were corrected — chiefly "one number is one
+  account" (untrue since 8.1.0), what the owner's audit log actually records
+  (doing, not looking), what a pro keeps seeing about a customer after a job
+  ends, and how precisely a location leaves the device for a map search.
+
+### Added
+- **You can remove your own account** (My SAAHAA), and the app shows what will
+  happen before it happens: what is removed, what is emptied but kept because
+  someone else's record points at it, and what stays — the ledger, because it
+  is hash-chained and a business must keep its books. What remains there is an
+  account number with nobody behind it.
+- **A way back into a forgotten account.** There was none: a pro who forgot
+  their password lost their storefront, wallet and history for good. With no
+  SMS rail yet, the reset is what a neighbourhood business does — you ring the
+  owner, they check it is you, and read out a one-time code that works once and
+  expires in half an hour. Only its hash is stored; issuing and using it are
+  both audited.
+
+### Fixed — the journeys
+From walking them as each person on a 375px screen: a guest who tapped
+"Confirm booking" lost the whole journey and now returns to the same priced
+sheet; "Book again" went to the order list instead of re-booking; a category
+with nobody free was a dead end; the trade quiz never warned that three wrong
+answers cost a day's work; a shop accepted an order showing only what the
+customer paid, not what she kept; the pro's stake was explained one screen
+after it was taken, and is now stated before the code is typed; a cancel quoted
+a rule instead of a number.
+
 ## [8.2.0] — 2026-09-09 — "A shop with a face"
 
 ### Added
