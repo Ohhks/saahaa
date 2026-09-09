@@ -25,14 +25,24 @@
    (pricing.liveMarkup, settings.getPricing, pricing.AGG_COMMISSION). Then
    the same forms, in .field language. A shop's form IS the mockup's SHOP
    SETUP screen: name, what you sell, where it is, then "Next — add your
-   stock", which drops the owner into the console with the ready list. */
+   stock", which drops the owner into the console with the ready list.
 
-import { mount, esc, toast, sheet } from '../dom.js';
+   OPEN A SHOP (8.1) — "so that everyone can list their products". The shop
+   branch is now a journey, not a form: the eight retail categories are a
+   picker with each category's own accent, its icon, its aisle count and the
+   fee IT charges; the shop's front is photographed here, before the shop row
+   exists, and optionally — skipping it blocks nothing; and somebody who is
+   already signed in is told in one line that this is a SECOND account on
+   their number, not a replacement for the one they have. It ends on
+   views/onboard.js's "you're live", which shows them what they made. */
+
+import { mount, esc, toast, sheet, delegate } from '../dom.js';
 import * as ID from '../../domain/identity.js';
 import { liveMarkup, AGG_COMMISSION } from '../../domain/pricing.js';
 import { getPricing } from '../../domain/settings.js';
 import { icon, hasIcon } from '../icons.js';
-import { ctx, getState, dispatch, saveSession } from '../../core/ctx.js';
+import { ctx, getState, dispatch, saveSession, me } from '../../core/ctx.js';
+import * as photoUI from '../photo.js';
 import { sha256 } from '../../core/crypto.js';
 import { nid } from '../../core/id.js';
 import { toPaise } from '../../core/money.js';
@@ -63,6 +73,39 @@ let suHits = [];          // last geocode results
 let mapH = null, mapEl = null;
 const HYD = { lat: 17.4486, lng: 78.3908 };
 
+/* OPEN A SHOP — the same reasoning, for the two things a shop needs and a
+   customer does not: WHAT IT SELLS and WHAT ITS FRONT LOOKS LIKE.
+
+   `suCatId` is the chosen retail category. It used to be a bare <select> that
+   a person had to know to look at; it is now a picker of the eight categories
+   the product actually has, each carrying its own accent, its icon and the
+   fee it charges — because the category is not a form field, it is the
+   decision that shapes the aisles, the ready-made product list and the money.
+   The hidden #suCat carries the answer, exactly the way #suArea carries the
+   place, so every existing read of val('suCat') is unchanged.
+
+   `suPhoto` is a photo id from core/photos.js, taken BEFORE the shop row
+   exists — so it cannot go through data-act="photo.shop", which needs a shop
+   id. It is stored the moment it is chosen and written onto the shop in
+   doSignup(). It is optional and never blocks anything. */
+let suCatId = '';
+let suPhoto = '';
+
+const chosenCat = () => retCats().find(c => c.id === suCatId) || null;
+
+/* What a shop actually pays. The engine charges the CATEGORY's own rate and
+   cap (domain/pricing.js quoteRetail), falling back to the dials — so this
+   reads both, and never a typed number. */
+function shopFee() {
+  const P = getPricing(), c = chosenCat();
+  return { pct: (c && c.takePct != null) ? c.takePct : P.retailTakePct,
+           cap: (c && c.takeCapPaise != null) ? c.takeCapPaise : P.retailTakeCapPaise };
+}
+
+/* a registry accent is code, not user input — but it lands in a style
+   attribute, so only a colour is ever let through */
+const safeAccent = v => (/^#[0-9a-fA-F]{3,8}$/.test(String(v || '')) ? String(v) : 'var(--color-accent)');
+
 const authCSS = `<style>
   .au{max-width:560px}
   .au__hdr.apphdr{padding-left:var(--gutter);padding-right:var(--gutter)}
@@ -84,6 +127,17 @@ const authCSS = `<style>
   .au__foot .btn-primary{width:100%;justify-content:flex-start}
   .au__links{font-size:12px;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:6px 14px;padding:16px 0}
   .au__links a{color:inherit;display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}
+  .au__cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:8px;margin-top:2px}
+  .au__cat{display:block;width:100%;min-width:0;text-align:left;padding:11px 12px;min-height:44px;
+    border:1px solid var(--color-divider);border-left:4px solid var(--cat,var(--color-accent));background:var(--surface);color:inherit}
+  .au__cat:hover{border-color:var(--color-text);border-left-color:var(--cat,var(--color-accent))}
+  .au__cat .ic{display:block;color:var(--cat,var(--color-accent))}
+  .au__cat b{display:block;font:800 14px/1.2 var(--font-heading);margin-top:7px;overflow-wrap:anywhere}
+  .au__cat span{display:block;font-size:11.5px;line-height:1.35;color:var(--ink-3);margin-top:3px}
+  .au__cat[aria-pressed="true"]{background:var(--color-accent);color:var(--accent-on-fill);border-color:var(--color-accent);border-left-color:var(--color-text)}
+  .au__cat[aria-pressed="true"] .ic,.au__cat[aria-pressed="true"] span{color:inherit;opacity:.92}
+  .au__shotpv img{display:block;width:100%;height:150px;object-fit:cover;border:2px solid var(--color-text);background:var(--surface-3)}
+  .au__shotbox .btn{width:100%;justify-content:flex-start}
   @media (min-width:768px){ .au__hdr.apphdr{padding-left:var(--sp-8);padding-right:var(--sp-8)} .au__hero{padding-left:var(--sp-8);padding-right:var(--sp-8)} }
   @media (min-width:1024px){ .au__hdr.apphdr{padding-left:var(--sp-10);padding-right:var(--sp-10)} .au__hero{padding-left:var(--sp-10);padding-right:var(--sp-10)}
     .au{max-width:1100px} .au__two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--sp-10);align-items:start} }
@@ -142,17 +196,17 @@ function loginForm() {
    read from the engine, never typed here. */
 function sideRows() {
   const pct = Math.round(liveMarkup() * 100);
-  const P = getPricing();
+  const F = shopFee();
   const rows = [
     ['customer', 'I need something done', 'Find pros and shops near you. Always free — no markup on their prices.'],
     ['partner',  'I offer a service',     `Quote jobs, keep 100% of your price. SAAHAA's ${pct}% is added on top and paid by the customer.`],
-    ['shop',     'I run a shop',          `A storefront with your stock, live today. ${P.retailTakePct}% an order, capped at ${M.fmt(P.retailTakeCapPaise)}. No yearly plan.`],
+    ['shop',     'I run a shop',          `A storefront with your stock, live today. ${F.pct}% an order, capped at ${M.fmt(F.cap)}. No yearly plan.`],
   ];
   return `<div>
     ${rows.map(([r, t, s]) => `<button class="au__side tap" type="button" aria-pressed="${role === r ? 'true' : 'false'}" data-act="auth.role" data-role="${r}"><b>${esc(t)}</b><span>${esc(s)}</span></button>`).join('')}
     <div style="padding:10px 0 4px">
       <div class="au__cost"><span class="muted">Cost to list</span><strong>₹0</strong></div>
-      <div class="au__cost"><span class="muted">Cost per order</span><strong>${role === 'shop' ? `${P.retailTakePct}%, capped ${M.fmt(P.retailTakeCapPaise)}` : role === 'partner' ? `₹0 — the customer pays ${pct}% on top` : '₹0'}</strong></div>
+      <div class="au__cost"><span class="muted">Cost per order</span><strong id="suCostLine">${costLine()}</strong></div>
       <div class="au__cost"><span class="muted">Typical aggregator</span><strong class="em">${Math.round(AGG_COMMISSION * 100)}%</strong></div>
     </div>
   </div>`;
@@ -210,20 +264,147 @@ function placeLine() {
   return `<b>${esc(suPlace.label)}</b> <span class="muted">· ${suPlace.lat.toFixed(4)}, ${suPlace.lng.toFixed(4)}</span>`;
 }
 
+/* ── open a shop: the category step ────────────────────────────
+   Eight cards, not a dropdown. Each one is the category's own name, its own
+   icon and its own accent, and choosing one immediately says what SAAHAA will
+   take on an order in that category — which is the only number that matters
+   to somebody deciding whether to open a shop at all. */
+function catStep() {
+  return `
+  <div class="field">
+    <div>
+      <div class="au__cats" id="suCatGrid" role="group" aria-label="What your shop sells">${catCards()}</div>
+      <p class="tiny" id="suCatLine" style="margin-top:10px">${catLine()}</p>
+      <!-- the answer, in the field every existing read already looks at -->
+      <input id="suCat" type="hidden" value="${esc(suCatId)}">
+    </div>
+    <label>What your shop sells</label>
+  </div>`;
+}
+
+function catCards() {
+  return retCats().map(c => `<button type="button" class="au__cat tap" data-cat="${esc(c.id)}"
+      aria-pressed="${suCatId === c.id ? 'true' : 'false'}" style="--cat:${safeAccent(c.accent)}">
+      <span class="ic" aria-hidden="true">${icon(hasIcon(c.id) ? c.id : 'groupShops', { size: 20 })}</span>
+      <b>${esc(c.name)}</b>
+      <span>${esc(c.blurb || '')}</span>
+    </button>`).join('');
+}
+
+function catLine() {
+  const c = chosenCat();
+  if (!c) return '<span class="muted">Pick one — it sets your aisles, the ready-made list you build your stock from, and what an order costs.</span>';
+  const f = shopFee(), n = (c.aisles || []).length;
+  return `<b>${esc(c.name)}</b> <span class="muted">· ${n} aisle${n === 1 ? '' : 's'} ready
+    · SAAHAA takes ${f.pct}% of an order, never more than ${M.fmt(f.cap)}</span>`;
+}
+
+/* ── open a shop: the picture ──────────────────────────────────
+   Optional, and said so out loud. The shop row does not exist yet, so this
+   cannot use data-act="photo.shop" (which needs a shop id): the picture is
+   shrunk and stored now, and its id is written onto the shop the moment the
+   shop is created. */
+function shotStep() {
+  return `
+  <div class="field">
+    <div>
+      <div id="suShot" class="au__shotbox">${shotInner()}</div>
+      <p class="micro muted" style="margin-top:6px">Optional — your shop opens without it. A photo of the front is what somebody
+        recognises from the street; you can add or change it any time from your console.</p>
+    </div>
+    <label>A photo of your shop</label>
+  </div>`;
+}
+
+function shotInner() {
+  const u = photoUI.url(suPhoto);
+  if (!u) return `<button type="button" class="au__shot tap btn btn-secondary">
+    ${icon('camera', { size: 18 })} Add a photo of your shop</button>`;
+  return `<div class="au__shotpv">
+    <img src="${u}" alt="The photo you chose of your shop front">
+    <div class="row" style="gap:8px;margin-top:8px">
+      <button type="button" class="au__shot tap btn btn-secondary btn--sm grow">Change photo</button>
+      <button type="button" class="au__shotx tap btn btn-secondary btn--sm grow">Remove</button>
+    </div>
+  </div>`;
+}
+
+/* PAINT, NEVER RE-RENDER — the same rule the place step follows: a full
+   render() here would wipe the shop name, mobile and password already typed.
+   The cards toggle their own aria-pressed so the keyboard focus stays where
+   the person put it. */
+function paintCat() {
+  document.querySelectorAll('.au__cat').forEach(b =>
+    b.setAttribute('aria-pressed', b.dataset.cat === suCatId ? 'true' : 'false'));
+  const hidden = document.getElementById('suCat');
+  if (hidden) hidden.value = suCatId;
+  const line = document.getElementById('suCatLine');
+  if (line) mount(line, catLine());
+  const cost = document.getElementById('suCostLine');
+  if (cost) mount(cost, costLine());
+}
+
+function paintShot() {
+  const box = document.getElementById('suShot');
+  if (box) mount(box, shotInner());
+}
+
+/* Two delegated listeners, registered once with the module — the `idcopy`
+   pattern in views/account.js. No new registered action exists, because none
+   is needed: nothing here is dispatched and nothing here navigates. */
+delegate('click', '.au__cat', (e, el) => {
+  const id = el.dataset.cat || '';
+  suCatId = suCatId === id ? '' : id;
+  paintCat();
+});
+
+delegate('click', '.au__shot', async () => {
+  const r = await photoUI.pick({ maxEdge: 900 });
+  if (r && r.ok) { suPhoto = r.id; paintShot(); toast('Photo added'); }
+  else if (r && !r.cancelled && r.reason) toast(r.reason, 'warn');
+});
+
+delegate('click', '.au__shotx', () => { suPhoto = ''; paintShot(); toast('Photo removed'); });
+
+/* the one honest number on the "which side are you on" block, kept in step
+   with whichever category is chosen */
+function costLine() {
+  const pct = Math.round(liveMarkup() * 100);
+  if (role === 'shop') { const f = shopFee(); return `${f.pct}%, capped ${M.fmt(f.cap)}`; }
+  return role === 'partner' ? `₹0 — the customer pays ${pct}% on top` : '₹0';
+}
+
+/* ── already inside? then this is a SECOND account, not an error ──
+   A customer or a pro opening a shop keeps everything they have. Said in one
+   line, before they wonder whether they are about to lose it. */
+function secondAccountLine() {
+  const s = me();
+  if (!s || s.role === role) return '';
+  const word = (ID.ROLE_LABEL[s.role] || 'account').toLowerCase();
+  const code = ID.normaliseCode(s.code || '');
+  const opening = role === 'shop' ? 'Opening a shop' : role === 'partner' ? 'Joining as a pro' : 'Opening a customer account';
+  return `<p class="tiny" style="margin:0 0 14px;padding:10px 12px;border-left:4px solid var(--color-accent);background:var(--color-accent-100);color:var(--ink-1)">
+    Signed in as <b>${esc(s.name)}</b>${ID.isCode(code) ? ` · <b class="num">${esc(code)}</b>` : ''} — your ${esc(word)} account.
+    ${esc(opening)} adds a <b>second account on the same number</b>, with its own password, wallet and history.
+    Your ${esc(word)} account is untouched; you can sign back into it any time.</p>`;
+}
+
 function signupForm() {
   const pct = Math.round(liveMarkup() * 100);
-  const P = getPricing();
-  const title = role === 'shop' ? 'Your shop' : role === 'partner' ? 'Your trade' : 'Your account';
-  const step = role === 'shop' ? 'Setup · then add your stock' : role === 'partner' ? 'Setup · then 7 verification steps' : 'One step';
+  const F = shopFee();
+  const s = me();
+  const title = role === 'shop' ? 'Open your shop' : role === 'partner' ? 'Your trade' : 'Your account';
+  const step = role === 'shop' ? 'Name it · photograph it · then list your stock' : role === 'partner' ? 'Setup · then 7 verification steps' : 'One step';
   return `
   <div class="au__two">
     ${sideRows()}
     <div>
       <div class="au__step"><b>${title}</b><span>${step}</span></div>
       <div class="au__form">
-        <div class="field"><input id="suName" placeholder=" " autocomplete="name"><label>${role === 'shop' ? 'Shop name' : 'Full name'}</label></div>
-        <div class="field"><input id="suMobile" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel"><label>10-digit mobile</label></div>
-        <div class="field"><input id="suPass" type="password" placeholder=" " autocomplete="new-password"><label>Create a password (8+ characters)</label></div>
+        ${secondAccountLine()}
+        <div class="field"><input id="suName" placeholder=" " autocomplete="name"><label>${role === 'shop' ? 'Shop name — what the board outside says' : 'Full name'}</label></div>
+        <div class="field"><input id="suMobile" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel" value="${esc(s ? String(s.mobile || '') : '')}"><label>10-digit mobile</label></div>
+        <div class="field"><input id="suPass" type="password" placeholder=" " autocomplete="new-password"><label>${s && s.role !== role ? 'A password for this new account (8+ characters)' : 'Create a password (8+ characters)'}</label></div>
 
         ${role === 'partner' ? `
           <div class="field">
@@ -234,17 +415,16 @@ function signupForm() {
           <p class="micro muted" style="margin:-6px 0 14px">You keep <b>100%</b> of this. SAAHAA's ${pct}% is added on top of it, paid by the customer.</p>` : ''}
 
         ${role === 'shop' ? `
-          <div class="field">
-            <select id="suCat">${retCats().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
-            <label>What you sell</label>
-          </div>
-          <p class="micro muted" style="margin:-6px 0 14px">Next you pick your stock from our ready list — about six seconds an item. SAAHAA takes ${P.retailTakePct}% an order, capped at ${M.fmt(P.retailTakeCapPaise)}, never ${Math.round(AGG_COMMISSION * 100)}%.</p>` : ''}
+          ${catStep()}
+          ${shotStep()}
+          <p class="micro muted" style="margin:-6px 0 14px">Then you pick your stock from our ready list — about six seconds an item, with a price you set.
+            SAAHAA takes ${F.pct}% an order, capped at ${M.fmt(F.cap)}, never ${Math.round(AGG_COMMISSION * 100)}%.</p>` : ''}
 
         ${placeStep()}
       </div>
       <div class="au__foot">
         <button class="btn btn-primary btn--lg" data-act="auth.signup">
-          ${role === 'shop' ? 'Next — add your stock' : role === 'partner' ? 'Next — get verified' : 'Create my account'}</button>
+          ${role === 'shop' ? 'Open my shop' : role === 'partner' ? 'Next — get verified' : 'Create my account'}</button>
         <p class="micro muted" style="margin-top:10px">One ${esc((ID.ROLE_LABEL[role] || 'account').toLowerCase())} account per mobile number —
           the same number can hold a customer account <i>and</i> a pro account, each with its own password, wallet and history.
           You get a SAAHAA ID (${role === 'shop' ? 'S' : role === 'partner' ? 'P' : 'C'}2026&hellip;) the moment this is done. ₹0 to join, ever.</p>
@@ -460,7 +640,13 @@ export async function doSignup() {
   if (!name || !mobile) { toast('Name and a 10-digit mobile, please', 'danger'); return; }
   const pwErr = passwordProblem(pw, mobile);
   if (pwErr) { toast(pwErr, 'danger'); return; }
-  if (!suPlace) { toast('Pick where you are — search it, use your location, or tap an area', 'danger'); return; }
+  if (role === 'shop' && !chosenCat()) {
+    toast('Pick what your shop sells — tap one of the eight', 'danger');
+    const g = document.getElementById('suCatGrid');
+    if (g && g.scrollIntoView) g.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  if (!suPlace) { toast(role === 'shop' ? 'Pick where the shop is — search it, use your location, or tap an area' : 'Pick where you are — search it, use your location, or tap an area', 'danger'); return; }
 
   const loc = { lat: suPlace.lat, lng: suPlace.lng, label: suPlace.label };
   const area = suPlace.label;
@@ -500,6 +686,9 @@ export async function doSignup() {
     user.shopId = sid;
     dispatch({ type: 'shop/add', payload: {
       id: sid, ownerKey: key, name, catId: val('suCat') || 'kirana', area, loc, mobile,
+      /* the front, photographed during signup and already stored: the row
+         carries the id, never the bytes (core/photos.js) */
+      photo: suPhoto || '',
       prepMins: 20, radiusKm: 3, status: 'active', isOpen: true,
       minOrder: toPaise(149), freeDeliveryAbove: toPaise(499), deliveryMode: 'both',
       selfDeliveryFee: toPaise(25), fillRate: 100, ratingAvg: 0, ratingCount: 0,
@@ -513,8 +702,14 @@ export async function doSignup() {
   saveSession({ ...user });
   audit.record('user.login', { key, role }, key);
   tab = 'login';
+  /* the signup screen's own scratch state is finished with — a second shop
+     opened later must start from a blank picker, not from this one's */
+  suCatId = ''; suPhoto = '';
   if (role === 'partner') { toast(`Welcome, ${name.split(' ')[0]}. Ten minutes and you are earning.`); ctx.go('onboard'); }
-  else if (role === 'shop') { toast('Your shop is live — add products'); ctx.go('shopadmin'); }
+  /* A shop goes to the same "you are live" screen a pro gets, because the
+     moment is the same one: they typed a name and now they have a shop. It
+     shows them what they made, then sends them to the console to list. */
+  else if (role === 'shop') { toast(`${name} is live — now add what you sell`); ctx.go('onboard'); }
   else { toast(`Welcome, ${name.split(' ')[0]}`); ctx.go('home'); }
   /* AFTER the navigation, never before: go() closes any open sheet, so the
      announcement has to ride on top of the screen they landed on. */

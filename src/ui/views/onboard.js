@@ -14,13 +14,23 @@
    MODERNIST 8.0: the ladder is unchanged — same seven steps, same ids, same
    actions. The surface is the mockup's form language: a 2px-ruled header
    that says "Step n of 7", a 3px progress rule, stacked .field labels, chips
-   for choices, Back on the left and the step's own action on the right. */
+   for choices, Back on the left and the step's own action on the right.
+
+   8.1 — A SHOP LANDS HERE TOO. A shop has no ladder: it is live the moment it
+   is named, so it gets the "you're live" half of this screen and none of the
+   steps. It shows the thing they just made — the name, the category in that
+   category's accent, the photograph, the S… ID — says what an order costs
+   (read from the engine, never typed), and hands them one button into the
+   console to start listing. */
 
 import { esc, toast, closeSheet } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
-import { ctx, getState } from '../../core/ctx.js';
+import { ctx, getState, me, myShop } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
 import { header } from './shops.js';
+import * as ID from '../../domain/identity.js';
+import { getPricing } from '../../domain/settings.js';
+import * as photoUI from '../photo.js';
 import * as V from '../../domain/verification.js';
 import { PASS, MAX_ATTEMPTS } from '../../domain/quiz.js';
 import { tier, PROVISIONAL_CAP, PROVISIONAL_JOBS } from '../../domain/trust.js';
@@ -60,6 +70,11 @@ const obCSS = `<style>
   .ob__kv{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:12px 0 0;margin-top:12px;border-top:1px solid var(--color-divider)}
   .ob__fee{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--color-divider);font-size:13px}
   .ob__hdr.apphdr{padding-left:var(--gutter);padding-right:var(--gutter)}
+  .ob__shot{display:block;width:100%;height:170px;object-fit:cover;border:2px solid var(--color-text);background:var(--surface-3);margin-top:8px}
+  .ob__shotempty{height:170px;margin-top:8px;border:2px dashed var(--color-divider);background:var(--surface-3);
+    display:grid;place-items:center;gap:6px;color:var(--ink-3);text-align:center;padding:10px}
+  .ob__id{display:flex;align-items:center;gap:10px;padding:12px;border:2px solid var(--color-text);background:var(--color-surface);margin-top:8px}
+  .ob__id b{display:block;font:800 22px/1.1 var(--font-heading);letter-spacing:.1em;margin-top:2px;-webkit-user-select:all;user-select:all;overflow-wrap:anywhere}
   @media (min-width:768px){ .ob__hdr.apphdr{padding-left:var(--sp-8);padding-right:var(--sp-8)} }
   @media (min-width:1024px){ .ob__hdr.apphdr{padding-left:var(--sp-10);padding-right:var(--sp-10)} .ob__two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--sp-9);align-items:start} }
 </style>`;
@@ -71,6 +86,14 @@ const stepHeader = (title, right) => `<header class="apphdr ob__hdr">
   </header>`;
 
 export function render() {
+  /* A SHOP OWNER LANDS HERE TOO. The seven-step ladder is a pro's chronology
+     and a shop has none — a shop is live the moment it is named. So the same
+     screen, at the same moment, shows them the thing they just made: the
+     name, the category, the photograph, the S… ID, what an order costs, and
+     one button into the console to start listing. */
+  const s = me();
+  if (s && s.role === 'shop') return shopLive(s);
+
   const p = V.myPartner();
   if (!p) return `${header('Become a partner', '')}<main class="wrap">
     <div class="empty empty--smart"><h3>Sign in as a partner first</h3>
@@ -114,6 +137,93 @@ export function render() {
           <p class="micro muted" style="margin-top:10px">Jobs open the moment step 7 is done. Nobody has to approve you.</p>
         </div>
       </div>
+    </div>
+  </main>`;
+}
+
+/* ── "you're live" · the shop ──────────────────────────────────
+   Everything on this screen is the shop's own: its name, its category with
+   that category's accent, the photo they took a minute ago, the S… ID they
+   will write down. The fee is read from the engine (the category's own rate,
+   falling back to the pushed dials) and never typed here. */
+function shopLive(user) {
+  const sh = myShop();
+  if (!sh) return `${obCSS}${header('Open a shop', '')}<main class="wrap ob">
+    <div class="empty empty--smart"><h3>No shop on this account yet</h3>
+      <p class="tiny muted">This account is a shop account, but its storefront is missing. Opening one takes a name, a category and a place.</p>
+      <button class="btn btn--primary" data-act="auth.open">Open a shop</button></div></main>`;
+
+  const cat = get('category', sh.catId) || { name: 'Shop', accent: '', takePct: null, takeCapPaise: null };
+  const P = getPricing();
+  const pct = cat.takePct != null ? cat.takePct : P.retailTakePct;
+  const cap = cat.takeCapPaise != null ? cat.takeCapPaise : P.retailTakeCapPaise;
+  const accent = /^#[0-9a-fA-F]{3,8}$/.test(String(cat.accent || '')) ? String(cat.accent) : 'var(--color-accent)';
+  const shot = photoUI.url(sh.photo);
+  const code = ID.normaliseCode((user && user.code) || '');
+  const aisles = (cat.aisles || []).length;
+
+  return `${obCSS}
+  ${stepHeader('You are live', cat.name)}
+  <div class="ob__bar" aria-hidden="true"><i style="width:100%"></i></div>
+  <main class="wrap ob" style="padding-bottom:40px">
+    <div class="ob__two">
+      <div>
+        <div style="padding:20px 0 0">
+          <div class="ob__check">${icon('check', { size: 28 })}</div>
+          <div class="ob__live">${esc(sh.name)}<br>is open in ${esc(sh.area || 'your area')}</div>
+          <p class="tiny muted" style="margin-top:10px;line-height:1.6">Nobody has to approve you. Your storefront exists now —
+            it just has nothing on the shelves yet.</p>
+          <div class="row" style="gap:6px;margin-top:12px;flex-wrap:wrap">
+            <span class="tag" style="border-color:${accent};color:${accent}">
+              <span aria-hidden="true">${icon(hasIcon(sh.catId) ? sh.catId : 'groupShops', { size: 13 })}</span>${esc(cat.name)}</span>
+            <span class="tag tag-neutral">${esc(sh.area || 'Your area')}</span>
+            <span class="tag tag-accent">Open</span>
+          </div>
+        </div>
+
+        <div class="ob__box">
+          <span class="eyebrow">Your shop front</span>
+          ${shot ? `<img class="ob__shot" src="${shot}" alt="${esc(sh.name)} — the photo of your shop front">`
+                 : `<div class="ob__shotempty">${icon('camera', { size: 32 })}
+                      <span class="tiny">No photo yet — a shop with a picture is the one people recognise.</span></div>`}
+          <button class="btn btn-secondary btn-block" style="margin-top:10px" data-act="photo.shop" data-id="${esc(sh.id)}">
+            ${shot ? 'Change the photo' : 'Add a photo of your shop'}</button>
+          <p class="micro muted" style="margin-top:8px">Optional, and changeable any time. Kept on this device and shrunk to a few tens of KB.</p>
+        </div>
+      </div>
+
+      <div>
+        <div style="padding-top:20px">
+          <span class="eyebrow">Your shop ID</span>
+          <div class="ob__id">
+            <span style="flex:1;min-width:0">
+              <span class="meta" style="display:block">Sign in with this, or with your number</span>
+              <b class="num">${esc(code || '—')}</b>
+            </span>
+            ${ID.isCode(code) ? `<button type="button" class="btn btn-secondary btn--sm idcopy tap" data-code="${esc(code)}"
+              style="flex:none" aria-label="Copy your shop ID, ${esc(code)}">Copy</button>` : ''}
+          </div>
+          <p class="micro muted" style="margin-top:8px">A name, not a secret. Your password is the secret.</p>
+        </div>
+
+        <div style="padding-top:20px">
+          <span class="eyebrow">What it costs</span>
+          <div class="ob__fee" style="margin-top:6px"><span class="muted">To open, and to stay open</span><b>₹0</b></div>
+          <div class="ob__fee"><span class="muted">Per order</span><b>${pct}% of the basket, never more than ${M.fmt(cap)}</b></div>
+          <div class="ob__fee"><span class="muted">Yearly plan</span><b>None</b></div>
+          <p class="micro muted" style="margin-top:8px">Your prices are yours — SAAHAA never marks them up, and the fee comes out of the order, not out of a subscription.</p>
+        </div>
+
+        <div style="padding-top:20px">
+          <span class="eyebrow">Next · put something on the shelves</span>
+          <p class="tiny" style="margin-top:6px">Your console opens on a ready-made list for ${esc(cat.name)}${aisles ? ` — ${aisles} aisle${aisles === 1 ? '' : 's'}` : ''}.
+            Tap an item, set your price, and it is on your storefront. About six seconds each.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="ob__foot" style="margin-top:20px">
+      <button class="btn btn-primary btn--lg" data-act="nav.tab" data-tab="earn">Add my first products</button>
     </div>
   </main>`;
 }

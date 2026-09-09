@@ -17,6 +17,7 @@ import { ctx, getState, me, myArea, isGuest, myOrders, saveSession, dispatch } f
 import * as persist from '../../core/persist.js';
 import { live, get } from '../../core/registry.js';
 import { AREA_NAMES, AREA_GEO, kmBetween, etaMins } from '../../domain/match.js';
+import { trustScore } from '../../domain/trust.js';
 import * as gmap from '../map.js';
 import { GROUPS } from '../../domain/catalog.services.js';
 import { mark } from '../logo.js';
@@ -999,8 +1000,20 @@ export function openCategory(catId, sub = null, pinnedId = null) {
   /* A control that NAMES a pro must book that pro. Arriving from someone's own
      page pins them as the hero; the matcher's pick is the fallback, and an
      unbookable pin (suspended, gone) falls back rather than dead-ends. */
-  const pinned = pinnedId ? getState().partners.find(x => x.id === pinnedId && !x.suspended) : null;
-  const hero = pinned || m.hero;
+  /* A pinned pro comes straight off the store, so it has none of the facts the
+     matcher derives — distance, arrival, trust. Booking one printed "undefined
+     km". Derive exactly what lockedMatch() would have attached. */
+  const raw = pinnedId ? getState().partners.find(x => x.id === pinnedId && !x.suspended) : null;
+  const enrich = p => {
+    if (!p) return null;
+    const ranked = (m.alternates || []).concat(m.hero ? [m.hero] : []).find(x => x.id === p.id);
+    if (ranked) return ranked;                       // already ranked this round
+    const km = kmBetween(myPlace(), p.loc || p.area);
+    const t = trustScore(p);
+    return { ...p, km, eta: etaMins(km), trust: t.score, band: t.band };
+  };
+  const hero = enrich(raw) || m.hero;
+  const pinned = raw ? hero : null;      // the sub chips carry it, so choosing a sub keeps this pro
   // The chosen sub-service is threaded all the way into the booking.
   const subs = (c.subs || []).map(s =>
     `<button class="chip${s === sub ? ' on' : ''}" data-act="book.sub" data-id="${catId}"

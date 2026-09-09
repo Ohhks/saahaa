@@ -12,6 +12,7 @@ import { applyTransition, canTransition } from './orders.js';
 import { acct, holdbackFor, balanceOf } from './ledger.js';
 import * as gateway from '../core/gateway.js';
 import * as W from './wallet.js';
+import * as photos from '../core/photos.js';
 import { quoteService, quoteRetail, compareWithApps, releaseService, cancelSplit } from './pricing.js';
 import { lockedMatch, rankShops, kmBetween, etaMins } from './match.js';
 import { escrowTier, markupFor, trustScore } from './trust.js';
@@ -160,14 +161,63 @@ export function verifyOtp(orderId, entered) {
   return true;
 }
 
-export function addEvidence(orderId, label) {
+export function addEvidence(orderId, label, photo = null) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return;
-  const ev = (o.evidence || []).concat([{ id: nid('ev'), label, ts: Date.now() }]);
+  const ev = (o.evidence || []).concat([{ id: nid('ev'), label, photo: photo || null, ts: Date.now() }]);
   dispatch({ type: 'order/patch', payload: { id: orderId, patch: { evidence: ev } } });
-  toast(`${label} photo attached`);
+  toast(photo ? `${label} photo attached` : `${label} noted`);
   ctx.render();
 }
+
+/* ── pictures ──────────────────────────────────────────────────
+   A record keeps the picture's ID; the bytes live in core/photos.js, outside
+   the state blob. Replacing a picture frees the one it replaces, so a shop
+   that re-photographs its front ten times does not spend ten pictures' worth
+   of a device's budget. */
+function swapPhoto(oldId, newId) { if (oldId && oldId !== newId) photos.remove(oldId); }
+
+export function setShopPhoto(shopId, photoId) {
+  const s = getState().shops.find(x => x.id === shopId); if (!s) return false;
+  swapPhoto(s.photo, photoId);
+  dispatch({ type: 'shop/patch', payload: { id: shopId, patch: { photo: photoId || null } } });
+  audit.record('shop.photo', { shopId }, me() ? me().key : 'system');
+  ctx.render(); return true;
+}
+export function setProductPhoto(productId, photoId) {
+  const p = getState().products.find(x => x.id === productId); if (!p) return false;
+  swapPhoto(p.photo, photoId);
+  dispatch({ type: 'product/patch', payload: { id: productId, patch: { photo: photoId || null } } });
+  ctx.render(); return true;
+}
+export function setPartnerPhoto(partnerId, photoId) {
+  const p = getState().partners.find(x => x.id === partnerId); if (!p) return false;
+  swapPhoto(p.photo, photoId);
+  dispatch({ type: 'partner/patch', payload: { id: partnerId, patch: { photo: photoId || null } } });
+  ctx.render(); return true;
+}
+/** A pro's work gallery. Capped, because a budget shared with everything else
+    is not somewhere to put forty photographs of the same fan. */
+export const MAX_WORK_PHOTOS = 8;
+export function addWorkPhoto(partnerId, photoId) {
+  const p = getState().partners.find(x => x.id === partnerId); if (!p || !photoId) return false;
+  const work = (p.work || []).slice();
+  if (work.length >= MAX_WORK_PHOTOS) {
+    toast(`Your page holds ${MAX_WORK_PHOTOS} photos — remove one to add another`, 'warn');
+    photos.remove(photoId); return false;
+  }
+  work.push(photoId);
+  dispatch({ type: 'partner/patch', payload: { id: partnerId, patch: { work } } });
+  ctx.render(); return true;
+}
+export function removeWorkPhoto(partnerId, photoId) {
+  const p = getState().partners.find(x => x.id === partnerId); if (!p) return false;
+  dispatch({ type: 'partner/patch', payload: { id: partnerId, patch: { work: (p.work || []).filter(x => x !== photoId) } } });
+  photos.remove(photoId);
+  ctx.render(); return true;
+}
+/** Pictures nothing points at any more stop costing the device anything. */
+export function sweepPhotos() { return photos.gc(photos.referenced(getState())); }
 
 /** Worker marks done. No photo -> never auto-release (V4: the single highest
     value anti-fraud rule in the system). */

@@ -34,6 +34,7 @@ import './core/selftests.money.js';
 import './core/selftests.security.js';
 import './core/selftests.auto.js';
 import './core/selftests.identity.js';
+import './core/selftests.photos.js';
 
 /* ui */
 import { mount, action, initActions, toast, sheet, closeSheet, esc, stickyToast } from './ui/dom.js';
@@ -53,6 +54,7 @@ import * as pro from './ui/views/pro.js';
 import * as account from './ui/views/account.js';
 import * as legal from './ui/views/legal.js';
 import * as checkout from './ui/checkout.js';
+import * as photo from './ui/photo.js';
 
 /* ══════════════ ROUTES ══════════════ */
 const ROUTES = {
@@ -341,6 +343,7 @@ function wireActions() {
     const p = getState().partners.find(x => x.id === d.pid);
     if (p) ask.bidSheet(d.id, p);
   });
+  A('shop.start',      () => { auth.setAuthTab('signup'); auth.setAuthRole('shop'); go('auth'); });   // open a shop, from anywhere
   A('partner.join',    () => { auth.setAuthTab('signup'); auth.setAuthRole('partner'); go('auth'); });
 
   /* auth */
@@ -348,6 +351,30 @@ function wireActions() {
   A('auth.role',  d => { auth.setAuthRole(d.role); render(); });
   A('auth.login', () => auth.doLogin());
   A('auth.pick',  d => { closeSheet(); auth.doLogin(d.key); });   // one number, two accounts: which one
+
+  /* pictures — ui/photo.js asks for the file and shrinks it; domain/flow.js
+     writes the id onto the record. A refusal (too big, budget full) is said
+     out loud rather than swallowed. */
+  const withPhoto = async (opts, then) => {
+    const r = await photo.pick(opts);
+    if (r.cancelled) return;
+    if (!r.ok) { toast(r.reason || 'That picture could not be added', 'danger'); return; }
+    then(r.id); render();
+  };
+  A('photo.shop',    d => withPhoto({ maxEdge: 900 }, id => flow.setShopPhoto(d.id, id)));
+  A('photo.product', d => withPhoto({ maxEdge: 560 }, id => flow.setProductPhoto(d.id, id)));
+  A('photo.pro',     d => withPhoto({ maxEdge: 560 }, id => flow.setPartnerPhoto(d.id, id)));
+  A('photo.work',    d => withPhoto({ maxEdge: 900 }, id => flow.addWorkPhoto(d.id, id)));
+  A('photo.workdrop',d => { flow.removeWorkPhoto(d.id, d.photo); render(); });
+  /* Taking a picture back off. Setting null frees the bytes (domain/flow.js),
+     so a shop that thinks better of a photograph gets its budget back. */
+  A('photo.drop',    d => {
+    if (d.kind === 'shop') flow.setShopPhoto(d.id, null);
+    else if (d.kind === 'pro') flow.setPartnerPhoto(d.id, null);
+    else flow.setProductPhoto(d.id, null);
+    render();
+  });
+  A('photo.evidence',d => withPhoto({ maxEdge: 900, capture: true }, id => flow.addEvidence(d.id, d.label || 'Work done', id)));
   A('auth.signup',() => auth.doSignup());
   A('auth.logout',() => auth.logout());
 
@@ -631,6 +658,9 @@ async function boot() {
   // the WORK_DONE screen promises auto-release; this is what keeps it
   flow.sweepAutoRelease().then(n => { if (n) { console.info('[saahaa] auto-released', n); render(); } });
   flow.sweepHoldbacks().then(n => { if (n) { console.info('[saahaa] holdbacks released', n); render(); } });
+  /* Pictures outlive the records that pointed at them — a deleted product, a
+     closed shop. They cost a device's storage until something collects them. */
+  { const n = flow.sweepPhotos(); if (n) console.info('[saahaa] reclaimed', n, 'unused photo(s)'); }
   /* APPROVALS HAPPEN BY THEMSELVES. After any state change settles, the sweep
      promotes whoever has earned the next tier (domain/autoverify.js). A
      promotion changes state, which schedules one more sweep, which finds

@@ -14,7 +14,14 @@
    trades · place · distance line, the rating and jobs tags, a row of stat
    blocks from real fields, the RATE CARD, the reviews as rows, and one
    booking bar that never leaves the screen. Every number is the engine's:
-   the pro's own rate, and SAAHAA's 8% laid on top for the customer. */
+   the pro's own rate, and SAAHAA's 8% laid on top for the customer.
+
+   PICTURES (8.1). A pro's page now carries what a shop's carries: his own
+   portrait in the band, and a strip of photographs of finished work. He adds
+   and removes them himself; a visitor only looks. Every picture is drawn from
+   photo.url(), which returns '' for anything the store cannot vouch for, and
+   every box is sized in CSS — a page with no photographs at all is still a
+   complete page, laid out exactly the same. */
 
 import { esc, ratingStars, timeAgo, sheet, toast } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
@@ -29,6 +36,8 @@ import { header } from './shops.js';
 import { readiness } from '../../domain/verification.js';
 import { canVouch } from '../../domain/autoverify.js';
 import { quoteService } from '../../domain/pricing.js';
+import { MAX_WORK_PHOTOS } from '../../domain/flow.js';
+import * as photo from '../photo.js';
 
 /* Peer-to-peer verification. A customer whose job with this pro settled, or
    a Background-Checked pro in the same trade, can vouch once. Everyone else
@@ -47,11 +56,59 @@ function vouchBlock(p, s) {
 
 const avg = p => { const r = p.ratings || []; return r.length ? r.reduce((a, x) => a + x.stars, 0) / r.length : 0; };
 
+/* A pro's work, photographed. This is the whole point of the release: a shop
+   has a front and a shelf, and until now a pro had a paragraph. The strip is
+   what a customer looks through; the add and remove controls appear only for
+   the person whose page it is. The cap is the engine's (flow.MAX_WORK_PHOTOS)
+   and is stated in plain words, so nobody discovers it by being refused. */
+function workBlock(p, mine, first) {
+  const held = (p.work || []).length;
+  const shots = (p.work || []).filter(id => photo.url(id));
+  const left = Math.max(0, MAX_WORK_PHOTOS - held);
+  if (!shots.length && !mine) return '';               // a visitor sees no empty frame
+  return `<div class="pro__sec">
+    <div class="between" style="align-items:baseline">
+      <span class="eyebrow">Work</span>
+      ${shots.length ? `<span class="tag tag-neutral">${shots.length} photo${shots.length === 1 ? '' : 's'}</span>` : ''}
+    </div>
+    ${shots.length || (mine && left) ? `<div class="pro__gal">
+      ${shots.map((pid, i) => `<div class="pro__shot">
+        <img src="${photo.url(pid)}" alt="Work by ${esc(p.name)}, photo ${i + 1}" loading="lazy" decoding="async">
+        ${mine ? `<button class="pro__x tap" data-act="photo.workdrop" data-id="${esc(p.id)}" data-photo="${esc(pid)}"
+          aria-label="Remove photo ${i + 1}">${icon('trash', { size: 15 })}</button>` : ''}
+      </div>`).join('')}
+      ${mine && left ? `<button class="pro__shot pro__add tap" data-act="photo.work" data-id="${esc(p.id)}">
+        ${icon('plus', { size: 20 })}<span>Add photo</span></button>` : ''}
+    </div>` : ''}
+    ${mine
+      ? `<p class="micro muted" style="margin-top:8px">${left
+          ? `${held} of ${MAX_WORK_PHOTOS} used — ${left} more to add. Photograph a finished job: it is what wins the next one.`
+          : `Your page holds ${MAX_WORK_PHOTOS} photos. Remove one to add another.`}</p>`
+      : `<p class="micro muted" style="margin-top:8px">Jobs ${esc(first)} has finished.</p>`}
+  </div>`;
+}
+
 const proCSS = `<style>
   .pro__hdr.apphdr{padding-left:var(--gutter);padding-right:var(--gutter)}
   .pro__hdr .t{font:800 15px/1.2 var(--font-heading);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .pro__photo{height:150px;background:var(--color-neutral-300);border-bottom:2px solid var(--color-divider);display:grid;place-items:center;color:var(--color-neutral-700)}
+  /* THE PORTRAIT. The band is sized by CSS, never by the picture, so the page
+     is laid out identically with a photograph, with the drawn initial, or
+     while the picture is still decoding. */
+  .pro__photo{position:relative;height:150px;background:var(--color-neutral-300);border-bottom:2px solid var(--color-divider);display:grid;place-items:center;color:var(--color-neutral-700);overflow:hidden}
   .pro__photo b{font:800 56px/1 var(--font-heading)}
+  .pro__photo img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover}
+  .pro__cam{position:absolute;right:var(--gutter);bottom:10px;gap:6px;min-height:44px;background:var(--bg);color:var(--ink-1)}
+  /* THE WORK. A strip a customer can push through, fixed tiles so nothing
+     reflows, and the whole scroll lives inside the strip — the page never
+     scrolls sideways. */
+  .pro__gal{display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px}
+  .pro__shot{position:relative;flex:none;width:150px;height:112px;background:var(--color-neutral-300);border:1px solid var(--color-divider);overflow:hidden}
+  .pro__shot img{display:block;width:100%;height:100%;object-fit:cover}
+  .pro__x{position:absolute;top:0;right:0;min-width:44px;min-height:44px;display:grid;place-items:center;
+    background:var(--bg);color:var(--ink-1);border-left:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)}
+  .pro__add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:none;
+    border:2px solid var(--color-divider);color:var(--ink-3);font:800 11px/1 var(--font-heading);cursor:pointer}
+  .pro__add:hover,.pro__add:focus-visible{border-color:var(--color-accent);color:var(--color-accent)}
   .pro__id{padding:12px 0;border-bottom:2px solid var(--color-divider)}
   .pro__name{font:800 22px/1.1 var(--font-heading);letter-spacing:-.01em}
   .pro__line{font-size:12px;color:var(--ink-3);margin:5px 0 9px}
@@ -66,7 +123,7 @@ const proCSS = `<style>
   .pro__rv:last-child{border-bottom:0}
   .pro__bar{position:sticky;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));display:flex;gap:8px;padding:12px 0;border-top:2px solid var(--color-divider);background:var(--bg);z-index:var(--z-sticky)}
   .pro__bar .btn-primary{flex:1;justify-content:flex-start}
-  @media (min-width:768px){ .pro__hdr.apphdr{padding-left:var(--sp-8);padding-right:var(--sp-8)} .pro__bar{bottom:0} .pro__photo{height:200px} }
+  @media (min-width:768px){ .pro__hdr.apphdr{padding-left:var(--sp-8);padding-right:var(--sp-8)} .pro__bar{bottom:0} .pro__photo{height:200px} .pro__cam{right:var(--sp-8)} }
   @media (min-width:1024px){ .pro__hdr.apphdr{padding-left:var(--sp-10);padding-right:var(--sp-10)}
     .prosplit{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--sp-9);align-items:start} .prosplit .pro__sec:last-child{border-bottom:2px solid var(--color-divider)} }
 </style>`;
@@ -104,7 +161,13 @@ export function render(id) {
     ${mine ? '<button class="btn btn-ghost" data-act="pro.edit">Edit</button>' : ''}
     <button class="btn btn-ghost tap" style="min-width:44px" data-act="pro.share" data-id="${p.id}" aria-label="Share">${icon('share', { size: 18 })}</button>
   </header>
-  <div class="pro__photo" aria-hidden="true"><b>${esc(p.name[0])}</b></div>
+  <div class="pro__photo">
+    ${photo.url(p.photo)
+      ? `<img src="${photo.url(p.photo)}" alt="${esc(p.name)}" decoding="async">`
+      : `<b aria-hidden="true">${esc(p.name[0])}</b>`}
+    ${mine ? `<button class="btn btn-secondary pro__cam tap" data-act="photo.pro" data-id="${esc(p.id)}">
+      ${icon('camera', { size: 16 })}<span>${photo.url(p.photo) ? 'Change photo' : 'Add your photo'}</span></button>` : ''}
+  </div>
   <main class="wrap" style="padding-top:0">
 
     <div class="pro__id">
@@ -127,6 +190,7 @@ export function render(id) {
 
     <div class="prosplit">
       <div>
+        ${workBlock(p, mine, first)}
         <div class="pro__sec">
           <span class="eyebrow">Rate card</span>
           <div class="pro__rate" style="margin-top:6px"><span>${esc(cat.name)} · typical job</span><strong>${M.fmt(p.ask)}</strong></div>

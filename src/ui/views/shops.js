@@ -12,6 +12,12 @@
    weight shows "est." until the shop weighs it. Hiding that is the single
    biggest trust bug in Indian grocery apps.
 
+   PICTURES (8.1). The shop's front photograph carries the list row and the
+   storefront band; a product's own picture carries its card and its cart line.
+   Nothing here reads the photo store directly — photo.url() validates and
+   returns '' when there is none, and the box keeps its size either way, so a
+   list is the same height before and after the pictures arrive.
+
    This file also owns the two pieces every customer screen shares: header()
    (a 2px-ruled screen header with a back button) and SYS_CSS (the list-row,
    step, note and sticky-bar classes the mockup uses that the system does
@@ -26,6 +32,7 @@ import * as M from '../../core/money.js';
 import { rankShops, kmBetween, etaMins } from '../../domain/match.js';
 import { getPricing } from '../../domain/settings.js';
 import * as gateway from '../../core/gateway.js';
+import * as photo from '../photo.js';
 import { mark } from '../logo.js';
 
 let shopFilter = '';
@@ -59,7 +66,15 @@ export const SYS_CSS = `<style>
   .m-row__go{font:800 13px/1 var(--font-heading);color:var(--color-accent);align-self:center;flex:none}
   .m-row__r{text-align:right;flex:none;align-self:center} .m-row__r .num{font-size:15px}
   .m-lead{width:4px;align-self:stretch;background:var(--color-accent);flex:none} .m-lead--dim{background:var(--color-neutral-400)}
-  .m-thumb{display:grid;place-items:center;color:var(--ink-3)}
+  .m-thumb{display:grid;place-items:center;color:var(--ink-3);overflow:hidden}
+  /* PICTURES. Every picture box is sized in CSS and never by the picture,
+     so a row is exactly as tall with a photograph as without one and a list
+     cannot jump as pictures decode. A missing picture leaves the drawn
+     placeholder the design already uses — never a broken image, never a gap. */
+  .m-img{display:block;width:100%;height:100%;object-fit:cover;background:var(--color-neutral-300)}
+  .m-front{height:150px;background:var(--color-neutral-300);border-bottom:2px solid var(--color-divider);
+    display:grid;place-items:center;color:var(--ink-3);overflow:hidden}
+  @media (min-width:768px){ .m-front{height:200px} }
   .m-cap{font:600 9.5px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:0 0 8px}
   /* On the ink grounds (.bestmatch, .on-plum) the muted ink of these classes
      is invisible — "THE BILL", "NEAREST" and the row meta all vanished on the
@@ -90,7 +105,7 @@ export const SYS_CSS = `<style>
   .m-grid2{display:grid;grid-template-columns:1fr 1fr}
   .m-prod{padding:10px;border-bottom:1px solid var(--color-divider);display:flex;flex-direction:column}
   .m-grid2 .m-prod:nth-child(odd){border-right:1px solid var(--color-divider)}
-  .m-prod__img{height:78px;background:var(--color-neutral-300);border:1px solid var(--color-divider);display:grid;place-items:center;color:var(--ink-3)}
+  .m-prod__img{height:78px;background:var(--color-neutral-300);border:1px solid var(--color-divider);display:grid;place-items:center;color:var(--ink-3);overflow:hidden}
   .m-prod__t{font:800 12.5px/1.25 var(--font-heading);margin:8px 0 3px} .m-prod__m{font-size:11px;color:var(--ink-3)}
   .m-prod__b{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto;padding-top:7px;gap:6px}
   .m-prod__p{font:800 15px/1 var(--font-heading)}
@@ -130,10 +145,24 @@ export function emptyBlock(title, body, cta = '') {
     <h3 style="font-size:17px">${esc(title)}</h3><p style="margin-top:6px">${esc(body)}</p>${cta ? `<div style="margin-top:12px">${cta}</div>` : ''}</div>`;
 }
 
-/* a thumb that carries the category's icon — no photos exist yet, and a
-   blank grey block reads as a broken image */
-const thumb = (catId, size = 52) => `<span class="thumb m-thumb" style="width:${size}px;height:${size}px" aria-hidden="true">${
-  hasIcon(catId) ? icon(catId, { size: Math.round(size * 0.42) }) : ''}</span>`;
+/* ── pictures ───────────────────────────────────────────────
+   One box, one fixed size, three possible fillings: the photograph the shop or
+   the shop owner uploaded, the category's drawn glyph, or nothing. The size is
+   the box's, never the image's — that is what keeps a list from jumping as
+   pictures decode. The src ALWAYS comes from photo.url(), which validates
+   against the user-editable store and returns '' when there is no picture. */
+const picture = (photoId, alt) => {
+  const src = photo.url(photoId);
+  return src ? `<img class="m-img" src="${src}" alt="${esc(alt || '')}" loading="lazy" decoding="async">` : '';
+};
+/* a thumb that carries the shop's own photograph, or the category's icon */
+const thumb = (catId, size = 52, photoId = null) => {
+  const pic = picture(photoId, '');
+  return `<span class="thumb m-thumb" style="width:${size}px;height:${size}px" aria-hidden="true">${
+    pic || (hasIcon(catId) ? icon(catId, { size: Math.round(size * 0.42) }) : '')}</span>`;
+};
+/* the glyph a product falls back to when it has no picture of its own */
+const prodGlyph = p => (p && p.coldChain) ? 'cold' : (p && p.rxRequired) ? 'rx' : 'box';
 
 /* ── the cart, as one floating control (the list) or a bar (the shop) ── */
 function cartFab() {
@@ -210,7 +239,7 @@ function shopRow(s) {
   const products = getState().products.filter(p => p.shopId === s.id && p.active && (!p.trackStock || p.stockQty > 0));
   const badges = (s.badges || []).slice(0, 1).map(b => BADGE_LABEL[b] || b);
   return `<button class="m-row" data-act="shop.open" data-id="${s.id}">
-    ${thumb(cat.id)}
+    ${thumb(cat.id, 52, s.photo)}
     <div class="grow" style="min-width:0">
       <div class="m-row__t">${esc(s.name)}</div>
       <div class="m-row__m">${products.length} items listed · ${s.km} km · ~${s.eta} min · min order ${M.fmt(s.minOrder)}</div>
@@ -243,9 +272,12 @@ export function renderShop(shopId) {
   const cart = flow.getCart();
   const lineFor = p => (cart && cart.shopId === s.id ? cart.lines.find(l => l.productId === p.id) : null);
 
+  const front = picture(s.photo, s.name);
   return `
   ${header(s.name, `${s.isOpen ? 'Open' : 'Closed'} · ${s.km} km · delivers in ~${s.eta} min`)}
-  <main class="wrap">
+  <div class="m-front"${front ? '' : ' aria-hidden="true"'}>${front
+    || (hasIcon(cat.id) ? icon(cat.id, { size: 46 }) : '')}</div>
+  <main class="wrap" style="padding-top:0">
     <div class="m-sec" style="padding-top:10px">
       <div class="row" style="gap:6px;flex-wrap:wrap">
         <span class="tag tag-accent">${esc(s.ratingAvg)} ★ (${s.ratingCount})</span>
@@ -301,7 +333,7 @@ function productCard(p, line) {
         <button data-act="cart.inc" data-id="${line.lineId}" aria-label="One more">+</button></span>`
     : `<button class="m-add" data-act="cart.add" data-id="${p.id}" aria-label="Add ${esc(p.name)}">ADD</button>`;
   return `<div class="m-prod" style="${out ? 'opacity:.55' : ''}">
-    <div class="m-prod__img">${icon(p.coldChain ? 'cold' : p.rxRequired ? 'rx' : 'box', { size: 22 })}</div>
+    <div class="m-prod__img">${picture(p.photo, p.name) || icon(prodGlyph(p), { size: 22 })}</div>
     <div class="m-prod__t">${esc(p.name)}</div>
     <div class="m-prod__m">${esc(stock)} · ${esc(p.unit)}${p.variableWeight ? ' · weighed at packing' : ''}${
       p.coldChain ? ' · cold chain' : ''}${p.rxRequired ? ' · prescription needed' : ''}${p.perishable && p.mfgDate ? ' · packed today' : ''}</div>
@@ -336,8 +368,14 @@ export function renderCart() {
     <div>
     <div class="m-sec">
       <p class="m-cap">${n} item${n === 1 ? '' : 's'}</p>
-      ${cart.lines.map(l => `
+      ${cart.lines.map(l => {
+        /* the picture the customer chose the item by, at the same 44px box
+           whether the shop photographed it or not */
+        const prod = getState().products.find(x => x.id === l.productId);
+        return `
       <div class="m-row" style="align-items:flex-start">
+        <span class="thumb m-thumb" style="width:44px;height:44px" aria-hidden="true">${
+          picture(prod && prod.photo, '') || icon(prodGlyph(prod || l), { size: 18 })}</span>
         <div class="grow" style="min-width:0">
           <div class="m-row__t">${esc(l.name)}</div>
           <div class="m-row__m">${M.fmt(l.unitPrice)} ${esc(l.unit)}${l.variableWeight ? ' · est. until weighed' : ''}</div>
@@ -357,7 +395,8 @@ export function renderCart() {
           </span>
           <b class="num" style="display:block;margin-top:8px">${M.fmt(l.unitPrice * l.qty)}</b>
         </div>
-      </div>`).join('')}
+      </div>`;
+      }).join('')}
       <p class="micro muted" style="margin-top:10px">
         The shop follows your choice above. No reply in 90 seconds means we refund that item —
         we never substitute silently.</p>

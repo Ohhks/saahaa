@@ -6,6 +6,39 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [8.2.0] — 2026-09-09 — "A shop with a face"
+
+### Added
+- **Pictures.** The product had none: a listing was a spreadsheet row. Shops
+  have a front photograph, products have their own, pros have a portrait and a
+  gallery of their work, and the photograph a job has always required before
+  payout is now an actual photograph instead of a label.
+- **Anyone can open a shop**, in one of the eight categories the product
+  already has — name it, photograph it, and land in a console ready to list.
+  Because an account is now per role, a customer or a pro can open one on the
+  number they already use, without giving up the account they have.
+
+### How pictures are kept, and why that way
+- **Not in the state blob.** `SAAHAA_V6_STATE` is rewritten on every change
+  and is already a quarter of a megabyte; images inside it would stringify
+  megabytes on the main thread at every keystroke — the same class of stall the
+  home screen had. Each picture is its own key, so writing one writes one
+  (`core/photos.js`).
+- **Shrunk before they are stored, never after.** A phone photograph is
+  several megabytes; `ui/photo.js` draws it into a canvas, re-encodes it, and
+  leans on quality and then on size until it fits — what is stored is a few
+  tens of KB.
+- **A hard budget, and an honest refusal.** localStorage is about 5MB for the
+  whole origin, shared with the state, the audit log and the backups. Pictures
+  may have 3MB and one picture 90KB. Over budget the app says so; it never
+  quietly deletes somebody else's shop front to make room.
+- **Only a real raster image ever reaches an `<img>`.** The store is
+  user-editable, so what comes out is validated on the way out: SVG is refused
+  (it can carry script), and a tampered entry reads back as no picture rather
+  than as a payload.
+- Pictures nothing points at are reclaimed at boot, and a wipe takes them with
+  it rather than leaving the budget spent.
+
 ## [8.1.0] — 2026-09-09 — "Two doors, one person"
 
 ### Added

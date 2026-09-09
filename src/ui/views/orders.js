@@ -9,7 +9,11 @@
    the status, and the one thing you can do about it sits right under it.
 
    The stage labels are the machine's own. They are never renamed here. Every
-   rupee is the order's: deal, platformFee, gst, deliveryFee, customerPays. */
+   rupee is the order's: deal, platformFee, gst, deliveryFee, customerPays.
+
+   The evidence block is the trust rule made visible: a real photograph, taken
+   on the job, shown to whoever is holding the phone. See THE PHOTOGRAPH THAT
+   RELEASES THE MONEY, below. */
 
 import { mount, esc, sheet, closeSheet, toast, clockTime, timeAgo, delegate } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
@@ -18,6 +22,7 @@ import { get } from '../../core/registry.js';
 import { trackerFor, trackerIndex, stage, canTransition, isTerminal } from '../../domain/orders.js';
 import { kmBetween, etaMins, geoOf, nameOf } from '../../domain/match.js';
 import * as gmap from '../map.js';
+import * as photo from '../photo.js';
 import * as flow from '../../domain/flow.js';
 import * as M from '../../core/money.js';
 import * as gateway from '../../core/gateway.js';
@@ -255,6 +260,13 @@ export function renderDetail(orderId) {
 
   const pct = o.deal ? Math.round(((o.platformFee | 0) + (o.gst | 0)) / o.deal * 100) : 0;
 
+  /* the pictures belong to both sides. They are drawn inside the action panel
+     at the two moments a decision hangs on them — the pro attaching, the
+     customer releasing — and in their own block every other time, so a
+     settled order, a live job or a dispute all still show the work. */
+  const evInPanel = (isPartner && o.stage === 'IN_PROGRESS') || (isCustomer && o.stage === 'WORK_DONE');
+  const showEv = !!(o.evidence || []).length && (isCustomer || isPartner || isShop) && !evInPanel;
+
   return `
   ${header(`Order ${orderNo(o)}`, `${who} · placed ${placed}`)}
   <main class="wrap">
@@ -312,6 +324,8 @@ export function renderDetail(orderId) {
             <p class="micro muted" style="margin-top:8px">${esc(paidWith(o))}. Held by SAAHAA until ${confirms} the delivery; an item the shop could not supply comes back to ${(isPartner || isShop) ? "the customer's" : 'your'} wallet.</p>
           </div>`}
 
+        ${showEv ? evidenceSection(o, isPartner) : ''}
+
         <div class="sec">
           <div class="between" style="margin-bottom:6px"><p class="m-cap" style="margin:0">Messages</p>
             <button class="more tap" data-act="nav.chat" data-id="${esc(o.id)}"
@@ -337,7 +351,7 @@ export function renderDetail(orderId) {
       </div>
     </div>
     <div style="height:40px"></div>
-  </main>${SYS_CSS}`;
+  </main>${EV_CSS}${SYS_CSS}`;
 }
 
 /* ══════════════ 6 · CHAT WITH THE PRO ═══════════════════════════
@@ -457,6 +471,90 @@ const CHAT_CSS = `<style>
   @media (min-width:1024px){ .ch-thread .msg{max-width:60%} }
 </style>`;
 
+/* ══════════════ THE PHOTOGRAPH THAT RELEASES THE MONEY ═══════════
+   The rule is older than this screen: no picture of the finished work, no
+   payout. Until now the screen only recorded a WORD — "After" — so a customer
+   confirming a job was trusting a label. Now the pro's camera opens and the
+   picture itself is attached, and both sides look at the same one.
+
+   Three things this must never do. Build an <img src> from anything but
+   photo.url() — the store is user-editable, and core/photos.js is the only
+   thing that decides a value is really a picture. Jump the page as pictures
+   decode — every tile is exactly THUMB square, reserved before the bytes
+   arrive. Leave a broken frame where an older label-only entry sits — those
+   are drawn as what they are, a note. Enlarging is a <details>: plain markup,
+   no action to register. */
+const THUMB = 112;
+
+function evidenceTiles(o) {
+  const list = o.evidence || [];
+  if (!list.length) return '';
+  return `<div class="ev-grid">${list.map(e => {
+    const label = esc((e && e.label) || 'Work done');
+    const when = e && e.ts ? esc(clockTime(e.ts)) : '';
+    const src = (e && e.photo) ? photo.url(e.photo) : '';
+    if (!src) return `<p class="ev-plain"><b>${label}</b>
+      <span>${when ? when + ' · ' : ''}noted, no photograph</span></p>`;
+    return `<details class="ev-card">
+      <summary class="ev-sum tap">
+        <img class="ev-img" src="${src}" width="${THUMB}" height="${THUMB}"
+          alt="${label} — the finished work, photographed">
+        <span class="ev-cap"><b>${label}</b><span class="ev-hint">${when ? when + ' · ' : ''}</span></span>
+      </summary>
+      <img class="ev-full" src="${src}" alt="${label} — the finished work, photographed, larger">
+    </details>`;
+  }).join('')}</div>`;
+}
+
+/* how many of the entries are actually a picture — an order carried over from
+   before the camera existed has evidence but nothing to show */
+const shot = o => (o.evidence || []).filter(e => e && e.photo && photo.url(e.photo)).length;
+
+/* The block both sides land on once the moment has passed: the customer
+   watching the job run, a settled order, a dispute, the shop looking back. */
+function evidenceSection(o, mine) {
+  const n = shot(o);
+  const line = !n
+    ? 'This job was recorded by name only — the photograph step came later, so there is nothing to look at.'
+    : mine
+      ? `Kept with the order. ${n === 1 ? 'It is' : 'They are'} what released the money, and what settles a dispute in your favour.`
+      : `${esc(o.partnerName || 'Your pro')} photographed the work. SAAHAA releases nothing until ${n === 1 ? 'it exists' : 'they exist'}, so you can see what you are paying for.`;
+  return `<div class="sec" id="evidence">
+    <p class="m-cap">Proof of work · ${(o.evidence || []).length}</p>
+    ${evidenceTiles(o)}
+    <p class="micro muted" style="margin-top:8px">${line}</p>
+  </div>`;
+}
+
+const EV_CSS = `<style>
+  .ev-grid{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px;margin:2px 0 0}
+  .ev-card{flex:0 0 auto;width:${THUMB}px;border:1px solid var(--color-divider);background:var(--surface-2)}
+  .ev-card[open]{width:100%;max-width:420px}
+  .ev-sum{display:block;list-style:none;cursor:pointer}
+  .ev-sum::-webkit-details-marker{display:none}
+  .ev-sum::marker{content:''}
+  .ev-img{display:block;width:${THUMB}px;height:${THUMB}px;object-fit:cover;background:var(--color-neutral-300)}
+  .ev-card[open] .ev-img{display:none}
+  .ev-full{display:block;width:100%;max-height:58vh;object-fit:contain;
+    background:var(--color-neutral-300);border-top:1px solid var(--color-divider)}
+  .ev-cap{display:flex;flex-direction:column;justify-content:center;gap:1px;min-height:44px;padding:5px 8px;
+    font:600 9.5px/1.3 var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  .ev-cap b{font:800 11px/1.2 var(--font-heading);letter-spacing:.03em;color:var(--ink-1)}
+  .ev-hint::after{content:'ENLARGE'} .ev-card[open] .ev-hint::after{content:'CLOSE'}
+  .ev-plain{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;gap:2px;min-height:44px;
+    max-width:100%;margin:0;padding:8px 10px;border:1px dashed var(--color-divider);
+    font:600 9.5px/1.3 var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  .ev-plain b{font:800 11px/1.2 var(--font-heading);letter-spacing:.03em;color:var(--ink-1)}
+  .ev-alt{margin-top:12px;border-top:1px solid color-mix(in srgb,var(--color-bg) 30%,transparent);padding-top:6px}
+  .ev-alt__sum{display:flex;align-items:center;min-height:44px;list-style:none;cursor:pointer;
+    font:600 10px/1.3 var(--font-body);letter-spacing:.1em;text-transform:uppercase}
+  .ev-alt__sum::-webkit-details-marker{display:none} .ev-alt__sum::marker{content:''}
+  .on-plum .ev-card,.on-plum .ev-plain{border-color:color-mix(in srgb,var(--color-bg) 40%,transparent);background:transparent}
+  .on-plum .ev-cap,.on-plum .ev-plain,.on-plum .ev-alt__sum{color:color-mix(in srgb,var(--color-bg) 70%,transparent)}
+  .on-plum .ev-cap b,.on-plum .ev-plain b{color:var(--color-bg)}
+  .on-plum .ev-full{border-top-color:color-mix(in srgb,var(--color-bg) 40%,transparent)}
+</style>`;
+
 /* the one panel that changes with role + stage — everything derived, no switch
    on a hard-coded id list */
 function actionPanel(o, r) {
@@ -478,18 +576,35 @@ function actionPanel(o, r) {
       <div class="otp-row" style="justify-content:center;margin-bottom:14px">
         ${[0,1,2,3].map(i => `<input id="otp${i}" inputmode="numeric" maxlength="1" data-role="otp" class="input" style="width:56px">`).join('')}
       </div>${B('otp.submit', 'Verify & start work')}`);
-    if (s === 'IN_PROGRESS') return panel('Photo evidence is required before payout', `
+    /* The camera IS the step. The label-only path stays — a pro whose camera
+       is broken must still be able to finish a paid job — but it is folded
+       away, because a word is not evidence and should not look like it. */
+    if (s === 'IN_PROGRESS') return panel('Photograph the finished work', `
       ${o.stake ? `<p class="tiny" style="margin-bottom:10px"><span class="state state--held">${M.fmt(o.stake.need)} locked</span>
         <span class="muted">from your wallet for this job${o.stake.onCredit ? ` (${M.fmt(o.stake.onCredit)} on credit against this payout)` : ''} — it comes back in full when the customer confirms.</span></p>` : ''}
-      <div class="row" style="gap:8px;margin-bottom:12px">
-        <button class="btn btn--secondary grow" data-act="ev.add" data-id="${o.id}" data-label="Before">${icon('camera', { size: 16 })} Before</button>
-        <button class="btn btn--secondary grow" data-act="ev.add" data-id="${o.id}" data-label="After">${icon('camera', { size: 16 })} After</button>
+      <div class="row" style="gap:8px;margin-bottom:10px">
+        <button class="btn btn--primary grow" data-act="photo.evidence" data-id="${o.id}" data-label="Before">${icon('camera', { size: 16 })} Before</button>
+        <button class="btn btn--primary grow" data-act="photo.evidence" data-id="${o.id}" data-label="After">${icon('camera', { size: 16 })} After</button>
       </div>
-      <p class="tiny muted" style="margin-bottom:12px">${(o.evidence || []).length} photo${(o.evidence || []).length === 1 ? '' : 's'} attached</p>
+      <p class="micro muted" style="margin-bottom:12px">Your camera opens. The customer sees the picture on their order and confirms
+        against it — that is what releases the money to you.</p>
+      ${(o.evidence || []).length ? `${evidenceTiles(o)}
+        <p class="micro muted" style="margin:8px 0 12px">${(o.evidence || []).length} attached${
+          shot(o) < (o.evidence || []).length ? ` · ${(o.evidence || []).length - shot(o)} without a photograph` : ''}</p>`
+        : '<div style="height:2px"></div>'}
       ${(o.evidence || []).length
         ? B('stage.done', 'Mark work finished')
         : `<button class="btn btn--primary btn--lg btn--block" disabled
-             style="opacity:.5;cursor:not-allowed">Add a photo first</button>`}`);
+             style="opacity:.5;cursor:not-allowed">Add a photo first</button>`}
+      <details class="ev-alt">
+        <summary class="ev-alt__sum tap">Camera not working?</summary>
+        <p class="micro muted" style="margin:2px 0 8px">Record the step by name instead. It still lets you finish the job, but the
+          customer sees a word where a picture should be.</p>
+        <div class="row" style="gap:8px">
+          <button class="btn btn--secondary btn--sm grow" data-act="ev.add" data-id="${o.id}" data-label="Before">Note Before</button>
+          <button class="btn btn--secondary btn--sm grow" data-act="ev.add" data-id="${o.id}" data-label="After">Note After</button>
+        </div>
+      </details>`);
     if (s === 'WORK_DONE')   return panel('Waiting on the customer',
       `<p class="tiny muted">${o.escrowTier === 'HOLD' ? 'Under team review.' : 'Auto-releases if the customer does not respond.'}</p>`);
   }
@@ -500,8 +615,10 @@ function actionPanel(o, r) {
       <p class="tiny muted" style="text-align:center;margin-top:8px">
         Only share it once they are at your door. It proves the right person arrived.</p>`);
     if (s === 'WORK_DONE') return panel('Work finished — confirm to release payment', `
-      ${(o.evidence || []).length ? `<p class="tiny muted" style="margin-bottom:12px">
-        ${(o.evidence || []).map(e => esc(e.label)).join(' · ')} photo attached</p>` : ''}
+      ${(o.evidence || []).length ? `${evidenceTiles(o)}
+        <p class="micro muted" style="margin:8px 0 12px">${shot(o)
+          ? 'This is what you are paying for. Nothing leaves SAAHAA until you confirm against it.'
+          : 'Your pro could not attach a photograph, so this is a note, not a picture. Report an issue if the work is not done.'}</p>` : ''}
       <div class="m-kv" style="margin-bottom:10px"><span>Held by SAAHAA for ${esc(o.partnerName)}</span>
         <span><b class="num">${M.fmt(o.deal)}</b> <span class="state state--held">not yet released</span></span></div>
       ${B('release.full', `Confirm & release ${M.fmt(o.deal)}`)}

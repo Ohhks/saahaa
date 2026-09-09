@@ -19,7 +19,7 @@
    to setShopTab(); a tab value prefixed "pro." belongs to the pro console.
    No new action, no app.js change. */
 
-import { esc, sheet, closeSheet, toast, ratingStars, timeAgo } from '../dom.js';
+import { $, esc, sheet, updateSheet, sheetOpen, closeSheet, toast, ratingStars, timeAgo } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
 import * as ID from '../../domain/identity.js';
 import { ctx, getState, dispatch, me, myPartner, myShop, myOrders } from '../../core/ctx.js';
@@ -38,6 +38,11 @@ import * as W from '../../domain/wallet.js';
 import * as autoverify from '../../domain/autoverify.js';
 import { acct, balanceOf } from '../../domain/ledger.js';
 import * as gateway from '../../core/gateway.js';
+/* pictures: core/photos.js keeps the bytes and the device budget, ui/photo.js
+   asks for the file and shrinks it. This console only draws and offers taps —
+   every write goes through the registered photo.product / photo.shop action. */
+import * as photos from '../../core/photos.js';
+import { url as photoSrc } from '../photo.js';
 
 let pickerQuery = '', catalogQuery = '', shopTab = 'today', proTab = 'leads';
 export const setPickerQuery = v => { pickerQuery = v; };
@@ -107,6 +112,21 @@ const consoleCSS = `<style>
   .pickbox{padding:14px 12px;border-top:2px solid var(--color-divider);border-bottom:2px solid var(--color-divider);background:var(--color-neutral-100);margin-top:16px}
   :root[data-theme="dark"] .pickbox{background:var(--surface-2)}
   .con .field{margin-bottom:0}
+  /* PICTURES. .thumb is the design's grey placeholder block; .pthumb turns it
+     into a 44px+ button that draws the stored picture when there is one and
+     the drawn camera glyph when there is not — never a broken image. */
+  .pthumb{position:relative;overflow:hidden;padding:0;flex:none;background:var(--color-neutral-300);border:1px solid var(--color-divider)}
+  .pthumb img{width:100%;height:100%;object-fit:cover}
+  .pthumb__ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--color-neutral-700)}
+  .pthumb__ph b{font:800 12px/1 var(--font-heading)}
+  .pthumb__edit{position:absolute;left:0;right:0;bottom:0;background:var(--color-accent);color:var(--accent-on-fill);font:700 8px/13px var(--font-body);letter-spacing:.06em;text-transform:uppercase;text-align:center}
+  .addpic{display:inline-flex;align-items:center;gap:6px;min-height:44px;font:600 11px/1 var(--font-body);letter-spacing:.05em;text-transform:uppercase;color:var(--color-accent)}
+  .budget{border-top:2px solid var(--color-divider);padding:12px 0 4px;margin-top:18px}
+  .budget__bar{height:6px;background:var(--color-neutral-300);margin:8px 0 6px}
+  .budget__bar i{display:block;height:100%;background:var(--color-accent)}
+  .cform{display:grid;gap:10px}
+  .cform .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .justadd{display:flex;gap:10px;align-items:center;border:2px solid var(--color-accent);padding:10px;margin-bottom:14px}
 </style>`;
 
 /** A stat block. k/v/d are trusted markup — callers escape their own values. */
@@ -541,6 +561,7 @@ export function renderShopAdmin() {
   const liveItems = items.filter(p => p.active !== false && (!p.trackStock || p.stockQty > 0)).length;
   const group = SHOP_GROUPS.find(g => g[2].includes(shopTab)) || SHOP_GROUPS[0];
   if (!group[2].includes(shopTab)) shopTab = 'today';
+  syncAddSheet(s);
 
   const body =
       shopTab === 'orders'    ? shopOrders(orders)
@@ -715,7 +736,7 @@ function pickerCall(items) {
   <div class="pickbox" style="margin-top:12px">
     <span class="eyebrow" style="display:block;margin-bottom:8px">Add without typing</span>
     <button class="btn btn-secondary btn-block" style="justify-content:flex-start" data-act="cat.picker">${icon('plus', { size: 16 })} Pick from the ready list</button>
-    <p class="micro muted" style="margin-top:8px">Tap an item, change the price, set stock. About six seconds each. Nothing goes live until you set a stock count.</p>
+    <p class="micro muted" style="margin-top:8px">Tap an item, change the price, set stock. About six seconds each. Nothing goes live until you set a stock count. Anything the ready list does not have, you add yourself — picture, name, price.</p>
   </div>
   <button class="fab" data-act="cat.picker" aria-label="Add items from the ready list">${icon('plus', { size: 22 })}
     <span class="fab__count">${items.length}</span></button>`;
@@ -728,7 +749,9 @@ function shopCatalog(s, items) {
   ${items.length ? `
     ${catalogSearch(items)}
     ${aisles.map(a => `${kick(a, `<span class="tag tag-neutral">${shown.filter(p => p.aisle === a).length}</span>`)}
-      <div class="prodgrid prodgrid--2">${shown.filter(p => p.aisle === a).map(catalogRow).join('')}</div>`).join('')}`
+      <div class="prodgrid prodgrid--2">${shown.filter(p => p.aisle === a).map(catalogRow).join('')}</div>`).join('')}
+    <p class="micro muted" style="padding:10px 0">Tap any picture to take a new one — the old one is thrown away, so re-photographing costs this phone nothing.</p>
+    ${photoBudget()}`
   : empty('No items listed yet', 'Add your first ten items — it takes about two minutes.')}
   ${pickerCall(items)}`;
 }
@@ -748,9 +771,77 @@ function shopPricing(s, items) {
 
 const stockWord = p => !p.trackStock ? 'stock not tracked' : p.stockQty <= 0 ? 'out of stock' : p.stockQty <= p.lowStockAt ? `only ${p.stockQty} left` : `${p.stockQty} in stock`;
 
+/* ══════════════ PICTURES ══════════════
+   A listing stops being a spreadsheet row the moment it has a photograph.
+   Everything hard about that already exists: ui/photo.js asks for the file and
+   shrinks it, core/photos.js keeps it and refuses politely when the device is
+   full, flow.setProductPhoto writes the id and frees the one it replaces. The
+   console's whole job is to draw what is there and put the tap within reach.
+
+   photoSrc() returns '' when there is no picture, so the placeholder branch is
+   the honest one — an <img> is never built from anything else. */
+
+/** A product's picture as a tappable block. Tapping it again replaces it. */
+function prodThumb(p, size = 52) {
+  const src = photoSrc(p.photo);
+  return `<button type="button" class="thumb pthumb tap" style="width:${size}px;height:${size}px"
+      data-act="photo.product" data-id="${p.id}"
+      aria-label="${src ? 'Replace the picture of' : 'Add a picture of'} ${esc(p.name)}">
+      ${src ? `<img src="${src}" alt=""><span class="pthumb__edit">Change</span>`
+            : `<span class="pthumb__ph">${icon('camera', { size: 16 })}<b>${esc(p.name[0])}</b></span>`}
+    </button>`;
+}
+
+/** Taking a picture back off. Only offered when there is one to remove; the
+    engine frees the bytes, so the device gets the room back. */
+const dropPhotoLink = (id, kind = 'product', name = '') =>
+  `<button type="button" class="addpic tap" data-act="photo.drop" data-kind="${kind}" data-id="${id}"
+     aria-label="Remove the picture of ${esc(name)}">${icon('trash', { size: 14 })} Remove picture</button>`;
+
+/** The words next to a picture-less row. Nothing when there is a picture. */
+const addPhotoLink = p => photoSrc(p.photo) ? dropPhotoLink(p.id, 'product', p.name)
+  : `<button type="button" class="addpic tap" data-act="photo.product" data-id="${p.id}"
+      aria-label="Add a picture of ${esc(p.name)}">${icon('camera', { size: 14 })} Add photo</button>`;
+
+/** The shop's own front. Same gesture, the shop's own registered action. */
+function shopThumb(s, size = 72) {
+  const src = photoSrc(s.photo);
+  return `<button type="button" class="thumb pthumb tap" style="width:${size}px;height:${size}px"
+      data-act="photo.shop" data-id="${s.id}"
+      aria-label="${src ? 'Replace the photo of your shop front' : 'Add a photo of your shop front'}">
+      ${src ? `<img src="${src}" alt=""><span class="pthumb__edit">Change</span>`
+            : `<span class="pthumb__ph">${icon('camera', { size: 20 })}<b>${esc(s.name[0])}</b></span>`}
+    </button>`;
+}
+
+/** What the pictures are costing this phone, said in words a shopkeeper uses.
+    A refusal should never be the first time anyone hears about the limit. */
+function photoBudget() {
+  const u = photos.usage();
+  /* KB under a megabyte: "0.0 MB of 3.0 MB" tells a shopkeeper nothing. */
+  const size = b => b >= 1024 * 1024 ? `${(b / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`;
+  /* How many more will fit, at what the pictures already here actually weigh —
+     never smaller than 40KB, so the number cannot flatter itself. */
+  const each = Math.max(40 * 1024, u.count ? u.bytes / u.count : 0);
+  const room = Math.floor(u.freeBytes / each);
+  const tight = u.pct >= 80;
+  return `<div class="budget">
+    <span class="eyebrow" style="display:block">Pictures on this phone</span>
+    <div class="between" style="gap:10px;margin-top:6px">
+      <b style="font:800 15px var(--font-heading)">${u.count} picture${u.count === 1 ? '' : 's'}</b>
+      <span class="micro muted num">${size(u.bytes)} of ${size(u.maxBytes)} used</span>
+    </div>
+    <div class="budget__bar" aria-hidden="true"><i style="width:${Math.max(2, u.pct)}%"></i></div>
+    <p class="micro ${tight ? 'em' : 'muted'}">${tight
+      ? `Nearly full — about ${room} more will fit. Replace a picture instead of adding one, or remove an item you no longer sell.`
+      : `About ${room} more will fit at the size these are. Every picture is shrunk before it is kept, so one never costs more than ${Math.round(photos.MAX_ONE / 1024)}KB.`}</p>
+  </div>`;
+}
+
 function priceRow(p) {
   const out = p.trackStock && p.stockQty <= 0;
   return `<div class="lrow lrow--c" style="flex-wrap:wrap">
+    ${prodThumb(p, 44)}
     <div class="grow" style="min-width:140px">
       <div class="lrow__t">${esc(p.name)}</div>
       <div class="lrow__m">${esc(p.unit)}${p.mrp ? ` · MRP ${M.fmt(p.mrp)}` : ''}${p.variableWeight ? ' · by weight' : ''}${p.rxRequired ? ' · Rx' : ''} · ${out ? '<span class="em">hidden</span>' : 'listed'}</div>
@@ -766,10 +857,11 @@ function catalogRow(p) {
   const out = p.trackStock && p.stockQty <= 0;
   const low = p.trackStock && p.stockQty > 0 && p.stockQty <= p.lowStockAt;
   return `<div class="lrow lrow--c" style="flex-wrap:wrap">
-    <div class="thumb" style="width:44px;height:44px;display:grid;place-items:center;font:800 14px var(--font-heading);color:var(--color-neutral-700)">${esc(p.name[0])}</div>
+    ${prodThumb(p)}
     <div class="grow" style="min-width:120px">
       <div class="lrow__t">${esc(p.name)}</div>
       <div class="lrow__m ${out || low ? 'em' : ''}">${M.fmt(p.price)} · ${stockWord(p)}${p.mrp ? ` · MRP ${M.fmt(p.mrp)}` : ''}</div>
+      ${addPhotoLink(p)}
     </div>
     <label class="row" style="gap:6px;flex:none"><span class="micro muted">₹</span>
       <input class="numin" type="number" value="${(p.price / 100).toFixed(0)}" data-role="price" data-id="${p.id}" aria-label="Price"></label>
@@ -780,11 +872,105 @@ function catalogRow(p) {
   </div>`;
 }
 
-export function openPicker() {
+/* ── ADDING AN ITEM ───────────────────────────────────────────
+   app.js routes exactly two actions here: `cat.picker` opens the sheet and
+   `pick.add` adds the ready-list row whose refId it carries. Two reserved
+   refIds ride the same action rather than asking for a new one: one opens the
+   own-item form, one saves it. No new registered action, no app.js change. */
+const CUSTOM_OPEN = '__custom', CUSTOM_SAVE = '__save';
+
+/* The item created a second ago. Its whole reason to exist is that the
+   photograph step needs something to belong to: a picture is written onto a
+   product id, so the item has to be listed before it can be photographed. */
+let justAdded = '';
+
+function justAddedStrip() {
+  if (!justAdded) return '';
+  const p = getState().products.find(x => x.id === justAdded);
+  if (!p) return '';
+  const done = !!photoSrc(p.photo);
+  return `<div class="justadd">
+    ${prodThumb(p, 52)}
+    <div class="grow" style="min-width:0">
+      <b style="font:800 14px/1.2 var(--font-heading);display:block">${esc(p.name)} is listed</b>
+      <span class="micro muted">${M.fmt(p.price)} · ${stockWord(p)}</span>
+      ${done ? '<span class="micro" style="display:block;color:var(--success)">Picture added — it is on your storefront now.</span>'
+             : addPhotoLink(p)}
+    </div>
+  </div>`;
+}
+
+/** The own-item form. Name, price, stock — then the picture, on the same
+    screen, the moment there is an item for it to belong to.
+    `keep` re-reads whatever is already typed, so redrawing the sheet after a
+    photograph never costs anybody a half-filled form. */
+function customForm(s, keep = false) {
+  const live = id => { const el = $('#' + id); return el ? String(el.value) : null; };
+  const v = (id, dflt) => { const x = keep ? live(id) : null; return x == null ? dflt : x; };
+  const aisles = aislesOf(s.catId);
+  const aisle = v('cpAisle', aisles[0] || '');
+  return `${justAddedStrip()}
+    <p class="tiny muted" style="margin-bottom:12px">Anything the ready list does not have. Name it, price it, save — then photograph it. It is on your storefront the moment you save.</p>
+    <div class="cform">
+      <div class="field"><input id="cpName" placeholder=" " autocomplete="off" value="${esc(v('cpName', ''))}"><label>What do you call it?</label></div>
+      <div class="two">
+        <div class="field"><input id="cpPrice" type="number" inputmode="numeric" min="1" step="1" placeholder=" " value="${esc(v('cpPrice', ''))}"><label>Your price ₹</label></div>
+        <div class="field"><input id="cpStock" type="number" inputmode="numeric" min="0" step="1" placeholder=" " value="${esc(v('cpStock', '10'))}"><label>How many you have</label></div>
+      </div>
+      <div class="two">
+        <div class="field"><input id="cpUnit" placeholder=" " autocomplete="off" value="${esc(v('cpUnit', 'each'))}"><label>Sold as (1 kg, 500 ml…)</label></div>
+        <div class="field"><input id="cpMrp" type="number" inputmode="numeric" min="0" step="1" placeholder=" " value="${esc(v('cpMrp', ''))}"><label>Printed MRP ₹ (if any)</label></div>
+      </div>
+      ${aisles.length ? `<div class="field"><select id="cpAisle">${aisles.map(a =>
+        `<option value="${esc(a)}"${a === aisle ? ' selected' : ''}>${esc(a)}</option>`).join('')}</select><label>Which shelf</label></div>` : ''}
+      <button class="btn btn-primary btn-block" data-act="pick.add" data-ref="${CUSTOM_SAVE}">Save it and start the next one</button>
+      <p class="micro muted">Selling above a printed MRP is illegal, so a price over the MRP you type is refused here and on every later edit.</p>
+    </div>
+    ${photoBudget()}`;
+}
+
+function openCustom() {
   const s = myShop(); if (!s) return;
+  openAddSheet = 'custom';
+  stripPhoto = '';
+  sheet('Add your own item', customForm(s), { noFocus: true });
+  focusName(340);
+}
+const focusName = (ms = 0) => setTimeout(() => { const el = $('#cpName'); if (el) el.focus({ preventScroll: true }); }, ms);
+
+/** Save, then leave the form empty and waiting — forty of these in a sitting
+    is the whole point, so nothing here closes or navigates. */
+function saveCustom(s) {
+  const val = id => { const el = $('#' + id); return el ? String(el.value).trim() : ''; };
+  const name = val('cpName');
+  if (!name) { toast('Give it a name first', 'warn'); focusName(); return; }
+  const price = M.toPaise(val('cpPrice'));
+  if (!Number.isFinite(price) || price <= 0) { toast('Put a price on it', 'warn'); return; }
+  const mrpTyped = val('cpMrp');
+  const mrp = mrpTyped ? M.toPaise(mrpTyped) : null;
+  if (mrp && price > mrp) { toast(`You cannot sell above the MRP you typed (${M.fmt(mrp)}) — it is illegal under Legal Metrology.`, 'danger'); return; }
+  const el = $('#cpAisle');
+  const p = flow.addCustomProduct(s.id, s.catId, {
+    name, price, mrp,
+    aisle: (el && el.value) || 'Everything else',
+    unit: val('cpUnit') || 'each',
+    stockQty: Math.max(0, Number(val('cpStock')) | 0),
+  });
+  justAdded = p ? p.id : '';
+  stripPhoto = '';
+  toast(`${name} is listed — now add its picture`);
+  updateSheet(customForm(s));
+  focusName();
+  ctx.render();
+}
+
+function pickerBody(s) {
   const owned = new Set(getState().products.filter(p => p.shopId === s.id).map(p => p.refId));
   const list = searchStarter(s.catId, pickerQuery).filter(sc => !owned.has(sc.refId));
-  sheet('Pick from the ready list', `
+  return `
+    ${justAddedStrip()}
+    <button class="btn btn-secondary btn-block" style="justify-content:flex-start;margin-bottom:var(--sp-6)"
+            data-act="pick.add" data-ref="${CUSTOM_OPEN}">${icon('camera', { size: 16 })} Add your own item — name, price, picture</button>
     <div class="search" style="margin-bottom:var(--sp-6)">
       <span aria-hidden="true">${icon('search', { size: 16 })}</span>
       <input id="pickq" type="search" placeholder="Search e.g. atta, tomato, milk"
@@ -797,8 +983,30 @@ export function openPicker() {
           <p class="micro muted">${esc(sc.aisle)} · ${esc(sc.unit)}${sc.mrp ? ` · MRP ${M.fmt(sc.mrp)}` : ''}</p></div>
         <b class="num tiny" style="flex:none">${M.fmt(sc.price)}</b>
         <button class="btn btn-primary btn--sm" style="flex:none;min-height:44px" data-act="pick.add" data-ref="${sc.refId}">Add</button>
-      </div>`).join('') || '<p class="muted tiny">Nothing left to add here.</p>'}
-  `, { noFocus: true });
+      </div>`).join('') || '<p class="muted tiny">Nothing left to add here.</p>'}`;
+}
+
+export function openPicker() {
+  const s = myShop(); if (!s) return;
+  openAddSheet = 'picker';
+  stripPhoto = (getState().products.find(x => x.id === justAdded) || {}).photo || '';
+  sheet('Pick from the ready list', pickerBody(s), { noFocus: true });
+}
+
+/* Taking a picture is a registered action that re-renders the SCREEN — the
+   sheet on top of it is not part of that render, so an open add-sheet would go
+   on saying "Add photo" over a photograph that already exists. Every render of
+   this console puts the sheet back in step, and only when the picture actually
+   changed, so nothing flickers and nothing already typed is lost. */
+let openAddSheet = '', stripPhoto = '';
+function syncAddSheet(s) {
+  if (!openAddSheet) return;
+  if (!sheetOpen()) { openAddSheet = ''; return; }
+  const p = justAdded ? getState().products.find(x => x.id === justAdded) : null;
+  const now = (p && p.photo) || '';
+  if (now === stripPhoto) return;
+  stripPhoto = now;
+  updateSheet(openAddSheet === 'custom' ? customForm(s, true) : pickerBody(s));
 }
 
 function shopStock(s, items) {
@@ -954,11 +1162,16 @@ function shopSetup(s) {
   const line = (k, v) => `<div class="feeline"><span class="muted">${k}</span>${v}</div>`;
   return `
     ${kick('Your shop')}
-    <div class="lrow lrow--c" style="border-bottom:2px solid var(--color-divider)">
-      <span class="avatar avatar--lg">${esc(s.name[0])}</span>
-      <div class="grow" style="min-width:0"><div class="lrow__t" style="font-size:17px">${esc(s.name)}</div>
-        <div class="lrow__m">${esc(cat.name)} · ${esc(s.area)} · ${esc(s.mobile)}</div></div>
+    <div class="lrow lrow--c" style="border-bottom:2px solid var(--color-divider);flex-wrap:wrap">
+      ${shopThumb(s)}
+      <div class="grow" style="min-width:150px"><div class="lrow__t" style="font-size:17px">${esc(s.name)}</div>
+        <div class="lrow__m">${esc(cat.name)} · ${esc(s.area)} · ${esc(s.mobile)}</div>
+        ${photoSrc(s.photo) ? '<div class="lrow__m">Tap the photo to take a new one.</div>'
+          : `<button type="button" class="addpic tap" data-act="photo.shop" data-id="${s.id}"
+               aria-label="Add a photo of your shop front">${icon('camera', { size: 14 })} Add your shop photo</button>`}
+      </div>
     </div>
+    <p class="micro muted" style="padding:8px 0">One photograph of your shutter or your counter. A customer scrolling a list stops at the shop they recognise from the street.</p>
     ${line('Minimum order', `<b class="num">${M.fmt(s.minOrder)}</b>`)}
     ${line('Free delivery above', `<b class="num">${M.fmt(s.freeDeliveryAbove)}</b>`)}
     ${line('Prep time', `<b>${s.prepMins} min</b>`)}
@@ -981,16 +1194,20 @@ function shopSetup(s) {
       <div class="grow" style="min-width:0"><div class="lrow__t" style="word-break:break-all">${esc(`${location.host}${location.pathname}#/shop/${s.id}`)}</div>
         <div class="lrow__m">What customers see. Share it on WhatsApp.</div></div>
       <span class="more">Open</span>
-    </button>`;
+    </button>
+    ${photoBudget()}`;
 }
 
 /* ── handlers ──────────────────────────────────────────────── */
 export function addFromPicker(refId) {
   const s = myShop(); if (!s) return;
+  if (refId === CUSTOM_OPEN) { openCustom(); return; }
+  if (refId === CUSTOM_SAVE) { saveCustom(s); return; }
   const sc = searchStarter(s.catId, '').find(x => x.refId === refId);
   if (!sc) return;
-  flow.addProductFromStarter(s.id, sc);
-  toast(`${sc.name} listed`);
+  const p = flow.addProductFromStarter(s.id, sc);
+  justAdded = p ? p.id : '';
+  toast(`${sc.name} listed — now add its picture`);
   openPicker();
   ctx.render();
 }
@@ -1000,6 +1217,7 @@ export function refill(productId) {
   ctx.render();
 }
 export function removeProduct(productId) {
+  if (justAdded === productId) justAdded = '';
   dispatch({ type: 'product/remove', payload: { id: productId } });
   toast('Removed from your catalog');
   ctx.render();

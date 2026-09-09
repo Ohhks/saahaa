@@ -21,6 +21,7 @@
 import { getState, ctx } from '../core/ctx.js';
 import * as audit from '../core/audit.js';
 import * as migrate from '../core/migrate.js';
+import * as photos from '../core/photos.js';
 
 export const DEMO_MOBILE = /^9[012]000000\d\d$/;
 const isDemo = r => !!r && (r.origin === 'demo' || (r.mobile != null && DEMO_MOBILE.test(String(r.mobile))));
@@ -62,6 +63,7 @@ export function purgeIfDemoResidue(st, demoMode) {
   const r = demoResidue(st);
   if (!r.total) return st;
   audit.record('data.demoPurged', { ...r, kept: 'admin, settings' }, 'system');
+  photos.gc([]);                 // the example roster's pictures go with it
   return freshState(st);
 }
 
@@ -70,7 +72,9 @@ export function freshStart(actor = 'admin') {
   const st = getState();
   const before = counts(st);
   const snap = migrate.snapshot(st, 'pre-fresh');
+  const pics = photos.usage().count;
   ctx.store.replaceState(freshState(st), 'fresh-start');
-  audit.record('data.freshStart', { before, snapshot: snap || null }, actor);
+  photos.gc([]);                 // every picture belonged to what was just removed
+  audit.record('data.freshStart', { before, photos: pics, snapshot: snap || null }, actor);
   return before;
 }
