@@ -10,7 +10,7 @@ import { SCHEMA_VERSION } from './version.js';
 import { defaultState } from '../domain/state.js';
 import { quoteService, releaseService, quoteRetail, cancelSplit, compareWithApps, GST_RATE } from '../domain/pricing.js';
 import { canTransition, applyTransition, stagesFor, trackerFor } from '../domain/orders.js';
-import { trustScore, WEIGHTS, escrowTier, tier } from '../domain/trust.js';
+import { trustScore, WEIGHTS, escrowTier, tier, ESCROW } from '../domain/trust.js';
 import { STARTER, byCategory } from '../domain/starter-catalog.js';
 import { kmBetween, AREA_NAMES } from '../domain/match.js';
 
@@ -255,19 +255,32 @@ describe('trust · the score is well-formed', () => {
   });
 });
 
-describe('trust · escrow tiering never auto-releases without evidence', () => {
+describe('trust · escrow tiering never auto-releases without a photograph', () => {
   const partner = { tier: 4, completed: 400, ratings: Array(30).fill({ stars: 5, ts: Date.now() }), lastActiveTs: Date.now() };
-  it('no photo means team review, whatever the trust score', () => {
+  const pic = { label: 'After', photo: 'ph_1' };
+  /* These fixtures used to pass `evidence: [{}]` — an entry with no photo — and
+     the rule counted entries, so they were asserting the very hole that let a
+     job settle on the typed word "Before". A note is a claim; a picture is
+     evidence, and only a picture may skip the review queue. */
+  it('no evidence at all means team review, whatever the trust score', () => {
     expect(escrowTier({ deal: 50000, evidence: [], otpVerified: true }, partner).id).toBe('HOLD');
   });
-  it('a small job from a trusted pro with evidence releases instantly', () => {
-    expect(escrowTier({ deal: 100000, evidence: [{}], otpVerified: true }, partner).id).toBe('INSTANT');
+  it('a NOTE is not a photograph — the camera-not-working fallback still means review', () => {
+    expect(escrowTier({ deal: 50000, evidence: [{ label: 'Before', photo: null }], otpVerified: true }, partner).id).toBe('HOLD');
+  });
+  it('a small job from a trusted pro WITH A PICTURE takes the fastest tier', () => {
+    expect(escrowTier({ deal: 100000, evidence: [pic], otpVerified: true }, partner).id).toBe('INSTANT');
+  });
+  it('even the fastest tier leaves the customer time to look at the work', () => {
+    /* INSTANT used to be holdMs 0, which paid out on the next page load without
+       her confirming anything, under four screens promising the opposite. */
+    expect(ESCROW.INSTANT.holdMs).toSatisfy(n => n > 0, 'INSTANT must not be instant-to-nobody');
   });
   it('a large job is always held for review', () => {
-    expect(escrowTier({ deal: 2000000, evidence: [{}], otpVerified: true }, partner).id).toBe('HOLD');
+    expect(escrowTier({ deal: 2000000, evidence: [pic], otpVerified: true }, partner).id).toBe('HOLD');
   });
   it('a suspended partner is frozen', () => {
-    expect(escrowTier({ deal: 1000, evidence: [{}] }, { ...partner, suspended: true }).id).toBe('FREEZE');
+    expect(escrowTier({ deal: 1000, evidence: [pic] }, { ...partner, suspended: true }).id).toBe('FREEZE');
   });
 });
 

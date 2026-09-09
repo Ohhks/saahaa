@@ -161,7 +161,12 @@ export function render() {
   const st = getState();
   const orders = myOrders();
   const liveList = liveOf(orders);
-  const needsYou = liveList.filter(o => stage(o.stage).owner === 'customer');
+  /* THIS WAS HARDCODED TO 'customer', so a pro with three jobs waiting on him
+     read "Needs you: 0" — on the list the Contact page tells everyone with a
+     problem to check. Partner-owned stages are owner:'worker' and shop-owned
+     are owner:'shop'. */
+  const mineOwner = s.role === 'partner' ? 'worker' : s.role === 'shop' ? 'shop' : 'customer';
+  const needsYou = liveList.filter(o => stage(o.stage).owner === mineOwner);
   const reviews = (st.reviews || []).filter(r => r.byKey === s.key && !r.hidden);
   const subs = orders.filter(o => o.kind === 'service' && (o.recurring || get('category', o.catId).recurring));
   const chatThreads = orders
@@ -271,6 +276,7 @@ export function render() {
     ${(() => {
       const jumps = [
         ['cwallet',    'Wallet',     ''],
+        ['acNeeds',    'Needs you',  needsYou.length],   // first, because it is the only urgent one
         ['acOpen',     'Still open', liveList.length],
         ['acRepeat',   'Repeating',  subs.length],
         ['acRegulars', 'Regulars',   regulars.length],

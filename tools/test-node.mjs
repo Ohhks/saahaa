@@ -89,6 +89,7 @@ try {
   await load('src/core/selftests.erase.js');
   await load('src/core/selftests.recovery.js');
   await load('src/core/selftests.doorcode.js');
+  await load('src/core/selftests.scale.js');
   harness = await load('src/core/selftest.js');
 } catch (err) {
   if (String(err.message).startsWith('DOM_ACCESS_IN_NODE_TEST')) {

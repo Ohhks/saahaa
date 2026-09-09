@@ -29,7 +29,7 @@ import * as W from '../../domain/wallet.js';
 import * as gateway from '../../core/gateway.js';
 import { getPricing } from '../../domain/settings.js';
 import { cancelSplit } from '../../domain/pricing.js';
-import { markupFor } from '../../domain/trust.js';
+import { markupFor, ESCROW } from '../../domain/trust.js';
 import { header, emptyBlock, SYS_CSS } from './shops.js';
 
 /* How the order was paid. EVERYONE PAYS SAAHAA: the wallet is drawn first
@@ -580,11 +580,34 @@ function actionPanel(o, r) {
 
   if (r.isPartner) {
     if (s === 'MATCHING')    return panel('New job for you', B('stage.accept', 'Accept this job'));
-    if (s === 'ASSIGNED')    return panel('Head to the customer', B('stage.enroute', 'Start travelling'));
+    if (s === 'ASSIGNED')    return panel('Head to the customer', `${whereTo(o)}${B('stage.enroute', 'Start travelling')}
+      <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--color-accent-400)"
+        data-act="worker.cancel" data-id="${o.id}">I cannot do this job</button>`);
+
+    /* THE WORST DEAD END IN THE PRODUCT. A dispute raised against him showed
+       the header "under review" and nothing else: not the reason, not that a
+       complaint had been made, not that his money was frozen, not for how
+       long, and no way to put his side. "Report an issue" also vanished at the
+       same moment, because DISPUTED cannot transition to DISPUTED — so his
+       only escalation route disappeared exactly when he needed it. */
+    if (s === 'DISPUTED') {
+      const d = (getState().disputes || []).find(x => x.orderId === o.id) || {};
+      const mine = d.by && me() && d.by === me().key;
+      return panel(mine ? 'You reported this — it is with the owner' : 'A complaint was raised on this job', `
+        <p class="tiny" style="margin-bottom:10px"><b>${esc(d.reason || o.disputeReason || 'Reported')}</b>${d.note ? ` — ${esc(d.note)}` : ''}</p>
+        <div class="m-kv"><span>Your payout, frozen for now</span><span class="num">${M.fmt(o.deal)}</span></div>
+        ${o.stake ? `<div class="m-kv"><span>Your stake, frozen with it</span><span class="num">${M.fmt(o.stake.need)}</span></div>` : ''}
+        <p class="micro muted" style="margin-top:10px">${mine
+          ? 'Nobody is paid while this is open. The owner reads both sides, usually within 24 hours.'
+          : 'Nothing is decided yet and nothing is held against you for one complaint. Put your side on the record — the owner reads both, usually within 24 hours. If it is upheld, your stake goes to the customer and it counts against SAAHAA Certified.'}</p>
+        <button class="btn btn--secondary btn--block" style="margin-top:10px"
+          data-act="nav.chat" data-id="${o.id}">Put my side on the record</button>
+        ${(o.evidence || []).length ? `<p class="micro muted" style="margin-top:8px">Your ${(o.evidence || []).length} piece${(o.evidence || []).length === 1 ? '' : 's'} of evidence ${(o.evidence || []).length === 1 ? 'is' : 'are'} attached to this job and the owner can see ${(o.evidence || []).length === 1 ? 'it' : 'them'}.</p>` : ''}`);
+    }
     /* The pro is travelling to a place, not to a word. The same map the
        customer is looking at, without the controls. */
     if (s === 'EN_ROUTE')    return panel('Arrived?',
-      `${mapCard(o, { interactive: false, id: 'jobMap' })}
+      `${whereTo(o)}${mapCard(o, { interactive: false, id: 'jobMap' })}
        <div style="height:12px"></div>${B('stage.arrived', "I've arrived")}`);
     if (s === 'ARRIVED')     return panel('Ask the customer for their SAAHAA code', `
       ${mapCard(o, { interactive: false, id: 'jobMap' })}
@@ -605,7 +628,14 @@ function actionPanel(o, r) {
       <p class="tiny muted" style="margin:0 0 12px">Entering this code starts the job and locks
         ${M.fmt(W.stakeFor(o.deal))} of your own money. Every rupee of it comes back the moment the
         customer confirms the work.</p>
-      ${B('otp.submit', 'Verify & start work')}`);
+      ${B('otp.submit', 'Verify & start work')}
+      <!-- A PRO COULD NOT CANCEL. The agreement he signs says "I will cancel
+           early if I cannot come, never just not show up", and the conduct quiz
+           marks that as the right answer — while the app gave him no control to
+           do it at any stage. His only options were to no-show (stake forfeit,
+           trust penalty) or to talk the customer into cancelling for him. -->
+      <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--color-accent-400)"
+        data-act="worker.cancel" data-id="${o.id}">I cannot do this job</button>`);
     /* The camera IS the step. The label-only path stays — a pro whose camera
        is broken must still be able to finish a paid job — but it is folded
        away, because a word is not evidence and should not look like it. */
@@ -636,7 +666,13 @@ function actionPanel(o, r) {
         </div>
       </details>`);
     if (s === 'WORK_DONE')   return panel('Waiting on the customer',
-      `<p class="tiny muted">${o.escrowTier === 'HOLD' ? 'Under team review.' : 'Auto-releases if the customer does not respond.'}</p>`);
+      /* "Auto-releases if the customer does not respond" with no time on it was
+         the pro's half of the same lie the customer was told: for a new pro it
+         is not true at all (first three jobs are reviewed), and for everyone
+         else the hour count was never shown. Both are stated now. */
+      `<p class="tiny muted">${o.escrowTier === 'HOLD'
+        ? 'A person at SAAHAA is checking this one — the first few jobs always are. Nothing is wrong.'
+        : `${esc((ESCROW[o.escrowTier] || {}).label || 'Auto-releases')} if the customer does not confirm before then.`}</p>`);
   }
 
   if (r.isCustomer) {
@@ -714,8 +750,29 @@ function actionPanel(o, r) {
           <li class="m-step pend"><span class="m-step__dot"></span>
             <span class="m-step__t">${M.fmt(o.customerPays)} is held by SAAHAA. ${esc(first)} is paid only after you confirm the work</span></li>
         </ol>
+        ${(s === 'ASSIGNED' || s === 'EN_ROUTE') ? `
+          <!-- THE MISSING ESCAPE. When a pro simply does not turn up, the only
+               control here used to be Cancel — which at EN_ROUTE hands 40% of
+               her money to a journey nobody made. WORKER_NO_SHOW (full refund
+               plus a credit) has been in the engine and on the published
+               refunds page the whole time with nothing able to call it. -->
+          <button class="btn btn--secondary btn--block" style="margin-bottom:6px"
+            data-act="noshow.open" data-id="${o.id}">${esc(first)} never arrived</button>` : ''}
         <button class="btn btn--ghost btn--block" style="color:var(--color-accent-400)"
           data-act="cancel.open" data-id="${o.id}">Cancel this booking</button>`);
+    }
+
+    /* A DISPUTED JOB USED TO BE A DEAD END FOR THE CUSTOMER TOO — this branch
+       simply did not exist, so the screen said "under review" and stopped. */
+    if (s === 'DISPUTED') {
+      const d = (getState().disputes || []).find(x => x.orderId === o.id) || {};
+      return panel('A person is looking at this', `
+        <p class="tiny" style="margin-bottom:10px">${esc(d.reason || o.disputeReason || 'Reported')}${d.note ? ` — ${esc(d.note)}` : ''}</p>
+        <div class="m-kv"><span>Frozen, and going nowhere</span><span class="num">${M.fmt(o.customerPays)}</span></div>
+        <p class="micro muted" style="margin-top:10px">Nobody is paid while this is open. Most are settled
+          within 24 hours, and you will see the outcome and the reason on this screen.</p>
+        <button class="btn btn--ghost btn--block btn--sm" style="margin-top:10px"
+          data-act="nav.chat" data-id="${o.id}">Add something to the record</button>`);
     }
   }
 
@@ -746,23 +803,78 @@ function actionPanel(o, r) {
    must be readable across a doorway. */
 const codeBig = v => `<div class="num" style="text-align:center;font-size:clamp(24px,7.5vw,34px);letter-spacing:.12em;word-break:break-all">${esc(v)}</div>`;
 
+/* WHERE THE JOB ACTUALLY IS. A pin on an area centroid is not an address, and
+   for eight versions this is all a tradesperson got: a name, a distance and a
+   dot in the middle of Madhapur. He now gets the door he has to knock on, as
+   soon as the job is his, and it is selectable so he can paste it into his own
+   maps app. Bookings taken before 8.6.0 have no address, so the block says so
+   rather than pretending. */
+function whereTo(o) {
+  const addr = (o.customerAddress || '').trim();
+  const mark = (o.customerLandmark || '').trim();
+  const area = o.customerArea || '';
+  return `<div class="card" style="padding:12px;margin-bottom:12px;background:var(--color-bg);color:var(--color-text)">
+    <div class="m-cap" style="margin:0 0 4px">Where to go</div>
+    ${addr ? `<div style="font:700 14px/1.35 var(--font-body);user-select:text">${esc(addr)}</div>` : ''}
+    ${mark ? `<div class="tiny" style="margin-top:2px;user-select:text">Landmark: ${esc(mark)}</div>` : ''}
+    <div class="micro muted" style="margin-top:${addr ? '4px' : '0'}">${esc(area)}${o.km != null ? ` · ${o.km} km away` : ''}</div>
+    ${addr ? '' : `<p class="micro muted" style="margin-top:6px">This booking was taken before addresses were collected.
+      Message the customer for the door number before you set out.</p>`}
+    <button class="btn btn--ghost btn--sm" style="margin-top:8px" data-act="nav.chat" data-id="${esc(o.id)}">Message the customer</button>
+  </div>`;
+}
+
 /* the "what happens next" block: a strong moment, so it is ink-inverted */
 const panel = (title, body) => `<div class="sec"><div class="on-plum" style="padding:14px">
   <p class="m-cap" style="color:color-mix(in srgb,var(--color-bg) 70%,transparent)">What happens next</p>
   <b style="display:block;font:800 17px/1.2 var(--font-heading);margin-bottom:12px">${esc(title)}</b>${body}</div></div>`;
 
-/* ── dispute: 3 taps ───────────────────────────────────────── */
+/* ── dispute: 3 taps ───────────────────────────────────────────
+   THE PRO USED TO GET THE CUSTOMER'S LIST. His "Report an issue" offered him
+   Not done, Damage, Overcharged and Rude or unsafe — seven accusations against
+   himself, every one of which froze his own payment. Each side now gets the
+   things that actually go wrong on their side of the doorstep. */
 export function openDispute(orderId) {
-  sheet('Report an issue', `
-    <p class="tiny muted" style="margin-bottom:14px">Pick what went wrong. Your money freezes immediately.</p>
-    <p class="m-note" style="margin-bottom:14px">Your money is <b>frozen on tap</b> and stays with SAAHAA until the owner has read both sides.</p>
+  const s = me() || {};
+  const mine = flow.reasonsFor(s.role);
+  const isPro = s.role === 'partner' || s.role === 'shop';
+  sheet(isPro ? 'Something is wrong at this job' : 'Report an issue', `
+    <p class="tiny muted" style="margin-bottom:14px">Pick what happened. The money on this job freezes immediately, on both sides.</p>
+    <p class="m-note" style="margin-bottom:14px">${isPro
+      ? 'Nothing here counts against you by itself. It stops the clock and puts the job in front of the owner with your reason on it.'
+      : 'Your money is <b>frozen on tap</b> and stays with SAAHAA until the owner has read both sides.'}</p>
     <div class="chiprow" style="flex-wrap:wrap;gap:8px">
-      ${flow.DISPUTE_REASONS.map(r => `<button class="chip" data-act="dispute.pick"
+      ${mine.map(r => `<button class="chip" data-act="dispute.pick"
         data-id="${orderId}" data-reason="${esc(r)}">${esc(r)}</button>`).join('')}
     </div>
-    <p class="micro muted" style="margin-top:16px">
-      Most issues are settled within 24 hours. If your pro never arrived and no start code was
-      entered, you are refunded in full automatically.</p>${SYS_CSS}`);
+    <p class="micro muted" style="margin-top:16px">${isPro
+      ? 'Most are settled within 24 hours. Your stake is not forfeit for raising this — only an upheld complaint against you moves it.'
+      : 'Most issues are settled within 24 hours. If your pro never arrived and no start code was entered, you are refunded in full.'}</p>${SYS_CSS}`);
+}
+
+/* THE NO-SHOW BUTTON THAT WAS NEVER WIRED. CANCEL_RULES.WORKER_NO_SHOW — a
+   full refund plus a credit — has been in the engine since v6 with nothing able
+   to call it, while the only control on screen when a pro fails to arrive was
+   Cancel, which at EN_ROUTE hands 40% of her money to a journey nobody made.
+   The refunds page has been publishing that rule the whole time. */
+export function openNoShow(orderId) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o) return;
+  const p = getState().partners.find(x => x.id === o.partnerId) || null;
+  const split = cancelSplit(o.deal, 'WORKER_NO_SHOW', { markup: markupFor(p) });
+  const first = String(o.partnerName || 'Your pro').split(' ')[0];
+  sheet('They never arrived?', `
+    <p>${esc(first)} has not entered your code, so nothing has started. This is on them, not on you.</p>
+    <div class="m-kv" style="margin-top:14px"><span>You paid</span><span class="num">${M.fmt(o.customerPays)}</span></div>
+    <div class="m-kv"><span>Back in your wallet</span><span class="num">${M.fmt(split.refund)}</span></div>
+    ${split.credit ? `<div class="m-kv"><span>Credit for the wasted wait</span><span class="num">${M.fmt(split.credit)}</span></div>` : ''}
+    <div class="m-kv"><span>${esc(first)} keeps</span><span class="num">${M.fmt(split.worker)}</span></div>
+    <p class="micro muted" style="margin:12px 0 0">Every rupee comes back${split.credit ? `, and ${M.fmt(split.credit)} is added for the trouble` : ''}.
+      It is recorded against them, so it cannot happen quietly twice.</p>
+    <button class="btn btn-primary btn--block" style="margin-top:14px"
+      data-act="noshow.confirm" data-id="${esc(orderId)}">They did not come — refund me</button>
+    <button class="btn btn--ghost btn--block btn--sm" style="margin-top:6px" data-act="sheet.close">Wait a bit longer</button>
+    ${SYS_CSS}`);
 }
 export function submitDispute(orderId, reason) {
   flow.raiseDispute(orderId, reason, '');

@@ -67,6 +67,44 @@ export async function customerTopUp(paise) {
   toast(`${M.fmt(amt)} added to your wallet`);
   return amt;
 }
+/* A SHOP'S MONEY HAD NOWHERE TO GO. Signup collected a name, a category, a
+   place and a photograph — and no UPI id, unlike the pro's step 6. Settled
+   orders credited SHOP:<id> and sat there: no withdraw control anywhere, and
+   the owner's "Mark paid" only set a flag and posted nothing, so the balance
+   stayed put for ever and there was no account to send it to. A marketplace
+   holding a kirana's takings with no way out is not a marketplace. */
+export function shopWallet(shopId) {
+  const legs = (getState().ledger || []).flatMap(e => e.legs || []);
+  const key = acct.shop(shopId);
+  const balance = legs.filter(l => l.account === key).reduce((n, l) => n + (l.delta | 0), 0);
+  return { balance: Math.max(0, balance) };
+}
+
+export async function shopWithdraw(shopId, paise) {
+  const shop = getState().shops.find(x => x.id === shopId);
+  if (!shop) return null;
+  const amt = M.int(paise), w = shopWallet(shopId);
+  if (amt > w.balance) { toast(`You can withdraw up to ${M.fmt(w.balance)}`, 'warn'); return null; }
+  if (amt < MIN_WITHDRAW) { toast(`The smallest withdrawal is ${M.fmt(MIN_WITHDRAW)}`, 'warn'); return null; }
+  if (!shop.upi) { toast('Add the UPI id this shop is paid into first', 'warn'); return null; }
+  const r = await gateway.payout({ paise: amt, purpose: 'shop-payout', key: shopId, upi: shop.upi });
+  if (!r.ok) { toast('Could not send that right now', 'danger'); return null; }
+  await ledger('WITHDRAW', amt, acct.shop(shopId), acct.world(), { via: r.via, ref: r.ref });
+  audit.record('shop.withdraw', { shopId, amt }, me() && me().key);
+  toast(`${M.fmt(amt)} sent to ${shop.upi}`);
+  ctx.render();
+  return amt;
+}
+
+export function setShopUpi(shopId, upi) {
+  const v = String(upi || '').trim();
+  if (!/^[\w.\-]{2,}@[A-Za-z]{2,}$/.test(v)) { toast('That does not look like a UPI id (name@bank)', 'warn'); return false; }
+  dispatch({ type: 'shop/patch', payload: { id: shopId, patch: { upi: v } } });
+  audit.record('shop.upiSet', { shopId }, me() && me().key);
+  toast('Saved. This is where your money goes.');
+  return true;
+}
+
 export async function customerWithdraw(paise) {
   const s = me(); if (!s) return null;
   const amt = M.int(paise), w = customerWallet(s.key);
@@ -108,6 +146,13 @@ export async function bookService({ catId, partner, sub, deal, slot }) {
   const order = {
     id: nid('ord'), kind: 'service', catId, sub: sub || null,
     customerKey: s.key, customerName: s.name, customerArea: s.area, customerLoc: s.loc || null,
+    /* AN AREA IS NOT AN ADDRESS. Until 8.6.0 the order carried only "Madhapur"
+       and a pin at the customer's sign-up coordinates, so a tradesperson was
+       sent to a neighbourhood centroid with no flat number, no landmark and no
+       way to ring. Both audits independently called this the thing that stops
+       the product working in the real world. */
+    customerAddress: String(s.address || '').slice(0, 240),
+    customerLandmark: String(s.landmark || '').slice(0, 120),
     partnerId: partner.id, partnerName: partner.name, partnerArea: partner.area,
     km, eta: etaMins(km),
     deal: q.deal, customerPays: q.customerPays, platformFee: q.platformFee, gst: q.gst,
@@ -168,8 +213,18 @@ export function verifyOtp(orderId, entered) {
     const fails = (o.otpFails || 0) + 1;
     dispatch({ type: 'order/patch', payload: { id: orderId, patch: { otpFails: fails } } });
     audit.record('otp.failed', { id: orderId, fails });
-    toast(fails >= 3 ? 'Too many wrong codes — this job is now flagged' : 'Wrong code', 'danger');
-    if (fails >= 3) advance(orderId, 'DISPUTED', { disputed: true, disputeReason: 'otp_fail' });
+    toast(fails >= 3 ? 'Too many wrong codes — a person will look at this' : 'Wrong code', 'danger');
+    /* THIS USED TO MOVE THE ORDER TO DISPUTED AND OPEN NO DISPUTE. The stage
+       said "under review", the owner's queue read "No open disputes", and the
+       customer's money and the pro's payout sat frozen with no record, no
+       actor and nobody watching. Three mistyped characters on a doorstep
+       stranded a job permanently. It raises a real dispute now, so it lands in
+       the queue like everything else. */
+    if (fails >= 3 && !(getState().disputes || []).some(d => d.orderId === orderId && d.status === 'OPEN')) {
+      raiseDispute(orderId, 'Code would not verify at the door',
+        'The code was entered incorrectly three times. Neither side has been charged or paid.',
+        { silent: true });
+    }
     return false;
   }
   audit.record('otp.verified', { id: orderId });
@@ -313,10 +368,20 @@ export async function walletTopUp(partnerId, paise) {
   toast(`${M.fmt(amt)} added to your wallet`);
   return amt;
 }
+/* THE ONE PLACE THE WITHDRAWAL FLOOR IS WRITTEN DOWN.
+   partner.js used to hard-code 100000 paise (Rs.1,000) in three places and grey
+   the button out below it, while this function has always allowed Rs.10. A pro
+   quoting Rs.520 — the ordinary case for this product — therefore finished a
+   job, watched the screen call the money "yours to withdraw", and could not
+   have it until a second job landed. A floor that only exists in the UI is a
+   floor nobody agreed to. */
+export const MIN_WITHDRAW = 1000;
+
 export async function walletWithdraw(partnerId, paise) {
   const amt = M.int(paise);
   const w = W.walletOf(getState().ledger, partnerId, getState().partners.find(x => x.id === partnerId) || {});
-  if (amt < 1000 || amt > w.available) { toast(`You can withdraw up to ${M.fmt(w.available)}`, 'warn'); return null; }
+  if (amt > w.available) { toast(`You can withdraw up to ${M.fmt(w.available)}`, 'warn'); return null; }
+  if (amt < MIN_WITHDRAW) { toast(`The smallest withdrawal is ${M.fmt(MIN_WITHDRAW)}`, 'warn'); return null; }
   const pUpi = ((getState().partners.find(x => x.id === partnerId) || {}).verification || {}).upi || '';
   const r = await gateway.payout({ paise: amt, purpose: 'earnings', key: partnerId, upi: pUpi });
   if (!r.ok) { toast('Could not send that right now', 'danger'); return null; }
@@ -434,10 +499,38 @@ export async function cancelOrder(orderId, ruleId) {
   toast(split.label);
 }
 
+/* THE PRO CAN CANCEL. Term 4 of the agreement he signs is "I will cancel early
+   if I cannot come, never just not show up", and the conduct quiz marks
+   "Cancel in the app as early as possible" as the right answer — while the app
+   gave him no such control at any stage. His only options were to no-show
+   (stake forfeit and a trust penalty) or to talk the customer into cancelling
+   for him. CANCEL_RULES.WORKER_CANCEL has been in the engine all along with
+   nothing calling it: the customer is made whole in full. */
+export async function workerCancel(orderId, reason) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o) return null;
+  if (['SETTLED', 'RATED', 'CLOSED', 'CANCELLED', 'REFUNDED'].includes(o.stage)) {
+    toast('This job is already finished', 'warn'); return null;
+  }
+  const out = await cancelOrder(orderId, 'WORKER_CANCEL');   // cancelOrder takes the rule id only
+  audit.record('order.workerCancel', { orderId, reason: reason || '' }, me() && me().key);
+  return out;
+}
+
 /* ── DISPUTE: 3 taps to raise ──────────────────────────────── */
 export const DISPUTE_REASONS = ['Not done', 'Partly done', 'Damage', 'Late / No-show',
                                 'Overcharged', 'Rude or unsafe', 'Wrong person came'];
-export function raiseDispute(orderId, reason, note) {
+/* A PRO GOT THE CUSTOMER'S LIST. His "Report an issue" offered him Not done,
+   Damage, Overcharged, Rude or unsafe — seven accusations against himself, any
+   of which froze his own payment. These are the things that actually go wrong
+   on his side of a doorstep. */
+export const PARTNER_DISPUTE_REASONS = [
+  'Nobody was at home', 'They would not give me their code', 'The job is bigger than quoted',
+  'I cannot safely do this work', 'Wrong address', 'They asked me to work off the app',
+];
+export const reasonsFor = role => (role === 'partner' || role === 'shop')
+  ? PARTNER_DISPUTE_REASONS : DISPUTE_REASONS;
+export function raiseDispute(orderId, reason, note, opts = {}) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return;
   const d = { id: nid('dsp'), orderId, reason, note: note || '', by: me() && me().key,
@@ -445,9 +538,17 @@ export function raiseDispute(orderId, reason, note) {
   dispatch({ type: 'dispute/open', payload: d });
   if (canTransition(o.stage, 'DISPUTED')) advance(orderId, 'DISPUTED', { disputed: true, disputeReason: reason });
   audit.record('dispute.opened', { id: d.id, orderId, reason }, me() && me().key);
-  toast('Reported. Your money is frozen until this is settled.');
+  if (!opts.silent) toast('Reported. Your money is frozen until this is settled.');
   return d;
 }
+
+/* A NEW SHOP PAYS NOTHING AT ALL ON ITS FIRST THIRTY ORDERS — not the
+   percentage and not the minimum. It was the single best thing on offer to a
+   kirana and the product never mentioned it anywhere a shop owner would look;
+   the console even showed "Fees today (3%)" to a shop paying 0%. Exported so a
+   screen can count down rather than reprint the number. */
+export const FREE_FIRST_ORDERS = 30;
+export const freeOrdersLeft = shop => Math.max(0, FREE_FIRST_ORDERS - ((shop && shop.ordersCompleted) || 0));
 
 /* ── RETAIL: cart + checkout ───────────────────────────────── */
 export function getCart() {
@@ -500,7 +601,7 @@ export function cartQuote(mode = 'rider') {
   const shop = getState().shops.find(s => s.id === cart.shopId);
   if (!shop) return null;
   const km = kmBetween(myArea(), shop.area);
-  const first = (shop.ordersCompleted || 0) < 30;
+  const first = (shop.ordersCompleted || 0) < FREE_FIRST_ORDERS;
   return { shop, km, ...quoteRetail(cart.lines, { catId: shop.catId, km, mode, firstOrders: first,
                                                   freeDeliveryAbove: shop.freeDeliveryAbove }) };
 }
@@ -525,6 +626,13 @@ export async function placeRetailOrder(mode = 'rider') {
   const order = {
     id: nid('ord'), kind: 'retail', catId: q.shop.catId, shopId: q.shop.id, shopName: q.shop.name,
     customerKey: s.key, customerName: s.name, customerArea: s.area, customerLoc: s.loc || null,
+    /* AN AREA IS NOT AN ADDRESS. Until 8.6.0 the order carried only "Madhapur"
+       and a pin at the customer's sign-up coordinates, so a tradesperson was
+       sent to a neighbourhood centroid with no flat number, no landmark and no
+       way to ring. Both audits independently called this the thing that stops
+       the product working in the real world. */
+    customerAddress: String(s.address || '').slice(0, 240),
+    customerLandmark: String(s.landmark || '').slice(0, 120),
     lines: cart.lines.map(l => ({ ...l, pickedQty: null, status: 'pending' })),
     itemsTotal: q.itemsTotal, deliveryFee: q.deliveryFee, customerPays: q.customerPays,
     platformFee: q.platformFee, gst: q.platformFeeGst, shopPayout: q.shopPayout,

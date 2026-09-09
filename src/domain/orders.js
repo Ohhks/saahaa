@@ -18,9 +18,16 @@ const SERVICE_STAGES = [
   { id:'DRAFT',       label:'Draft',              short:'Draft',      owner:'customer', to:['MATCHING','CANCELLED'], tracker:false, tone:'soft' },
   { id:'MATCHING',    label:'Finding your pro',   short:'Matching',   owner:'system',   to:['ASSIGNED','NO_MATCH','CANCELLED'], tracker:true, tone:'info', ico:'🔎' },
   { id:'NO_MATCH',    label:'No pro free',        short:'No match',   owner:'system',   to:['MATCHING','CANCELLED'], tracker:false, tone:'warn' },
-  { id:'ASSIGNED',    label:'Pro accepted',       short:'Accepted',   owner:'worker',   to:['EN_ROUTE','MATCHING','CANCELLED'], tracker:true, tone:'ok', ico:'🤝' },
+  /* DISPUTED was missing from the two stages where a no-show actually happens —
+     the pro accepted and never set out, or is "on the way" and never arrives.
+     Because "Report an issue" is gated on canTransition(stage,'DISPUTED'), the
+     customer's only control at exactly that moment was Cancel, which at
+     EN_ROUTE takes 40% of her money for a journey nobody made. The engine has
+     always had CANCEL_RULES.WORKER_NO_SHOW — a full refund plus a credit — and
+     nothing could reach it. */
+  { id:'ASSIGNED',    label:'Pro accepted',       short:'Accepted',   owner:'worker',   to:['EN_ROUTE','MATCHING','CANCELLED','DISPUTED'], tracker:true, tone:'ok', ico:'🤝' },
   { id:'SCHEDULED',   label:'Booked for later',   short:'Scheduled',  owner:'system',   to:['EN_ROUTE','CANCELLED','EXPIRED'], tracker:false, tone:'info' },
-  { id:'EN_ROUTE',    label:'On the way to you',  short:'On the way', owner:'worker',   to:['ARRIVED','CANCELLED'], tracker:true, tone:'info', ico:'🛵' },
+  { id:'EN_ROUTE',    label:'On the way to you',  short:'On the way', owner:'worker',   to:['ARRIVED','CANCELLED','DISPUTED'], tracker:true, tone:'info', ico:'🛵' },
   /* `needsOtp` is the old name for what is now the customer's own SAAHAA code
      read out at the door — no code is generated or sent any more. The field
      name is kept because orders in flight carry it. See domain/flow.js. */

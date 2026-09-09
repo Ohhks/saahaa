@@ -6,6 +6,115 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [8.6.0] — 2026-09-10 — "The promises it could not keep"
+
+Three agents audited this build independently: one walked every customer
+journey, one walked the earning side, one diffed the whole tree against the
+archives. They converged, and what they found was not bugs at the edges. The
+three things the product said loudest were the three it did not do.
+
+### Fixed — the money released itself
+
+*"SAAHAA holds the money until you confirm the work"* appears on the home
+screen, the booking sheet, the order page and the footer of every screen. It
+was not true. `ESCROW.INSTANT` had `holdMs: 0`, so a job was already past its
+release time the moment the pro marked it finished, and the next time anyone
+opened the app it paid out — against **two typed notes and no photograph**,
+with the customer's screen still reading NOT YET RELEASED.
+
+- INSTANT now holds for two hours. A tier called instant may mean "with no
+  review queue in the way". It cannot mean "without her".
+- **A note is not a photograph.** The rule said "no photo → never auto-release"
+  and the code counted evidence *entries* — so the "Camera not working?"
+  fallback, which writes an entry with `photo: null`, satisfied it. The test
+  fixtures asserted the hole rather than the rule; they assert the rule now.
+- The pro's side of the same screen said "Auto-releases if the customer does not
+  respond" with no time on it — and for a new pro, whose first three jobs are
+  reviewed, no truth in it either. It states the real wait.
+
+### Fixed — when the pro never came, the only button took 40% of your money
+
+`CANCEL_RULES.WORKER_NO_SHOW` — full refund plus a ₹100 credit — has been in
+the engine since v6 and **published on the refunds page the whole time**, with
+nothing in the app able to call it. Meanwhile "Report an issue" was gated on a
+transition that `ASSIGNED` and `EN_ROUTE` did not have, so at exactly the two
+stages where a no-show happens there was no way to report one. The only control
+was Cancel, which at EN_ROUTE hands 40% of the money to a journey nobody made.
+
+Both stages can reach DISPUTED now, and a **"They never arrived"** button routes
+to the rule that was always meant for it. Verified end to end: ₹462.24 paid,
+₹562.24 back.
+
+### Fixed — nobody could actually turn up
+
+There was **no address anywhere in the product**. An order carried an area name
+and a pin at the customer's sign-up coordinates, so a tradesperson was sent to a
+neighbourhood centroid with no flat number, no landmark and no way to ring —
+while this repo's own deck promised him "a job with the address". Both audits,
+independently, called this the thing that stops the product working in the real
+world. The booking sheet asks once, remembers it, and the pro's screen now
+carries the door he has to knock on.
+
+### Fixed — the pro's dead ends
+- **Three mistyped characters stranded a job for ever.** Three wrong door codes
+  moved the order to DISPUTED and opened *no dispute record*: the owner's queue
+  read "No open disputes" while both sides' money sat frozen with nobody
+  watching. It raises a real dispute now.
+- **He could not cancel** — though the agreement he signs says he will, and the
+  conduct quiz marks it the right answer. `WORKER_CANCEL` existed with no caller.
+- **A complaint against him showed the word "under review" and nothing else** —
+  not the reason, not that his money was frozen, not for how long, and no way to
+  answer. "Report an issue" vanished at the same moment, because DISPUTED cannot
+  transition to DISPUTED. He gets the reason, the frozen amounts, the
+  consequences and a way to put his side.
+- **His "Report an issue" offered him the customer's list** — seven accusations
+  against himself, each of which froze his own pay. Each side now gets the
+  things that actually go wrong on their side of the doorstep.
+
+### Fixed — money with no way out
+- **"Yours to withdraw", beside a disabled button.** The UI invented a ₹1,000
+  floor, written as a raw `100000` in three places; the engine has always
+  allowed ₹10. A plumber's first ₹520 job was locked behind a second one.
+- **A shop had no exit at all**: no UPI collected at signup, no withdraw
+  control, and the owner's "Mark paid" set a flag and posted nothing — so a
+  kirana's takings sat in the ledger for ever with no account to send them to.
+- **The shop's statement was ₹5 an order short of its own total**, because it
+  showed the rider's share and not the dispatch cut the shop also absorbs.
+- **A new shop pays nothing at all on its first 30 orders** — the best thing on
+  offer to a kirana, mentioned nowhere. The console even showed "Fees today
+  (3%)" to a shop paying 0%. It counts down now.
+
+### Fixed — smaller untruths
+"Every pro ID-checked" (tier 1 is a confirmed number and no ID) · "Money lands
+here after every job" at the UPI step (nothing is automatic) · a hardcoded
+"8% → 6%" on the pro's ladder that ignored the pricing engine · a 60-second
+accept timer that does not exist · "Needs you" hardcoded to the customer, so a
+pro with three jobs waiting read zero.
+
+### Fixed — the deck tool had been silently broken since 8.4.0
+Removing the fake SMS left `deckscenes.js` calling two deleted functions, and
+`app.js` swallowed the error into a `console.error` — so **7 of the 50 slides**
+had been capturing blank instead of failing. A broken scene now paints its own
+error. All 7 verified through the real capture tool.
+
+### Added — scale
+`tools/stress.mjs` measures the ceiling rather than guessing it: one pincode
+0.32 MB, a ward 1.13 MB, a suburb 2.38 MB, a small city 9.01 MB — past which
+the answer is the server, not a bigger phone. And the crash mode it found
+first: `writeDebounced` threw away `write()`'s result, so a full device **failed
+to save silently** while the app went on looking healthy. It says so now, at the
+top of every screen, in a banner that cannot be dismissed. `bids` and
+`disputes` are bounded — the dispute cap keeps every unresolved one, because a
+plain cap evicts the person who has waited longest.
+
+### Also
+`.sidenav` was built into every render and hidden by `display:none!important`
+while a comment claimed nothing rendered it — the same shape as the `.rail`
+casualty. Nothing was lost with it; the invisible markup is gone and the comment
+is true. And `docs/deck/workflows.html` + `tools/deck-pdf.py`: the customer and
+partner workflows, both sides of one job, and every earning and saving
+opportunity, as a 13-page PDF whose figures are printed by the pricing engine.
+
 ## [8.5.0] — 2026-09-10 — "Nothing was deleted; some of it was buried"
 
 A check that the v8 redesign had not quietly dropped features, and repairs for

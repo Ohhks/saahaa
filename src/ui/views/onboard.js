@@ -318,7 +318,7 @@ function stepPanel(p, id, cat) {
 
     case 'payout': return `<div class="ob__form">
       <div class="field"><input id="obUpi" placeholder=" " autocomplete="off" inputmode="email"><label>Your UPI id (yourname@upi)</label></div>
-      <p class="micro muted">PhonePe, GPay, Paytm — any UPI id. Your money lands here after each job is confirmed. You keep 100% of every quote.</p>
+      <p class="micro muted">PhonePe, GPay, Paytm — any UPI id. Confirmed jobs are paid into your SAAHAA wallet, and you send it here whenever you like, in one tap. You keep 100% of every quote.</p>
       </div>
       ${foot('<button class="btn btn-primary" data-act="ob.payout">Save UPI</button>')}`;
 

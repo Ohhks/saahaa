@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SAAHAA — Workflows, Earnings and Savings</title>
+<!--
+  SAAHAA · docs/deck/workflows.html — the presentation.
+
+  EVERY NUMBER ON THESE PAGES IS THE ENGINE'S. The figures were taken from
+  domain/pricing.js (quoteService, compareWithApps) and domain/settings.js
+  (getPricing) at build time, not written by hand — see docs/deck/NUMBERS.md
+  for the exact command that prints them. If a rate changes, re-run it and
+  update the pages rather than editing a number in place.
+
+  Render to PDF:  python tools/deck-pdf.py
+  A4 landscape, one slide per page, so it prints and imports cleanly.
+-->
+<style>
+@font-face { font-family:'Archivo'; font-style:normal; font-weight:100 900; font-display:swap;
+  src:url("../../vendor/fonts/archivo-latin.woff2") format('woff2'); }
+
+:root{
+  --paper:#f3f2f2; --ink:#201e1d; --accent:#ec3013;
+  --ink-2:#4a4644; --ink-3:#7c7674; --rule:#201e1d;
+  --pad:16mm;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#8d8a88;font-family:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--ink)}
+
+.slide{
+  width:297mm; height:210mm; background:var(--paper); position:relative;
+  padding:var(--pad); overflow:hidden; page-break-after:always; break-after:page;
+  margin:0 auto 8mm; display:flex; flex-direction:column;
+}
+.slide:last-child{page-break-after:auto;break-after:auto}
+
+.kicker{font:700 9pt/1 'Archivo';letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
+.kicker--ink{color:var(--ink-3)}
+h1{font:800 40pt/0.98 'Archivo';letter-spacing:-.025em;margin:6mm 0 0}
+h2{font:800 24pt/1.05 'Archivo';letter-spacing:-.02em;margin:3mm 0 0}
+h3{font:800 13pt/1.15 'Archivo';letter-spacing:-.01em}
+p{font:400 10.5pt/1.5 'Archivo';color:var(--ink-2);max-width:150mm}
+.lede{font:400 13pt/1.45 'Archivo';color:var(--ink);max-width:170mm}
+.rule{height:2px;background:var(--rule);margin:5mm 0}
+.rule--thin{height:1px;background:#c9c5c3}
+.foot{position:absolute;left:var(--pad);right:var(--pad);bottom:9mm;display:flex;
+  justify-content:space-between;font:600 8pt/1 'Archivo';letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3);border-top:2px solid var(--rule);padding-top:2.5mm}
+.body{flex:1;min-height:0;padding-top:4mm}
+
+/* the step ladder used by the workflow pages */
+.steps{display:grid;grid-template-columns:repeat(7,1fr);gap:0;margin-top:5mm}
+.step{border-left:2px solid var(--rule);padding:3mm 3mm 0 3mm}
+.step:first-child{border-left-width:2px}
+.step__n{font:800 22pt/1 'Archivo';color:var(--accent)}
+.step__t{font:800 10pt/1.15 'Archivo';margin-top:2mm;letter-spacing:-.01em}
+.step__d{font:400 8pt/1.35 'Archivo';color:var(--ink-2);margin-top:1.5mm}
+.step__m{font:600 7pt/1.2 'Archivo';letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-top:2mm}
+
+/* two-column facing view */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0;height:100%}
+.two > div{padding:4mm 6mm}
+.two > div:first-child{border-right:2px solid var(--rule);padding-left:0}
+.two > div:last-child{padding-right:0}
+
+/* the money tables */
+table{width:100%;border-collapse:collapse;margin-top:4mm}
+th{font:600 7.5pt/1 'Archivo';letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);
+  text-align:left;padding:0 0 2mm;border-bottom:2px solid var(--rule)}
+td{font:400 10pt/1.4 'Archivo';padding:2.6mm 0;border-bottom:1px solid #d6d2d0;vertical-align:top}
+td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+td.big{font:800 13pt/1.1 'Archivo';text-align:right;font-variant-numeric:tabular-nums}
+.accent{color:var(--accent)}
+tr.total td{border-bottom:2px solid var(--rule);border-top:2px solid var(--rule);font-weight:800}
+
+/* stat blocks */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:5mm}
+.stat{border-left:2px solid var(--rule);padding:3mm 4mm}
+.stat__v{font:800 26pt/1 'Archivo';letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat__k{font:600 7.5pt/1.2 'Archivo';letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-top:2mm}
+.stat__d{font:400 8pt/1.35 'Archivo';color:var(--ink-2);margin-top:1.5mm}
+
+ul{list-style:none;margin-top:3mm}
+li{font:400 10pt/1.45 'Archivo';color:var(--ink-2);padding:2mm 0 2mm 7mm;position:relative;border-bottom:1px solid #d6d2d0}
+li:before{content:'';position:absolute;left:0;top:4.4mm;width:3.5mm;height:3.5mm;background:var(--accent)}
+li b{color:var(--ink)}
+
+.cover{justify-content:center;align-items:flex-start;background:var(--paper)}
+.cover h1{font-size:64pt;letter-spacing:-.035em}
+.wordmark{font:800 92pt/0.86 'Archivo';letter-spacing:-.045em}
+.cover .bar{width:52mm;height:5px;background:var(--accent);margin:7mm 0}
+
+.invert{background:var(--ink);color:var(--paper)}
+.invert h2,.invert h1,.invert h3{color:var(--paper)}
+.invert p,.invert li,.invert .step__d,.invert .stat__d{color:#c9c5c3}
+.invert .foot{color:#8d8a88;border-top-color:var(--paper)}
+.invert .step,.invert .stat{border-left-color:var(--paper)}
+.invert .rule{background:var(--paper)}
+.invert td{border-bottom-color:#4a4644}
+.invert th{border-bottom-color:var(--paper);color:#a8a3a1}
+.invert li{border-bottom-color:#4a4644}
+.invert tr.total td{border-color:var(--paper)}
+
+.note{font:400 8.5pt/1.4 'Archivo';color:var(--ink-3);margin-top:4mm;max-width:170mm}
+.invert .note{color:#8d8a88}
+
+/* Slide 7 carries two full tables and the four headline figures. Everything
+   else breathes at the default rhythm; this one is tightened rather than being
+   split across two pages, because the comparison only lands side by side. */
+.slide--dense td{padding:1.7mm 0;font-size:9.5pt}
+.slide--dense th{padding-bottom:1.5mm}
+.slide--dense table{margin-top:2.5mm}
+.slide--dense .stats{margin-top:4mm !important}
+.slide--dense .stat{padding:2mm 3.5mm}
+.slide--dense .stat__v{font-size:20pt}
+.slide--dense .stat__d{font-size:7.5pt;line-height:1.3}
+.slide--dense .stat__k{margin-top:1.2mm}
+.slide--dense .two > div{padding-top:2mm}
+/* THE ACTUAL CAUSE of this slide overflowing: .two is height:100%, so it fills
+   the body and anything placed after it is pushed off the page. On a slide that
+   has content below the two columns, the columns take the height they need. */
+.slide--dense .two{height:auto}
+.slide--dense td.big{font-size:11.5pt}
+
+@page{size:A4 landscape;margin:0}
+@media print{ html,body{background:#fff} .slide{margin:0;box-shadow:none} }
+</style>
+</head>
+<body>
+
+<!-- ── 1 · cover ─────────────────────────────────────────── -->
+<section class="slide cover">
+  <div class="kicker">Hyderabad · one pincode at a time</div>
+  <div class="wordmark">SAAHAA</div>
+  <div class="bar"></div>
+  <h1 style="font-size:30pt;letter-spacing:-.02em;max-width:200mm">Workflows, earnings,<br>and where the money is saved.</h1>
+  <p class="lede" style="margin-top:8mm">Every service and every shop in your neighbourhood, in one app.
+    The professional keeps 100% of what they quote. The customer still pays less than a commission app.
+    This deck shows how both of those are true at the same time.</p>
+  <div class="foot"><span>SAAHAA · Together, we elevate life</span><span>01</span></div>
+</section>
+
+<!-- ── 2 · the one idea ──────────────────────────────────── -->
+<section class="slide invert">
+  <div class="kicker">The whole idea, in one line</div>
+  <h1 style="max-width:230mm">A commission app takes a quarter of a worker's pay.<br>
+    We add our charge <span class="accent">on top</span> instead.</h1>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="stats">
+      <div class="stat"><div class="stat__v">100%</div><div class="stat__k">The pro keeps</div>
+        <div class="stat__d">Of the price they quoted. Not 75%. There is no commission to deduct, because our charge is never inside their money.</div></div>
+      <div class="stat"><div class="stat__v accent">8%</div><div class="stat__k">Added on top</div>
+        <div class="stat__d">Paid by the customer, shown before they book. 6% once a pro is SAAHAA Certified.</div></div>
+      <div class="stat"><div class="stat__v">3%</div><div class="stat__k">A shop pays</div>
+        <div class="stat__d">Of the basket, capped at ₹25 an order, and free for their first 30 orders.</div></div>
+      <div class="stat"><div class="stat__v">₹0</div><div class="stat__k">To join, ever</div>
+        <div class="stat__d">No listing fee, no monthly plan, no lead credits, no charge for a job you did not win.</div></div>
+    </div>
+    <p class="note">All four figures are read live from the pricing engine, never typed into a screen.
+      The owner can change them; a booked order keeps the numbers it was booked with.</p>
+  </div>
+  <div class="foot"><span>The idea</span><span>02</span></div>
+</section>
+
+<!-- ── 3 · customer workflow ─────────────────────────────── -->
+<section class="slide">
+  <div class="kicker">Workflow one</div>
+  <h2>The customer, from a problem to a paid job</h2>
+  <p style="margin-top:3mm">Seven steps. The whole path is shown on the first screen, so nobody wonders how many more there are.</p>
+  <div class="body">
+    <div class="steps">
+      <div class="step"><div class="step__n">1</div><div class="step__t">Say the problem</div>
+        <div class="step__d">Type it plainly — “fan in the bedroom stopped working”. One search covers pros, shops and your own orders.</div>
+        <div class="step__m">~10 sec</div></div>
+      <div class="step"><div class="step__n">2</div><div class="step__t">See who is free</div>
+        <div class="step__d">The nearest available pro, with distance, arrival time, trust score and their price.</div>
+        <div class="step__m">Instant</div></div>
+      <div class="step"><div class="step__n">3</div><div class="step__t">Price is locked</div>
+        <div class="step__d">Before you commit. It cannot rise afterwards. Extra work needs your approval.</div>
+        <div class="step__m">Held</div></div>
+      <div class="step"><div class="step__n">4</div><div class="step__t">Money is held</div>
+        <div class="step__d">SAAHAA holds it — not the pro. Nothing reaches them until you confirm the work.</div>
+        <div class="step__m">Escrow</div></div>
+      <div class="step"><div class="step__n">5</div><div class="step__t">Read your code</div>
+        <div class="step__d">Your own SAAHAA code, at the door. It proves the right person turned up. Nothing is ever texted to you.</div>
+        <div class="step__m">At the door</div></div>
+      <div class="step"><div class="step__n">6</div><div class="step__t">See the work</div>
+        <div class="step__d">A photograph before and after. The pro cannot be paid without it.</div>
+        <div class="step__m">Evidence</div></div>
+      <div class="step"><div class="step__n">7</div><div class="step__t">Confirm, and pay</div>
+        <div class="step__d">You release the money. Unhappy? Full or partial refund, and the pro's stake is forfeit to you.</div>
+        <div class="step__m">Your call</div></div>
+    </div>
+    <p class="note">Cancel before the pro sets out and it is a full refund. Every rule on screen is read from the
+      engine, so what you are told is what the code does.</p>
+  </div>
+  <div class="foot"><span>Customer workflow</span><span>03</span></div>
+</section>
+
+<!-- ── 4 · partner workflow ──────────────────────────────── -->
+<section class="slide">
+  <div class="kicker">Workflow two</div>
+  <h2>The professional, from a phone to a paid week</h2>
+  <p style="margin-top:3mm">Sign-up is seven steps and about eleven minutes. Nobody has to approve him to start working.</p>
+  <div class="body">
+    <div class="steps">
+      <div class="step"><div class="step__n">1</div><div class="step__t">Your number</div>
+        <div class="step__d">Confirm it, and collect your permanent SAAHAA code. Nothing is texted — this product never sends codes.</div>
+        <div class="step__m">1 min</div></div>
+      <div class="step"><div class="step__n">2</div><div class="step__t">Your ID</div>
+        <div class="step__d">Aadhaar, PAN or licence. Only a scrambled fingerprint and the last four digits are kept.</div>
+        <div class="step__m">2 min</div></div>
+      <div class="step"><div class="step__n">3</div><div class="step__t">One photo</div>
+        <div class="step__d">For verification, and it stays private. The face on your public page is one you choose.</div>
+        <div class="step__m">1 min</div></div>
+      <div class="step"><div class="step__n">4</div><div class="step__t">Five trade questions</div>
+        <div class="step__d">Real ones about your own trade. Four out of five passes.</div>
+        <div class="step__m">3 min</div></div>
+      <div class="step"><div class="step__n">5</div><div class="step__t">How it works</div>
+        <div class="step__d">Six questions that teach rather than reject — the code at the door, never cash outside, the photo.</div>
+        <div class="step__m">2 min</div></div>
+      <div class="step"><div class="step__n">6</div><div class="step__t">Where to pay you</div>
+        <div class="step__d">Your UPI id. This is the only place your money goes.</div>
+        <div class="step__m">1 min</div></div>
+      <div class="step"><div class="step__n">7</div><div class="step__t">You are live</div>
+        <div class="step__d">A public page with your name on it, built and kept current by SAAHAA. You maintain nothing.</div>
+        <div class="step__m">₹0 paid</div></div>
+    </div>
+    <p class="note">Then every job: accept → travel → type the customer's code at the door → photograph the work →
+      get paid. The stake locked at check-in comes back in full the moment the customer confirms.</p>
+  </div>
+  <div class="foot"><span>Partner workflow</span><span>04</span></div>
+</section>
+
+<!-- ── 5 · vice versa ────────────────────────────────────── -->
+<section class="slide">
+  <div class="kicker">Vice versa</div>
+  <h2>The same job, from both sides at once</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:22%">The moment</th><th style="width:39%">What the customer sees</th><th style="width:39%">What the professional sees</th></tr>
+      <tr><td><b>Booked</b></td>
+        <td>A named pro, a locked price, an arrival time.</td>
+        <td>A job with the address, the distance and exactly what he will be paid.</td></tr>
+      <tr><td><b>On the way</b></td>
+        <td>A live map, and how many minutes away he is.</td>
+        <td>The same map, without the controls. He is travelling to a place, not a word.</td></tr>
+      <tr><td><b>At the door</b></td>
+        <td>“Read your code out to your pro.” Her own SAAHAA code, the same every job.</td>
+        <td>“Ask the customer for their SAAHAA code.” Typing it starts the job and locks his stake — stated <i>before</i> he types.</td></tr>
+      <tr><td><b>Working</b></td>
+        <td>The job is running. Her money is held, not paid.</td>
+        <td>His stake is locked. Extra work needs her approval before he does it.</td></tr>
+      <tr><td><b>Finished</b></td>
+        <td>A photograph of the work, before and after.</td>
+        <td>He must photograph it. There is no path to payment without it.</td></tr>
+      <tr><td><b>Paid</b></td>
+        <td>She releases the money. She sees the fee and the GST, itemised.</td>
+        <td>He receives 100% of his quote, and his stake back in full, at once.</td></tr>
+      <tr class="total"><td><b>If it went wrong</b></td>
+        <td>Full or partial refund. His stake is forfeit <b>to her</b>, never to SAAHAA.</td>
+        <td>He can answer the dispute. The owner decides, and every decision is on the record.</td></tr>
+    </table>
+    <p class="note">The contact details each side sees are masked in chat, and a phone number written any way a
+      person writes it is caught. The pro keeps an invoice record of past customers — that is stated on the privacy page rather than hidden.</p>
+  </div>
+  <div class="foot"><span>Both sides</span><span>05</span></div>
+</section>
+
+<!-- ── 6 · the shop ──────────────────────────────────────── -->
+<section class="slide">
+  <div class="kicker">Workflow three</div>
+  <h2>The shop, from a shelf to a delivery</h2>
+  <div class="body">
+    <div class="two">
+      <div>
+        <h3>Opening the shop</h3>
+        <ul>
+          <li><b>Tap items from a ready-made list.</b> ~180 real Hyderabad SKUs with real prices — about six seconds each, no typing.</li>
+          <li><b>Add a photo, a name, a price.</b> Anyone can list what they actually sell.</li>
+          <li><b>MRP is enforced.</b> The app refuses to list above it, so a shop cannot quietly overcharge.</li>
+          <li><b>Open or closed is one switch.</b> Closed means no orders can reach you — not a queue of angry customers.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Taking an order</h3>
+        <ul>
+          <li><b>Accept, pack, weigh.</b> The screen shows what the customer paid <i>and</i> what you keep.</li>
+          <li><b>Something out of stock?</b> Offer a similar item, refund that line, or ask her — she has 90 seconds, then it refunds automatically.</li>
+          <li><b>Delivery or pickup.</b> Pickup shows the customer's code at the counter.</li>
+          <li><b>3% from your side</b>, capped at ₹25 — and your first 30 orders are free of it entirely.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Shop workflow</span><span>06</span></div>
+</section>
+
+<!-- ── 7 · the money, service ────────────────────────────── -->
+<section class="slide invert slide--dense">
+  <div class="kicker">Where every rupee goes</div>
+  <h2>A ₹1,000 job, itemised</h2>
+  <div class="body">
+    <div class="two">
+      <div>
+        <table>
+          <tr><th>On SAAHAA</th><th style="text-align:right">Amount</th></tr>
+          <tr><td>The professional's quote</td><td class="num">₹1,000</td></tr>
+          <tr><td>SAAHAA's charge (8%, on top)</td><td class="num accent">₹80</td></tr>
+          <tr><td style="padding-left:6mm;color:#8d8a88">— platform fee</td><td class="num" style="color:#8d8a88">₹68</td></tr>
+          <tr><td style="padding-left:6mm;color:#8d8a88">— GST, remitted not kept</td><td class="num" style="color:#8d8a88">₹12</td></tr>
+          <tr class="total"><td><b>The customer pays</b></td><td class="big">₹1,080</td></tr>
+          <tr class="total"><td><b>The professional keeps</b></td><td class="big accent">₹1,000</td></tr>
+        </table>
+      </div>
+      <div>
+        <table>
+          <tr><th>A typical commission app</th><th style="text-align:right">Amount</th></tr>
+          <tr><td>Price set by the app</td><td class="num">₹1,333</td></tr>
+          <tr><td>Commission taken from the worker (25%)</td><td class="num">−₹333</td></tr>
+          <tr><td>Convenience fee added to the customer</td><td class="num">₹99</td></tr>
+          <tr class="total"><td><b>The customer pays</b></td><td class="big">₹1,432</td></tr>
+          <tr class="total"><td><b>The professional keeps</b></td><td class="big">₹736</td></tr>
+        </table>
+      </div>
+    </div>
+    <!-- The four stat blocks that used to sit here crowded the page and half
+         repeated the next one. The single sentence is the whole point anyway. -->
+    <div class="rule" style="margin:5mm 0 4mm"></div>
+    <p style="font:800 15pt/1.3 'Archivo';color:var(--paper);max-width:255mm;margin:0">
+      The customer pays <span class="accent">₹352 less</span> and the professional takes home
+      <span class="accent">₹264 more</span> — on the very same job. Both, because the quarter that
+      used to disappear was never work anybody did.</p>
+    <p class="note" style="margin-top:3mm">SAAHAA's whole share of this job is ₹80, and ₹12 of that is GST, remitted rather than kept.</p>
+  </div>
+  <div class="foot"><span>The money · services</span><span>07</span></div>
+</section>
+
+<!-- ── 8 · the money, at three sizes ─────────────────────── -->
+<section class="slide">
+  <div class="kicker">The same arithmetic, at three sizes</div>
+  <h2>It does not stop working on a small job</h2>
+  <div class="body">
+    <table>
+      <tr><th>The pro quotes</th><th style="text-align:right">Pro keeps</th><th style="text-align:right">Customer pays</th>
+          <th style="text-align:right">A commission app</th><th style="text-align:right">Customer saves</th><th style="text-align:right">Pro gains</th></tr>
+      <tr><td><b>₹500</b> — a tap washer, a fan</td><td class="num">₹500</td><td class="num">₹540</td>
+          <td class="num">₹766</td><td class="num accent">₹226 · 29%</td><td class="num accent">₹169</td></tr>
+      <tr><td><b>₹1,000</b> — a geyser, a deep clean</td><td class="num">₹1,000</td><td class="num">₹1,080</td>
+          <td class="num">₹1,432</td><td class="num accent">₹352 · 25%</td><td class="num accent">₹264</td></tr>
+      <tr><td><b>₹2,500</b> — a full rewire, a move</td><td class="num">₹2,500</td><td class="num">₹2,700</td>
+          <td class="num">₹3,432</td><td class="num accent">₹732 · 21%</td><td class="num accent">₹549</td></tr>
+      <tr class="total"><td><b>Once a pro is SAAHAA Certified</b></td><td class="num">100%</td><td class="num">+6% only</td>
+          <td class="num">—</td><td class="num accent">More again</td><td class="num accent">Unchanged</td></tr>
+    </table>
+    <p class="note">A commission app is modelled at 25% plus a ₹99 convenience fee, with the pro taking home the
+      same amount — the standard shape in this market. These rows are printed by the pricing engine itself
+      (<code>compareWithApps</code>), not typed by hand.</p>
+    <div class="stats" style="margin-top:5mm">
+      <div class="stat"><div class="stat__v">₹0</div><div class="stat__k">Cost to list</div><div class="stat__d">For a pro or a shop, for ever.</div></div>
+      <div class="stat"><div class="stat__v">₹0</div><div class="stat__k">Per lead</div><div class="stat__d">You are never charged for a job you did not win.</div></div>
+      <div class="stat"><div class="stat__v">₹0</div><div class="stat__k">Monthly</div><div class="stat__d">No plan, no tier to buy, no visibility to rent.</div></div>
+      <div class="stat"><div class="stat__v">₹0</div><div class="stat__k">To the customer</div><div class="stat__d">Browsing, searching and asking for rates are all free.</div></div>
+    </div>
+  </div>
+  <div class="foot"><span>The money · at scale</span><span>08</span></div>
+</section>
+
+<!-- ── 9 · earning opportunities ─────────────────────────── -->
+<section class="slide">
+  <div class="kicker">Every way to earn</div>
+  <h2>What the app can do for the people who work</h2>
+  <div class="body">
+    <div class="two">
+      <div>
+        <h3>A professional</h3>
+        <ul>
+          <li><b>Keep the whole quote.</b> Roughly ₹264 more per ₹1,000 job than a commission app — about <b>₹5,300 a month</b> on twenty jobs.</li>
+          <li><b>Get found without advertising.</b> A public page, built and kept current from your work. Share the link on WhatsApp — it is your professional card.</li>
+          <li><b>Win work by being trusted, not cheapest.</b> Sealed rates are scored on trust and distance as much as price.</li>
+          <li><b>Climb and pay less.</b> SAAHAA Certified drops the customer's charge from 8% to 6%, which makes you the better-priced pro without cutting your own rate.</li>
+          <li><b>Be paid on the day.</b> Money released to your UPI when the customer confirms — no thirty-day terms.</li>
+          <li><b>Repeat customers, on the record.</b> "Book again" puts you one tap away for anyone you have worked for.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>A shop</h3>
+        <ul>
+          <li><b>Open in an evening.</b> Tap items from a ready list; a storefront is live the same day.</li>
+          <li><b>First 30 orders free.</b> Then 3%, capped at ₹25 — a ₹2,000 basket costs ₹25, not ₹60.</li>
+          <li><b>Delivery without hiring anybody.</b> A visible per-distance fee, ₹5 of which is dispatch and the rest the rider's.</li>
+          <li><b>Sell what the aggregators will not list.</b> Your own products, your own photos, your own prices under MRP.</li>
+          <li><b>No dark-store competing with you.</b> The platform does not hold stock, so it is never your rival.</li>
+        </ul>
+        <h3 style="margin-top:5mm">Both</h3>
+        <ul>
+          <li><b>One number, two accounts.</b> Trade as a pro and buy as a customer — separate wallets, separate histories, one phone.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Earning</span><span>09</span></div>
+</section>
+
+<!-- ── 10 · savings ──────────────────────────────────────── -->
+<section class="slide invert">
+  <div class="kicker">Every way to save</div>
+  <h2>What the app can do for the people who buy</h2>
+  <div class="body">
+    <div class="two">
+      <div>
+        <h3>On a service</h3>
+        <ul>
+          <li><b>21–29% less</b> than the same job on a commission app, because there is no quarter to fund.</li>
+          <li><b>Ask several pros for a price</b> without losing the one you have — your booking stays held while you ask, so asking costs nothing.</li>
+          <li><b>The price is locked before you book</b> and cannot rise. Extra work needs your say-so.</li>
+          <li><b>A warranty on the work</b>, where the category carries one.</li>
+          <li><b>Full refund</b> if you cancel before the pro sets out.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>On a shop order</h3>
+        <ul>
+          <li><b>Never above MRP.</b> The app refuses to list an item above it.</li>
+          <li><b>Delivery priced by distance</b>, shown as its own line — ₹19 up to 2 km, not a mystery fee.</li>
+          <li><b>Out of stock is your decision</b>, not theirs: a similar item, a refund, or ask me.</li>
+          <li><b>Money held until you confirm</b>, on a grocery order as much as a plumber.</li>
+          <li><b>Buy from the shop on your street</b>, so the margin stays in the neighbourhood.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">A household booking two services a month and ordering weekly saves in the region of
+      ₹700–900 a month against commission apps — before counting what stays in the neighbourhood rather than leaving it.</p>
+  </div>
+  <div class="foot"><span>Saving</span><span>10</span></div>
+</section>
+
+<!-- ── 11 · trust ────────────────────────────────────────── -->
+<section class="slide">
+  <div class="kicker">Why anyone should believe it</div>
+  <h2>Trust is mechanical here, not a promise</h2>
+  <div class="body">
+    <div class="steps" style="grid-template-columns:repeat(4,1fr)">
+      <div class="step"><div class="step__n">01</div><div class="step__t">Verified, in seven steps</div>
+        <div class="step__d">Number, ID (hash and last four only), photo, a trade quiz, a conduct quiz, UPI, agreement. The owner approves nothing below tier 3.</div></div>
+      <div class="step"><div class="step__n">02</div><div class="step__t">Money held by SAAHAA</div>
+        <div class="step__d">Never paid to the pro directly, and never released until the customer confirms the work.</div></div>
+      <div class="step"><div class="step__n">03</div><div class="step__t">A code at the door</div>
+        <div class="step__d">The customer's own, so nobody can claim a visit that did not happen. Nothing is ever texted, so nothing can be phished.</div></div>
+      <div class="step"><div class="step__n">04</div><div class="step__t">A photo before payout</div>
+        <div class="step__d">There is no path to being paid that skips the evidence.</div></div>
+    </div>
+    <div class="steps" style="grid-template-columns:repeat(4,1fr);margin-top:6mm">
+      <div class="step"><div class="step__n">05</div><div class="step__t">The worker has skin in it</div>
+        <div class="step__d">A stake locks at check-in and returns in full on confirmation — forfeit to the customer, never to SAAHAA, if a dispute is upheld.</div></div>
+      <div class="step"><div class="step__n">06</div><div class="step__t">A ledger that reconciles</div>
+        <div class="step__d">Double-entry and hash-chained. It sums to zero or the release does not ship.</div></div>
+      <div class="step"><div class="step__n">07</div><div class="step__t">Your data, and a way out</div>
+        <div class="step__d">Remove your own account and see exactly what goes, what is kept, and why, before it happens.</div></div>
+      <div class="step"><div class="step__n">08</div><div class="step__t">Open source</div>
+        <div class="step__d">The pricing engine and the legal pages are public. You can check the app does what these pages say.</div></div>
+    </div>
+  </div>
+  <div class="foot"><span>Trust</span><span>11</span></div>
+</section>
+
+<!-- ── 12 · honest limits ────────────────────────────────── -->
+<section class="slide">
+  <div class="kicker">What this is not, yet</div>
+  <h2>The limits, stated before anyone asks</h2>
+  <div class="body">
+    <div class="two">
+      <div>
+        <ul>
+          <li><b>A neighbourhood app, by design.</b> Everything lives on one device today. Measured: one pincode is comfortable, a ward fits, a suburb needs a desktop. Past that the answer is the server, not a bigger phone.</li>
+          <li><b>Payments run in sandbox</b> until the gateway is switched on, and every screen that moves money says so.</li>
+          <li><b>No SMS, deliberately.</b> Removed from the plan, not deferred — which is why SAAHAA never sends you a code, and anyone claiming otherwise is not us.</li>
+        </ul>
+      </div>
+      <div>
+        <ul>
+          <li><b>Client-side auth is UI, not authorization.</b> Written down in the security document rather than glossed over. Real money needs the server-side rails, and those are built and waiting.</li>
+          <li><b>A device that fills up says so.</b> Loudly, at the top of every screen, and it cannot be dismissed — because silently failing to save would be worse than crashing.</li>
+          <li><b>One owner, one city.</b> Ten pros, three shops, fifty households, then the next pincode.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">Stating these is the point. A marketplace asking people to trust it with their livelihood
+      does not get to be vague about what it cannot do yet.</p>
+  </div>
+  <div class="foot"><span>Honest limits</span><span>12</span></div>
+</section>
+
+<!-- ── 13 · close ────────────────────────────────────────── -->
+<section class="slide invert cover">
+  <div class="kicker">One circle. One purpose.</div>
+  <h1 style="font-size:44pt;max-width:220mm;margin-top:6mm">The quarter that used to disappear<br>was never work anybody did.</h1>
+  <div class="bar" style="background:var(--accent)"></div>
+  <p class="lede" style="color:#c9c5c3;max-width:190mm">So we stopped taking it. The professional keeps everything they
+    quote, the customer still pays a fifth to a quarter less than a commission app, and the difference stays
+    in the neighbourhood that produced it.</p>
+  <p class="note" style="margin-top:10mm">saahaa · github.com/Ohhks/saahaa · ohhks.github.io/saahaa</p>
+  <div class="foot"><span>Thank you</span><span>13</span></div>
+</section>
+
+</body>
+</html>

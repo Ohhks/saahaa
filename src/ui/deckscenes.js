@@ -21,7 +21,6 @@ import * as home from './views/home.js';
 import * as ask from './views/ask.js';
 import * as auth from './views/auth.js';
 import * as admin from './views/admin.js';
-import * as onboard from './views/onboard.js';
 import * as partner from './views/partner.js';
 import * as orders from './views/orders.js';
 
@@ -62,7 +61,13 @@ async function ladder(upTo) {                    // walk the seven steps up to (
   for (const st of steps) {
     if (st === upTo) break;
     p = V.myPartner();
-    if (st === 'phone')     { const c = V.sendPhoneCode(p); V.confirmPhone(V.myPartner(), c); }
+    /* 8.4.0 removed the fake SMS: there is no code to send and confirmPhone now
+       takes the number the account was opened with, not four digits. This line
+       still called the deleted sendPhoneCode, and because app.js swallows a
+       scene error into console.error, every scene that walks the ladder came
+       out as a blank screenshot instead of failing loudly. */
+    if (st === 'phone')     { const u = (getState().users || []).find(x => x.key === p.userKey) || {};
+                              V.confirmPhone(V.myPartner(), u.mobile || p.mobile || ''); }
     if (st === 'identity')  await V.submitIdentity(p, 'aadhaar', '234567894821');
     if (st === 'selfie')    V.submitSelfie(p);
     if (st === 'trade' || st === 'conduct') { const bank = V.quizFor(p, st); V.submitQuiz(p, st, bank.map(b => b.a)); }
@@ -155,7 +160,7 @@ const SCENES = {
   /* ── partner ──────────────────────────────────────────────── */
   async 'p01-earn'()   { ctx.go('earn'); },
   async 'p02-signup'() { auth.setAuthTab('signup'); auth.setAuthRole('partner'); ctx.go('auth'); },
-  async 'p03-phone'()  { const p = await ladder('phone'); onboard.rememberCode(V.sendPhoneCode(p)); ctx.go('onboard'); },
+  async 'p03-phone'()  { await ladder('phone'); ctx.go('onboard'); },   // the step shows the pro's own code; nothing to remember
   async 'p04-id'()     { await ladder('identity'); ctx.go('onboard'); },
   async 'p05-quiz'()   { await ladder('trade'); ctx.go('onboard'); },
   async 'p06-conduct'(){ await ladder('conduct'); ctx.go('onboard'); },

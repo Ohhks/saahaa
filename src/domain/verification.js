@@ -43,7 +43,7 @@ export const STEPS = [
   { id: 'selfie',    n: 3, title: 'One photo of you',      sub: 'For SAAHAA only — never shown to a customer.',              mins: 1 },
   { id: 'trade',     n: 4, title: 'Five trade questions',  sub: 'Things every real pro knows. Get 4 right.',                mins: 3 },
   { id: 'conduct',   n: 5, title: 'How SAAHAA works',      sub: 'Six questions on the rules. Get 5 right.',                 mins: 2 },
-  { id: 'payout',    n: 6, title: 'Where to pay you',      sub: 'Your UPI id. Money lands here after every job.',           mins: 1 },
+  { id: 'payout',    n: 6, title: 'Where to pay you',      sub: 'Your UPI id. You send your earnings here whenever you like.',           mins: 1 },
   { id: 'agreement', n: 7, title: 'Agree and go',          sub: 'One tap. You are a SAAHAA pro.',                           mins: 1 },
 ];
 export const CORE_IDS = STEPS.map(s => s.id);

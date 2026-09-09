@@ -743,7 +743,7 @@ export function render() {
           <div class="sec">
             <p class="m-cap">Why this is safe</p>
             <ul class="m-steps" style="gap:8px">
-              <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">Every pro ID-checked</span></li>
+              <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">Every pro is verified in stages — you always see which</span></li>
               <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">Price locked before you book</span></li>
               <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">SAAHAA holds the money until you confirm the work</span></li>
               <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">The pro keeps the whole of their price</span></li>
@@ -1300,6 +1300,17 @@ export function heroCard(catId, p, sub = null) {
          confirmBooking() sends them to #/auth. The label now says what the tap
          does, and the intent is kept so signing in comes back to this price
          instead of dropping them on an empty Home. -->
+    <!-- WHERE, EXACTLY. The booking used to carry only an area name, so the pro
+         was sent to a neighbourhood centroid. It is asked once and remembered:
+         a returning customer sees it filled in and never types it again. -->
+    ${me() ? `<div class="field" style="margin:2px 0 8px">
+      <input id="bkAddr" autocomplete="street-address" placeholder=" " maxlength="240"
+        value="${esc((me() || {}).address || '')}">
+      <label>Flat / house and street</label></div>
+    <div class="field" style="margin:0 0 12px">
+      <input id="bkMark" autocomplete="off" placeholder=" " maxlength="120"
+        value="${esc((me() || {}).landmark || '')}">
+      <label>Landmark, so they can find you (optional)</label></div>` : ''}
     <button class="btn btn--primary btn--lg btn--block" style="justify-content:flex-start" data-act="book.confirm"
             data-id="${catId}" data-pid="${p.id}" data-sub="${esc(sub || '')}">
       ${me() ? 'Confirm booking' : 'Sign in to book'} · ${M.fmt(q.customerPays)}
@@ -1349,6 +1360,16 @@ export async function confirmBooking(catId, partnerId, sub) {
   }
   const p = getState().partners.find(x => x.id === partnerId);
   if (!p) return;
+  /* Remember where they are before booking, so the order carries a real address
+     and the next booking has it filled in already. Saved on the account, not on
+     the order alone — a person types their own door number once. */
+  const val = id => ((document.getElementById(id) || {}).value || '').trim();
+  const addr = val('bkAddr'), mark = val('bkMark');
+  const s0 = me() || {};
+  if (addr !== (s0.address || '') || mark !== (s0.landmark || '')) {
+    dispatch({ type: 'user/patch', payload: { key: s0.key, patch: { address: addr, landmark: mark } } });
+    saveSession({ ...s0, address: addr, landmark: mark });
+  }
   const o = await flow.bookService({ catId, partner: p, sub });
   /* the need has been served: leaving the query in place meant the next visit
      to Home opened on "Results for fan" instead of Home */

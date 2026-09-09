@@ -109,7 +109,12 @@ register('reducer', { id:'requests', slice:'requests', reduce(s = [], a) {
 
 register('reducer', { id:'bids', slice:'bids', reduce(s = [], a) {
   switch (a.type) {
-    case 'bid/add':   return s.concat([a.payload]);
+    /* BIDS GROW FOREVER OTHERWISE. Requests are capped at 200 and each one can
+       draw several sealed rates, so this list outruns every other slice in the
+       state — on a device that never clears, it is the first thing to fill the
+       5 MB. Losing the tail of a decided auction costs nothing; the order it
+       produced is the record that matters. */
+    case 'bid/add':   return s.concat([a.payload]).slice(-1200);
     case 'bid/patch': return patch(s, a.payload.id, b => ({ ...b, ...a.payload.patch }));
     case 'bid/rejectOthers':
       return s.map(b => (b.requestId === a.payload.requestId && b.id !== a.payload.keepId
@@ -150,7 +155,18 @@ register('reducer', { id:'reviews', slice:'reviews', reduce(s = [], a) {
 
 register('reducer', { id:'disputes', slice:'disputes', reduce(s = [], a) {
   switch (a.type) {
-    case 'dispute/open':   return [a.payload].concat(s);
+    /* A cap here has to be careful: an open dispute is somebody waiting for
+       their money back, and a plain slice() would eventually evict the oldest
+       one — which is precisely the one that has been waiting longest. So every
+       unresolved dispute is kept, however old, and only the RESOLVED tail is
+       trimmed. */
+    case 'dispute/open': {
+      const next = [a.payload].concat(s);
+      if (next.length <= 300) return next;
+      const open = next.filter(d => !d.resolvedAt);
+      const done = next.filter(d => d.resolvedAt).slice(0, Math.max(0, 300 - open.length));
+      return open.concat(done);
+    }
     case 'dispute/resolve':return patch(s, a.payload.id, d => ({ ...d, ...a.payload.patch, resolvedAt:Date.now() }));
     default: return s;
   }

@@ -302,7 +302,7 @@ function walletCard(p) {
     <p class="micro muted" style="margin-top:6px"><b>Pending</b> is your ${HOLDBACK_PCT}% holdback: ${HOLDBACK_PCT} paise in every rupee paid to you waits ${HOLDBACK_DAYS} days and then moves to Available by itself. It never grows past ${M.fmt(HOLDBACK_CAP)} in total, it is not a fee, and nobody has to approve it.</p>
     <div class="row" style="gap:8px;margin-top:10px">
       <button class="btn btn-secondary grow" data-act="wallet.topup" data-id="${p.id}">Add money</button>
-      <button class="btn btn-ghost grow" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${w.available < 100000 ? 'disabled' : ''}>Withdraw${w.available >= 100000 ? ' ' + M.fmt(w.available) : ''}</button>
+      <button class="btn btn-ghost grow" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${w.available < flow.MIN_WITHDRAW ? 'disabled' : ''}>Withdraw${w.available >= flow.MIN_WITHDRAW ? ' ' + M.fmt(w.available) : ''}</button>
     </div>`;
 }
 
@@ -343,9 +343,14 @@ function proEarnings(p, orders, paid, earned, held, paidOut) {
         <b style="font:800 15px var(--font-heading);display:block">${M.fmt(w.available)} payable now</b>
         <span class="micro" style="opacity:.85">${p.verification && p.verification.upi ? esc(p.verification.upi) : 'your UPI'} · ${esc(gateway.label())}</span>
       </div>
-      <button class="btn btn-secondary" style="border-color:currentColor;color:inherit" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${w.available < 100000 ? 'disabled' : ''}>Withdraw</button>
+      <button class="btn btn-secondary" style="border-color:currentColor;color:inherit" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${w.available < flow.MIN_WITHDRAW ? 'disabled' : ''}>Withdraw</button>
     </div>
-    ${w.available < 100000 ? '<p class="micro muted" style="margin-top:6px">Withdrawals start at ₹1,000.</p>' : ''}
+    <!-- THIS SAID "Withdrawals start at Rs.1,000" AND GREYED THE BUTTON, beside a
+         figure the same screen labelled "yours to withdraw". The engine has
+         always allowed Rs.10 — the floor existed only here, written as a raw
+         100000 in three places, and it locked a plumber's first Rs.520 job
+         behind a second one. -->
+    ${w.available < flow.MIN_WITHDRAW ? `<p class="micro muted" style="margin-top:6px">The smallest withdrawal is ${M.fmt(flow.MIN_WITHDRAW)}.</p>` : ''}
 
     <div class="con2">
       <div>
@@ -670,7 +675,10 @@ function shopToday(s, orders, items, cat) {
   return `
     <div class="stat3 stat2 bleed">
       ${capsule('Sales today', M.fmt(sales), `${today.length} order${today.length === 1 ? '' : 's'}`)}
-      ${capsule(`Fees today (${cat.takePct}%)`, M.fmt(fees), `capped ${M.fmt(cat.takeCapPaise)} an order`)}
+      ${(() => { const left = flow.freeOrdersLeft(s);
+        return left
+          ? capsule('Fees today', '₹0', `${left} free order${left === 1 ? '' : 's'} left`, 'ok')
+          : capsule(`Fees today (${cat.takePct}%)`, M.fmt(fees), `capped ${M.fmt(cat.takeCapPaise)} an order`); })()}
     </div>
 
     ${fresh ? liveBlock(s) : ''}
@@ -679,7 +687,7 @@ function shopToday(s, orders, items, cat) {
       <div>
         ${kick('Orders needing you', needing.length ? `<span class="tag tag-accent">${needing.length} open</span>` : '')}
         ${needing.length ? needing.map(orderRow).join('')
-          : empty('Nothing waiting', s.isOpen ? 'New orders appear here with a 60-second accept timer.' : 'Open the shop to start receiving orders.')}
+          : empty('Nothing waiting', s.isOpen ? 'New orders appear here the moment they are placed.' : 'Open the shop to start receiving orders.')}
       </div>
       <div>
         ${kick('Wants attention', out.length || low.length ? `<span class="tag tag-neutral">${out.length + low.length}</span>` : '')}
@@ -1101,7 +1109,15 @@ function shopMoney(s, orders) {
   const now = new Date();
   const month = done.filter(o => ymOf(o.settledAt) === now.getFullYear() * 12 + now.getMonth());
   const sum = (list, f) => list.reduce((n, o) => n + (o[f] || 0), 0);
-  const gross = sum(done, 'itemsTotal'), fee = sum(done, 'platformFee'), rider = sum(done, 'riderPayout'), net = sum(done, 'shopPayout');
+  const gross = sum(done, 'itemsTotal'), fee = sum(done, 'platformFee'), net = sum(done, 'shopPayout');
+  /* THE STATEMENT WAS RS.5 AN ORDER SHORT OF ITS OWN TOTAL. `rider` summed
+     riderPayout — the rider's share alone — while the shop actually absorbs the
+     whole delivery cost, of which riderDispatchCut is SAAHAA's. Showing only
+     part of a deduction makes gross minus deductions disagree with the net on
+     the same panel, which is the one thing a money screen must never do. */
+  const riderPaid = sum(done, 'riderPayout');
+  const dispatch = Math.max(0, gross - fee - riderPaid - net);   // whatever is left is the dispatch cut
+  const rider = riderPaid;
   const mNet = sum(month, 'shopPayout'), mGross = sum(month, 'itemsTotal');
   const cat = get('category', s.catId);
   const agg = Math.round(gross * AGG_COMMISSION);
@@ -1115,7 +1131,8 @@ function shopMoney(s, orders) {
       <div>
         <div class="feeline"><span>Orders (${done.length} settled)</span><b class="num">${M.fmt(gross)}</b></div>
         <div class="feeline"><span>SAAHAA fee · ${cat.takePct}%, capped ${M.fmt(cat.takeCapPaise)}</span><b class="num">− ${M.fmt(fee)}</b></div>
-        <div class="feeline"><span>Rider fees</span><b class="num">− ${M.fmt(rider)}</b></div>
+        <div class="feeline"><span>Delivery you absorbed · to the rider</span><b class="num">− ${M.fmt(rider)}</b></div>
+        ${dispatch ? `<div class="feeline"><span>Delivery you absorbed · dispatch</span><b class="num">− ${M.fmt(dispatch)}</b></div>` : ''}
         <div class="feeline"><span>Listing fee</span><b class="num">₹0</b></div>
         <div class="feeline"><span>Yearly plan</span><b class="num">₹0</b></div>
         <div class="feeline" style="border-bottom:2px solid var(--color-divider);font:800 15px var(--font-heading)"><span>Yours</span><span class="num good">${M.fmt(net)}</span></div>
@@ -1182,7 +1199,29 @@ function shopPayouts(s, orders) {
       ${capsule('Awaiting payout', M.fmt(sum(waiting)), `${waiting.length} settled`, 'warn')}
       ${capsule('In escrow', M.fmt(sum(inEscrow)), `${inEscrow.length} live`, 'info')}
     </div>
-    <p class="micro muted" style="padding:10px 0">These three never add up into one number. Escrow becomes awaiting the moment an order settles; awaiting becomes sent when the payout run clears.</p>
+    <p class="micro muted" style="padding:10px 0">These three never add up into one number. Escrow becomes awaiting the moment an order settles; awaiting becomes sent when you take it out.</p>
+
+    <!-- UNTIL 8.6.0 THIS SHOP'S MONEY HAD NO EXIT. Signup never asked for a UPI
+         id and there was no withdraw control anywhere, so settled takings sat
+         in SHOP:<id> for ever with no account to send them to. -->
+    ${(() => {
+      const w = flow.shopWallet(s.id);
+      return `<div class="con2" style="padding:12px 0;border-top:2px solid var(--color-divider)">
+        <div>
+          <span class="eyebrow">Yours to take out</span>
+          <div class="big">${M.fmt(w.balance)}</div>
+          <p class="micro muted" style="margin-top:4px">${s.upi
+            ? `Goes to <b>${esc(s.upi)}</b> · ${esc(gateway.label())}`
+            : 'Add the UPI id this shop is paid into — nothing can be sent until you do.'}</p>
+        </div>
+        <div class="row" style="gap:8px;align-items:flex-end;flex-wrap:wrap">
+          <button class="btn btn-secondary" data-act="shop.upi" data-id="${esc(s.id)}">${s.upi ? 'Change UPI id' : 'Add UPI id'}</button>
+          <button class="btn btn-primary" data-act="shop.withdraw" data-id="${esc(s.id)}" data-amt="${w.balance}"
+            ${(!s.upi || w.balance < flow.MIN_WITHDRAW) ? 'disabled' : ''}>Take out ${M.fmt(w.balance)}</button>
+        </div>
+      </div>
+      ${w.balance && w.balance < flow.MIN_WITHDRAW ? `<p class="micro muted">The smallest withdrawal is ${M.fmt(flow.MIN_WITHDRAW)}.</p>` : ''}`;
+    })()}
     <div class="con2">
       <div>
         ${kick('Payouts', `<span class="tag tag-neutral">${legs.length}</span>`)}

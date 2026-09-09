@@ -16,7 +16,7 @@ export const TIERS = [
   { n:3, id:'background', label:'Background Checked',badge:'Background Checked', tone:'ok',
     capPaise:5000000, unlocks:'Unlocks in-home work: maid, cook, childcare, elder care, tuition.' },
   { n:4, id:'certified',  label:'SAAHAA Certified',  badge:'SAAHAA Certified',   tone:'gold',
-    capPaise:Infinity,unlocks:'Top of search, instant payouts, platform fee 8% → 6%.' },
+    capPaise:Infinity,unlocks:'Top of search, and the charge your customers pay on your jobs drops.' },
 ];
 export const tier = n => TIERS[Math.max(0, Math.min(4, n | 0))];
 export const tierMeets = (partnerTier, required) => (partnerTier | 0) >= (required | 0);
@@ -91,7 +91,16 @@ export function band(score) {
    Manual review on every job does not scale past ~30 bookings/day for a solo
    admin; pure auto-release hands fraudsters a free ATM. The risk score picks. */
 export const ESCROW = {
-  INSTANT:  { id:'INSTANT',  holdMs: 0,             label:'Instant on confirm' },
+  /* INSTANT USED TO MEAN holdMs: 0, WHICH MEANT THE MONEY PAID ITSELF OUT.
+     `releaseAt` was already in the past the moment the pro marked the work
+     done, so the next boot swept it to SETTLED — and the customer, who had
+     been told on four separate screens that SAAHAA holds the money "until you
+     confirm the work", confirmed nothing.
+
+     A tier called INSTANT can mean "as soon as she confirms, with no review
+     queue in the way". It cannot mean "without her". Two hours is the shortest
+     window in which somebody could plausibly have looked at the work. */
+  INSTANT:  { id:'INSTANT',  holdMs: 2*3600e3,      label:'Auto-release in 2h' },
   FAST:     { id:'FAST',     holdMs: 6*3600e3,      label:'Auto-release in 6h' },
   STANDARD: { id:'STANDARD', holdMs: 24*3600e3,     label:'Auto-release in 24h' },
   HOLD:     { id:'HOLD',     holdMs: Infinity,      label:'Team review required' },
@@ -103,7 +112,12 @@ export function escrowTier(order, partner) {
   const D = order.deal | 0;
   if (partner.suspended || (partner.disputesUpheld || 0) >= 2) return ESCROW.FREEZE;
   if (order.disputed) return ESCROW.HOLD;
-  if (!order.evidence || !order.evidence.length) return ESCROW.HOLD;  // no photo -> never auto
+  /* THE COMMENT SAID "no photo" AND THE CODE COUNTED ENTRIES. `ev.add` — the
+     "Camera not working?" fallback — writes an entry with photo:null, so a job
+     whose only evidence was the typed word "Before" reached INSTANT and paid
+     out. A note is a claim; a photograph is evidence. */
+  const pics = (order.evidence || []).filter(e => e && e.photo);
+  if (!pics.length) return ESCROW.HOLD;
   if (D > 1000000 || t < 55 || (partner.completed || 0) < 3) return ESCROW.HOLD;
   if (D <= 150000 && t >= 70 && (partner.completed || 0) >= 10 && order.otpVerified) return ESCROW.INSTANT;
   if (D <= 500000 && t >= 55 && order.otpVerified) return ESCROW.FAST;

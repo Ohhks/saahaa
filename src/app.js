@@ -5,6 +5,7 @@ import { VERSION, SCHEMA_VERSION, BUILD_ID } from './core/version.js';
 import { ctx, getState, dispatch, me, restoreSession, myArea, saveSession, myPartner } from './core/ctx.js';
 import { createStore, combineFromRegistry } from './core/store.js';
 import * as persist from './core/persist.js';
+import * as bus from './core/bus.js';
 import * as registry from './core/registry.js';
 import * as flags from './core/flags.js';
 import * as audit from './core/audit.js';
@@ -38,6 +39,7 @@ import './core/selftests.photos.js';
 import './core/selftests.erase.js';
 import './core/selftests.recovery.js';
 import './core/selftests.doorcode.js';
+import './core/selftests.scale.js';
 
 /* ui */
 import { mount, action, initActions, toast, sheet, closeSheet, esc, stickyToast } from './ui/dom.js';
@@ -127,6 +129,40 @@ function back() {
   render();
 }
 
+/* THE DEVICE IS FULL, AND EVERYTHING ON SCREEN IS A LIE.
+
+   All of this product's data lives in one browser's localStorage, which is
+   hard-capped — about 5 MB on an iPhone. When it fills, `setItem` throws, and
+   until 8.6.0 the app swallowed that and carried on looking healthy: an order
+   would be placed, a balance would change, and none of it reached the disk.
+   The person found out on their next reload, when it had all gone back.
+
+   Nothing about that is acceptable in an app holding money, so it is said out
+   loud, at the top of every screen, and it does not go away by itself. The
+   warning at 80% is the useful one — it arrives while there is still time to
+   do something rather than after the damage.
+
+   The banner is deliberately not dismissible. This is the one message in the
+   product a person must not be able to tidy away. */
+function storageBanner() {
+  const failed = persist.saveFailed && persist.saveFailed();
+  if (failed) {
+    return `<div class="sysbar sysbar--bad" role="alert">
+      <b>This device is full — your last changes were not saved.</b>
+      <span>Everything on screen after this point may disappear when you reopen the app.
+        Free some space on the phone, or ask the owner to export and clear old data.</span>
+    </div>`;
+  }
+  const u = persist.usage ? persist.usage() : { pct: 0 };
+  if (u.pct >= 0.8) {
+    return `<div class="sysbar sysbar--warn" role="status">
+      <b>This device is nearly full (${Math.round(u.pct * 100)}%).</b>
+      <span>SAAHAA keeps everything on this phone. Clear some space soon, or new orders will stop saving.</span>
+    </div>`;
+  }
+  return '';
+}
+
 function render() {
   const view = ROUTES[ctx.view] || ROUTES.home;
   let body;
@@ -146,8 +182,7 @@ function render() {
      rail, on mobile the bottom bar. All three are the same NAV array — the CSS
      decides which is visible, so no view knows or cares which device it is on. */
   mount('app', `<div class="shell${showNav ? '' : ' shell--bare'}">
-    ${showNav ? sideNav() : ''}
-    <div class="shell__main">${showNav ? topBar() : ''}${body}</div>
+    <div class="shell__main">${showNav ? topBar() : ''}${storageBanner()}${body}</div>
   </div>${showNav ? navBar() : ''}`);
 }
 
@@ -158,23 +193,21 @@ function currentTab() {
 }
 
 /* desktop ≥1024px persistent · tablet 768–1023 icon rail · hidden on mobile */
-function sideNav() {
-  const s = me();
-  const cur = currentTab();
-  return `<aside class="sidenav" aria-label="Main">
-    <div class="sidenav__brand">${mark(30, { glow: false })}<span class="wordmark wm">SAAHAA</span></div>
-    ${NAV.map(([id, ic, label]) => `<button class="sidenav__item" data-act="nav.tab" data-tab="${id}"
-        ${cur === id ? 'aria-current="page"' : ''}>
-        <span class="ic">${icon(ic, { size: 22 })}</span><span class="lbl">${label}</span></button>`).join('')}
-    ${s && s.role === 'partner' ? `<button class="sidenav__item" data-act="pro.open" data-id="${esc(s.partnerId || '')}">
-        <span class="ic">${icon('navYou', { size: 22 })}</span><span class="lbl">My page</span></button>` : ''}
-    <div class="sidenav__foot">
-      <button class="sidenav__item" data-act="theme.toggle"><span class="ic">${icon('theme', { size: 20 })}</span><span class="lbl">Light / dark</span></button>
-      ${s ? `<button class="sidenav__item" data-act="auth.logout"><span class="ic">${icon('signout', { size: 20 })}</span><span class="lbl">Sign out</span></button>`
-          : `<button class="sidenav__item" data-act="auth.open"><span class="ic">${icon('signin', { size: 20 })}</span><span class="lbl">Sign in</span></button>`}
-    </div>
-  </aside>`;
-}
+/* THE SIDE RAIL IS GONE, DELIBERATELY, AND THIS IS THE NOTE THAT SAYS SO.
+
+   Until 8.6.0 `sideNav()` was still built into every single render and then
+   hidden by `.sidenav{display:none!important}` in tokens.css — while a comment
+   in that stylesheet claimed nothing rendered it. Invisible markup on every
+   paint, and a comment that was not true.
+
+   The v8 shell replaced it with the top bar plus a horizontal tab row, and an
+   audit confirmed every control the rail carried is reachable elsewhere: the
+   five tabs in navBar(), theme.toggle and auth.logout on the account screen,
+   "My page" on the partner and pro screens. So nothing was lost with it.
+
+   If a persistent desktop rail is ever wanted back, it is a design decision to
+   take on purpose — git has this function — not a hidden element to un-hide. */
+
 
 /* desktop-only top strip: where am I, what can I do */
 function topBar() {
@@ -539,6 +572,18 @@ function wireActions() {
   A('dispute.open',  d => ordersView.openDispute(d.id));
   A('dispute.pick',  d => ordersView.submitDispute(d.id, d.reason));
   A('cancel.open',   d => ordersView.openCancel(d.id));
+  /* THE ESCAPES THAT EXISTED IN THE ENGINE AND ON THE PUBLISHED REFUNDS PAGE,
+     but that nothing on screen could reach: a customer whose pro never came,
+     and a pro who cannot make it and is required by his own agreement to say so. */
+  A('noshow.open',      d => ordersView.openNoShow(d.id));
+  A('noshow.confirm',   async d => { await flow.cancelOrder(d.id, 'WORKER_NO_SHOW'); closeSheet(); render(); });
+  A('worker.cancel',    d => sheet('Cannot do this job?', `
+    <p>Say so now rather than not turning up. The customer is refunded in full and gets her booking back;
+      you keep your stake, and this is recorded as a cancellation, not a no-show.</p>
+    <p class="micro muted" style="margin-top:10px">Not turning up costs you the stake and a trust penalty. This does not.</p>
+    <button class="btn btn-primary btn--block" style="margin-top:14px" data-act="worker.cancel.do" data-id="${esc(d.id)}">Cancel this job</button>
+    <button class="btn btn--ghost btn--block btn--sm" style="margin-top:6px" data-act="sheet.close">Keep the job</button>`));
+  A('worker.cancel.do', async d => { await flow.workerCancel(d.id); closeSheet(); render(); });
   A('cancel.confirm',d => { flow.cancelOrder(d.id, d.rule); closeSheet(); render(); });
 
   /* partner + shop console */
@@ -549,6 +594,19 @@ function wireActions() {
   // was an explanatory sheet with nothing behind it; it is the ladder now
   A('partner.upgrade', () => go('onboard'));
   A('shop.tab',    d => { partner.setShopTab(d.tab); render(); });
+  /* a shop's takings need an account to land in, and a control to send them */
+  A('shop.upi', d => sheet('Where this shop is paid', `
+    <p class="tiny muted" style="margin-bottom:12px">Your settled orders are sent here. It is the only
+      destination SAAHAA will pay a shop into, and you can change it whenever you like.</p>
+    <div class="field"><input id="shUpi" autocomplete="off" spellcheck="false" placeholder=" "
+      value="${esc((ctx.store.getState().shops.find(x => x.id === d.id) || {}).upi || '')}"><label>UPI id — name@bank</label></div>
+    <button class="btn btn-primary btn--block" data-act="shop.upi.save" data-id="${esc(d.id)}">Save</button>`));
+  A('shop.upi.save', d => {
+    const v = (document.getElementById('shUpi') || {}).value || '';
+    if (flow.setShopUpi(d.id, v)) { closeSheet(); render(); }
+  });
+  A('shop.withdraw', async d => { await flow.shopWithdraw(d.id, Number(d.amt)); render(); });
+
   A('shop.toggle', () => {
     const s = getState().shops.find(x => x.ownerKey === me().key);
     if (s) { ctx.store.dispatch({ type:'shop/toggle', payload:{ id:s.id } }); render(); }
@@ -686,6 +744,10 @@ async function boot() {
   /* Subscribe BEFORE seeding, or the seed (and its `seeded` flag) is never
      written and the app re-seeds on every reload. */
   store.subscribe(() => persist.writeDebounced(persist.KEYS.state, () => store.getState()));
+  /* A save that failed has to reach the screen on the next paint, not whenever
+     something else happens to re-render. */
+  bus.on('persist:failed', () => render());
+  bus.on('persist:recovered', () => render());
   window.addEventListener('beforeunload', () => persist.flush(persist.KEYS.state));
 
   if (!mig.state.createdAt) store.dispatch({ type: 'meta/born', payload: Date.now() });
@@ -755,7 +817,23 @@ async function boot() {
      seeds a real state and walks to a real screen so headless Chrome can
      photograph it. Never loaded otherwise; it is UI tooling, not product. */
   const shot = new URLSearchParams(location.search).get('shot');
-  if (shot) { import('./ui/deckscenes.js').then(m => m.run(shot)).catch(e => console.error('[shot]', e)); }
+  /* A BROKEN SCENE MUST NOT PHOTOGRAPH QUIETLY. This used to swallow the error
+     into console.error, so when 8.4.0 deleted the functions a scene called, the
+     capture tool went on producing blank and wrong slides for the deck and
+     nobody found out until an audit read the source. Now the failure is painted
+     onto the page: the screenshot shows the error, which is impossible to miss
+     and impossible to publish by accident. */
+  if (shot) {
+    import('./ui/deckscenes.js').then(m => m.run(shot)).catch(e => {
+      console.error('[shot]', e);
+      const el = document.getElementById('app');
+      if (el) el.innerHTML = `<main class="wrap"><div class="card" style="margin-top:40px;border:2px solid var(--color-accent)">
+        <b style="color:var(--color-accent)">Scene &ldquo;${esc(shot)}&rdquo; failed</b>
+        <p class="tiny" style="margin-top:8px">${esc(e && e.message ? e.message : String(e))}</p>
+        <p class="micro muted" style="margin-top:6px">src/ui/deckscenes.js — fix the scene, do not publish this slide.</p>
+      </div></main>`;
+    });
+  }
   // the WORK_DONE screen promises auto-release; this is what keeps it
   flow.sweepAutoRelease().then(n => { if (n) { console.info('[saahaa] auto-released', n); render(); } });
   flow.sweepHoldbacks().then(n => { if (n) { console.info('[saahaa] holdbacks released', n); render(); } });
