@@ -6,6 +6,55 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [8.5.0] — 2026-09-10 — "Nothing was deleted; some of it was buried"
+
+A check that the v8 redesign had not quietly dropped features, and repairs for
+what it had. The audit was mechanical, not impressionistic: every action, route,
+export and file in the current tree compared against the v7.1.0 archive.
+
+**What the audit found.** No files lost. No routes lost. Two exports gone, both
+the fake-SMS removal from 8.4.0, deliberately. The current tree carries 164
+actions against v7.1.0's 147. Nothing had been deleted — but three useful
+things had been made unreachable, which to the person using it is the same
+thing.
+
+### Fixed — three things that were there and could not be found
+
+- **"Most booked near you" is back.** The v8 redesign dropped its markup *and*
+  set `.rail{display:none}` in the stylesheet, so the single fastest path to a
+  common need left the product and the only way to reach a category became
+  scrolling to a grid four screens down. The rail is a real component again —
+  one swipeable line — and it is better than the one it replaces: v7.1.0 railed
+  the first eight categories in catalog order and called them "most booked",
+  which was not true. This counts the orders actually placed nearby, puts
+  categories with somebody free first, and falls back to the catalog only on a
+  fresh install with nothing to count.
+- **The home header shortcut is back.** I deleted it in 8.4.0 for anybody with
+  no history, because it was falling back to the same four chips the list below
+  already showed. That was the wrong half of a real fix: it took the fastest
+  path into the product away from precisely the people who had never used it.
+  It now carries what nothing else on the screen does — who is free this minute,
+  and how many. A returning customer still gets their own history first.
+- **My SAAHAA has an index.** Twelve sections were stacked in one long scroll —
+  wallet, regulars, live orders, repeating work, messages, reviews, shortlist,
+  settings. Nothing had ever been removed from it, but somebody who does not
+  scroll to the bottom never learns those exist, which is indistinguishable
+  from their having been taken away. A row at the top now lists only the
+  sections that have something in them, says how much, and jumps straight there.
+
+### Fixed — a navigation control that silently did nothing
+`behavior:'smooth'` is a request, not a promise: several engines and embedded
+webviews ignore it and the page does not move at all. **"All 24 categories →"
+had this bug already.** Both it and the new section jump now ask for smooth,
+check a beat later whether anything actually happened, and land instantly if it
+did not.
+
+### Changed
+The category chips that trailed "Or pick what you need" now open the rail
+directly beneath it instead — the same categories, two more of them, plus the
+link to all 24. Nothing left the screen; it stopped being said twice in two
+rows that looked alike.
+
 ## [8.4.0] — 2026-09-10 — "One code, and nothing to wait for"
 
 Two things, and the second one deletes a whole rail from the plan.

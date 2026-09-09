@@ -261,6 +261,30 @@ export function render() {
       ${otherBlock}
     </div>
 
+    <!-- WHAT IS ACTUALLY IN HERE. My SAAHAA stacks twelve sections in one long
+         scroll: wallet, regulars, live orders, repeating work, messages,
+         reviews, shortlist, settings. Nothing was ever removed from it — but a
+         person who does not scroll to the bottom never learns those exist,
+         which is indistinguishable from their having been taken away.
+         This row is the index: it lists only what has something in it, says
+         how much, and jumps straight there. -->
+    ${(() => {
+      const jumps = [
+        ['cwallet',    'Wallet',     ''],
+        ['acOpen',     'Still open', liveList.length],
+        ['acRepeat',   'Repeating',  subs.length],
+        ['acRegulars', 'Regulars',   regulars.length],
+        ['acMsgs',     'Messages',   chatThreads.length],
+        ['acReviews',  'Reviews',    reviews.length],
+        ['acList',     'Shortlist',  reviews.length ? 0 : ''],   // that block renders only when reviews do not
+        ['acSettings', 'Settings',   ''],
+      ].filter(([, , n]) => n === '' || n > 0);
+      return jumps.length > 2 ? `<div class="chiprow acjump" role="navigation" aria-label="Jump to a section">
+        ${jumps.map(([id, label, n]) => `<button class="chip" data-act="nav.jump" data-to="${id}">${esc(label)}${
+          n === '' ? '' : `<span class="micro" style="opacity:.65;margin-left:5px">${n}</span>`}</button>`).join('')}
+      </div>` : '';
+    })()}
+
     <div class="capsules" style="grid-template-columns:repeat(3,1fr);gap:0;border-bottom:2px solid var(--color-divider)">
       <button class="capsule" style="border:0;border-right:1px solid var(--color-divider);text-align:left;padding:11px 12px" data-act="nav.orders">
         <span class="capsule__v" style="font-size:17px">${orders.length}</span><span class="capsule__k">Orders</span></button>
@@ -270,7 +294,7 @@ export function render() {
         <span class="capsule__v num" style="font-size:17px">${M.fmt(feesPaid)}</span><span class="capsule__k">Fees paid</span></span>
     </div>
 
-    ${regulars.length ? `<div class="sec" style="border-bottom:2px solid var(--color-divider)">
+    ${regulars.length ? `<div class="sec" id="acRegulars" style="border-bottom:2px solid var(--color-divider)">
       <p class="m-cap">My regulars</p>
       <div class="m-regs">
         ${regulars.slice(0, 8).map(r => `<button class="m-reg" data-act="${r.kind === 'service' ? 'pro.open' : 'shop.open'}" data-id="${esc(r.id)}">
@@ -283,16 +307,16 @@ export function render() {
 
     <div class="m-two">
     <div>
-    ${needsYou.length ? `<div class="sec">
+    ${needsYou.length ? `<div class="sec" id="acNeeds">
       <p class="m-cap">Needs you</p>
       ${needsYou.slice(0, 3).map(orderRow).join('')}
     </div>` : ''}
 
-    ${liveList.length ? `<div class="sec">
+    ${liveList.length ? `<div class="sec" id="acOpen">
       <div class="between" style="margin-bottom:4px"><p class="m-cap" style="margin:0">Still open</p>
         <button class="more tap" data-act="nav.orders" style="min-height:44px;padding-inline:2px">All ${orders.length} →</button></div>
       ${liveList.filter(o => !needsYou.includes(o)).slice(0, 3).map(orderRow).join('')}
-    </div>` : `<div class="sec">
+    </div>` : `<div class="sec" id="acOrders">
       <p class="m-cap">Orders</p>
       ${orders.length ? `<p class="tiny muted">Last one ${timeAgo(orders[0].createdAt)}. <button class="more tap" data-act="nav.orders" style="min-height:44px;padding-inline:2px">See all ${orders.length} →</button></p>`
         : emptyBlock('No orders yet', 'Your first pro is two taps away.',
@@ -301,7 +325,7 @@ export function render() {
 
     ${walletSection(s.key, orders)}
 
-    ${subs.length ? `<div class="sec">
+    ${subs.length ? `<div class="sec" id="acRepeat">
       <p class="m-cap">Repeating work</p>
       ${subs.slice(0, 3).map(o => `<div class="m-kv"><span class="tiny">${esc(get('category', o.catId).name)} · ${esc(o.partnerName || '')}</span>
         <b class="num" style="font-size:13px">${M.fmt(o.customerPays)}</b></div>`).join('')}
@@ -309,7 +333,7 @@ export function render() {
     </div>
 
     <div>
-    <div class="sec">
+    <div class="sec" id="acSettings">
       <p class="m-cap">Settings</p>
       ${setRow('area.pick', 'Addresses', pinned ? `${esc(myArea())} · pinned` : esc(myArea()))}
       ${infoRow('Payment methods', `Wallet · ${esc(gateway.label().split(' — ')[0])}`)}
@@ -320,7 +344,7 @@ export function render() {
       ${setRow('shop.start', 'Open a shop', 'A second account, on this number')}
     </div>
 
-    ${chatThreads.length ? `<div class="sec">
+    ${chatThreads.length ? `<div class="sec" id="acMsgs">
       <p class="m-cap">Messages</p>
       ${chatThreads.map(({ o, msgs }) => {
         const last = msgs[msgs.length - 1];
@@ -334,14 +358,14 @@ export function render() {
       }).join('')}
     </div>` : ''}
 
-    ${reviews.length ? `<div class="sec">
+    ${reviews.length ? `<div class="sec" id="acReviews">
       <div class="between" style="margin-bottom:4px"><p class="m-cap" style="margin:0">Your reviews</p>
         <span class="meta">${reviews.length}</span></div>
       ${reviews.slice(0, 3).map(r => `<div style="padding:8px 0;border-bottom:1px solid var(--color-divider)">
         <div class="between"><b class="tiny">${esc(r.partnerName || '')}</b><span class="micro muted">${timeAgo(r.ts)}</span></div>
         <p class="tiny muted">${ratingStars(r.stars)} ${r.stars}.0${r.text ? ` · ${esc(r.text)}` : ''}</p>
       </div>`).join('')}
-    </div>` : `<div class="sec">
+    </div>` : `<div class="sec" id="acList">
       <p class="m-cap">Your shortlist</p>
       <p class="tiny muted">Open a service or a shop and it is one tap away next time.</p>
       <div class="chiprow" style="margin-top:10px;flex-wrap:wrap">

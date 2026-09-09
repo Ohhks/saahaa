@@ -443,7 +443,21 @@ button.cmd{width:100%} .cmd:hover{border-color:var(--color-text);border-left-col
 .pillars{display:flex;flex-wrap:wrap;gap:6px 14px;font:600 10px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
 .v{display:flex;flex-direction:column} .ic{display:inline-flex;align-items:center;justify-content:center} .from{font-size:11px;color:var(--ink-3)}
 .body{font-size:var(--fs-base)} .shd{box-shadow:var(--shadow-md)} .k{font-weight:600}
-.expand{width:100%;text-align:left} .workspace{padding:var(--sp-6) 0} .rail{display:none}
+.expand{width:100%;text-align:left} .workspace{padding:var(--sp-6) 0}
+/* A ROW YOU SWIPE. The v8 redesign set this to display:none and the "most
+   booked" shortcut left the product with it. It is the fastest path to a
+   common need on a phone, so it is a real component again: one line, scrolled
+   sideways, snapping, with the scrollbar hidden but the gesture intact. */
+.rail{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x proximity;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;margin:0 calc(-1 * var(--gutter));padding-inline:var(--gutter)}
+.rail::-webkit-scrollbar{display:none}
+/* the section index on My SAAHAA — one swipeable line, never a wrapped block */
+.acjump{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:6px;
+  margin:0 calc(-1 * var(--gutter)) 0;padding:10px var(--gutter);border-bottom:2px solid var(--color-divider)}
+.acjump::-webkit-scrollbar{display:none}
+.acjump .chip{flex:0 0 auto}
+.rail > *{flex:0 0 auto;scroll-snap-align:start;min-width:132px}
+@media (min-width:900px){ .rail{margin:0;padding-inline:0} }
 
 /* ---------- 15. MOTION — arrival only ---------- */
 .rise{animation:rise var(--dur-base) var(--ease-emph) both} .rise-2{animation:rise var(--dur-base) var(--ease-emph) 40ms both}

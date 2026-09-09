@@ -460,6 +460,65 @@ function shopRow(s, km) {
     </div>
   </button>`;
 }
+/* Four categories somebody can be booked in RIGHT NOW, with the number free.
+   The rail below ranks by popularity and the grids list everything; neither
+   says who is standing by, which is the one fact that makes a shortcut worth
+   tapping. If nobody at all is free the row renders nothing rather than
+   offering four dead ends. */
+function freeNowChips() {
+  const st = getState();
+  const freeIn = c => st.partners.filter(p => p.cat === c.id && !p.suspended && p.online !== false).length;
+  return services()
+    .map(c => ({ c, n: freeIn(c) }))
+    .filter(x => x.n)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 4)
+    .map(x => `<button class="chip chip--smart" data-act="cat.open" data-id="${x.c.id}">
+      <span class="chip__ic" aria-hidden="true">${catGlyph(x.c)}</span>${esc(x.c.name)}
+      <span class="micro" style="opacity:.7;margin-left:6px">${x.n} free</span></button>`).join('');
+}
+
+/* ── MOST BOOKED NEAR YOU ──────────────────────────────────────
+   Restored in 8.5.0. This existed until the v8 redesign, which dropped the
+   markup and set `.rail{display:none}` — so the single fastest path to a
+   common need went with it, and the only way to reach a category became
+   scrolling to a grid four screens down.
+
+   It is better than it was: v7.1.0 railed the first eight categories in
+   catalog order and called them "most booked", which was not true. This
+   counts the orders actually placed around here, and only falls back to the
+   catalog when a fresh install has nothing to count. Categories with nobody
+   free are pushed down rather than hidden — a dead end is worse than a queue,
+   and the tile already says how many are free. */
+function mostBooked() {
+  const st = getState();
+  const all = services();
+  if (!all.length) return '';
+  const here = myArea();
+  const n = new Map();
+  for (const o of st.orders || []) {
+    if (!o.catId) continue;
+    const near = !o.customerArea || !here || o.customerArea === here;
+    n.set(o.catId, (n.get(o.catId) || 0) + (near ? 2 : 1));   // this area counts double
+  }
+  const free = c => st.partners.filter(p => p.cat === c.id && !p.suspended && p.online !== false).length;
+  const ranked = all.slice().sort((a, b) => {
+    const fa = free(a) ? 1 : 0, fb = free(b) ? 1 : 0;
+    if (fa !== fb) return fb - fa;                       // somebody free comes first
+    const na = n.get(a.id) || 0, nb = n.get(b.id) || 0;
+    if (na !== nb) return nb - na;
+    return all.indexOf(a) - all.indexOf(b);              // stable: catalog order
+  }).slice(0, 8);
+  const counted = [...n.values()].reduce((x, y) => x + y, 0);
+  return `<div class="sec">
+    <div class="between" style="margin-bottom:8px">
+      <p class="m-cap" style="margin:0">${counted ? 'Most booked near you' : 'Start here'}</p>
+      <button class="more" data-act="scroll.all">All ${cats().length} categories →</button>
+    </div>
+    <div class="rail">${ranked.map(c => tileHtml(c)).join('')}</div>
+  </div>`;
+}
+
 function openNow() {
   const st = getState();
   const here = myPlace();
@@ -558,11 +617,6 @@ export function render() {
   const shopsOpen = st.shops.filter(x => x.isOpen && x.status === 'active').length;
   const P = getPricing();
 
-  /* suggestions when the box is empty: the categories with real supply right
-     now, ordered by it — not a hand-written list that can go stale */
-  const suggest = services()
-    .map(c => ({ c, n: st.partners.filter(p => p.cat === c.id && p.online !== false && !p.suspended).length }))
-    .sort((a, b) => b.n - a.n).slice(0, 6).map(x => x.c);
   const recentChips = recent.map(t => ({ t, c: bestCat(t) })).filter(x => x.c);
   const best = q ? bestCat(q) : null;
 
@@ -630,14 +684,18 @@ export function render() {
                12-minute clock. A label must name its own destination. -->
           ${best ? `<button class="btn btn--primary btn--block" style="justify-content:flex-start;margin-top:10px"
               data-act="cat.open" data-id="${best.id}">See who is free · ${esc(best.name)}</button>` : ''}
-          <!-- THESE FOUR CHIPS USED TO BE PRINTED TWICE. When somebody had no
-               history the header fell back to the same four suggestions the list
-               below already shows — two identical rows, one screen apart, doing
-               the same thing, which is exactly what makes an app feel confusing.
-               The header row now appears ONLY when it carries something the list
-               below cannot: what this person booked before. -->
-          ${!q && recentChips.length ? `<div class="chiprow" style="margin-top:10px;flex-wrap:wrap">
-            ${recentChips.map(x => smartChip(x.t, x.c.id, icon('refresh', { size: 14 }))).join('')}
+          <!-- THE HEADER SHORTCUT. In 8.4.0 I deleted this row for anybody with
+               no history, because it was falling back to the same four chips the
+               list below already showed — a real duplicate. Deleting it was the
+               wrong half of the fix: it took the fastest path into the product
+               away from exactly the people who had never used it.
+               It is back, and it now carries what no other row on this screen
+               does — who is actually free this minute. A returning customer
+               still gets their own history first. -->
+          ${!q ? `<div class="chiprow" style="margin-top:10px;flex-wrap:wrap">
+            ${recentChips.length
+              ? recentChips.map(x => smartChip(x.t, x.c.id, icon('refresh', { size: 14 }))).join('')
+              : freeNowChips()}
           </div>` : ''}
           ${!q ? `<p class="micro muted" style="margin-top:8px">One search finds people who come to you, shops that deliver to you, and your own orders.</p>` : ''}
         </div>
@@ -657,6 +715,11 @@ export function render() {
           ${stillOpen()}
 
           <div class="sec">
+            <!-- THE FAST ACTIONS, not a second category list. The categories
+                 that used to trail this row now open the "Most booked near you"
+                 rail directly beneath it — the same categories, two more of
+                 them, plus a link to all 24. Nothing left the screen; it stopped
+                 being said twice in two rows that looked identical. -->
             <p class="m-cap">Or pick what you need</p>
             <div class="chiprow" style="flex-wrap:wrap">
               ${againChip()}
@@ -668,9 +731,10 @@ export function render() {
                 <span class="chip__ic" aria-hidden="true">${icon('groupShops', { size: 14 })}</span>Neighbourhood map</button>
               ${cartCount ? `<button class="chip on" data-act="nav.cart">
                 <span class="chip__ic" aria-hidden="true">${icon('basket', { size: 14 })}</span>Cart · ${cartCount}</button>` : ''}
-              ${suggest.map(c => smartChip(c.name, c.id, catGlyph(c))).join('')}
             </div>
           </div>
+
+          ${mostBooked()}
 
           ${openNow()}
         </div>

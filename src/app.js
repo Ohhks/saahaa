@@ -216,8 +216,24 @@ function wireActions() {
   /* Pointed at #shopsSec, which only exists while the RETAIL flag is on — so
      in safe mode (every flag off) it silently did nothing, and even when it
      worked it scrolled to shops rather than to all categories. */
-  A('scroll.all',  () => (document.getElementById('allCats') || document.getElementById('shopsSec'))
-                          ?.scrollIntoView({ behavior: 'smooth' }));
+  /* SCROLLING TO A SECTION, RELIABLY.
+     `behavior:'smooth'` is a request, not a promise: in some engines and in
+     several embedded webviews it is silently ignored and the page does not move
+     at all. A navigation control that does nothing is worse than one that jumps.
+     So: ask for smooth, check a beat later whether anything actually happened,
+     and land it instantly if it did not. "All 24 categories" had this bug
+     already — it used scrollIntoView({behavior:'smooth'}) and could do nothing. */
+  const scrollToEl = el => {
+    if (!el) return;
+    const y = Math.max(0, el.getBoundingClientRect().top + window.scrollY - 64);  // clear the top bar
+    const from = window.scrollY;
+    try { window.scrollTo({ top: y, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, y); }
+    setTimeout(() => { if (Math.abs(window.scrollY - from) < 2 && Math.abs(y - from) > 8) window.scrollTo(0, y); }, 240);
+  };
+  /* Jump to a section on the current screen. My SAAHAA stacks a dozen of them
+     and a person who does not scroll never learns they are there. */
+  A('nav.jump',   d => scrollToEl(d && d.to && document.getElementById(d.to)));
+  A('scroll.all', () => scrollToEl(document.getElementById('allCats') || document.getElementById('shopsSec')));
   A('nav.tab', d => {
     // A partner or shop owner already earns here, so the tab is their console.
     // Everyone else — including a signed-out guest — gets the invitation to
