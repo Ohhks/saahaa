@@ -27,8 +27,14 @@ DIST = os.path.join(ROOT, 'dist')
 read = lambda p: io.open(p, encoding='utf-8').read()
 rel_of = lambda p: os.path.relpath(p, SRC).replace('\\', '/')
 
+# A TRAILING COMMENT USED TO DEFEAT THIS. The `[ \t]*$` meant that
+#     import * as M from './core/money.js';   // why it is needed
+# did not match, so the statement survived into the single inlined <script> and
+# the whole app died with "Cannot use import statement outside a module" — a
+# blank page whose only symptom was the smoke test failing. A line comment after
+# the semicolon is ordinary JavaScript and must not break the build.
 IMPORT_RE = re.compile(
-    r"""^[ \t]*import\s+(?:(?P<clause>[^'"]+?)\s+from\s+)?['"](?P<path>[^'"]+)['"]\s*;?[ \t]*$""",
+    r"""^[ \t]*import\s+(?:(?P<clause>[^'"]+?)\s+from\s+)?['"](?P<path>[^'"]+)['"]\s*;?[ \t]*(?://[^\n]*)?$""",
     re.M)
 
 
@@ -214,6 +220,21 @@ def build():
     # characters to JavaScript and invisible to the HTML parser; '<!--' likewise.
     js = re.sub(r'</(script)', r'<\\/\1', js, flags=re.I).replace('<!--', '<\\!--')
     assert re.search(r'</script', js, re.I) is None, 'a </script> survived escaping'
+
+    # AND NO `import` MAY SURVIVE. The inlined bundle is one classic <script>,
+    # so a single unstripped import statement kills the entire app with
+    # "Cannot use import statement outside a module" — a blank page. That
+    # happened, and the only thing that noticed was the browser smoke test at
+    # the end of the pre-flight. A build that cannot run must not be written to
+    # disk at all.
+    stray = re.search(r'^[ \t]*import\s+[^\n]*from\s+[\'"]', js, re.M)
+    if stray:
+        line = js[:stray.start()].count('\n') + 1
+        raise SystemExit(
+            'build: an import statement survived into the bundle (line %d):\n    %s\n'
+            '  The inlined script is not a module, so this would ship a blank page.\n'
+            '  Check IMPORT_RE against that exact line — a trailing comment or an\n'
+            '  unusual spacing is the usual cause.' % (line, stray.group(0).strip()[:110]))
 
     html = read(os.path.join(ROOT, 'index.html'))
     html = re.sub(r'\s*<link rel="stylesheet" href="src/ui/[^"]*">', '', html)

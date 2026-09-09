@@ -6,6 +6,8 @@ import { ctx, getState, dispatch, me, restoreSession, myArea, saveSession, myPar
 import { createStore, combineFromRegistry } from './core/store.js';
 import * as persist from './core/persist.js';
 import * as bus from './core/bus.js';
+/* the erase sheet names an amount, and threw ReferenceError without this */
+import * as M from './core/money.js';
 import { CONTACT } from './core/config.js';
 import * as i18n from './ui/i18n.js';
 import * as verification from './domain/verification.js';
@@ -151,6 +153,17 @@ function back() {
    The banner is deliberately not dismissible. This is the one message in the
    product a person must not be able to tidy away. */
 function storageBanner() {
+  /* A BROKEN BOOK IS LOUDER THAN A FULL DISK. If the ledger stops balancing,
+     payouts are already refused (domain/flow.js assertBookOk) — but somebody
+     has to be told, and it must not be dismissible. */
+  const book = flow.bookStatus && flow.bookStatus();
+  if (book) {
+    return `<div class="sysbar sysbar--bad" role="alert">
+      <b>Payouts are paused — the books do not balance.</b>
+      <span>${esc(book.problems.join(' · '))}. Nothing can be sent out until this is settled.
+        Open Admin → Finance and verify the chain.</span>
+    </div>`;
+  }
   const failed = persist.saveFailed && persist.saveFailed();
   if (failed) {
     return `<div class="sysbar sysbar--bad" role="alert">
@@ -939,6 +952,7 @@ async function boot() {
     flow.sweepHoldbacks().then(n => { if (n) { console.info('[saahaa] holdbacks released', n); render(); } });
     flow.sweepUnaccepted().then(n => { if (n) { console.info('[saahaa] unaccepted refunded', n); render(); } });
   };
+  flow.assertBookOk('boot');
   sweepAll();
   setInterval(sweepAll, 60 * 1000);
   /* coming back to a phone that slept for hours must not wait for the next tick */

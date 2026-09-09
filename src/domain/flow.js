@@ -10,7 +10,7 @@ import * as M from '../core/money.js';
 import { find } from '../core/registry.js';
 import { subSize } from './catalog.services.js';
 import { applyTransition, canTransition } from './orders.js';
-import { acct, holdbackFor, balanceOf } from './ledger.js';
+import { acct, holdbackFor, balanceOf, checkInvariants } from './ledger.js';
 import * as gateway from '../core/gateway.js';
 import * as W from './wallet.js';
 import * as photos from '../core/photos.js';
@@ -87,6 +87,7 @@ export function shopWallet(shopId) {
 }
 
 export async function shopWithdraw(shopId, paise) {
+  if (!assertBookOk('withdraw')) return null;
   const shop = getState().shops.find(x => x.id === shopId);
   if (!shop) return null;
   const amt = M.int(paise), w = shopWallet(shopId);
@@ -123,6 +124,7 @@ export function setCustomerUpi(upi) {
 }
 
 export async function customerWithdraw(paise) {
+  if (!assertBookOk('withdraw')) return null;
   const s = me(); if (!s) return null;
   const amt = M.int(paise), w = customerWallet(s.key);
   if (amt < 1000) { toast('The smallest take-out is ₹10', 'warn'); return null; }
@@ -280,13 +282,44 @@ export async function sweepUnaccepted(now = Date.now()) {
      worse than doing nothing: the money froze and no actor in the system could
      release it. A return the shop ignores now refunds itself, because the
      person who has already been let down should not also have to chase. */
-  const returns = getState().orders.filter(o => o.stage === 'R_RETURN'
+  /* ESCALATING A RETURN USED TO CANCEL HER OWN RESCUE. Asking SAAHAA to step in
+     moved the order to DISPUTED, which this filter no longer matched — so the
+     24-hour auto-refund stopped applying and the owner's own remedy could not
+     reach it either. The one action a worried person takes must not be the one
+     that strands them. */
+  const returns = getState().orders.filter(o =>
+    (o.stage === 'R_RETURN' || (o.stage === 'DISPUTED' && o.kind === 'retail'))
     && (now - (o.stageTs || o.createdAt || now)) > RETURN_WINDOW_MS);
   for (const o of returns) {
     await refundRetail(o.id, 'The shop did not answer the return in time');
     audit.record('order.returnUnanswered', { id: o.id }, 'system');
   }
   return stale.length + shopStale.length + returns.length;
+}
+
+/* ── THE BOOK GUARDS ITSELF ────────────────────────────────────
+   `checkInvariants` is the best-written function in this repo and until 8.9.0
+   NOTHING CALLED IT. It knows the book must balance, that no entry may be
+   lopsided, and that no spendable account may go negative — and it sat there
+   while two separate bugs drove escrow negative and let a shop withdraw more
+   money than the customer ever paid. A safety net nobody attached is not a
+   safety net; it is a comment.
+
+   It is attached now, at the only moment that matters: before money leaves the
+   system. A payout over a broken book is refused and the failure is said out
+   loud, because quietly continuing is how the first one went unnoticed for
+   four audits. */
+let bookFrozen = null;
+export const bookStatus = () => bookFrozen;
+
+export function assertBookOk(where) {
+  const r = checkInvariants(getState().ledger || []);
+  const fatal = (r.checks || []).filter(c => c.fatal && !c.ok);
+  if (!fatal.length) { bookFrozen = null; return true; }
+  bookFrozen = { where, at: Date.now(), problems: fatal.map(c => c.detail) };
+  audit.record('ledger.frozen', { where, problems: bookFrozen.problems }, 'system');
+  toast('Payouts are paused — the books do not balance. The owner has been told.', 'danger');
+  return false;
 }
 
 /* ── stage machine driver ──────────────────────────────────── */
@@ -485,6 +518,7 @@ export async function walletTopUp(partnerId, paise) {
 export const MIN_WITHDRAW = 1000;
 
 export async function walletWithdraw(partnerId, paise) {
+  if (!assertBookOk('withdraw')) return null;
   const amt = M.int(paise);
   const w = W.walletOf(getState().ledger, partnerId, getState().partners.find(x => x.id === partnerId) || {});
   if (amt > w.available) { toast(`You can withdraw up to ${M.fmt(w.available)}`, 'warn'); return null; }
@@ -867,6 +901,13 @@ export async function setPickedQty(orderId, lineId, qty) {
   const agreed = (o.agreedTotal != null ? o.agreedTotal : o.customerPays) | 0;
   const capped = Math.min(q.customerPays, agreed);
   const under = capped < agreed;
+  /* CAPPING ONLY HER SIDE MINTED MONEY. The charge was clamped to what she
+     agreed and `shopPayout` was left at the heavier figure, so a shop typing
+     6.0 kg against a 2 kg order drove escrow NEGATIVE and could then withdraw
+     more than the customer ever paid. Everything downstream of the cap has to
+     be recomputed from the capped total, not from the raw quote. */
+  const scale = q.customerPays > 0 ? capped / q.customerPays : 1;
+  const cut = v => Math.round((v | 0) * scale);
 
   dispatch({ type: 'order/patch', payload: { id: orderId, patch: {
     lines,
@@ -877,11 +918,11 @@ export async function setPickedQty(orderId, lineId, qty) {
     /* only the capped figure is ever charged, and the refund itself is posted
        once, at settlement, so correcting a typo costs nobody anything */
     customerPays: capped,
-    itemsTotal: q.itemsTotal,
-    platformFee: q.platformFee,
-    gst: q.platformFeeGst,
-    shopPayout: q.shopPayout,
-    riderPayout: q.riderPayout,
+    itemsTotal: cut(q.itemsTotal),
+    platformFee: cut(q.platformFee),
+    gst: cut(q.platformFeeGst),
+    shopPayout: cut(q.shopPayout),
+    riderPayout: cut(q.riderPayout),
   } } });
   ctx.render();
   return q;
@@ -957,7 +998,12 @@ export async function acceptReturn(orderId) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o || o.stage !== 'R_RETURN') return null;
   if (!advance(orderId, 'R_REFUNDED', { refund: o.customerPays, refundedAt: Date.now() })) return null;
-  await ledger('REFUND', o.customerPays, acct.escrow(o.id), acct.customer(o.customerKey), { reason: 'return' });
+  /* REFUNDED A STALE FIGURE. A reweighed order holds `agreedTotal` in escrow
+     while `customerPays` has come down, so refunding the latter left the
+     difference stranded in a closed order — under a screen promising "your
+     money comes back in full". Refund what is actually held. */
+  const heldBack = Math.max(0, balanceOf(getState().ledger, acct.escrow(o.id)));
+  if (heldBack) await ledger('REFUND', heldBack, acct.escrow(o.id), acct.customer(o.customerKey), { reason: 'return' });
   const a = getState().agg;
   bumpAgg({ refunds: a.refunds + o.customerPays, escrow: Math.max(0, a.escrow - (o.customerPays | 0)) });
   advance(orderId, 'R_CLOSED', { closedAt: Date.now() });
@@ -978,32 +1024,55 @@ export async function settleRetail(orderId) {
   // rider order; and GST sat inside the fee leg, so `revenue` mixed
   // gross-of-GST retail with net-of-GST service in the same total.
   const feeExGst = Math.max(0, o.platformFee - (o.gst | 0));
-  // the dispatch cut is the RESIDUAL of what the customer paid after the shop,
-  // the fee, the GST and the rider — so a free-delivery rider order (shop
-  // absorbed the ride, cut still carved) leaves nothing stranded in escrow
-  const dispatchCut = Math.max(0, (o.customerPays | 0) - (o.shopPayout | 0) - (o.platformFee | 0) - (o.riderPayout | 0));
-  const shopPayout = Math.max(0, o.shopPayout - lineRefund);
-  /* WHAT A REWEIGH LEFT BEHIND. Escrow holds what she agreed; the order may now
-     be settling for less because loose goods weighed light. That difference is
-     hers, and until this leg existed it sat in a closed order's escrow account
-     for ever while her screen said it had come back automatically. */
-  const heldNow = (o.agreedTotal != null ? o.agreedTotal : o.customerPays) | 0;
-  const reweighBack = Math.max(0, heldNow - (o.customerPays | 0));
-  if (reweighBack) {
-    await ledger('REFUND', reweighBack, acct.escrow(o.id), acct.customer(o.customerKey), { reason: 'weighed lighter than ordered' });
-    dispatch({ type: 'order/patch', payload: { id: orderId, patch: { reweighRefund: reweighBack } } });
+
+  /* SETTLEMENT DISTRIBUTES WHAT IS HELD, AND NOTHING ELSE.
+     Three separate bugs all had the same shape: a figure on the order was
+     trusted over the escrow balance. An over-weigh left `shopPayout` above the
+     capped charge; a line refund bigger than the shop's share was posted in
+     full while the payout merely clamped at zero; and a reweighed order
+     refunded `o.customerPays` while escrow still held `agreedTotal`. Two of
+     those drove escrow NEGATIVE — the system paid out more than it ever
+     collected — and the third stranded money in a closed order for ever.
+
+     So the order is now: give the customer back what is hers, then read what
+     is actually left, then hand out the rest in priority order, and let the
+     dispatch cut absorb the residual so the account lands at exactly zero. */
+  const held0 = balanceOf(getState().ledger, acct.escrow(o.id));
+
+  /* 1 · hers first — the reweigh difference and any line she did not receive */
+  const reweighBack = Math.max(0, held0 - (o.customerPays | 0));
+  const refundNow = Math.min(Math.max(0, lineRefund), Math.max(0, held0 - reweighBack));
+  const backToHer = reweighBack + refundNow;
+  if (backToHer) {
+    await ledger('REFUND', backToHer, acct.escrow(o.id), acct.customer(o.customerKey),
+      { reason: reweighBack && refundNow ? 'weighed lighter, and items not supplied'
+        : reweighBack ? 'weighed lighter than ordered' : 'items not supplied' });
+    dispatch({ type: 'order/patch', payload: { id: orderId, patch: {
+      reweighRefund: reweighBack || undefined, refund: refundNow || undefined } } });
   }
-  await ledger('SHOP_PAYOUT', shopPayout, acct.escrow(o.id), acct.shop(o.shopId), {});
-  if (lineRefund) await ledger('REFUND', lineRefund, acct.escrow(o.id), acct.customer(o.customerKey), { reason: 'unavailable items' });
-  if (lineRefund) dispatch({ type: 'order/patch', payload: { id: orderId, patch: { shopPayout, refund: lineRefund } } });
-  if (feeExGst)      await ledger('FEE', feeExGst, acct.escrow(o.id), acct.fee(), {});
-  if (o.gst)         await ledger('GST', o.gst, acct.escrow(o.id), acct.gst(), {});
-  if (o.riderPayout) await ledger('RIDER', o.riderPayout, acct.escrow(o.id), acct.rider(), {});
-  if (dispatchCut)   await ledger('DISPATCH', dispatchCut, acct.escrow(o.id), acct.fee(), {});
+
+  /* 2 · what is genuinely left to share out */
+  let left = Math.max(0, held0 - backToHer);
+  const take = want => { const n = Math.max(0, Math.min(want | 0, left)); left -= n; return n; };
+  const shopPayout = take(o.shopPayout - refundNow);
+  const feePart = take(feeExGst);
+  const gstPart = take(o.gst);
+  const riderPart = take(o.riderPayout);
+  const dispatchCut = left;                       // the residual, so escrow ends at 0
+
+  if (shopPayout)  await ledger('SHOP_PAYOUT', shopPayout, acct.escrow(o.id), acct.shop(o.shopId), {});
+  if (refundNow)   dispatch({ type: 'order/patch', payload: { id: orderId, patch: { shopPayout } } });
+  if (feePart)     await ledger('FEE', feePart, acct.escrow(o.id), acct.fee(), {});
+  if (gstPart)     await ledger('GST', gstPart, acct.escrow(o.id), acct.gst(), {});
+  if (riderPart)   await ledger('RIDER', riderPart, acct.escrow(o.id), acct.rider(), {});
+  if (dispatchCut) await ledger('DISPATCH', dispatchCut, acct.escrow(o.id), acct.fee(), {});
+
   const a = getState().agg;
-  bumpAgg({ retailOrders: a.retailOrders + 1, gmv: a.gmv + o.itemsTotal - lineRefund,
-            revenue: a.revenue + feeExGst, gst: a.gst + (o.gst | 0), refunds: a.refunds + lineRefund,
-            escrow: Math.max(0, a.escrow - heldNow) });
+  /* the aggregates report what MOVED, not what the order once said it would */
+  bumpAgg({ retailOrders: a.retailOrders + 1, gmv: a.gmv + o.itemsTotal - refundNow,
+            revenue: a.revenue + feePart + dispatchCut, gst: a.gst + gstPart,
+            refunds: a.refunds + backToHer,
+            escrow: Math.max(0, a.escrow - held0) });
   // R_SETTLED was the end of the road: nothing advanced to R_CLOSED, so every
   // retail order sat in a non-terminal stage forever and two views had to
   // hard-code R_SETTLED into their "hide it" lists instead of using isTerminal.
@@ -1031,7 +1100,9 @@ export async function refundRetail(orderId, reason = 'shop unresponsive') {
     toast('That order cannot be cancelled from its current stage', 'danger');
     return null;
   }
-  await ledger('REFUND', o.customerPays, acct.escrow(o.id), acct.customer(o.customerKey), { reason });
+  /* the same stale-figure bug as acceptReturn: refund what escrow holds */
+  const heldOut = Math.max(0, balanceOf(getState().ledger, acct.escrow(o.id)));
+  if (heldOut) await ledger('REFUND', heldOut, acct.escrow(o.id), acct.customer(o.customerKey), { reason });
   const a = getState().agg;
   bumpAgg({ refunds: a.refunds + o.customerPays, escrow: Math.max(0, a.escrow - (o.customerPays | 0)) });
 

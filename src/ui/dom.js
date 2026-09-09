@@ -114,7 +114,7 @@ export function stickyToast(title, body, onTap) {
 }
 
 /* ── bottom sheet ──────────────────────────────────────────── */
-let scrimEl = null, sheetEl = null, onClose = null, openRaf = 0;
+let scrimEl = null, sheetEl = null, onClose = null, openRaf = 0, openFallback = 0;
 export function sheet(title, bodyHtml, opts = {}) {
   if (!scrimEl) {
     scrimEl = document.createElement('div');
@@ -140,8 +140,17 @@ export function sheet(title, bodyHtml, opts = {}) {
   // The open is deferred a frame for the slide-in. A close arriving inside
   // that frame used to be undone by the pending callback, re-opening a sheet
   // the app had already dismissed — so the handle is cancellable.
+  /* AND A SHEET MUST NOT DEPEND ON ONE FRAME ARRIVING. requestAnimationFrame
+     does not fire in a background tab, under headless capture, or in some
+     embedded webviews — so the sheet was built, inserted, and left invisible
+     with no fallback and no error. The frame is still preferred, because it is
+     what makes the slide-in smooth; a timer behind it guarantees the sheet
+     opens whether or not the frame ever comes. */
+  const reveal = () => { if (scrimEl) scrimEl.classList.add('on'); if (sheetEl) sheetEl.classList.add('on'); };
   cancelAnimationFrame(openRaf);
-  openRaf = requestAnimationFrame(() => { scrimEl.classList.add('on'); sheetEl.classList.add('on'); });
+  openRaf = requestAnimationFrame(reveal);
+  clearTimeout(openFallback);
+  openFallback = setTimeout(reveal, 120);
   const first = sheetEl.querySelector('input,button,select,textarea');
   if (first && !opts.noFocus) setTimeout(() => first.focus({ preventScroll: true }), 340);
   return sheetEl;
@@ -150,6 +159,7 @@ export function updateSheet(bodyHtml) {
   if (sheetEl) mount(sheetEl.querySelector('.sbody'), bodyHtml);
 }
 export function closeSheet() {
+  clearTimeout(openFallback);
   cancelAnimationFrame(openRaf); openRaf = 0;
   if (!sheetEl) return;
   scrimEl.classList.remove('on');

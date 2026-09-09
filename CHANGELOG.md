@@ -6,6 +6,66 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [8.9.0] — 2026-09-10 — "A shop could mint money"
+
+The fourth customer audit scored 8.8.0 at 5/10 again and found something worse
+than any previous round: **a shop could be paid more than the customer ever
+paid.** Not a rounding error — ₹414.63 collected, ₹618.15 paid out, on one
+order, withdrawable through the ordinary button.
+
+### Fixed — escrow is the ceiling, and nothing can be minted
+
+Three bugs had the same shape: a figure written on the order was trusted over
+the escrow balance.
+
+- **Over-weighing minted money.** `setPickedQty` capped *her* charge at what she
+  agreed and left `shopPayout` at the heavier figure, so typing 6 kg against a
+  2 kg order drove escrow negative. Everything downstream of the cap is scaled
+  with it now.
+- **A large line refund overdrew escrow.** When a refunded item exceeded the
+  shop's share, the payout clamped to zero while the full refund was still
+  posted.
+- **A return after a reweigh stranded money**, because it refunded
+  `o.customerPays` while escrow still held `agreedTotal` — under a screen
+  promising the money comes back in full.
+
+Settlement now does one thing in one order: give the customer back what is
+hers, read what is actually left, and hand out the rest in priority with the
+dispatch cut absorbing the residual — so the account lands at exactly zero by
+construction. Verified on the auditor's own repro: ₹2,653 in, ₹2,653 out,
+escrow ₹0, book balances, no negative accounts.
+
+### Fixed — the safety net that was never attached
+
+`checkInvariants` is the best-written function in this repo and **nothing
+called it.** It knows the book must balance, that no entry may be lopsided and
+that no spendable account may go negative — and it sat there through four
+audits while two separate bugs drove escrow negative. A net nobody attached is
+a comment.
+
+It runs at boot and before every withdrawal now. A payout over a broken book is
+refused, and an undismissable banner says so — because quietly continuing is
+how the first one went unnoticed.
+
+### Fixed — escalating a return was a one-way door
+Asking SAAHAA to step in moved the order to `DISPUTED`, which had no retail
+exits *and* was no longer matched by the 24-hour auto-refund sweep. The one
+action a worried person takes was the one that stranded her.
+
+### Fixed — two of my own
+The erase-blocked sheet threw `ReferenceError: M is not defined`, so the guard
+built for people with money in the app was a dead button. And every sheet in
+the product depended on a single `requestAnimationFrame` that never arrives in
+a background tab or an embedded webview — built, inserted, invisible, no error.
+
+### Fixed — a build that could ship a blank page
+A trailing comment after an import's semicolon defeated the bundler's strip
+regex, so the statement survived into the single inlined `<script>` and the app
+died with "Cannot use import statement outside a module". The only thing that
+noticed was the smoke test. `tools/build.py` now tolerates the comment **and
+refuses to write a bundle containing a surviving import at all** — verified by
+reintroducing the exact shape and watching the build refuse.
+
 ## [8.8.0] — 2026-09-10 — "The audit that scored it lower"
 
 8.7.0 shipped on an inference: every severe finding had been fixed, so the

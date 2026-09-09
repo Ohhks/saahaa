@@ -43,7 +43,7 @@ const SERVICE_STAGES = [
      three money buttons, none of which is "let him try again", so a pro whose
      customer read the code out correctly two seconds later still had a dead
      job and she had to rebook from scratch. */
-  { id:'DISPUTED',    label:'Under review',       short:'Disputed',   owner:'admin',    to:['SETTLED','PARTIAL','REFUNDED','CLOSED','ARRIVED'], tracker:false, tone:'bad', ico:'⚖️' },
+  { id:'DISPUTED',    label:'Under review',       short:'Disputed',   owner:'admin',    to:['SETTLED','PARTIAL','REFUNDED','CLOSED','ARRIVED','R_REFUNDED','R_CANCELLED'], tracker:false, tone:'bad', ico:'⚖️' },
   { id:'REFUNDED',    label:'Refunded',           short:'Refunded',   owner:'system',   to:['CLOSED'], tracker:false, tone:'warn' },
   { id:'CANCELLED',   label:'Cancelled',          short:'Cancelled',  owner:'either',   to:[], tracker:false, tone:'bad', terminal:true },
   { id:'EXPIRED',     label:'Expired',            short:'Expired',    owner:'system',   to:[], tracker:false, tone:'soft', terminal:true },
