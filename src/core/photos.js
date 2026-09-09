@@ -28,8 +28,28 @@ import * as persist from './persist.js';
 
 export const MAX_ONE   = 90 * 1024;          // one picture, as stored (a data URL)
 export const MAX_TOTAL = 3 * 1024 * 1024;    // all pictures together
-const INDEX = 'SAAHAA_PHOTOS';
-const KEY = id => 'SAAHAA_PHOTO_' + id;
+
+/* WHERE THE PICTURES SIT.
+   The in-app suite (Admin -> System & audit -> Run tests) runs against the very
+   storage the person is using. A suite that calls gc() to tidy up after itself
+   therefore DELETED every real picture on the device — a shopkeeper pressing a
+   diagnostic button lost their shop front. The shelf is now swappable, so the
+   tests keep their own and can never reach anybody's. */
+let shelf = '';
+const INDEX_OF = s => 'SAAHAA_PHOTOS' + s;
+const KEY_OF = (s, id) => 'SAAHAA_PHOTO' + s + '_' + id;
+const idxKey = () => INDEX_OF(shelf);
+const KEY = id => KEY_OF(shelf, id);
+
+/** Where a picture actually sits, on the shelf currently in use. */
+export const storageKey = id => KEY(id);
+
+/** Tests only: move to a named shelf, and get back a function that restores. */
+export function useShelf(name = '') {
+  const was = shelf;
+  shelf = name ? '_' + String(name).replace(/[^A-Za-z0-9]/g, '') : '';
+  return () => { shelf = was; };
+}
 
 /** Only ever a real raster data URL. The store is user-editable — a value that
     is not one of these is treated as missing rather than handed to an <img>. */
@@ -39,8 +59,8 @@ export const isPhotoUrl = v =>
 export const newId = () =>
   'ph_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-const index = () => { const i = persist.read(INDEX, {}); return (i && typeof i === 'object') ? i : {}; };
-const saveIndex = i => persist.write(INDEX, i);
+const index = () => { const i = persist.read(idxKey(), {}); return (i && typeof i === 'object') ? i : {}; };
+const saveIndex = i => persist.write(idxKey(), i);
 
 /** What the pictures are costing, so a screen can say it plainly. */
 export function usage() {
@@ -61,7 +81,7 @@ export function put(dataUrl, id = newId()) {
   if (!isPhotoUrl(dataUrl)) return { ok: false, reason: 'That is not an image' };
   const bytes = dataUrl.length;
   if (bytes > MAX_ONE)
-    return { ok: false, reason: `That picture is ${Math.round(bytes / 1024)}KB — the limit is ${Math.round(MAX_ONE / 1024)}KB` };
+    return { ok: false, reason: `That picture is ${(bytes / 1024).toFixed(0)}KB — the most one may be is ${Math.floor(MAX_ONE / 1024)}KB` };
 
   const i = index();
   const had = (i[id] && i[id].b | 0) || 0;

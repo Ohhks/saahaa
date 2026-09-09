@@ -25,15 +25,27 @@ import { icon } from '../icons.js';
 import * as A from '../../domain/auction.js';
 import { priceScore } from '../../domain/bidding.js';
 import { quoteService, liveMarkup } from '../../domain/pricing.js';
+import { markupFor } from '../../domain/trust.js';
 import { SYS_CSS } from './shops.js';
 
 /* Workers bid the DEAL — their own rate, which they keep 100% of. The
    customer is charged the deal plus the platform's service markup — the LIVE
    one from Admin → Charges, never a constant. Every customer-facing number
    here is what they PAY; every worker-facing number is what he EARNS. */
-const pay = deal => quoteService(deal).customerPays;
-const payGap = deal => Math.round(deal * (1 + liveMarkup()));
-const pct = () => Math.round(liveMarkup() * 100);
+const payGap = deal => Math.round(deal * (1 + liveMarkup()));   // population estimates, not one person's bill
+
+/* WHOSE MARKUP (8.2 guardian). The markup is not one number: domain/trust.js
+   `markupFor()` gives a tier-4 pro the loyalty rate, and domain/flow.js prices
+   the real order with it. Every figure on this screen belongs to ONE named
+   worker's bid, so it has to be quoted at that worker's rate — quoting the
+   general one made an Elite pro's card read "incl. SAAHAA 8% · Rs.764" and then
+   charged Rs.750 at 6% on the very next screen. The general helpers above stay
+   for the sentences that are about SAAHAA rather than about a person. */
+const partnerOf = pid => (pid && getState().partners.find(x => x.id === pid)) || null;
+const mkOf = pid => markupFor(partnerOf(pid));
+const payP = (deal, pid) => quoteService(deal, { markup: mkOf(pid) }).customerPays;
+const gapP = (deal, pid) => Math.round(deal * (1 + mkOf(pid)));
+const pctP = pid => Math.round(mkOf(pid) * 100);
 
 /* ── the live clock ───────────────────────────────────────────
    One interval for the whole module. A screen that stops moving while workers
@@ -59,9 +71,9 @@ const avatar = (name, size = 40, dim = false) =>
   `<span class="avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size / 2.8)}px;${dim ? 'opacity:.35' : ''}">${esc((name || '?')[0])}</span>`;
 
 /* the strip that never scrolls away: who holds the money, and what it is */
-const honest = held => `<p class="m-note" style="margin:0 calc(-1 * var(--gutter));border-bottom:2px solid var(--color-divider)">
-  Every price below is the worker's own rate plus SAAHAA's ${pct()}% charge. ${held
-    ? `Your ${M.fmt(pay(held))} stays held by SAAHAA until you confirm the work — nothing is paid to anyone directly.`
+const honest = (held, pid) => `<p class="m-note" style="margin:0 calc(-1 * var(--gutter));border-bottom:2px solid var(--color-divider)">
+  Every price below is the worker's own rate plus SAAHAA's charge. ${held
+    ? `Your ${M.fmt(payP(held, pid))} stays held by SAAHAA until you confirm the work — nothing is paid to anyone directly.`
     : 'You pay SAAHAA; the money is held until you confirm the work.'}</p>`;
 
 /* ── entry point: the row under Confirm — 1d "Request a job" ────
@@ -85,7 +97,7 @@ export function entryRow(catId, partner, heldAmount) {
   </div>
   <p class="m-cap" style="opacity:.8">Request a job instead</p>
   <p class="tiny" style="opacity:.85;margin-bottom:8px">Goes to ${pool} ${esc(cat.name.toLowerCase())} pro${pool === 1 ? '' : 's'} near ${esc(myArea())}.
-    ${esc(lead)}${done < 2 ? ` Takes about ${o.mins} min. Your ${M.fmt(pay(heldAmount))} with ${esc(partner.name)} stays held — you lose nothing by asking.` : ''}</p>
+    ${esc(lead)}${done < 2 ? ` Takes about ${o.mins} min. Your ${M.fmt(payP(heldAmount, partner.id))} with ${esc(partner.name)} stays held — you lose nothing by asking.` : ''}</p>
   <button class="btn btn--secondary btn--block" style="justify-content:flex-start;color:inherit;border-color:currentColor"
           data-act="ask.start" data-id="${catId}" data-pid="${partner.id}" data-held="${heldAmount}">
     Send to the circle →
@@ -174,12 +186,12 @@ function waiting(req) {
   bids.forEach(b => cards.push(replyRow(req, { ...b, held: false, held0: held })));
 
   return shell(`${cat.name}${req.sub ? ' · ' + req.sub : ''}`, `Sent ${timeAgo(req.openedAt)} · ${replies} of ${invited} replied`, `
-    ${honest(held)}
+    ${honest(held, req.held && req.held.partnerId)}
 
     <div class="sec">
       <div class="between">
         <div><p class="m-cap" style="margin:0 0 2px">Your held price</p>
-          <div class="num" style="font:800 27px/1 var(--font-heading)">${M.fmt(pay(held || req.target))}</div></div>
+          <div class="num" style="font:800 27px/1 var(--font-heading)">${M.fmt(payP(held || req.target, req.held && req.held.partnerId))}</div></div>
         <span class="tag tag-neutral">Safe · nothing charged yet</span>
       </div>
       <p class="tiny muted" style="margin-top:6px">${req.held ? `${esc(req.held.partnerName)} comes as planned unless you pick someone else.` : 'Nothing is charged until you pick.'}</p>
@@ -202,7 +214,7 @@ function waiting(req) {
 
     <p class="tiny muted" style="padding:12px 0;border-top:2px solid var(--color-divider)">
       ${Math.max(0, invited - replies)} more workers are still preparing rates. Nothing expires while you wait —
-      if you don't pick, your ${M.fmt(pay(held || req.target))} booking stays. Nothing is lost.</p>
+      if you don't pick, your ${M.fmt(payP(held || req.target, req.held && req.held.partnerId))} booking stays. Nothing is lost.</p>
 
     ${elapsed > 30000 ? `<button class="btn btn--ghost btn--block" style="justify-content:flex-start"
         data-act="ask.background" data-id="${req.id}">Close the app. We'll message you.</button>` : ''}
@@ -223,8 +235,8 @@ function replyRow(req, b) {
         <div style="font-size:11px;color:var(--ink-3);margin-top:3px">${avgOf(b.partnerId).toFixed(1)} ★${b.km != null ? ` · ${b.km} km` : p.area ? ` · ${esc(p.area)}` : ''}${b.eta ? ` · ~${b.eta} min` : ''}${b.held ? ' · your first match' : ''}</div>
       </div>
       <div style="text-align:right;flex:none">
-        <div style="font:800 21px/1 var(--font-heading)" class="num">${M.fmt(pay(b.amount))}</div>
-        <div style="font-size:10px;color:var(--ink-3);margin-top:3px">${less ? `${M.fmt(payGap(less))} less than held` : `incl. SAAHAA ${pct()}%`}</div>
+        <div style="font:800 21px/1 var(--font-heading)" class="num">${M.fmt(payP(b.amount, b.partnerId))}</div>
+        <div style="font-size:10px;color:var(--ink-3);margin-top:3px">${less ? `${M.fmt(gapP(less, b.partnerId))} less than held` : `incl. SAAHAA ${pctP(b.partnerId)}%`}</div>
       </div>
     </div>
     ${b.held ? `<div class="row" style="gap:8px;margin-top:10px">
@@ -238,7 +250,7 @@ function bottomBar(req) {
   const held = req.held ? req.held.amount : null;
   return `<div class="m-bar" style="gap:8px">
     ${held ? `<button class="btn btn--primary grow" style="justify-content:flex-start" data-act="ask.held" data-id="${req.id}">
-      Book ${M.fmt(pay(held))} now</button>` : ''}
+      Book ${M.fmt(payP(held, req.held && req.held.partnerId))} now</button>` : ''}
     <button class="btn btn--secondary" data-act="ask.cancel" data-id="${req.id}">Cancel</button>
   </div>
   <p class="micro muted" style="margin-top:6px">Cancelling charges nothing.</p>`;
@@ -261,14 +273,14 @@ function choosing(req) {
   r.others.forEach(b => cards.push(otherReply(req, b, r.hero, r.cheapest, held)));
 
   return shell(`${cat.name}${req.sub ? ' · ' + req.sub : ''}`, `${r.all.length} workers replied · ${mmss(msLeft)} to pick`, `
-    ${honest(held)}
+    ${honest(held, req.held && req.held.partnerId)}
     <div class="sec">${cards.join('')}</div>
     ${held ? `<div style="padding:12px 0;border-top:2px solid var(--color-divider)">
       <div class="between" style="gap:10px">
         <div class="row">${avatar(req.held.partnerName, 34, true)}
           <div class="grow"><b class="tiny">${esc(req.held.partnerName)}</b>
             <p class="micro muted">Your held price · first match</p></div></div>
-        <button class="btn btn--secondary btn--sm" data-act="ask.held" data-id="${req.id}">Book ${M.fmt(pay(held))}</button>
+        <button class="btn btn--secondary btn--sm" data-act="ask.held" data-id="${req.id}">Book ${M.fmt(payP(held, req.held && req.held.partnerId))}</button>
       </div></div>` : ''}
     <p class="micro muted" style="margin-top:12px">Whoever you pick, you pay SAAHAA and the money is held until you confirm the work.</p>`);
 }
@@ -286,18 +298,18 @@ function heroReply(req, b, held, showCounter) {
           <p class="tiny" style="opacity:.8">${ratingStars(avgOf(b.partnerId))} · ${b.km} km · ${esc((b.band && b.band.label) || 'Verified')}</p></div>
       </div>
       <div style="text-align:right;flex:none">
-        <div class="num" style="font:800 24px/1 var(--font-heading)">${M.fmt(pay(b.amount))}</div>
-        <div class="micro" style="opacity:.75;margin-top:3px">${less ? `${M.fmt(payGap(less))} less than held` : 'fair price'}</div>
+        <div class="num" style="font:800 24px/1 var(--font-heading)">${M.fmt(payP(b.amount, b.partnerId))}</div>
+        <div class="micro" style="opacity:.75;margin-top:3px">${less ? `${M.fmt(gapP(less, b.partnerId))} less than held` : 'fair price'}</div>
       </div>
     </div>
     <p class="tiny" style="opacity:.85">${esc(whyLine(b))}</p>
     <div class="row" style="gap:8px">
       <button class="btn btn--primary" style="flex:1;justify-content:flex-start" data-act="ask.accept"
-              data-id="${req.id}" data-bid="${b.id}">Accept · ${M.fmt(pay(b.amount))}</button>
+              data-id="${req.id}" data-bid="${b.id}">Accept · ${M.fmt(payP(b.amount, b.partnerId))}</button>
       ${pending ? '' : c.available ? `<button class="btn btn--secondary" style="color:inherit;border-color:currentColor"
-        data-act="ask.counter" data-id="${req.id}" data-bid="${b.id}">Ask ${M.fmt(pay(c.amount))}?</button>` : ''}
+        data-act="ask.counter" data-id="${req.id}" data-bid="${b.id}">Ask ${M.fmt(payP(c.amount, b.partnerId))}?</button>` : ''}
     </div>
-    ${pending ? `<p class="micro" style="opacity:.75">Asked. If he says no, ${M.fmt(pay(b.amount))} is still yours.</p>` : ''}
+    ${pending ? `<p class="micro" style="opacity:.75">Asked. If he says no, ${M.fmt(payP(b.amount, b.partnerId))} is still yours.</p>` : ''}
   </div>`;
 }
 
@@ -311,16 +323,16 @@ function otherReply(req, b, hero, cheapest, held) {
         <div style="font-size:11px;color:var(--ink-3);margin-top:3px">${avgOf(b.partnerId).toFixed(1)} ★ · ${b.km} km · ~${b.eta} min${isCheapest ? ' · lowest price' : ''}</div>
       </div>
       <div style="text-align:right;flex:none">
-        <div class="num" style="font:800 21px/1 var(--font-heading)">${M.fmt(pay(b.amount))}</div>
-        <div style="font-size:10px;color:var(--ink-3);margin-top:3px">incl. SAAHAA ${pct()}%</div>
+        <div class="num" style="font:800 21px/1 var(--font-heading)">${M.fmt(payP(b.amount, b.partnerId))}</div>
+        <div style="font-size:10px;color:var(--ink-3);margin-top:3px">incl. SAAHAA ${pctP(b.partnerId)}%</div>
       </div>
     </div>
     ${isCheapest && gap > 0 ? `<p style="font-size:12.5px;margin:9px 0 0;line-height:1.5">
-      ${M.fmt(payGap(gap))} cheaper, but ${esc(tradeoff(b, hero))}.</p>` : ''}
+      ${M.fmt(gapP(gap, b.partnerId))} cheaper, but ${esc(tradeoff(b, hero))}.</p>` : ''}
     <div class="row" style="gap:8px;margin-top:10px">
       <button class="btn btn--secondary" style="flex:1;justify-content:flex-start"
               data-act="ask.accept" data-id="${req.id}" data-bid="${b.id}"
-              data-warn="${lowRated(b, hero) ? '1' : ''}">Accept · ${M.fmt(pay(b.amount))}</button>
+              data-warn="${lowRated(b, hero) ? '1' : ''}">Accept · ${M.fmt(payP(b.amount, b.partnerId))}</button>
     </div>
   </div>`;
 }
@@ -349,13 +361,13 @@ const lowRated = (b, hero) => (hero.parts.rating - b.parts.rating) > 0.24;
    A failed ask is framed as a CONFIRMED GOOD PRICE, not a broken feature. */
 function noBids(req) {
   const held = req.held ? req.held.amount : null;
-  return shell('Rates are in', held ? `Your ${M.fmt(pay(held))} was the best rate` : 'No replies', `
+  return shell('Rates are in', held ? `Your ${M.fmt(payP(held, req.held && req.held.partnerId))} was the best rate` : 'No replies', `
     <div class="sec">
       <p class="card-kicker">Confirmed</p>
       <h2 class="h-sec" style="margin:4px 0 6px">No one beat your price.</h2>
-      <p class="tiny muted">${held ? `Your ${M.fmt(pay(held))} with ${esc(req.held.partnerName)} is still ready. ` : ''}Nothing was charged.</p>
+      <p class="tiny muted">${held ? `Your ${M.fmt(payP(held, req.held.partnerId))} with ${esc(req.held.partnerName)} is still ready. ` : ''}Nothing was charged.</p>
       ${held ? `<button class="btn btn--primary btn--lg btn--block" style="margin-top:18px;justify-content:flex-start"
-        data-act="ask.held" data-id="${req.id}">Book ${M.fmt(pay(held))}</button>` : ''}
+        data-act="ask.held" data-id="${req.id}">Book ${M.fmt(payP(held, req.held.partnerId))}</button>` : ''}
       <button class="btn btn--ghost btn--block" style="margin-top:8px"
         data-act="ask.cancel" data-id="${req.id}">Cancel</button>
     </div>`);
@@ -366,16 +378,22 @@ function noBids(req) {
    last job. */
 export function showReceipt(req, paid, workerName) {
   const s = A.savings(req, paid);
+  /* app.js hands us the name, not the id — so find the bid this receipt is for
+     and quote it at THAT worker's markup, the one the order was just escrowed
+     at. Falls back to the held match, then to the general rate. */
+  const booked = (A.bidsFor(req.id) || []).find(b => b.partnerName === workerName && b.amount === paid)
+    || (req.held && req.held.partnerName === workerName ? req.held : null);
+  const bid = booked ? booked.partnerId : null;
   const zero = s.amount <= 0;
   sheet('', `<div style="padding:4px 0">
     <p class="m-cap">You asked ${Math.max(1, s.replies)} ${Math.max(1, s.replies) === 1 ? 'worker' : 'workers'}</p>
-    <div class="m-kv"><span>You pay</span><span class="num" style="font-size:22px">${M.fmt(pay(paid))}</span></div>
+    <div class="m-kv"><span>You pay</span><span class="num" style="font-size:22px">${M.fmt(payP(paid, bid))}</span></div>
     ${zero
       // A zero shown AS zero kills the second use permanently. It is not a
       // loss — it is a confirmed good price, and it must read as one.
       ? `<p class="m-note" style="margin-top:10px">Your held price was already the best rate. Nothing lost.</p>`
-      : `<div class="m-kv m-kv--total"><span>You saved</span><span class="num" style="color:var(--color-accent)">${M.fmt(payGap(s.amount))}</span></div>`}
-    <p class="tiny muted" style="margin-top:14px">${esc(workerName)} is booked. SAAHAA holds ${M.fmt(pay(paid))} until you confirm the work.</p>
+      : `<div class="m-kv m-kv--total"><span>You saved</span><span class="num" style="color:var(--color-accent)">${M.fmt(gapP(s.amount, bid))}</span></div>`}
+    <p class="tiny muted" style="margin-top:14px">${esc(workerName)} is booked. SAAHAA holds ${M.fmt(payP(paid, bid))} until you confirm the work.</p>
     <button class="btn btn--primary btn--lg btn--block" style="margin-top:20px;justify-content:flex-start" data-act="sheet.close">Done</button>
   </div>${SYS_CSS}`);
 }
@@ -428,10 +446,10 @@ export function bidSheet(requestId, partner) {
       <div class="between" style="font-size:12.5px;margin-top:4px">
         <span class="muted">You keep</span><span class="muted">100% — nothing comes out of it</span></div>
       <div class="between" style="font-size:12.5px;margin-top:2px">
-        <span class="muted">SAAHAA's ${pct()}%, paid by the customer</span>
-        <span class="muted" id="bidFee">${M.fmt(payGap(req.target) - req.target)}</span></div>
+        <span class="muted">SAAHAA's ${pctP(partner.id)}%, paid by the customer</span>
+        <span class="muted" id="bidFee">${M.fmt(gapP(req.target, partner.id) - req.target)}</span></div>
       <div class="between" style="font:800 14px/1.2 var(--font-heading);padding-top:8px;margin-top:8px;border-top:1px solid var(--color-divider)">
-        <span>The customer pays</span><span id="bidPays">${M.fmt(payGap(req.target))}</span></div>
+        <span>The customer pays</span><span id="bidPays">${M.fmt(gapP(req.target, partner.id))}</span></div>
     </div>
 
     <button class="btn btn--primary btn--lg btn--block" style="margin-top:14px;justify-content:flex-start"
@@ -439,10 +457,10 @@ export function bidSheet(requestId, partner) {
             data-amt="${req.target}">Send ${M.fmt(req.target)}</button>
     <button class="btn btn--ghost btn--block" style="margin-top:6px" data-act="sheet.close">Not interested</button>
     ${SYS_CSS}`);
-  wireSlider(req);
+  wireSlider(req, partner);
 }
 
-function wireSlider(req) {
+function wireSlider(req, partner) {
   const range = document.getElementById('bidRange');
   if (!range) return;
   const amtEl = document.getElementById('bidAmt');
@@ -469,8 +487,9 @@ function wireSlider(req) {
     const keep = document.getElementById('bidKeep');
     if (keep) {
       keep.textContent = M.fmt(paise);
-      document.getElementById('bidFee').textContent = M.fmt(payGap(paise) - paise);
-      document.getElementById('bidPays').textContent = M.fmt(payGap(paise));
+      const pid = partner && partner.id;
+      document.getElementById('bidFee').textContent = M.fmt(gapP(paise, pid) - paise);
+      document.getElementById('bidPays').textContent = M.fmt(gapP(paise, pid));
     }
   };
   range.addEventListener('input', paint);

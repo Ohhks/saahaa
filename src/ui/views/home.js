@@ -17,7 +17,7 @@ import { ctx, getState, me, myArea, isGuest, myOrders, saveSession, dispatch } f
 import * as persist from '../../core/persist.js';
 import { live, get } from '../../core/registry.js';
 import { AREA_NAMES, AREA_GEO, kmBetween, etaMins } from '../../domain/match.js';
-import { trustScore } from '../../domain/trust.js';
+import { trustScore, markupFor } from '../../domain/trust.js';
 import * as gmap from '../map.js';
 import { GROUPS } from '../../domain/catalog.services.js';
 import { mark } from '../logo.js';
@@ -27,12 +27,13 @@ import * as M from '../../core/money.js';
 import { tier } from '../../domain/trust.js';
 import * as flags from '../../core/flags.js';
 import { trackerFor, trackerIndex, stage, isTerminal } from '../../domain/orders.js';
-import { CANCEL_RULES } from '../../domain/pricing.js';
+import { CANCEL_RULES, quoteService } from '../../domain/pricing.js';
 import { getPricing } from '../../domain/settings.js';
 import * as gateway from '../../core/gateway.js';
 import * as A from '../../domain/auction.js';
 import * as ask from './ask.js';
 import { SYS_CSS, header, emptyBlock } from './shops.js';
+import * as photo from '../photo.js';
 
 /* the four sections of the neighbourhood, drawn like everything else */
 const GROUP_ICON = { home: 'groupHome', care: 'groupCare', life: 'groupLife', shops: 'groupShops' };
@@ -350,6 +351,16 @@ function orderRow(o, lead = true) {
     <span class="m-row__go" aria-hidden="true">→</span>
   </button>`;
 }
+/* WHAT IS ACTUALLY HELD. `r.held.amount` is the worker's DEAL; every other
+   customer-facing surface — the booking sheet, the ask screen, the order —
+   prints what the customer PAYS, which is the deal plus that worker's own
+   markup (a tier-4 pro carries the loyalty rate, domain/trust.js `markupFor`).
+   Printing the deal here made this row say Rs.750 while the ask screen it
+   links to said Rs.795 about the same money. */
+const heldPays = held => quoteService(held.amount, {
+  markup: markupFor(getState().partners.find(x => x.id === held.partnerId) || null),
+}).customerPays;
+
 function askRow(r) {
   const cat = get('category', r.catId);
   const n = A.bidsFor(r.id).length;
@@ -358,7 +369,7 @@ function askRow(r) {
     <div class="grow" style="min-width:0">
       <div class="m-row__t">${esc(cat.name)}${r.sub ? ` · ${esc(r.sub)}` : ''}</div>
       <div class="m-row__m" style="margin-bottom:0">${r.status === 'bidding' ? 'Asking workers for rates' : 'Rates are in — pick one'} · ${n} ${n === 1 ? 'reply' : 'replies'}${
-        r.held ? ` · your ${M.fmt(r.held.amount)} stays held` : ''}</div>
+        r.held ? ` · your ${M.fmt(heldPays(r.held))} stays held` : ''}</div>
     </div>
     <span class="m-row__go" aria-hidden="true">→</span>
   </a>`;
@@ -376,6 +387,21 @@ function stillOpen() {
   </div>`;
 }
 
+/* THE FACE ON A ROW (8.2). A shop and a pro carry a photograph now, and the
+   home list is where a customer actually scrolls — it was still drawing the
+   category glyph for everybody, so the whole point of the release was invisible
+   on the first screen. The box is the same fixed `.m-thumb`, so a row with a
+   photograph is exactly as tall as one without; `photo.url()` is the only
+   source of an `<img src>` and returns '' for anything the store cannot vouch
+   for, which falls straight back to the drawn glyph. */
+function faceThumb(photoId, catId, name, size = 22, cls = '') {
+  const src = photo.url(photoId);
+  const inner = src
+    ? `<img class="m-img" src="${src}" alt="" loading="lazy" decoding="async">`
+    : (hasIcon(catId) ? icon(catId, { size }) : esc((name || '?')[0]));
+  return `<span class="thumb m-thumb${cls ? ' ' + cls : ''}" aria-hidden="true">${inner}</span>`;
+}
+
 /* ── who is open now: named pros and shops, nearest first ──── */
 export function avgOf(p) {
   const r = p.ratings || [];
@@ -386,7 +412,7 @@ function proRow(p, km) {
   const cat = get('category', p.cat) || { name: '' };
   const t = tier(p.tier);
   return `<button class="m-row" data-act="pro.open" data-id="${esc(p.id)}">
-    <span class="thumb m-thumb" aria-hidden="true">${hasIcon(p.cat) ? icon(p.cat, { size: 22 }) : esc(p.name[0])}</span>
+    ${faceThumb(p.photo, p.cat, p.name)}
     <div class="grow" style="min-width:0">
       <div class="m-row__t">${esc(p.name)}</div>
       <div class="m-row__m">${esc(cat.name)} · ${km} km · ~${etaMins(km)} min</div>
@@ -399,7 +425,7 @@ function shopRow(s, km) {
   const cat = get('category', s.catId) || { name: '' };
   const n = getState().products.filter(p => p.shopId === s.id && p.active).length;
   return `<button class="m-row" data-act="shop.open" data-id="${esc(s.id)}">
-    <span class="thumb m-thumb" aria-hidden="true">${hasIcon(s.catId) ? icon(s.catId, { size: 22 }) : esc(s.name[0])}</span>
+    ${faceThumb(s.photo, s.catId, s.name)}
     <div class="grow" style="min-width:0">
       <div class="m-row__t">${esc(s.name)}</div>
       <div class="m-row__m">${esc(cat.name)} · ${n} items in stock · ${km} km</div>
@@ -649,7 +675,10 @@ export function render() {
         <p class="tiny muted" style="margin:6px 0 12px;max-width:60ch">List your services or your products. A pro keeps 100% of their quote —
           SAAHAA's ${esc(P.serviceMarkupPct)}% sits on top and is paid by the customer. A shop pays
           ${esc(P.retailTakePct)}% of the basket, never more than ${M.fmt(P.retailTakeCapPaise)} an order.</p>
-        <button class="btn btn--primary" data-act="partner.join">List my shop or service →</button>
+        <div class="row" style="gap:10px;flex-wrap:wrap">
+          <button class="btn btn--primary" data-act="partner.join">List my shop or service →</button>
+          <button class="btn btn--secondary" data-act="shop.start">Open a shop →</button>
+        </div>
       </div>
     `}
 
@@ -787,8 +816,7 @@ function nearRow(it) {
     : `${esc(it.cat.name)} · ${it.km} km · ~${etaMins(it.km)} min`;
   const rating = it.kind === 'shop' ? Number(it.raw.ratingAvg) : avgOf(it.raw);
   return `<button class="m-row" data-act="${act}" data-id="${esc(it.id)}">
-    <span class="thumb m-thumb nb-thumb" aria-hidden="true">${
-      hasIcon(it.catId) ? icon(it.catId, { size: 18 }) : esc((it.name || '?')[0])}</span>
+    ${faceThumb(it.raw && it.raw.photo, it.catId, it.name, 18, 'nb-thumb')}
     <div class="grow" style="min-width:0">
       <div class="m-row__t">${esc(it.name)}</div>
       <div class="m-row__m">${line}</div>

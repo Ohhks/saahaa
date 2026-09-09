@@ -309,6 +309,7 @@ export function render() {
       ${setRow('theme.toggle', 'Appearance', theme)}
       ${setRow('splash.replay', 'Welcome screen', 'Replay')}
       ${setRow('partner.join', 'List my shop or service', '', { em: true })}
+      ${setRow('shop.start', 'Open a shop', 'A second account, on this number')}
     </div>
 
     ${chatThreads.length ? `<div class="sec">

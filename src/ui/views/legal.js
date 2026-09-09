@@ -316,5 +316,10 @@ export function render(page = 'terms') {
     .lg-kv + .lg-kv{border-top:1px solid var(--color-divider)}
     .lg-foot{margin-top:var(--sp-9)}
     .lg-foot a,.lg-sec a{color:var(--brand-text)}
+    /* An inline link inside a sentence — the same treatment tokens.css gives the
+       footer's legal row. Block padding on an INLINE box grows the hit area to
+       44px without touching the line box, so the type and the paragraph do not
+       move. Width stays the width of the words: the WCAG inline-link exception. */
+    .lg-sec p > a{padding-block:15px}
   </style>`;
 }

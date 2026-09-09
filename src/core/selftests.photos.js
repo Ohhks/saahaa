@@ -7,12 +7,24 @@
    tested, and the fact that a tampered store cannot put a hostile string into
    an <img src> is tested. */
 
-import { describe, it, expect } from './selftest.js';
+import { describe, it as rawIt, expect } from './selftest.js';
 import * as P from '../core/photos.js';
 import * as persist from '../core/persist.js';
 
 /* a valid, tiny data URL — the shape toDataURL('image/jpeg') produces */
 const img = (n = 40) => 'data:image/jpeg;base64,' + 'A'.repeat(n);
+
+/* THE SUITE RUNS ON ITS OWN SHELF. It used to call gc([]) against the real
+   store to tidy up between cases, so pressing "Run tests" in the admin console
+   deleted every picture on the device.
+
+   The shelf is switched around each test and put back afterwards — NOT at
+   import time, because these modules are imported at boot and that would move
+   the whole running app onto the test shelf. */
+const it = (name, fn) => rawIt(name, async () => {
+  const restore = P.useShelf('selftest');
+  try { return await fn(); } finally { P.gc([]); restore(); }
+});
 const clear = () => { P.gc([]); };
 
 describe('photos · a picture is stored by id, never inside the state blob', () => {
@@ -85,7 +97,7 @@ describe('photos · nothing but a real image ever reaches an <img>', () => {
   it('a store tampered with by hand reads back as no picture, not as a payload', () => {
     clear();
     const r = P.put(img(64));
-    persist.write('SAAHAA_PHOTO_' + r.id, 'javascript:alert(1)');
+    persist.write(P.storageKey(r.id), 'javascript:alert(1)');   // straight past put()'s validation
     expect(P.url(r.id)).toBe('');                 // treated as missing
   });
   it('svg is refused — it can carry script, and a shop front does not need it', () => {

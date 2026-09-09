@@ -31,6 +31,7 @@ import { header } from './shops.js';
 import * as ID from '../../domain/identity.js';
 import { getPricing } from '../../domain/settings.js';
 import * as photoUI from '../photo.js';
+import * as flow from '../../domain/flow.js';
 import * as V from '../../domain/verification.js';
 import { PASS, MAX_ATTEMPTS } from '../../domain/quiz.js';
 import { tier, PROVISIONAL_CAP, PROVISIONAL_JOBS } from '../../domain/trust.js';
@@ -273,13 +274,25 @@ function stepPanel(p, id, cat) {
       </div>
       ${foot('<button class="btn btn-primary" data-act="ob.submitid">Save ID</button>')}`;
 
-    case 'selfie': return `<div class="ob__form">
+    /* STEP 3 KEEPS THE PICTURE (8.2). The step said "customers see this face at
+       the door" and then stored nothing — the ladder marked itself done and the
+       pro's page went live with a letter where the face should be. It is the
+       same portrait `photo.pro` writes on My page, taken here instead, so a pro
+       who finishes the ladder is already photographed. The step still completes
+       if the camera is cancelled or the device is out of room: verification is
+       not held hostage by a picture, and My page can add one later. */
+    case 'selfie': {
+      const shot = photoUI.url(p.photo);
+      return `<div class="ob__form">
       <div class="row" style="gap:14px">
-        <div class="thumb" style="width:96px;height:96px;display:grid;place-items:center;color:var(--color-neutral-700)">${icon('camera', { size: 40 })}</div>
+        <div class="thumb" style="width:96px;height:96px;display:grid;place-items:center;overflow:hidden;color:var(--color-neutral-700)">${
+          shot ? `<img src="${shot}" alt="The photo you took of yourself" style="display:block;width:100%;height:100%;object-fit:cover">`
+               : icon('camera', { size: 40 })}</div>
         <p class="tiny muted">Face straight, good light, no cap or glasses. This is what the customer sees at the door.</p>
       </div>
       </div>
-      ${foot('<button class="btn btn-primary" data-act="ob.selfie">Take my photo</button>')}`;
+      ${foot(`<button class="btn btn-primary" data-act="ob.selfie">${shot ? 'Use this photo' : 'Take my photo'}</button>`)}`;
+    }
 
     case 'trade': return quizPanel(p, 'trade', `${esc(cat.name)} — five questions`);
     case 'conduct': return quizPanel(p, 'conduct', 'How SAAHAA works — six questions');
@@ -397,6 +410,20 @@ function certifiedCard(p) {
     <p class="micro muted" style="margin-top:6px">${e.jobs && e.rating && e.disputes ? 'You qualify — SAAHAA confirms Certified status within 2 working days.' : 'Earned automatically from your work. Nothing to submit.'}</p>`;
 }
 
+/* Step 3, done properly: ask for the picture, keep it on the pro's own record
+   through the same domain call `photo.pro` uses, then mark the step done. A
+   cancel or a full device still finishes the step — the ladder is about who
+   somebody is, and it is not the place to strand a pro over storage. */
+async function takeSelfie(p) {
+  if (photoUI.url(p.photo)) { V.submitSelfie(p); toast('Photo saved'); ctx.render(); return; }
+  const r = await photoUI.pick({ maxEdge: 560 });
+  if (r && r.ok) { flow.setPartnerPhoto(p.id, r.id); toast('Photo saved'); }
+  else if (r && !r.cancelled && r.reason) toast(`${r.reason} — the step is done; add a photo later from My page`, 'warn');
+  else toast('No photo yet — the step is done; add one later from My page');
+  V.submitSelfie(p);
+  ctx.render();
+}
+
 /* ── actions, called from app.js ───────────────────────────── */
 export function act(name, d) {
   const p = V.myPartner(); if (!p) return;
@@ -406,7 +433,7 @@ export function act(name, d) {
     case 'ob.confirmphone': if (V.confirmPhone(p, val('obPhone'))) { shownCode = ''; toast('Number confirmed'); } break;
     case 'ob.idtype':       setIdType(d.type); break;
     case 'ob.submitid':     return V.submitIdentity(p, idType, val('obId')).then(ok => { if (ok) toast('ID saved — only the last 4 digits kept'); ctx.render(); });
-    case 'ob.selfie':       V.submitSelfie(p); toast('Photo saved'); break;
+    case 'ob.selfie':       return takeSelfie(p);
     case 'ob.pick':         pick(d.kind, d.q, d.o); break;
     case 'ob.quiz': {
       const res = V.submitQuiz(p, d.kind, answers[d.kind] || []);

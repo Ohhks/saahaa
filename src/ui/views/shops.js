@@ -71,7 +71,17 @@ export const SYS_CSS = `<style>
      so a row is exactly as tall with a photograph as without one and a list
      cannot jump as pictures decode. A missing picture leaves the drawn
      placeholder the design already uses — never a broken image, never a gap. */
-  .m-img{display:block;width:100%;height:100%;object-fit:cover;background:var(--color-neutral-300)}
+  /* place-self:stretch is what makes height:100% mean anything here. Every
+     picture box below is display:grid + place-items:center so the drawn
+     placeholder sits in the middle; a centred grid item is sized by its
+     CONTENT, so the percentage had nothing definite to resolve against and the
+     photograph kept its own height — a 1:1 shot rendered 153px tall inside a
+     78px box and was clipped from the TOP by overflow:hidden. The row never
+     moved (that part was right), but object-fit:cover never got to do its
+     job: shop fronts lost their bottom 85px. Stretching the image to the grid
+     area gives the percentage a definite box, and cover crops from the centre. */
+  .m-img{display:block;width:100%;height:100%;place-self:stretch;min-width:0;min-height:0;
+    object-fit:cover;background:var(--color-neutral-300)}
   .m-front{height:150px;background:var(--color-neutral-300);border-bottom:2px solid var(--color-divider);
     display:grid;place-items:center;color:var(--ink-3);overflow:hidden}
   @media (min-width:768px){ .m-front{height:200px} }

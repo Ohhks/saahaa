@@ -106,13 +106,18 @@ const WHY = [
 
 /* The two working sides, worded from the live dials. A service partner keeps
    every rupee they quote; a shop pays a small per-order fee out of its own
-   price, capped, and never a yearly plan. */
+   price, capped, and never a yearly plan.
+
+   EACH ROW OPENS ITS OWN SIGN-UP (8.2). Both used to carry `earn.start`,
+   which sets the role to *partner* — so "I run a shop" landed a shopkeeper on
+   the trade form and left them to notice the picker and correct it. `shop.start`
+   has existed since 8.2 for exactly this; the row that says shop now uses it. */
 function sideRows(pct, P) {
   const rows = [
-    ['I offer a service', `Quote jobs and keep 100% of your price. SAAHAA's ${pct}% is added on top and paid by the customer.`],
-    ['I run a shop', `A storefront with your stock, live today. ${P.retailTakePct}% an order, capped at ${M.fmt(P.retailTakeCapPaise)}. No yearly plan.`],
+    ['earn.start', 'I offer a service', `Quote jobs and keep 100% of your price. SAAHAA's ${pct}% is added on top and paid by the customer.`],
+    ['shop.start', 'I run a shop', `A storefront with your stock, live today. ${P.retailTakePct}% an order, capped at ${M.fmt(P.retailTakeCapPaise)}. No yearly plan.`],
   ];
-  return rows.map(([t, s]) => `<button class="ern__side tap" type="button" data-act="earn.start">
+  return rows.map(([a, t, s]) => `<button class="ern__side tap" type="button" data-act="${a}">
       <b>${esc(t)}</b><span>${esc(s)}</span></button>`).join('');
 }
 
@@ -151,7 +156,7 @@ function invite() {
   </div>
 
   <div>${sideRows(pct, P)}</div>
-  <p class="ern__note">Both open the same sign-up, and the first thing on it is this same choice — so pick either one and change your mind there.
+  <p class="ern__note">Each opens its own sign-up, and the choice is the first thing on it either way — so changing your mind costs one tap.
     Already need something done instead? That is the Home tab: always free, and no markup on anyone's prices.</p>
 
   <main class="wrap ern" style="padding-top:0">

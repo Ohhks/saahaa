@@ -32,7 +32,7 @@ describe('fresh · demo never leaks, the credential and the dials always survive
   it('demo mode keeps the roster; production mode drops it', () => {
     const st = demoState();
     expect(F.purgeIfDemoResidue(st, true)).toBe(st);
-    const out = F.purgeIfDemoResidue(st, false);
+    const out = F.purgeIfDemoResidue(st, false, { commit: false });   // judge it, do not perform it
     expect(out.users).toHaveLength(0); expect(out.orders).toHaveLength(0); expect(out.ledger).toHaveLength(0);
     expect(out.seeded).toBeFalse();
   });

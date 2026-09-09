@@ -208,7 +208,10 @@ p.micro > a.micro{padding-block:17px}
    account"): 12px of type gave it a 12px hit area. The type stays 12px, the
    target becomes 44 — the extra height is padding, so nothing moves but the
    edges of the box you can hit. */
-.hd .more,.more{display:inline-flex;align-items:center;min-height:44px;padding:2px 0;
+/* 8.2: the height was stated and the width was not, so a short one — Account's
+   "All 4 →" — measured 42 wide. Every other .more is already wider, so the
+   minimum only ever moves the short ones, and by two pixels. */
+.hd .more,.more{display:inline-flex;align-items:center;justify-content:flex-end;min-height:44px;min-width:44px;padding:2px 0;
   font:600 12px/1 var(--font-body);color:var(--color-accent);letter-spacing:.02em}
 .between{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-5)}
 .row{display:flex;align-items:center;gap:var(--sp-5)} .grow{flex:1;min-width:0} .stack{display:flex;flex-direction:column;gap:var(--sp-4)}

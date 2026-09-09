@@ -341,7 +341,10 @@ export function renderDetail(orderId) {
           <div class="row" style="margin-top:10px;gap:0;border:1px solid var(--color-divider)">
             <input id="chatIn" class="grow" placeholder="Message"
               style="height:44px;padding:0 12px;border:0;background:var(--surface);color:var(--ink-1);font-size:14px;min-width:0">
-            <button class="btn btn--primary" style="min-height:44px;padding-inline:14px" data-act="chat.send" data-id="${o.id}" aria-label="Send">↑</button>
+            <!-- an icon-only button: padding around a 9px glyph came to 37px wide,
+                 so the minimum is stated rather than inferred (the #/chat composer's
+                 own .ch-send already sets 52px) -->
+            <button class="btn btn--primary" style="min-height:44px;min-width:44px;padding-inline:14px" data-act="chat.send" data-id="${o.id}" aria-label="Send">↑</button>
           </div>` : '<p class="micro muted" style="margin-top:10px">Sign in to reply.</p>'}
         </div>
 

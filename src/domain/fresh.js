@@ -58,12 +58,23 @@ export function counts(st) {
  * Boot guard. Returns the state to continue with: unchanged when clean or in
  * demo mode, otherwise a fresh one (and the reason is on the audit log).
  */
-export function purgeIfDemoResidue(st, demoMode) {
+/**
+ * @param {object} st         the state to judge
+ * @param {boolean} demoMode  true when ?demo=1 asked for the roster
+ * @param {object} [opts]     { commit } — false computes the answer WITHOUT
+ *   writing to the audit log or touching the picture store. A test asking
+ *   "what would this do" must not do it: this function used to write a real
+ *   `data.demoPurged` entry and wipe every picture whenever a suite ran.
+ */
+export function purgeIfDemoResidue(st, demoMode, opts = {}) {
+  const commit = opts.commit !== false;
   if (demoMode) return st;
   const r = demoResidue(st);
   if (!r.total) return st;
-  audit.record('data.demoPurged', { ...r, kept: 'admin, settings' }, 'system');
-  photos.gc([]);                 // the example roster's pictures go with it
+  if (commit) {
+    audit.record('data.demoPurged', { ...r, kept: 'admin, settings' }, 'system');
+    photos.gc([]);               // the example roster's pictures go with it
+  }
   return freshState(st);
 }
 
