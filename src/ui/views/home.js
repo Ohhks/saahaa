@@ -1087,7 +1087,11 @@ export function openCategory(catId, sub = null, pinnedId = null) {
        data-sub="${esc(s)}"${pinned ? ` data-pid="${esc(pinned.id)}"` : ''} aria-pressed="${s === sub}">${esc(s)}</button>`).join('');
 
   sheet(c.name, `
-    ${stepbar(hero ? (sub ? 5 : 2) : 2)}
+    ${/* The bar must not claim ground the customer has not covered. With nobody
+          free there is no match to progress to, so the journey is still at
+          Service; with a pro and a sub-service chosen this sheet IS the price,
+          and Confirm is the sheet after it. */ ''}
+    ${stepbar(hero ? (sub ? 4 : 2) : 1)}
     <div class="capsules" style="margin:0 0 14px">
       <span class="capsule"><span class="capsule__k">Priced</span>
         <span class="capsule__v" style="font-size:16px">${esc(c.unit)}</span></span>
