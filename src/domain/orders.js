@@ -63,7 +63,13 @@ const RETAIL_STAGES = [
   { id:'R_OUT',       label:'Out for delivery',       short:'On the way', owner:'rider',    to:['R_DELIVERED','R_FAILED'], tracker:true, tone:'info', ico:'🛵' },
   { id:'R_DELIVERED', label:'Delivered',              short:'Delivered',  owner:'rider',    to:['R_SETTLED','R_RETURN'], tracker:true, tone:'ok', ico:'✅', needsOtp:true },
   { id:'R_FAILED',    label:'Delivery failed',        short:'Failed',     owner:'system',   to:['R_RETURN','R_CANCELLED'], tracker:false, tone:'bad' },
-  { id:'R_RETURN',    label:'Return requested',       short:'Return',     owner:'customer', to:['R_REFUNDED'], tracker:false, tone:'warn' },
+  /* A RETURN WAS A ONE-WAY DOOR. The only edge out was R_REFUNDED, reachable
+     only from the SHOP's own console — so a shop that simply never answered
+     froze the whole order value for ever, and the customer's screen had no
+     control at all except the map and the chat. The admin's own escape hatch
+     could not reach it either (it advances to R_CANCELLED, which was not an
+     edge). She can escalate now, and the owner can end it. */
+  { id:'R_RETURN',    label:'Return requested',       short:'Return',     owner:'customer', to:['R_REFUNDED','R_CANCELLED','DISPUTED'], tracker:false, tone:'warn' },
   { id:'R_REFUNDED',  label:'Refunded',               short:'Refunded',   owner:'system',   to:['R_CLOSED'], tracker:false, tone:'warn' },
   { id:'R_SETTLED',   label:'Settled',                short:'Settled',    owner:'system',   to:['R_CLOSED'], tracker:true, tone:'ok', ico:'💰' },
   { id:'R_CANCELLED', label:'Cancelled',              short:'Cancelled',  owner:'either',   to:[], tracker:false, tone:'bad', terminal:true },

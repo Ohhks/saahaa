@@ -355,7 +355,11 @@ export function render() {
       </div>
       <p class="m-cap">Settings</p>
       ${setRow('area.pick', 'Addresses', pinned ? `${esc(myArea())} · pinned` : esc(myArea()))}
-      ${infoRow('Payment methods', `Wallet · ${esc(gateway.label().split(' — ')[0])}`)}
+      <!-- THIS WAS AN infoRow — a line of text, not a control — so there was no
+           way anywhere in the app for a customer to say where her money should
+           go, while "Take out to your UPI" sent it to an empty string. -->
+      ${setRow('cwallet.upi', 'Where refunds and take-outs go',
+        s.upi ? esc(s.upi) : 'Not set — needed before you can take money out')}
       ${setRow('nav.orders', 'Notifications', needsYou.length ? `${needsYou.length} waiting on you` : 'Only when a decision is yours')}
       ${setRow('theme.toggle', 'Appearance', theme)}
       ${setRow('splash.replay', 'Welcome screen', 'Replay')}

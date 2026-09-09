@@ -1377,7 +1377,13 @@ export function showAlternates(catId, sub = null) {
       Ranked on trust, distance and a fair price — never on price alone.</p>
     ${list.map((p, i) => {
       const pv = flow.previewBooking(catId, p, sub);
-      return `<button class="m-row" data-act="book.confirm" data-id="${catId}" data-pid="${p.id}" data-sub="${esc(sub || '')}">
+      /* THIS BOUGHT INSTEAD OF COMPARING. A row showing a name, a rating, a
+         distance and a price reads as "select" — and it was wired straight to
+         book.confirm, so one tap funded escrow and created a live order with
+         no bill, no fee line, no cancellation terms, no address and no
+         confirmation. It re-opens the priced sheet for that pro now, which is
+         where every one of those disclosures lives. */
+      return `<button class="m-row" data-act="book.sub" data-id="${catId}" data-pid="${p.id}" data-sub="${esc(sub || '')}">
         <span class="avatar avatar--md">${esc(p.name[0])}</span>
         <div class="grow" style="min-width:0">
           <div class="m-row__t">${esc(p.name)}</div>

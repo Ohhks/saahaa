@@ -8,6 +8,7 @@ import * as persist from './core/persist.js';
 import * as bus from './core/bus.js';
 import { CONTACT } from './core/config.js';
 import * as i18n from './ui/i18n.js';
+import * as verification from './domain/verification.js';
 import * as registry from './core/registry.js';
 import * as flags from './core/flags.js';
 import * as audit from './core/audit.js';
@@ -295,6 +296,16 @@ function wireActions() {
   A('sheet.close', () => closeSheet());
 
   /* theme + brand */
+  A('cwallet.upi', () => sheet('Where your money goes', `
+    <p class="tiny muted" style="margin-bottom:12px">Refunds and take-outs are sent here. Until it is set,
+      SAAHAA has nowhere to pay you and the take-out button stays off.</p>
+    <div class="field"><input id="cwUpi" autocomplete="off" spellcheck="false" placeholder=" "
+      value="${esc((ctx.session || {}).upi || '')}"><label>UPI id — name@bank</label></div>
+    <button class="btn btn-primary btn--block" data-act="cwallet.upi.save">Save</button>`));
+  A('cwallet.upi.save', () => {
+    const v = (document.getElementById('cwUpi') || {}).value || '';
+    if (flow.setCustomerUpi(v)) { closeSheet(); render(); }
+  });
   A('lang.set', d => { i18n.setLang(d.lang); render(); });
   A('theme.toggle', () => {
     const cur = document.documentElement.getAttribute('data-theme');
@@ -440,6 +451,25 @@ function wireActions() {
     if (!s) { toast('Sign in first', 'warn'); return; }
     const plan = erase.erasePlan(s.key);
     const row = (k, v) => `<div class="between tiny" style="padding:4px 0"><span class="muted">${esc(k)}</span><b>${esc(String(v))}</b></div>`;
+    const blockers = erase.eraseBlockers(s.key);
+    /* THE MOST HONEST SCREEN IN THE APP NEVER MENTIONED MONEY. It itemised what
+       is removed, what is emptied but kept, and what stays — and said nothing
+       about the wallet or the jobs in flight, while erasure removed the user
+       row and left the balance in a ledger nobody could sign in to claim. */
+    if (blockers.length) {
+      const live = blockers.find(b => b.kind === 'live');
+      const money = blockers.find(b => b.kind === 'money');
+      sheet('Not yet — your money is still here', `
+        <p class="tiny" style="margin-bottom:12px">Your account can be removed, but not while SAAHAA is
+          still holding something of yours. Removing it now would forfeit it, and that is not a deletion.</p>
+        ${money ? `<div class="m-kv"><span>In your wallet</span><span class="num">${M.fmt(money.paise)}</span></div>` : ''}
+        ${live ? `<div class="m-kv"><span>Jobs still running</span><span class="num">${live.n}</span></div>` : ''}
+        <p class="micro muted" style="margin-top:10px">${live ? 'Finish or cancel those first. ' : ''}${money
+          ? 'Then take your money out from My SAAHAA — it is yours either way.' : ''}
+          Come back after that and this will go through.</p>
+        <button class="btn btn--secondary btn--block" style="margin-top:12px" data-act="sheet.close">Got it</button>`);
+      return;
+    }
     sheet('Remove my account', `
       <p class="tiny muted" style="margin-bottom:12px">This cannot be undone. Here is exactly what happens to
         ${esc(s.name)} (${esc(s.code || s.key)}).</p>
@@ -573,7 +603,13 @@ function wireActions() {
   A('retail.out',       d => { flow.markLineUnavailable(d.id, d.line); render(); });
   A('retail.sub',       d => { flow.decideSubstitution(d.id, d.line, d.choice); render(); });
   A('retail.ready',     d => { flow.readyForPickup(d.id); render(); });
-  A('retail.collected', d => { flow.collected(d.id); render(); });
+  /* The retail handover now checks the code the customer reads out, exactly as
+     the service door does — it used to print her permanent code on the shop's
+     screen and simply mark it done, so the check verified nothing. */
+  const doorCode = () => Array.from(document.querySelectorAll('[data-role="otp"]'))
+    .map(el => el.value || '').join('').trim();
+  A('retail.collected', d => { if (flow.checkRetailCode(d.id, doorCode())) { flow.collected(d.id); render(); } });
+  A('retail.delivered', d => { if (flow.checkRetailCode(d.id, doorCode())) { flow.advance(d.id, 'R_DELIVERED'); render(); } });
   A('retail.return',    d => sheet('Return this order', `
     <p class="tiny muted" style="margin-bottom:12px">Pick what went wrong. The shop or SAAHAA confirms, and your money comes back in full.</p>
     <div class="chiprow" style="flex-wrap:wrap;gap:8px">
@@ -617,6 +653,20 @@ function wireActions() {
   A('partner.upgrade', () => go('onboard'));
   A('shop.tab',    d => { partner.setShopTab(d.tab); render(); });
   /* a shop's takings need an account to land in, and a control to send them */
+  A('pro.upi', d => {
+    const pr = (ctx.store.getState().partners || []).find(x => x.id === d.id) || {};
+    sheet('Where you are paid', `
+      <p class="tiny muted" style="margin-bottom:12px">Your settled jobs are sent here, in one tap, whenever
+        you like. It is the only destination SAAHAA will pay you into.</p>
+      <div class="field"><input id="prUpi" autocomplete="off" spellcheck="false" placeholder=" "
+        value="${esc((pr.verification || {}).upi || '')}"><label>UPI id — name@bank</label></div>
+      <button class="btn btn-primary btn--block" data-act="pro.upi.save" data-id="${esc(d.id)}">Save</button>`);
+  });
+  A('pro.upi.save', d => {
+    const pr = (ctx.store.getState().partners || []).find(x => x.id === d.id);
+    const v = (document.getElementById('prUpi') || {}).value || '';
+    if (pr && verification.submitPayout(pr, v)) { closeSheet(); render(); }
+  });
   A('shop.upi', d => sheet('Where this shop is paid', `
     <p class="tiny muted" style="margin-bottom:12px">Your settled orders are sent here. It is the only
       destination SAAHAA will pay a shop into, and you can change it whenever you like.</p>

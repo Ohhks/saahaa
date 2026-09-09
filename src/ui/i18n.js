@@ -71,6 +71,14 @@ export function setLang(id) {
    one screen at a time. English is the source of truth; a missing key in
    another language falls back to it rather than showing the key. */
 const EN = {
+  'stage.MATCHING':       'Finding your pro',
+  'stage.ASSIGNED':       'Pro accepted',
+  'stage.EN_ROUTE':       'On the way to you',
+  'stage.ARRIVED':        'Pro has arrived',
+  'stage.IN_PROGRESS':    'Work in progress',
+  'stage.WORK_DONE':      'Work finished',
+  'stage.SETTLED':        'Paid & settled',
+
   'lang.pick':            'Language',
   'lang.unreviewed':      'This translation has not yet been checked by a native speaker. Tell us if anything reads wrong.',
 
@@ -136,6 +144,14 @@ const EN = {
 };
 
 const HI = {
+  'stage.MATCHING':       'आपका कारीगर ढूँढ रहे हैं',
+  'stage.ASSIGNED':       'कारीगर ने काम लिया',
+  'stage.EN_ROUTE':       'आपकी ओर आ रहे हैं',
+  'stage.ARRIVED':        'कारीगर पहुँच गए',
+  'stage.IN_PROGRESS':    'काम चल रहा है',
+  'stage.WORK_DONE':      'काम पूरा हुआ',
+  'stage.SETTLED':        'भुगतान हो गया',
+
   'lang.pick':            'भाषा',
   'lang.unreviewed':      'यह अनुवाद अभी तक किसी मूल भाषी ने नहीं जाँचा है। कुछ गलत लगे तो हमें बताएँ।',
 
@@ -197,6 +213,14 @@ const HI = {
 };
 
 const TE = {
+  'stage.MATCHING':       'మీ ప్రొను వెతుకుతున్నాం',
+  'stage.ASSIGNED':       'ప్రొ ఒప్పుకున్నారు',
+  'stage.EN_ROUTE':       'మీ దగ్గరికి వస్తున్నారు',
+  'stage.ARRIVED':        'ప్రొ వచ్చారు',
+  'stage.IN_PROGRESS':    'పని జరుగుతోంది',
+  'stage.WORK_DONE':      'పని పూర్తయింది',
+  'stage.SETTLED':        'చెల్లింపు పూర్తి',
+
   'lang.pick':            'భాష',
   'lang.unreviewed':      'ఈ అనువాదాన్ని ఇంకా తెలుగు మాతృభాషీయులు ఎవరూ సరిచూడలేదు. ఏదైనా తప్పుగా అనిపిస్తే మాకు చెప్పండి.',
 

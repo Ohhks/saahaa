@@ -186,7 +186,7 @@ export function renderList() {
       <span class="m-lead${live ? '' : ' m-lead--dim'}" aria-hidden="true"></span>
       <div class="grow" style="min-width:0">
         <div class="m-row__t">${esc(title)}</div>
-        <div class="m-row__m">${esc(who)} · ${esc(st.label.toLowerCase())}${live ? ` · step ${idx + 1} of ${track.length}` : ''} · ${timeAgo(o.createdAt)}</div>
+        <div class="m-row__m">${esc(who)} · ${esc(stageLabel(st).toLowerCase())}${live ? ` · step ${idx + 1} of ${track.length}` : ''} · ${timeAgo(o.createdAt)}</div>
         <div class="m-row__tags">
           <span class="tag ${TONE_TAG[st.tone] || ''}">${esc(st.short)}</span>
           <span class="tag" style="background:transparent;border-color:var(--color-divider)">${orderNo(o)}</span>
@@ -285,7 +285,7 @@ export function renderDetail(orderId) {
     <div class="row" style="gap:10px;padding:12px 0;border-bottom:2px solid var(--color-divider)">
       <span class="thumb m-thumb" style="width:40px;height:40px" aria-hidden="true">${hasIcon(cat.id) ? icon(cat.id, { size: 18 }) : icon('box', { size: 18 })}</span>
       <div class="grow" style="min-width:0">
-        <div style="font:800 13.5px/1.2 var(--font-heading)">${esc(who)} · ${esc(st.label.toLowerCase())}</div>
+        <div style="font:800 13.5px/1.2 var(--font-heading)">${esc(who)} · ${esc(stageLabel(st).toLowerCase())}</div>
         <div style="font-size:11px;color:var(--ink-3);margin-top:2px">${running
           ? `${km} km away · ~${o.eta || etaMins(km)} min · step ${idx + 1} of ${track.length}`
           : `${esc(st.short)} · ${timeAgo(o.createdAt)}`}</div>
@@ -326,7 +326,7 @@ export function renderDetail(orderId) {
             <p class="micro muted" style="margin-top:6px">${esc(paidWith(o))}. ${esc(o.partnerName)} receives the full ${M.fmt(o.deal)} —
               SAAHAA holds it until ${confirms} the work and never takes a cut of their quote.</p>
             ${o.saved && !(isPartner || isShop) ? `<p class="micro" style="margin-top:6px;color:var(--color-accent)">You saved ${M.fmt(o.saved)} against a commission app — and your pro was paid more.</p>` : ''}
-            ${o.saved && (isPartner || isShop) ? `<p class="micro" style="margin-top:6px;color:var(--color-accent)">You keep the whole ${M.fmt(o.deal)}. SAAHAA's charge was paid on top, by the customer.</p>` : ''}
+            ${o.saved && (isPartner || isShop) ? `<p class="micro" style="margin-top:6px;color:var(--color-accent)">${esc(t('money.youKeep', { amount: M.fmt(o.deal) }))}</p>` : ''}
           </div>` : `
           <div class="sec">
             <p class="m-cap">${o.lines.length} item${o.lines.length === 1 ? '' : 's'}${o.provisional ? ' · est. until weighed' : ''}</p>
@@ -444,7 +444,7 @@ export function renderChat(orderId) {
       hasIcon(cat.id) ? icon(cat.id, { size: 16 }) : icon('chat', { size: 16 })}</span>
     <div class="grow" style="min-width:0">
       <div class="ch-who">${esc(who)}</div>
-      <div class="ch-state">${esc(st.label)} · ${M.fmt(o.kind === 'service' ? o.deal : o.customerPays)} · ${esc(clockTime(o.createdAt))}</div>
+      <div class="ch-state">${esc(stageLabel(st))} · ${M.fmt(o.kind === 'service' ? o.deal : o.customerPays)} · ${esc(clockTime(o.createdAt))}</div>
     </div>
     <button class="btn btn-secondary" style="flex:none" data-act="order.open" data-id="${esc(o.id)}">Order</button>
   </header>
@@ -647,7 +647,7 @@ function actionPanel(o, r) {
        away, because a word is not evidence and should not look like it. */
     if (s === 'IN_PROGRESS') return panel(t('job.photoNeeded'), `
       ${o.stake ? `<p class="tiny" style="margin-bottom:10px"><span class="state state--held">${M.fmt(o.stake.need)} locked</span>
-        <span class="muted">from your wallet for this job${o.stake.onCredit ? ` (${M.fmt(o.stake.onCredit)} on credit against this payout)` : ''} — it comes back in full when the customer confirms.</span></p>` : ''}
+        <span class="muted">${o.stake.onCredit ? `(${M.fmt(o.stake.onCredit)} on credit against this payout) ` : ''}${esc(t('money.stakeBack', { amount: M.fmt(o.stake.need) }))}</span></p>` : ''}
       <div class="row" style="gap:8px;margin-bottom:10px">
         <button class="btn btn--primary grow" data-act="photo.evidence" data-id="${o.id}" data-label="Before">${icon('camera', { size: 16 })} Before</button>
         <button class="btn btn--primary grow" data-act="photo.evidence" data-id="${o.id}" data-label="After">${icon('camera', { size: 16 })} After</button>
@@ -716,6 +716,21 @@ function actionPanel(o, r) {
         <button class="btn btn--secondary" data-act="rate.skip" data-id="${o.id}">Skip</button>
       </div>`);
     }
+    /* A RETURN WAS A TRAP: the money froze and this screen had no control at
+       all. She can escalate now, and if the shop simply never answers the sweep
+       pays her back within a day — which the panel says, so she is not left
+       wondering whether tapping return was a mistake. */
+    if (s === 'R_RETURN') return panel('Return requested', `
+      <p class="tiny" style="margin-bottom:10px">${esc(o.returnReason || 'You asked to return this order.')}</p>
+      <div class="m-kv"><span>Held, going nowhere else</span><span class="num">${M.fmt(o.customerPays)}</span></div>
+      <p class="micro muted" style="margin-top:10px">${esc(o.shopName || 'The shop')} can accept it now. If they do not
+        answer within ${Math.round(flow.RETURN_WINDOW_MS / 3600e3)} hours, SAAHAA refunds you in full automatically —
+        you do not have to chase it.</p>
+      <button class="btn btn--secondary btn--block" style="margin-top:10px"
+        data-act="dispute.open" data-id="${o.id}">Ask SAAHAA to step in now</button>
+      <button class="btn btn--ghost btn--block btn--sm" style="margin-top:6px"
+        data-act="nav.chat" data-id="${o.id}">Message ${esc(String(o.shopName || 'the shop').split(' ')[0])}</button>`);
+
     if (s === 'R_DELIVERED') return panel('Delivered — confirm', `${B('retail.settle', 'Confirm delivery')}
       <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--color-accent-400)"
         data-act="retail.return" data-id="${o.id}">Something was wrong — return this order</button>`);
@@ -838,11 +853,33 @@ function actionPanel(o, r) {
     if (s === 'R_PACKED')   return o.mode === 'pickup'
       ? panel('Packed — customer collects', B('retail.ready', 'Ready for pickup'))
       : panel('Hand over', B('stage.out', 'Out for delivery'));
-    if (s === 'R_PICKUP_READY') return panel('Waiting at the counter', `<p class="tiny muted">Ask for their SAAHAA code <b class="num">${esc(o.otp)}</b> when they collect.</p>`);
+    /* THE SHOP WAS SHOWN THE CUSTOMER'S PERMANENT CODE AND TOLD TO ASK FOR IT.
+       That is the same code a plumber must type to prove he is standing at her
+       door, it is hers for life, and it cannot be rotated — so every shop she
+       ever ordered from learned it. The service side already refuses to print a
+       specimen for exactly this reason and says so. The shop is told the shape
+       and types what she says, like the pro does. */
+    if (s === 'R_PICKUP_READY') return panel('Waiting at the counter', `
+      <p class="tiny muted" style="margin:0 0 10px">Ask for their SAAHAA code when they collect —
+        it starts with a letter and has eight digits after it.</p>
+      <div class="field" style="margin-bottom:12px">
+        <input id="otpCode" data-role="otp" autocapitalize="characters" autocomplete="off"
+          spellcheck="false" maxlength="12" placeholder=" "
+          style="letter-spacing:.12em;text-transform:uppercase">
+        <label>${esc(t('door.pro.field'))}</label>
+      </div>
+      ${B('retail.collected', 'Check the code & hand it over')}`);
     if (s === 'R_RETURN') return panel('Return requested', `<p class="tiny muted" style="margin-bottom:10px">${esc(o.returnReason || '')}</p>${B('retail.acceptreturn', 'Accept return — refund in full')}`);
-    if (s === 'R_OUT')      return panel("The customer's code",
-      `${codeBig(o.otp)}<p class="tiny muted" style="text-align:center;margin:8px 0 0">Ask for it at the door before you hand the order over.</p>
-       <div style="height:12px"></div>${B('stage.delivered', 'Mark delivered')}`);
+    if (s === 'R_OUT')      return panel('Ask for their code at the door', `
+      <p class="tiny muted" style="margin:0 0 10px">Their own SAAHAA code — it starts with a letter and has
+        eight digits after it. Typing it is how the handover is recorded.</p>
+      <div class="field" style="margin-bottom:12px">
+        <input id="otpCode" data-role="otp" autocapitalize="characters" autocomplete="off"
+          spellcheck="false" maxlength="12" placeholder=" "
+          style="letter-spacing:.12em;text-transform:uppercase">
+        <label>${esc(t('door.pro.field'))}</label>
+      </div>
+      ${B('retail.delivered', 'Check the code & mark delivered')}`);
   }
   return '';
 }
@@ -878,6 +915,28 @@ function whereTo(o) {
    plus the credit, repeat. A real no-show takes at least as long as the journey
    she was quoted, plus a grace period for traffic. */
 const NO_SHOW_AFTER_MS = 20 * 60 * 1000;
+
+/* The stage a person is looking at, in their own language. The engine keeps the
+   English label as its source of truth (domain/orders.js) and a translation is
+   looked up by stage id — so a language that has not translated a stage falls
+   back to the engine's own word rather than to a blank. */
+const stageLabel = st => {
+  /* Written out rather than built as 'stage.' + id, so tools/lint-i18n.mjs can
+     see each key. A key a static check cannot find is a key that silently rots
+     — which is exactly how seven of these sat translated and unrendered. */
+  switch (st.id) {
+    case 'MATCHING':    return t('stage.MATCHING');
+    case 'ASSIGNED':    return t('stage.ASSIGNED');
+    case 'EN_ROUTE':    return t('stage.EN_ROUTE');
+    case 'ARRIVED':     return t('stage.ARRIVED');
+    case 'IN_PROGRESS': return t('stage.IN_PROGRESS');
+    case 'WORK_DONE':   return t('stage.WORK_DONE');
+    case 'SETTLED':     return t('stage.SETTLED');
+    default:            return st.label;      // retail stages keep the engine's word
+  }
+};
+
+
 
 /* What the customer is told about the deadline on her own job. A job under
    review has no clock at all and must not pretend to; one with a window states

@@ -53,6 +53,7 @@ import { mark, pillarRow } from '../logo.js';
 import * as gmap from '../map.js';
 import { passwordProblem, normaliseMobile, loginGate, noteLoginFail, noteLoginOk }
   from '../../core/security.js';
+import * as security from '../../core/security.js';
 import * as audit from '../../core/audit.js';
 
 let tab = 'login';        // login | signup
@@ -560,14 +561,20 @@ export async function doLogin(pickedKey = null) {
   const u = pickedKey ? r.matches.find(x => x.key === pickedKey) : r.matches[0];
   if (!u) { toast('Pick which account to open', 'warn'); return; }
   const mobile = normaliseMobile(u.mobile);
-  const h = await sha256(pw);
-  if (u.pass && u.pass !== h) {
+  /* Understands both the old unsalted hash and the new salted one, and quietly
+     re-stores an old account's password with a salt the first time they sign
+     in — nobody is locked out by the upgrade. */
+  const check = await security.checkPassword(pw, u);
+  if (u.pass && !check.ok) {
     const f = noteLoginFail(mobile);
     toast(f.blocked ? `Wrong password — locked for ${Math.ceil(f.waitMs / 1000)}s` : 'Wrong password', 'danger');
     return;
   }
+  if (check.upgrade) dispatch({ type: 'user/patch', payload: { key: u.key, patch: check.upgrade } });
   noteLoginOk(mobile);
-  saveSession({ ...u });          // survives a refresh and a PWA relaunch
+  /* the session must not carry the credential around with it */
+  const { pass, passSalt, passIter, ...safe } = u;
+  saveSession(safe);              // survives a refresh and a PWA relaunch
   audit.record('user.login', { key: u.key, code: u.code || null, role: u.role }, u.key);
   toast(`Welcome back, ${u.name.split(' ')[0]}`);
   ctx.go(u.role === 'partner' ? 'partner' : u.role === 'shop' ? 'shopadmin' : 'home');
@@ -664,9 +671,9 @@ export async function doSignup() {
   const key = ID.nextCode(role, getState().users);
   const code = key;
 
-  const pass = await sha256(pw);
+  const cred = await security.hashPassword(pw);   // salted PBKDF2, never a bare sha256
   const id = nid('u');
-  const user = { key, code, id, name, mobile, role, pass, area, loc, tier: 1, createdAt: Date.now() };
+  const user = { key, code, id, name, mobile, role, ...cred, area, loc, tier: 1, createdAt: Date.now() };
 
   if (role === 'partner') {
     const pid = nid('p');

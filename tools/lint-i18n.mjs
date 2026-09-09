@@ -1,24 +1,34 @@
-/* SAAHAA · tools/lint-i18n.mjs — a translated string nobody renders is not a translation.
+/* SAAHAA · tools/lint-i18n.mjs — is the APP translated, or only the table?
 
-   The first version of the language layer shipped 53 keys and rendered 24 of
-   them. Telugu existed for all seven onboarding steps, for every money word,
-   for the door-code errors, and for the note explaining that the trade quiz is
-   only in English — and every one of those was dead, because the views printed
-   the English source directly. A pro switching to Telugu got two translated
-   paragraphs marooned in an English sign-up, which is worse than English.
+   This lint used to print "53 keys defined, 53 rendered ✓" while seven keys
+   were rendered nowhere and the app itself was about two per cent translated.
+   Two audits in a row found a Telugu tab bar sitting on an entirely English
+   product, and every key-level check passed the whole time.
 
-   The module's own docstring claimed those strings were live. Nothing caught
-   it because a dead key breaks nothing: no error, no blank, no warning. This
-   is the check that makes it visible.
+   Two things went wrong, and both are the same mistake: measuring what was
+   easy to measure instead of what mattered.
 
-   Run: node tools/lint-i18n.mjs      (wired into tools/preflight.sh)
-   Exits non-zero if a key is defined and never used, or used and never defined. */
+     1. The "stem" escape hatch — meant for `t(s.k + '.t')`, where a view builds
+        a key from a prefix — matched that prefix ANYWHERE in the tree. So
+        `money.available` counted as used because the unrelated literal
+        `['money', 'Sales']` exists in partner.js.
+     2. Nothing counted how many places actually call `t()`. A table with no
+        gaps says nothing about whether any screen reads from it.
+
+   A measurement that tells you what you hoped is worse than no measurement.
+
+   Run: node tools/lint-i18n.mjs        (wired into tools/preflight.sh)
+   Exits non-zero on a dead key, an undefined key, or too little coverage. */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 
 const ROOT = process.cwd();
 const I18N = join(ROOT, 'src', 'ui', 'i18n.js');
+
+/* The floor this build refuses to drop below. A ratchet, not a target: raise it
+   whenever coverage grows so it can never quietly slide back. */
+const MIN_SITES = 40;
 
 const walk = d => {
   let out = [];
@@ -29,41 +39,63 @@ const walk = d => {
   return out;
 };
 
-const src = readFileSync(I18N, 'utf8');
+/* `t(` with no boundary matched get(, esc(, isOn(, format( — everything that
+   happens to end in a t. It reported 645 render sites and 46 undefined keys,
+   all of them nonsense like 'app' and 'SIM_MARKET'. */
+const BOUND = '(?<![\\w.$])';
 
-/* the English table is the source of truth for what keys exist */
+const src = readFileSync(I18N, 'utf8');
 const enBlock = src.slice(src.indexOf('const EN = {'), src.indexOf('const HI = {'));
 const defined = [...enBlock.matchAll(/^\s*'([\w.]+)':/gm)].map(m => m[1]);
 
-/* every other .js file that could render one */
-const files = walk(join(ROOT, 'src'))
-  .filter(f => f.endsWith('.js') && !f.includes('i18n.js'));
-
+const files = walk(join(ROOT, 'src')).filter(f => f.endsWith('.js') && !f.includes('i18n.js'));
 const body = files.map(f => readFileSync(f, 'utf8')).join('\n');
 
-const unused = defined.filter(k => !body.includes(`'${k}'`) && !body.includes(`"${k}"`)
-  /* `t(s.k + '.t')` builds a key from a prefix — count the prefix as a use */
-  && !(k.includes('.') && body.includes(`'${k.slice(0, k.lastIndexOf('.'))}'`)));
+/* Which suffixes a view genuinely builds onto a stem, e.g. t(s.k + '.t'). */
+const STEM = new RegExp(BOUND + 't\\(\\s*[\\w.]+\\s*\\+\\s*[\'"]([.][\\w.]+)[\'"]', 'g');
+const stems = new Set([...body.matchAll(STEM)].map(m => m[1]));
 
-/* keys a view asks for that the table does not have */
-const asked = new Set([...body.matchAll(/\bt\(\s*'([\w.]+)'/g)].map(m => m[1]));
+const builtFromStem = key => {
+  const dot = key.lastIndexOf('.');
+  if (dot < 0) return false;
+  if (!stems.has(key.slice(dot))) return false;
+  /* and the stem must appear as a whole quoted string, never as a substring */
+  const stem = key.slice(0, dot).replace(/\./g, '\\.');
+  return new RegExp('[\'"`]' + stem + '[\'"`]').test(body);
+};
+
+const unused = defined.filter(k =>
+  !body.includes("'" + k + "'") && !body.includes('"' + k + '"') && !builtFromStem(k));
+
+const LITERAL = new RegExp(BOUND + 't\\(\\s*[\'"`]', 'g');
+const COMPUTED = new RegExp(BOUND + 't\\(\\s*[\\w.]+\\s*\\+', 'g');
+const sites = [...body.matchAll(LITERAL)].length + [...body.matchAll(COMPUTED)].length;
+
+const ASKED = new RegExp(BOUND + 't\\(\\s*[\'"]([\\w.]+)[\'"]', 'g');
+const asked = new Set([...body.matchAll(ASKED)].map(m => m[1]));
 const missing = [...asked].filter(k => !defined.includes(k));
 
-const pad = (s, n) => String(s).padEnd(n);
-console.log(`  i18n: ${defined.length} keys defined, ${defined.length - unused.length} rendered`);
+console.log('  i18n: ' + defined.length + ' keys, ' + (defined.length - unused.length)
+  + ' rendered, ' + sites + ' render sites');
 
 let bad = 0;
 if (unused.length) {
   bad = 1;
-  console.log(`\n  ✗ DEFINED BUT NEVER RENDERED (${unused.length}) — translated for nobody:`);
+  console.log('\n  x DEFINED BUT NEVER RENDERED (' + unused.length + ') — translated for nobody:');
   unused.forEach(k => console.log('      ' + k));
-  console.log('    Either render it, or delete it. A key that no screen reads is a promise');
-  console.log('    of translation that the person never receives.');
+  console.log('    Render it or delete it. A key no screen reads is a translation nobody gets.');
 }
 if (missing.length) {
   bad = 1;
-  console.log(`\n  ✗ ASKED FOR BUT NOT DEFINED (${missing.length}) — these fall back to the key name:`);
+  console.log('\n  x ASKED FOR BUT NOT DEFINED (' + missing.length + ') — these fall back to the key name:');
   missing.forEach(k => console.log('      ' + k));
 }
-if (!bad) console.log('  ✓ every key is rendered, and every key a view asks for exists');
+if (sites < MIN_SITES) {
+  bad = 1;
+  console.log('\n  x ONLY ' + sites + ' RENDER SITES (floor is ' + MIN_SITES + ').');
+  console.log('    A full table on an untranslated app means somebody switching language gets');
+  console.log('    a translated tab bar and an English product — worse than English alone.');
+  console.log('    Raise coverage, or stop offering the language. See docs/I18N.md.');
+}
+if (!bad) console.log('  ok every key renders, every asked key exists, coverage is above the floor');
 process.exit(bad);

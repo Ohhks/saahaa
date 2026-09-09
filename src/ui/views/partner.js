@@ -291,10 +291,10 @@ function walletCard(p) {
   const live = getState().orders.filter(o => o.partnerId === p.id && o.stake && !o.stake.returned && !o.stake.forfeited);
   return `${kick('Wallet', `<span class="tag tag-neutral">min stake ${M.fmt(W.MIN_STAKE)}</span>`)}
     <div class="capsules" style="grid-template-columns:repeat(2,1fr)">
-      <div class="capsule capsule--ok"><span class="capsule__k">Available</span><span class="capsule__v num">${M.fmt(w.available)}</span><span class="state state--available">yours to withdraw</span></div>
-      <div class="capsule capsule--info"><span class="capsule__k">Locked</span><span class="capsule__v num">${M.fmt(w.locked)}</span><span class="state state--held">${live.length ? `${live.length} job${live.length > 1 ? 's' : ''} in progress` : 'returns when done'}</span></div>
-      <div class="capsule capsule--warn"><span class="capsule__k">Pending</span><span class="capsule__v num">${M.fmt(w.pending)}</span><span class="state state--pending">7-day holdback</span></div>
-      <div class="capsule capsule--gold"><span class="capsule__k">Released</span><span class="capsule__v num">${M.fmt(w.released)}</span><span class="state state--released">lifetime</span></div>
+      <div class="capsule capsule--ok"><span class="capsule__k">${esc(t('money.available'))}</span><span class="capsule__v num">${M.fmt(w.available)}</span><span class="state state--available">${esc(t('money.availableSub'))}</span></div>
+      <div class="capsule capsule--info"><span class="capsule__k">${esc(t('money.locked'))}</span><span class="capsule__v num">${M.fmt(w.locked)}</span><span class="state state--held">${live.length ? `${live.length} job${live.length > 1 ? 's' : ''} in progress` : 'returns when done'}</span></div>
+      <div class="capsule capsule--warn"><span class="capsule__k">${esc(t('money.pending'))}</span><span class="capsule__v num">${M.fmt(w.pending)}</span><span class="state state--pending">7-day holdback</span></div>
+      <div class="capsule capsule--gold"><span class="capsule__k">${esc(t('money.released'))}</span><span class="capsule__v num">${M.fmt(w.released)}</span><span class="state state--released">lifetime</span></div>
     </div>
     ${w.debt ? `<p class="tiny" style="margin-top:8px;color:var(--warn)">${M.fmt(w.debt)} owed from a job you left — recovered from your next payout.</p>` : ''}
     <p class="micro muted" style="margin-top:8px">${esc(gateway.label())}</p>
@@ -303,9 +303,11 @@ function walletCard(p) {
     <p class="micro muted" style="margin-top:6px"><b>Pending</b> is your ${HOLDBACK_PCT}% holdback: ${HOLDBACK_PCT} paise in every rupee paid to you waits ${HOLDBACK_DAYS} days and then moves to Available by itself. It never grows past ${M.fmt(HOLDBACK_CAP)} in total, it is not a fee, and nobody has to approve it.</p>
     <div class="row" style="gap:8px;margin-top:10px">
       <button class="btn btn-secondary grow" data-act="wallet.topup" data-id="${p.id}">${esc(t('money.add'))}</button>
-      <button class="btn btn-ghost grow" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${w.available < flow.MIN_WITHDRAW ? 'disabled' : ''}>${esc(t('money.withdraw'))}${w.available >= flow.MIN_WITHDRAW ? ' ' + M.fmt(w.available) : ''}</button>
+      <button class="btn btn-ghost grow" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${(!upiOf(p) || w.available < flow.MIN_WITHDRAW) ? 'disabled' : ''}>${esc(t('money.withdraw'))}${w.available >= flow.MIN_WITHDRAW ? ' ' + M.fmt(w.available) : ''}</button>
     </div>`;
 }
+
+const upiOf = p => ((p && p.verification) || {}).upi || '';
 
 /* seven months of what was KEPT, drawn with divs off the settled orders */
 function monthBars(paid) {
@@ -342,9 +344,18 @@ function proEarnings(p, orders, paid, earned, held, paidOut) {
     <div class="payline">
       <div class="grow" style="min-width:0">
         <b style="font:800 15px var(--font-heading);display:block">${M.fmt(w.available)} payable now</b>
-        <span class="micro" style="opacity:.85">${p.verification && p.verification.upi ? esc(p.verification.upi) : 'your UPI'} · ${esc(gateway.label())}</span>
+        <span class="micro" style="opacity:.85">${upiOf(p)
+          ? esc(upiOf(p)) : 'No UPI id yet — nothing can be sent until you add one'} · ${esc(gateway.label())}</span>
       </div>
-      <button class="btn btn-secondary" style="border-color:currentColor;color:inherit" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${w.available < flow.MIN_WITHDRAW ? 'disabled' : ''}>Withdraw</button>
+      <!-- THE PRO HAD NO WAY TO SET HIS OWN UPI ANYWHERE IN THE APP. Onboarding
+           step 6 collects it once and is unreachable afterwards, so a pro whose
+           bank changed was stuck for ever — and this button stayed enabled and
+           then refused with "add a UPI id first" on a screen with no way to add
+           one. The shop's payout screen, further down this same file, has done
+           it correctly the whole time. -->
+      <button class="btn btn-secondary" style="border-color:currentColor;color:inherit"
+        data-act="pro.upi" data-id="${p.id}">${upiOf(p) ? 'Change' : 'Add UPI id'}</button>
+      <button class="btn btn-secondary" style="border-color:currentColor;color:inherit" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${(!upiOf(p) || w.available < flow.MIN_WITHDRAW) ? 'disabled' : ''}>Withdraw</button>
     </div>
     <!-- THIS SAID "Withdrawals start at Rs.1,000" AND GREYED THE BUTTON, beside a
          figure the same screen labelled "yours to withdraw". The engine has

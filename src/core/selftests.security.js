@@ -11,6 +11,7 @@
 
 import { describe, it, expect } from './selftest.js';
 import * as S from './security.js';
+import { sha256 } from './crypto.js';
 import * as adminauth from './adminauth.js';
 import { ADMIN_BOOTSTRAP } from './config.js';
 import * as persist from './persist.js';
@@ -267,5 +268,42 @@ describe('chat masking · a number written the way people write it is still a nu
   it('leaves ordinary sentences with numbers alone — it is a mask, not a censor', () => {
     ['the price is 350 rupees', 'order 4471 at 9 am', '2 items, 40 left', 'flat 302, 3rd floor']
       .forEach(t => expect(maskContact(t)).toBe(t));
+  });
+});
+
+/* PASSWORDS. Until 8.8.0 a person's password was stored as `sha256(password)`:
+   unsalted, one round. Two people who both chose "123" had the same stored
+   string, and the whole state blob is exportable from the admin console. The
+   owner's own credential in this codebase has always used PBKDF2 at 250,000
+   rounds with a random salt — the right pattern was written and never applied
+   to the people whose livelihoods are in the app. */
+describe('security · a password is salted and stretched, and old ones still work', () => {
+  it('two people who pick the same password do not get the same stored hash', async () => {
+    const a = await S.hashPassword('Str0ngPass!9');
+    const b = await S.hashPassword('Str0ngPass!9');
+    expect(a.pass).toSatisfy(v => v !== b.pass, 'salted, so identical passwords differ');
+    expect(a.passSalt).toSatisfy(v => v !== b.passSalt, 'and the salts differ');
+    expect(a.passIter).toSatisfy(n => n >= 100000, 'stretched, got ' + a.passIter);
+  });
+
+  it('the stored value is never the bare sha256 of the password', async () => {
+    const cred = await S.hashPassword('123');
+    const bare = await sha256('123');
+    expect(cred.pass).toSatisfy(v => v !== bare, 'a rainbow table must not open it');
+  });
+
+  it('the right password opens it and the wrong one does not', async () => {
+    const cred = await S.hashPassword('Str0ngPass!9');
+    expect((await S.checkPassword('Str0ngPass!9', cred)).ok).toBeTrue();
+    expect((await S.checkPassword('Str0ngPass!8', cred)).ok).toBeFalse();
+  });
+
+  it('an account stored the OLD way still signs in, and is upgraded on the way', async () => {
+    /* nobody may be locked out by this change */
+    const legacy = { pass: await sha256('123') };
+    const r = await S.checkPassword('123', legacy);
+    expect(r.ok).toBeTrue();
+    expect(r.upgrade).toSatisfy(u => !!u && !!u.passSalt, 'a salted credential to store');
+    expect((await S.checkPassword('nope', legacy)).ok).toBeFalse();
   });
 });

@@ -20,6 +20,7 @@
    Node — see core/selftests.security.js. */
 
 import * as persist from './persist.js';
+import { sha256 } from './crypto.js';
 
 /* ── session policy ────────────────────────────────────────────
    A customer session survives a refresh and a PWA relaunch, but not forever:
@@ -130,6 +131,62 @@ export const commonPasswordCount = () => COMMON.size;
  * @param {string} [mobile] the number being registered, when known
  * @returns {string|null}
  */
+/* ── HOW A PERSON'S PASSWORD IS STORED ─────────────────────────
+   It was `sha256(password)`: unsalted, one round. Two people who both chose
+   "123" had the same stored string, every stored hash was a rainbow-table
+   lookup away from the password, and the whole state blob is exportable from
+   the admin console. Meanwhile the OWNER's credential in this same codebase
+   has always used PBKDF2-SHA256 with a random salt at 250,000 rounds — the
+   right pattern was already written, and it had simply never been applied to
+   the people whose livelihoods are in the app.
+
+   Old accounts keep working: a stored hash with no salt is verified the old
+   way and quietly upgraded the next time that person signs in, so nobody is
+   locked out by this change. */
+const ITERATIONS = 250000;
+const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+function randomSaltHex() {
+  const a = new Uint8Array(16);
+  (globalThis.crypto || {}).getRandomValues
+    ? globalThis.crypto.getRandomValues(a)
+    : a.forEach((_, i) => { a[i] = Math.floor(Math.random() * 256); });
+  return hex(a.buffer);
+}
+
+async function pbkdf2(password, saltHex, iterations = ITERATIONS) {
+  const subtle = (globalThis.crypto || {}).subtle;
+  if (!subtle) return null;                       // no WebCrypto: caller falls back
+  const salt = Uint8Array.from(saltHex.match(/../g).map(h => parseInt(h, 16)));
+  const key = await subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  return hex(await subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, key, 256));
+}
+
+/** Make a stored credential for a NEW password. */
+export async function hashPassword(password) {
+  const salt = randomSaltHex();
+  const h = await pbkdf2(password, salt);
+  if (!h) return { pass: await sha256(password), passSalt: '', passIter: 0 };   // ancient browser
+  return { pass: h, passSalt: salt, passIter: ITERATIONS };
+}
+
+/**
+ * Does this password open this account? Understands both shapes, so an account
+ * created before 8.8.0 still signs in.
+ * Returns { ok, upgrade } — `upgrade` is a fresh credential to store when an
+ * old unsalted hash was accepted.
+ */
+export async function checkPassword(password, user) {
+  if (!user) return { ok: false, upgrade: null };
+  if (user.passSalt) {
+    const h = await pbkdf2(password, user.passSalt, user.passIter || ITERATIONS);
+    return { ok: !!h && h === user.pass, upgrade: null };
+  }
+  const legacy = await sha256(password);
+  if (legacy !== user.pass) return { ok: false, upgrade: null };
+  return { ok: true, upgrade: await hashPassword(password) };
+}
+
 export function passwordProblem(pw, mobile) {
   const s = String(pw == null ? '' : pw);
   if (!s) return 'Please choose a password.';

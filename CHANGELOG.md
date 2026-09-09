@@ -6,6 +6,76 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [8.8.0] — 2026-09-10 — "The audit that scored it lower"
+
+8.7.0 shipped on an inference: every severe finding had been fixed, so the
+score must have gone up. Nobody re-scored it. A third pair of audits did, and
+the customer experience came back at **5/10 — a drop** — with the partner side
+at 6/10. Shipping on "I fixed what they said" instead of on a measurement is
+the same mistake as believing a comment instead of running the code.
+
+### Fixed — five ways a customer lost money with no recourse
+
+- **The comparison screen bought instead of comparing.** Every row in "Choose
+  your pro" was wired straight to `book.confirm`, so one tap on what reads as
+  *select* funded escrow and created a live order — no bill, no fee line, no
+  cancellation terms, no address, no confirmation. It re-opens the priced sheet
+  for that pro now, which is where all of those live.
+- **Requesting a return was strictly worse than doing nothing.** `R_RETURN` had
+  one exit, reachable only from the shop's own console, so a shop that never
+  answered froze the order value for ever — and the customer's screen had no
+  control at all. The admin's escape hatch could not reach it either. She can
+  escalate now, the owner can end it, and a return nobody answers refunds
+  itself within a day.
+- **The reweigh refund was computed, shown to both sides, and never posted.**
+  This was 8.7.0's fix, and it was decoration again: the order was patched down
+  and settlement paid against the smaller figure, stranding the difference in a
+  closed order's escrow. Verified now end to end — escrow clears to ₹0 and the
+  ₹77 reaches her wallet.
+- **And the fix I shipped for it had introduced a ratchet.** Each entry compared
+  against the *current* total, so the weight could only ever fall: typing 0.5
+  instead of 5.0 was unrecoverable and the shop silently ate the difference.
+  `agreedTotal` is pinned once and never moves, so the weight can be corrected
+  freely in either direction and the money moves once, at settlement.
+- **"Take out to your UPI" sent money to a UPI id the app never asked for.** No
+  screen anywhere let a customer set one. There is one now, and the withdrawal
+  refuses without it.
+- **Deleting your account silently forfeited your money.** Erasure removed the
+  user row with no balance check and no payout, so the wallet stayed in a ledger
+  nobody could ever sign in to claim — under a sheet itemising "exactly what
+  happens" that never mentioned money. It now refuses while anything is held,
+  and says what and how much.
+
+### Fixed — the earning side
+
+- **A pro could never set or change his payout UPI.** Onboarding collects it
+  once and is unreachable afterwards; the Withdraw button stayed enabled and
+  then refused with "add a UPI id first" on a screen with no way to add one.
+  The shop's payout screen has done this correctly the whole time, in the same
+  file.
+- **The shop was handed the customer's permanent door code** and told to ask for
+  it — the same code a plumber must type to prove he is standing at her door,
+  hers for life and unrotatable. Every shop she ordered from learned it. The
+  shop now types what she reads out, like the pro does, and the retail handover
+  actually checks it instead of just marking itself done.
+- **Passwords were unsalted, single-round SHA-256.** Two people who chose "123"
+  had the same stored string, in a blob the admin console can export — while
+  the owner's own credential in this codebase has always used PBKDF2 at 250,000
+  rounds with a random salt. Every account is salted now, old ones are upgraded
+  transparently on their next sign-in, and the session no longer carries the
+  credential at all.
+
+### Fixed — the measurement that let this happen
+`tools/lint-i18n.mjs` printed **"53 keys, 53 rendered ✓"** while seven were
+rendered nowhere and the app was about 2% translated. Its stem escape hatch
+matched a prefix anywhere in the tree, and nothing counted how many places
+actually call `t()`. It now counts render sites, enforces a floor, and refuses a
+key it cannot statically see — which immediately caught seven more.
+
+Coverage went from 28 render sites to 45: the stage tracker, the wallet card and
+the money lines are translated, so the order screen is no longer a Telugu
+instruction wrapped in an English bill.
+
 ## [8.7.0] — 2026-09-10 — "Two of those fixes were decoration"
 
 8.6.0's fixes went back to the same two agents to be checked rather than

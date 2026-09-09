@@ -23,6 +23,7 @@
 
 import { getState, dispatch } from '../core/ctx.js';
 import { sha256 } from '../core/crypto.js';
+import { hashPassword } from '../core/security.js';
 import * as audit from '../core/audit.js';
 import * as ID from './identity.js';
 
@@ -84,7 +85,8 @@ export async function redeem(who, code, newPassword, now = Date.now()) {
     return bad;
   }
   dispatch({ type: 'user/patch', payload: { key: u.key, patch: {
-    pass: await sha256(newPassword), reset: null,
+    ...(await hashPassword(newPassword)), reset: null,   // salted, like every other credential
+
   } } });
   audit.record('account.resetUsed', { code: u.code || null, role: u.role }, 'self');
   return { ok: true, account: { key: u.key, name: u.name, code: u.code || null, role: u.role } };

@@ -30,6 +30,8 @@
    DOM-free. Every function takes or returns plain data, so it is testable. */
 
 import { getState, dispatch } from '../core/ctx.js';
+import { balanceOf } from './ledger.js';
+import { isTerminal } from './orders.js';
 import * as audit from '../core/audit.js';
 import * as photos from '../core/photos.js';
 
@@ -76,7 +78,32 @@ export function erasePlan(key, st = getState()) {
     },
     deIdentified: { pros: partners.length, shops: shops.length, orders: orders.length },
     kept: { ledgerLegs, reason: 'double-entry, hash-chained, and a business must keep its books' },
+    /* THE PLAN NEVER MENTIONED MONEY. This screen is the most honest one in the
+       product — Removed / Emptied but kept / Kept and why — and it said nothing
+       about the wallet balance or the orders in flight, while `eraseAccount`
+       removed the user row and left the balance in a ledger nobody could ever
+       sign in to claim. Somebody could type REMOVE under a heading reading
+       "here is exactly what happens" and lose their money. */
+    money: {
+      wallet: Math.max(0, balanceOf(st.ledger || [], 'CUSTOMER:' + key)),
+      partnerWallets: partners.reduce((n, p) => n + Math.max(0, balanceOf(st.ledger || [], 'PARTNER:' + p.id)), 0),
+      shopWallets: shops.reduce((n, sh) => n + Math.max(0, balanceOf(st.ledger || [], 'SHOP:' + sh.id)), 0),
+      liveOrders: orders.filter(o => !isTerminal(o.stage)),
+    },
   };
+}
+
+/* Erasure is refused while money is still moving. Not to keep anybody here —
+   the account can be removed the moment the jobs finish and the wallet is
+   emptied — but because a deletion that silently forfeits a balance is not a
+   deletion, it is a confiscation. */
+export function eraseBlockers(key, st = getState()) {
+  const m = erasePlan(key, st).money;
+  const out = [];
+  const held = m.wallet + m.partnerWallets + m.shopWallets;
+  if (m.liveOrders.length) out.push({ kind: 'live', n: m.liveOrders.length });
+  if (held > 0) out.push({ kind: 'money', paise: held });
+  return out;
 }
 
 /**
@@ -87,6 +114,10 @@ export function eraseAccount(key, actor = 'self') {
   const st = getState();
   const plan = erasePlan(key, st);
   if (!plan.found) return { ok: false, reason: 'No such account' };
+  /* Refuse rather than confiscate. The screen shows this before the button, so
+     nobody should ever reach it — but the engine must not depend on a screen. */
+  const blockers = eraseBlockers(key, st);
+  if (blockers.length) return { ok: false, reason: 'money still moving', blockers, plan };
 
   const u = st.users.find(x => x.key === key);
 

@@ -2,7 +2,7 @@
    dispatch raw actions themselves, so every money movement and every state
    transition goes through one auditable place. */
 
-import { ctx, getState, dispatch, me, myArea } from '../core/ctx.js';
+import { ctx, getState, dispatch, me, myArea, saveSession } from '../core/ctx.js';
 import { nid, otp as makeOtp } from '../core/id.js';
 import { appendBlock } from '../core/crypto.js';
 import * as audit from '../core/audit.js';
@@ -111,16 +111,32 @@ export function setShopUpi(shopId, upi) {
   return true;
 }
 
+export function setCustomerUpi(upi) {
+  const s = me(); if (!s) return false;
+  const v = String(upi || '').trim();
+  if (!/^[\w.\-]{2,}@[A-Za-z]{2,}$/.test(v)) { toast('That does not look like a UPI id (name@bank)', 'warn'); return false; }
+  dispatch({ type: 'user/patch', payload: { key: s.key, patch: { upi: v } } });
+  saveSession({ ...s, upi: v });
+  audit.record('cwallet.upiSet', {}, s.key);
+  toast('Saved. This is where refunds and take-outs go.');
+  return true;
+}
+
 export async function customerWithdraw(paise) {
   const s = me(); if (!s) return null;
   const amt = M.int(paise), w = customerWallet(s.key);
   if (amt < 1000) { toast('The smallest take-out is ₹10', 'warn'); return null; }
   if (amt > w.balance) { toast(`You can take out up to ${M.fmt(w.balance)}`, 'warn'); return null; }
-  const r = await gateway.payout({ paise: amt, purpose: 'refund-out', key: s.key, upi: s.upi || (getState().users.find(u => u.key === s.key) || {}).upi || '' });
+  /* THE APP NEVER ASKED HER FOR A UPI ID — no screen anywhere sets one — and
+     this sent the money anyway, to '', toasting "sent to your UPI". In sandbox
+     that is a lie; on a live rail it is a payout into nowhere. */
+  const dest = s.upi || (getState().users.find(u => u.key === s.key) || {}).upi || '';
+  if (!dest) { toast('Add the UPI id you want to be paid into first', 'warn'); return null; }
+  const r = await gateway.payout({ paise: amt, purpose: 'refund-out', key: s.key, upi: dest });
   if (!r.ok) { toast('Could not send that right now', 'danger'); return null; }
   await ledger('WITHDRAW', amt, acct.customer(s.key), acct.world(), { via: r.via, ref: r.ref });
   audit.record('cwallet.withdraw', { amt }, s.key);
-  toast(`${M.fmt(amt)} sent to your UPI`);
+  toast(`${M.fmt(amt)} sent to ${dest}`);
   return amt;
 }
 
@@ -236,6 +252,10 @@ export async function bookService({ catId, partner, sub, deal, slot }) {
    back. Long enough for a phone in a pocket, short enough that nobody's evening
    is spent waiting on a screen that says "finding". */
 export const ACCEPT_WINDOW_MS = 10 * 60 * 1000;
+/* How long a shop has to answer a return before the customer is simply paid
+   back. Long enough to be fair to a busy counter, short enough that nobody is
+   left chasing money for a delivery that already went wrong. */
+export const RETURN_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /* THE ESCALATION THAT NEVER RAN. `match.js` builds a ladder of alternates with
    a per-pro window and nothing in the product ever read it, so an unaccepted
@@ -256,7 +276,17 @@ export async function sweepUnaccepted(now = Date.now()) {
     await refundRetail(o.id, 'The shop did not pick this up in time');
     audit.record('order.shopNoResponse', { id: o.id, waitedMs: now - (o.stageTs || 0) }, 'system');
   }
-  return stale.length + shopStale.length;
+  /* AND A RETURN THE SHOP NEVER ANSWERS. Requesting one used to be strictly
+     worse than doing nothing: the money froze and no actor in the system could
+     release it. A return the shop ignores now refunds itself, because the
+     person who has already been let down should not also have to chase. */
+  const returns = getState().orders.filter(o => o.stage === 'R_RETURN'
+    && (now - (o.stageTs || o.createdAt || now)) > RETURN_WINDOW_MS);
+  for (const o of returns) {
+    await refundRetail(o.id, 'The shop did not answer the return in time');
+    audit.record('order.returnUnanswered', { id: o.id }, 'system');
+  }
+  return stale.length + shopStale.length + returns.length;
 }
 
 /* ── stage machine driver ──────────────────────────────────── */
@@ -637,6 +667,17 @@ export const reasonsFor = role => role === 'shop' ? SHOP_DISPUTE_REASONS
 /* Let them try the code again. Only for a job stuck by a mistyped code — never
    for a real complaint, which is somebody's money and not a typo. The fail
    count resets so the pro is not one keystroke from the same dead end. */
+/* The retail handover check. Same forgiving comparison as the service door —
+   a person is reading digits out on a doorstep either way. */
+export function checkRetailCode(orderId, entered) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o) return false;
+  if (!sameCode(entered, o.otp)) { toast(t('door.wrong'), 'danger'); return false; }
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { otpVerified: true } } });
+  audit.record('retail.codeVerified', { id: orderId }, me() && me().key);
+  return true;
+}
+
 export function retryDoorCode(orderId) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o || o.stage !== 'DISPUTED' || o.disputeReason !== 'Code would not verify at the door') return null;
@@ -760,6 +801,7 @@ export async function placeRetailOrder(mode = 'rider') {
     stage: 'R_PLACED', stageTs: now, createdAt: now,
     history: [{ stage: 'R_CART', at: now }, { stage: 'R_PLACED', at: now }],
     otp: String(s.code || '') || makeOtp(), evidence: [],   // the shopper's own code — see bookService
+    agreedTotal: q.customerPays,   // what SHE agreed; never moves, so a reweigh has a fixed anchor and can be corrected freely
   };
   dispatch({ type: 'order/add', payload: order });
   // the customer's payment arrives from the world first; only then is it locked
@@ -796,7 +838,7 @@ export async function placeRetailOrder(mode = 'rider') {
    the shop is picking, and it cannot silently increase what she agreed to pay:
    anything above the estimate needs her approval, exactly like extra work on a
    service job. */
-export function setPickedQty(orderId, lineId, qty) {
+export async function setPickedQty(orderId, lineId, qty) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o || o.stage !== 'R_PICKING') return null;
   const n = Math.max(0, Number(qty) || 0);
@@ -804,33 +846,42 @@ export function setPickedQty(orderId, lineId, qty) {
   const shop = getState().shops.find(x => x.id === o.shopId) || {};
   const first = (shop.ordersCompleted || 0) < FREE_FIRST_ORDERS;
   const q = quoteRetail(lines, { catId: shop.catId, km: o.km, mode: o.mode, firstOrders: first });
-  /* THE WEIGHT HAS TO REACH THE MONEY. The first version stored `weighedTotal`
-     and settled off the old estimate anyway, so a shop typing a real weight
-     changed nothing at all and somebody quietly ate the difference. It also
-     printed "she has to approve the difference" beside an approval step that
-     did not exist.
 
-     What happens now: weighing LESS is passed straight back to her, because
-     nobody should pay for rice they did not get. Weighing MORE is never taken
-     silently — the order is capped at what she agreed and the surplus is
-     recorded, so the shop can ask her in the chat or hand over the smaller
-     amount. A marketplace may reduce a price on its own; it may not raise one. */
-  const agreed = o.customerPays | 0;
-  const under = q.customerPays < agreed;
+  /* TWO BUGS LIVED HERE AND THE SECOND ONE WAS MINE.
+
+     The first: the weight was stored and settlement paid out against the
+     reduced figure, so the difference stayed in escrow for ever while the
+     screen told the shop it had gone back to her automatically.
+
+     The second, which I introduced fixing the first: I compared each entry
+     against the CURRENT total, so every keystroke could only lower it. Typing
+     0.5 instead of 5.0 was unrecoverable — 1.0 afterwards changed nothing, and
+     the shop silently ate the difference on a slipped decimal.
+
+     Both go away by moving the money to one place. `agreedTotal` is what she
+     agreed and never changes; the shop may re-weigh as often as it likes,
+     upward or downward, and nothing is posted until settlement. A marketplace
+     may reduce a price on its own and may not raise one, so the charge is
+     capped at what she agreed — a heavier weight is shown to the shop and
+     never taken from her. */
+  const agreed = (o.agreedTotal != null ? o.agreedTotal : o.customerPays) | 0;
+  const capped = Math.min(q.customerPays, agreed);
+  const under = capped < agreed;
+
   dispatch({ type: 'order/patch', payload: { id: orderId, patch: {
     lines,
+    agreedTotal: agreed,                        // pinned the first time, then never moved
     weighedTotal: q.customerPays,
     overEstimate: Math.max(0, q.customerPays - agreed),
-    /* only a reduction moves the money without asking her */
-    ...(under ? {
-      customerPays: q.customerPays,
-      itemsTotal: q.itemsTotal,
-      platformFee: q.platformFee,
-      gst: q.platformFeeGst,
-      shopPayout: q.shopPayout,
-      riderPayout: q.riderPayout,
-      reweighed: true,
-    } : {}),
+    reweighed: under,
+    /* only the capped figure is ever charged, and the refund itself is posted
+       once, at settlement, so correcting a typo costs nobody anything */
+    customerPays: capped,
+    itemsTotal: q.itemsTotal,
+    platformFee: q.platformFee,
+    gst: q.platformFeeGst,
+    shopPayout: q.shopPayout,
+    riderPayout: q.riderPayout,
   } } });
   ctx.render();
   return q;
@@ -932,6 +983,16 @@ export async function settleRetail(orderId) {
   // absorbed the ride, cut still carved) leaves nothing stranded in escrow
   const dispatchCut = Math.max(0, (o.customerPays | 0) - (o.shopPayout | 0) - (o.platformFee | 0) - (o.riderPayout | 0));
   const shopPayout = Math.max(0, o.shopPayout - lineRefund);
+  /* WHAT A REWEIGH LEFT BEHIND. Escrow holds what she agreed; the order may now
+     be settling for less because loose goods weighed light. That difference is
+     hers, and until this leg existed it sat in a closed order's escrow account
+     for ever while her screen said it had come back automatically. */
+  const heldNow = (o.agreedTotal != null ? o.agreedTotal : o.customerPays) | 0;
+  const reweighBack = Math.max(0, heldNow - (o.customerPays | 0));
+  if (reweighBack) {
+    await ledger('REFUND', reweighBack, acct.escrow(o.id), acct.customer(o.customerKey), { reason: 'weighed lighter than ordered' });
+    dispatch({ type: 'order/patch', payload: { id: orderId, patch: { reweighRefund: reweighBack } } });
+  }
   await ledger('SHOP_PAYOUT', shopPayout, acct.escrow(o.id), acct.shop(o.shopId), {});
   if (lineRefund) await ledger('REFUND', lineRefund, acct.escrow(o.id), acct.customer(o.customerKey), { reason: 'unavailable items' });
   if (lineRefund) dispatch({ type: 'order/patch', payload: { id: orderId, patch: { shopPayout, refund: lineRefund } } });
@@ -942,7 +1003,7 @@ export async function settleRetail(orderId) {
   const a = getState().agg;
   bumpAgg({ retailOrders: a.retailOrders + 1, gmv: a.gmv + o.itemsTotal - lineRefund,
             revenue: a.revenue + feeExGst, gst: a.gst + (o.gst | 0), refunds: a.refunds + lineRefund,
-            escrow: Math.max(0, a.escrow - (o.customerPays | 0)) });
+            escrow: Math.max(0, a.escrow - heldNow) });
   // R_SETTLED was the end of the road: nothing advanced to R_CLOSED, so every
   // retail order sat in a non-terminal stage forever and two views had to
   // hard-code R_SETTLED into their "hide it" lists instead of using isTerminal.
