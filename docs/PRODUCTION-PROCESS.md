@@ -56,12 +56,13 @@ Steps 1–7 are today. Steps 8–15 are the first two weeks. Phase D is forever.
     (a worker's or shop's share, held until the customer confirms) or a
     Payout (a wallet take-out), after penny-drop verification of each UPI id.
     *Produces: pros, shops and customers are paid by rail, not by hand.*
-11. **SMS OTP** for step 1 of verification, the arrival code and the
-    reference's 4-digit code (any DLT-registered sender). Until that sender
-    is live each code is generated and shown on the partner's own screen; the
-    ladder and the reference step are real, but nothing is texted.
-    *Produces: the last two steps that still complete inside the app run
-    against an outside system.*
+11. ~~**SMS OTP**~~ — **removed from the plan (8.4.0), not deferred.**
+    None of the three places that wanted a texted code needs one: verification
+    step 1 confirms the number and hands over the pro's permanent code, the
+    arrival check is the customer's own code, and the reference quotes the
+    pro's. *Produces: one fewer vendor, one fewer bill, and no DLT
+    registration — while the ladder, the door check and the reference step all
+    work exactly as before.*
 12. **Tax**: GST registration for the platform fee (18% of the fee is
     remitted, already computed per order); TDS u/s 194-O on partner payouts
     (`docs/PRODUCTION.md` §3). The treasury already holds the GST

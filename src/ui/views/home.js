@@ -470,7 +470,7 @@ function openNow() {
   if (!pros.length && !shops.length) return '';
   return `<div class="sec">
     <div class="between" style="margin-bottom:8px">
-      <p class="m-cap" style="margin:0">Open now</p>
+      <p class="m-cap" style="margin:0">Free near you right now</p>
       <div class="row" style="gap:14px">
         <button class="more" data-act="nav.nearby">Map view →</button>
         <button class="more" data-act="scroll.all">All ${cats().length} categories →</button>
@@ -630,12 +630,16 @@ export function render() {
                12-minute clock. A label must name its own destination. -->
           ${best ? `<button class="btn btn--primary btn--block" style="justify-content:flex-start;margin-top:10px"
               data-act="cat.open" data-id="${best.id}">See who is free · ${esc(best.name)}</button>` : ''}
-          ${!q ? `<div class="chiprow" style="margin-top:10px;flex-wrap:wrap">
-            ${recentChips.length
-              ? recentChips.map(x => smartChip(x.t, x.c.id, icon('refresh', { size: 14 }))).join('')
-              : suggest.slice(0, 4).map(c => smartChip(c.name, c.id, catGlyph(c))).join('')}
-          </div>
-          <p class="micro muted" style="margin-top:8px">One search finds people who come to you, shops that deliver to you, and your own orders.</p>` : ''}
+          <!-- THESE FOUR CHIPS USED TO BE PRINTED TWICE. When somebody had no
+               history the header fell back to the same four suggestions the list
+               below already shows — two identical rows, one screen apart, doing
+               the same thing, which is exactly what makes an app feel confusing.
+               The header row now appears ONLY when it carries something the list
+               below cannot: what this person booked before. -->
+          ${!q && recentChips.length ? `<div class="chiprow" style="margin-top:10px;flex-wrap:wrap">
+            ${recentChips.map(x => smartChip(x.t, x.c.id, icon('refresh', { size: 14 }))).join('')}
+          </div>` : ''}
+          ${!q ? `<p class="micro muted" style="margin-top:8px">One search finds people who come to you, shops that deliver to you, and your own orders.</p>` : ''}
         </div>
       </div>
     </div>
@@ -653,7 +657,7 @@ export function render() {
           ${stillOpen()}
 
           <div class="sec">
-            <p class="m-cap">Or say it in one tap</p>
+            <p class="m-cap">Or pick what you need</p>
             <div class="chiprow" style="flex-wrap:wrap">
               ${againChip()}
               <button class="chip" data-act="quick.emergency">
@@ -673,7 +677,7 @@ export function render() {
 
         <aside class="home-lay__side">
           <div class="sec">
-            <p class="m-cap">Why this circle holds</p>
+            <p class="m-cap">Why this is safe</p>
             <ul class="m-steps" style="gap:8px">
               <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">Every pro ID-checked</span></li>
               <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">Price locked before you book</span></li>
@@ -709,7 +713,7 @@ export function render() {
       </div>` : ''}
 
       <div class="sec">
-        <p class="card-kicker">The other side of the circle</p>
+        <p class="card-kicker">Work with SAAHAA</p>
         <h2 class="h-sec" style="margin-top:4px">Run a shop or work a trade?</h2>
         <p class="tiny muted" style="margin:6px 0 12px;max-width:60ch">List your services or your products. A pro keeps 100% of their quote —
           SAAHAA's ${esc(P.serviceMarkupPct)}% sits on top and is paid by the customer. A shop pays

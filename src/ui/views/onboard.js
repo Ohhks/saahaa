@@ -40,12 +40,12 @@ import * as M from '../../core/money.js';
 /* per-attempt UI state: chosen answers and the chosen id type */
 let answers = { trade: [], conduct: [] };
 let idType = 'aadhaar';
-let shownCode = '';
+/* the pro's permanent SAAHAA code, from the partner row or the user behind it */
+const myCode = p => String((p && p.code) || ((getState().users || []).find(u => u.key === (p || {}).userKey) || {}).code || '');
 let lastWrong = [];      // the rules a pro got wrong on the conduct quiz, shown back to them
 export const setIdType = t => { idType = t; };
 export function pick(kind, q, o) { answers[kind] = answers[kind].slice(); answers[kind][Number(q)] = Number(o); }
 export const resetAnswers = kind => { answers[kind] = []; };
-export const rememberCode = c => { shownCode = c; };
 
 const obCSS = `<style>
   .ob{max-width:640px}
@@ -265,14 +265,22 @@ const foot = (primary) => `<div class="ob__foot">
 
 function stepPanel(p, id, cat) {
   switch (id) {
+    /* THIS STEP NO LONGER PRETENDS TO TEXT ANYBODY. It confirms the number the
+       pro will be reached on, and hands them the one code they will use for
+       everything after this — see domain/verification.js for why. */
     case 'phone': return `<div class="ob__form">
-      ${shownCode ? `<p class="tiny">Your code: <b class="num" style="font-size:22px;letter-spacing:.15em">${esc(shownCode)}</b>
-          <span class="micro muted" style="display:block">Sandbox: shown here because the SMS rail is not wired yet. Type it below to confirm this is your number.</span></p>
-        <div class="field"><input id="obPhone" inputmode="numeric" maxlength="4" placeholder=" " autocomplete="one-time-code"><label>4-digit code</label></div>`
-        : `<p class="tiny muted">We send a 4-digit code to …${esc(String(p.mobile || '').slice(-4) || 'your number')}. Nothing else is needed for this step.</p>`}
+      <p class="tiny muted">Type the number you opened this account with. Nothing is texted to you —
+        SAAHAA never sends codes.</p>
+      <div class="field"><input id="obPhone" inputmode="numeric" maxlength="10" placeholder=" "
+        autocomplete="tel-national"><label>Your 10-digit mobile number</label></div>
+      ${myCode(p) ? `<div class="card" style="padding:12px;margin-top:12px">
+        <div class="m-cap" style="margin:0 0 4px">And this is your SAAHAA code</div>
+        <b class="num" style="font-size:24px;letter-spacing:.12em">${esc(myCode(p))}</b>
+        <p class="micro muted" style="margin:6px 0 0">It is yours for good. Customers type it at their
+          door to confirm you turned up, and it is printed on your public page. There is never another
+          code to wait for.</p></div>` : ''}
       </div>
-      ${foot(shownCode ? '<button class="btn btn-primary" data-act="ob.confirmphone">Confirm</button>'
-                       : `<button class="btn btn-primary" data-act="ob.sendcode">Send code to …${esc(String(p.mobile || '').slice(-4) || 'my number')}</button>`)}`;
+      ${foot('<button class="btn btn-primary" data-act="ob.confirmphone">Confirm my number</button>')}`;
 
     case 'identity': return `<div class="ob__form">
       <div class="field"><div class="ob__chips">
@@ -488,8 +496,7 @@ export function act(name, d) {
   const p = V.myPartner(); if (!p) return;
   const val = id => (document.getElementById(id) || {}).value || '';
   switch (name) {
-    case 'ob.sendcode':     rememberCode(V.sendPhoneCode(p)); toast('Code sent'); break;
-    case 'ob.confirmphone': if (V.confirmPhone(p, val('obPhone'))) { shownCode = ''; toast('Number confirmed'); } break;
+    case 'ob.confirmphone': if (V.confirmPhone(p, val('obPhone'))) toast('Number confirmed — your code is yours for good'); break;
     case 'ob.idtype':       setIdType(d.type); break;
     case 'ob.submitid':     return V.submitIdentity(p, idType, val('obId')).then(ok => { if (ok) toast('ID saved — only the last 4 digits kept'); ctx.render(); });
     case 'ob.selfie':       return takeSelfie(p);

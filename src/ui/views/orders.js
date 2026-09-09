@@ -1,4 +1,4 @@
-/* SAAHAA · ui/views/orders.js — order list, live tracker, OTP, evidence,
+/* SAAHAA · ui/views/orders.js — order list, live tracker, door code, evidence,
    chat and the 3-tap dispute.
 
    MODERNIST. The mockup's 1c "Order tracking": the order number and shop
@@ -295,8 +295,8 @@ export function renderDetail(orderId) {
 
     ${o.otp && running && isCustomer && !o.otpVerified && o.stage !== 'ARRIVED' && o.stage !== 'R_PICKUP_READY' ? `
       <div class="between" style="padding:9px 0;border-bottom:1px solid var(--color-divider)">
-        <span class="tiny muted">Your 4-digit code — share it only at the door</span>
-        <b class="num" style="font-size:17px;letter-spacing:.14em">${esc(o.otp)}</b></div>` : ''}
+        <span class="tiny muted">Your SAAHAA code — read it out only at the door</span>
+        <b class="num" style="font-size:15px;letter-spacing:.1em">${esc(o.otp)}</b></div>` : ''}
 
     <div class="m-two">
       <div>
@@ -586,11 +586,19 @@ function actionPanel(o, r) {
     if (s === 'EN_ROUTE')    return panel('Arrived?',
       `${mapCard(o, { interactive: false, id: 'jobMap' })}
        <div style="height:12px"></div>${B('stage.arrived', "I've arrived")}`);
-    if (s === 'ARRIVED')     return panel('Ask the customer for their 4-digit code', `
+    if (s === 'ARRIVED')     return panel('Ask the customer for their SAAHAA code', `
       ${mapCard(o, { interactive: false, id: 'jobMap' })}
       <div style="height:12px"></div>
-      <div class="otp-row" style="justify-content:center;margin-bottom:14px">
-        ${[0,1,2,3].map(i => `<input id="otp${i}" inputmode="numeric" maxlength="1" data-role="otp" class="input" style="width:56px">`).join('')}
+      <!-- The hint gives the SHAPE, never a specimen. An example like "C20262001"
+           is a real person's code — the first customer of 2026 — so printing one
+           here would hand the pro a code they might not have been given. -->
+      <p class="tiny muted" style="margin:0 0 10px">It starts with <b class="num">C</b> and has eight
+        digits after it. It is on their screen, and it is the same one every time you work for them.</p>
+      <div class="field" style="margin-bottom:14px">
+        <input id="otpCode" data-role="otp" autocapitalize="characters" autocomplete="off"
+          spellcheck="false" maxlength="12" placeholder=" "
+          style="font-family:var(--font-mono,inherit);letter-spacing:.12em;text-transform:uppercase">
+        <label>Their SAAHAA code</label>
       </div>
       <!-- The code is what LOCKS the stake. Saying so afterwards is telling
            somebody their money moved; saying it here is asking them. -->
@@ -632,10 +640,11 @@ function actionPanel(o, r) {
   }
 
   if (r.isCustomer) {
-    if (s === 'ARRIVED') return panel('Give your pro this code', `
-      <div style="text-align:center" class="num num-xl">${esc(o.otp)}</div>
+    if (s === 'ARRIVED') return panel('Read your code out to your pro', `
+      ${codeBig(o.otp)}
       <p class="tiny muted" style="text-align:center;margin-top:8px">
-        Only share it once they are at your door. It proves the right person arrived.</p>`);
+        This is your own SAAHAA code — the same one every job, so there is never a code to wait for.
+        Read it out only once they are at your door. Them typing it is proof the right person came.</p>`);
     if (s === 'WORK_DONE') return panel('Work finished — confirm to release payment', `
       ${(o.evidence || []).length ? `${evidenceTiles(o)}
         <p class="micro muted" style="margin:8px 0 12px">${shot(o)
@@ -667,8 +676,8 @@ function actionPanel(o, r) {
       <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--color-accent-400)"
         data-act="retail.return" data-id="${o.id}">Something was wrong — return this order</button>`);
     if (s === 'R_PICKUP_READY') return panel('Ready at the shop — collect it', `
-      <p class="tiny muted" style="margin-bottom:10px">Show this code at the counter.</p>
-      <div style="text-align:center" class="num num-xl">${esc(o.otp)}</div>
+      <p class="tiny muted" style="margin-bottom:10px">Show your SAAHAA code at the counter.</p>
+      ${codeBig(o.otp)}
       ${B('retail.collected', 'I have collected it')}`);
     if (s === 'R_SUB_PENDING') return panel('The shop needs your call', `
       ${(o.lines || []).filter(l => l.status === 'asking').map(l => `<div class="card" style="padding:12px;margin-bottom:8px">
@@ -701,7 +710,7 @@ function actionPanel(o, r) {
           ${next ? `<li class="m-step pend"><span class="m-step__dot"></span>
             <span class="m-step__t">Then: ${esc(next.label)}</span></li>` : ''}
           ${o.otp ? `<li class="m-step pend"><span class="m-step__dot"></span>
-            <span class="m-step__t">Give ${esc(first)} the code ${esc(o.otp)} at your door — never before</span></li>` : ''}
+            <span class="m-step__t">Read ${esc(first)} your code <b class="num">${esc(o.otp)}</b> at your door — never before</span></li>` : ''}
           <li class="m-step pend"><span class="m-step__dot"></span>
             <span class="m-step__t">${M.fmt(o.customerPays)} is held by SAAHAA. ${esc(first)} is paid only after you confirm the work</span></li>
         </ol>
@@ -724,13 +733,19 @@ function actionPanel(o, r) {
     if (s === 'R_PACKED')   return o.mode === 'pickup'
       ? panel('Packed — customer collects', B('retail.ready', 'Ready for pickup'))
       : panel('Hand over', B('stage.out', 'Out for delivery'));
-    if (s === 'R_PICKUP_READY') return panel('Waiting at the counter', `<p class="tiny muted">Ask for the code <b class="num">${esc(o.otp)}</b> when they collect.</p>`);
+    if (s === 'R_PICKUP_READY') return panel('Waiting at the counter', `<p class="tiny muted">Ask for their SAAHAA code <b class="num">${esc(o.otp)}</b> when they collect.</p>`);
     if (s === 'R_RETURN') return panel('Return requested', `<p class="tiny muted" style="margin-bottom:10px">${esc(o.returnReason || '')}</p>${B('retail.acceptreturn', 'Accept return — refund in full')}`);
-    if (s === 'R_OUT')      return panel('Delivery code',
-      `<div style="text-align:center" class="num num-xl">${esc(o.otp)}</div>${B('stage.delivered', 'Mark delivered')}`);
+    if (s === 'R_OUT')      return panel("The customer's code",
+      `${codeBig(o.otp)}<p class="tiny muted" style="text-align:center;margin:8px 0 0">Ask for it at the door before you hand the order over.</p>
+       <div style="height:12px"></div>${B('stage.delivered', 'Mark delivered')}`);
   }
   return '';
 }
+/* ONE CODE, EVERYWHERE. A person's SAAHAA code is 9 characters, not 4 digits,
+   so it gets its own treatment: it must never overflow a 375px screen and it
+   must be readable across a doorway. */
+const codeBig = v => `<div class="num" style="text-align:center;font-size:clamp(24px,7.5vw,34px);letter-spacing:.12em;word-break:break-all">${esc(v)}</div>`;
+
 /* the "what happens next" block: a strong moment, so it is ink-inverted */
 const panel = (title, body) => `<div class="sec"><div class="on-plum" style="padding:14px">
   <p class="m-cap" style="color:color-mix(in srgb,var(--color-bg) 70%,transparent)">What happens next</p>

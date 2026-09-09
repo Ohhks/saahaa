@@ -9,7 +9,7 @@ import { getPricing } from './settings.js';
 export const TIERS = [
   { n:0, id:'unverified', label:'Unverified',        badge:'',                   tone:'soft',
     capPaise:0,       unlocks:'Browse only. Cannot bid, cannot be booked.' },
-  { n:1, id:'phone',      label:'Phone Verified',    badge:'Phone Verified',     tone:'soft',
+  { n:1, id:'phone',      label:'Number confirmed',  badge:'Number confirmed',   tone:'soft',
     capPaise:150000,  unlocks:'Bid and accept jobs. Max ₹1,500 a job.' },
   { n:2, id:'id',         label:'ID Verified',       badge:'ID Verified',        tone:'info',
     capPaise:1000000, unlocks:'Higher caps, appears in the Verified filter, can list products.' },

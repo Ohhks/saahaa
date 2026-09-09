@@ -98,9 +98,12 @@ export function entryRow(catId, partner, heldAmount) {
   <p class="m-cap" style="opacity:.8">Request a job instead</p>
   <p class="tiny" style="opacity:.85;margin-bottom:8px">Goes to ${pool} ${esc(cat.name.toLowerCase())} pro${pool === 1 ? '' : 's'} near ${esc(myArea())}.
     ${esc(lead)}${done < 2 ? ` Takes about ${o.mins} min. Your ${M.fmt(payP(heldAmount, partner.id))} with ${esc(partner.name)} stays held — you lose nothing by asking.` : ''}</p>
+  <!-- "Send to the circle" is the brand talking, not the button. A label has to
+       name its own destination, which is the rule this file's own header states.
+       The paragraph above already says who it goes to; the button now agrees. -->
   <button class="btn btn--secondary btn--block" style="justify-content:flex-start;color:inherit;border-color:currentColor"
           data-act="ask.start" data-id="${catId}" data-pid="${partner.id}" data-held="${heldAmount}">
-    Send to the circle →
+    Ask ${pool} ${esc(cat.name.toLowerCase())} pro${pool === 1 ? '' : 's'} for their price →
   </button>`;
 }
 
@@ -216,8 +219,12 @@ function waiting(req) {
       ${Math.max(0, invited - replies)} more workers are still preparing rates. Nothing expires while you wait —
       if you don't pick, your ${M.fmt(payP(held || req.target, req.held && req.held.partnerId))} booking stays. Nothing is lost.</p>
 
+    <!-- This used to say "We'll message you." SAAHAA does not message anybody —
+         there is no SMS rail and there is not going to be one. What is true is
+         that nothing here is lost by leaving, which is the reassurance the
+         person actually wanted. -->
     ${elapsed > 30000 ? `<button class="btn btn--ghost btn--block" style="justify-content:flex-start"
-        data-act="ask.background" data-id="${req.id}">Close the app. We'll message you.</button>` : ''}
+        data-act="ask.background" data-id="${req.id}">Leave this open and come back — nothing is lost</button>` : ''}
 
     ${bottomBar(req)}`);
 }

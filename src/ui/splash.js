@@ -59,6 +59,8 @@ export function showSplash(o = {}) {
         <div class="sp-wm">SAAHAA</div>
         <div class="sp-rule" aria-hidden="true"><i></i><b></b><i></i></div>
         <div class="sp-tag">Together, we elevate life</div>
+        ${flash ? '' : `<p class="sp-what">Book a plumber, an electrician or a cleaner near you —
+          and order from the shops on your own street. One app, one neighbourhood.</p>`}
         ${flash ? '' : pillars()}
         ${flash ? '' : `
           <button class="btn btn--primary btn--lg btn--block sp-cta" data-sp="enter">

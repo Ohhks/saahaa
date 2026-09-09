@@ -115,7 +115,12 @@ export async function bookService({ catId, partner, sub, deal, slot }) {
     slot: slot || 'now',
     stage: 'MATCHING', stageTs: now, createdAt: now,
     history: [{ stage: 'DRAFT', at: now }, { stage: 'MATCHING', at: now }],
-    otp: makeOtp(), otpVerified: false, evidence: [], escrowed: q.customerPays,
+    /* THE DOOR CODE IS THE CUSTOMER'S OWN SAAHAA CODE — not a per-job number.
+       Nothing is generated, delivered or expires; there is no SMS rail to need.
+       She already knows it, it is the same every job, and the pro typing it is
+       proof he is standing in front of her. The FIELD NAME does not change, so
+       jobs booked before this release keep their old number and still work. */
+    otp: String(s.code || '') || makeOtp(), otpVerified: false, evidence: [], escrowed: q.customerPays,
   };
   dispatch({ type: 'order/add', payload: order });
   // the customer's money is in their SAAHAA wallet first (wallet balance, then the gateway for the rest); only then is it locked
@@ -143,10 +148,23 @@ export function advance(orderId, toStage, patch = {}) {
   return next;
 }
 
+/* Typed by a person standing on a doorstep, so it is read forgivingly: case,
+   spaces and hyphens are noise, not a wrong answer. Exported because this one
+   comparison is now the whole door check — it is worth pinning down in a test
+   rather than trusting by eye. */
+const tidyCode = v => String(v == null ? '' : v).replace(/[\s-]/g, '').toUpperCase();
+export const sameCode = (a, b) => {
+  const x = tidyCode(a);
+  /* Nothing matches nothing. Without this an order that somehow carried no code
+     would be opened by an empty field — the test that found it is in
+     core/selftests.doorcode.js. */
+  return x !== '' && x === tidyCode(b);
+};
+
 export function verifyOtp(orderId, entered) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return false;
-  if (String(entered).trim() !== String(o.otp)) {
+  if (!sameCode(entered, o.otp)) {
     const fails = (o.otpFails || 0) + 1;
     dispatch({ type: 'order/patch', payload: { id: orderId, patch: { otpFails: fails } } });
     audit.record('otp.failed', { id: orderId, fails });
@@ -249,7 +267,7 @@ export function markDone(orderId) {
   toast(tierInfo.id === 'HOLD' ? 'Sent for team review' : `Done — ${tierInfo.label.toLowerCase()}`);
 }
 
-/** Customer taps Confirm — the second factor without typing a second OTP. */
+/** Customer taps Confirm — the second factor without typing a second code. */
 /* ── the commitment stake ──────────────────────────────────────
    Locked the moment the customer's code is entered, returned in full the
    moment the customer confirms the work. See domain/wallet.js. */
@@ -371,7 +389,7 @@ export async function confirmAndRelease(orderId, pct = 1) {
   // unconditionally — including on the admin's full-refund path.
   const p = getState().partners.find(x => x.id === o.partnerId);
   /* `completed` is what the profile shows; `countedJobs` is what the ladder
-     and the provisional cap use, and it only moves for a job with an OTP
+     and the provisional cap use, and it only moves for a job with a code
      check-in AND a work photo. A friend booking and releasing without ever
      opening the door is a display number, not a credential. */
   const real = !!o.otpVerified && (o.evidence || []).length > 0;
@@ -514,7 +532,7 @@ export async function placeRetailOrder(mode = 'rider') {
     provisional: cart.lines.some(l => l.variableWeight),
     stage: 'R_PLACED', stageTs: now, createdAt: now,
     history: [{ stage: 'R_CART', at: now }, { stage: 'R_PLACED', at: now }],
-    otp: makeOtp(), evidence: [],
+    otp: String(s.code || '') || makeOtp(), evidence: [],   // the shopper's own code — see bookService
   };
   dispatch({ type: 'order/add', payload: order });
   // the customer's payment arrives from the world first; only then is it locked

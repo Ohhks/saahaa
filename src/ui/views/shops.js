@@ -204,7 +204,7 @@ function cartBar(shop) {
       <div class="m-bar__t">${n} item${n === 1 ? '' : 's'} · ${M.fmt(q.customerPays)}</div>
       <div class="m-bar__m">${sameShop ? deliveryLine(q) : `In your cart from ${esc(q.shop.name)}`}</div>
     </div>
-    <button class="btn btn--primary" data-act="nav.cart">Checkout</button>
+    <button class="btn btn--primary" data-act="nav.cart">View cart</button>
   </div>`;
 }
 

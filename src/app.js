@@ -37,6 +37,7 @@ import './core/selftests.identity.js';
 import './core/selftests.photos.js';
 import './core/selftests.erase.js';
 import './core/selftests.recovery.js';
+import './core/selftests.doorcode.js';
 
 /* ui */
 import { mount, action, initActions, toast, sheet, closeSheet, esc, stickyToast } from './ui/dom.js';
@@ -228,7 +229,9 @@ function wireActions() {
   A('nav.onboard', () => go('onboard'));
 
   /* ── partner verification (the chronology) ─────────────────── */
-  ['ob.sendcode','ob.confirmphone','ob.idtype','ob.submitid','ob.selfie','ob.pick','ob.quiz','ob.payout','ob.agree','ob.bg']
+  /* 'ob.sendcode' is gone with the fake SMS — the phone step confirms a number
+     and hands over the pro's permanent code instead. */
+  ['ob.confirmphone','ob.idtype','ob.submitid','ob.selfie','ob.pick','ob.quiz','ob.payout','ob.agree','ob.bg']
     .forEach(n => A(n, d => onboard.act(n, d)));
 
   /* ── the pro's public page ─────────────────────────────────── */
@@ -272,7 +275,7 @@ function wireActions() {
   /* ── ask rates (the P2P auction, in the customer's words) ──── */
   A('ask.start',  d => ask.startAsk(d.id, d.pid, Number(d.held)));
   A('ask.cancel', d => { auction.cancelRequest(d.id); toast('Cancelled. Nothing was charged.'); go('home'); });
-  A('ask.background', () => { toast('We will message you when rates come in.'); go('home'); });
+  A('ask.background', () => { toast('Rates keep arriving. Open Orders whenever you like — nothing expires.'); go('home'); });
   A('ask.counter', d => auction.sendCounter(d.id, d.bid));
   A('ask.held',   async d => {
     const req = auction.requestById(d.id);
@@ -486,8 +489,12 @@ function wireActions() {
   A('stage.arrived', d => flow.advance(d.id, 'ARRIVED'));
   A('stage.done',    d => flow.markDone(d.id));
   A('ev.add',        d => flow.addEvidence(d.id, d.label));
+  /* Reads every [data-role="otp"] field and joins them, so it works whether the
+     screen shows ONE code box (today) or the old four digit boxes (an order
+     booked before codes replaced the per-job number). */
   A('otp.submit',    d => {
-    const code = [0,1,2,3].map(i => (document.getElementById('otp' + i) || {}).value || '').join('');
+    const code = Array.from(document.querySelectorAll('[data-role="otp"]'))
+      .map(el => el.value || '').join('').trim();
     flow.verifyOtp(d.id, code);
   });
   A('release.full',  d => flow.confirmAndRelease(d.id, 1).then(render));
@@ -608,9 +615,11 @@ function wireInputs() {
          Rs.1, then Rs.15, then Rs.150 — and when setProductPrice rejected an
          above-MRP value there was no re-render, so the field kept showing the
          illegal number while state held the old one. */
+      /* Only the legacy four-box layout auto-advances; the single code field
+         has nowhere to advance to. */
       case 'otp': {
         const i = Number(t.id.replace('otp', ''));
-        if (t.value && i < 3) document.getElementById('otp' + (i + 1))?.focus();
+        if (Number.isFinite(i) && t.value && i < 3) document.getElementById('otp' + (i + 1))?.focus();
         break;
       }
     }

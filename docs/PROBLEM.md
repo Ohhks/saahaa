@@ -58,7 +58,7 @@ against: *"Why can't shop owners create websites without coding knowledge?"
 4. **Trust is mechanical, not promised.** Every pro passes a seven-step,
    ten-minute self-verification (phone, ID kept as a hash + last 4, selfie,
    a trade quiz that only a real tradesperson passes, the rules, UPI,
-   agreement); the customer gets a 4-digit code that proves the right person
+   agreement); the customer reads out their own SAAHAA code, which proves the right person
    arrived; the price is locked before booking; the money is held until the
    customer confirms the work; a photo is required before payout; the worker
    stakes a minimum of their own money the moment work starts and gets all of

@@ -6,6 +6,65 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [8.4.0] — 2026-09-10 — "One code, and nothing to wait for"
+
+Two things, and the second one deletes a whole rail from the plan.
+
+### Changed — there is only one code now, and it is one you already have
+
+The product used to generate three different codes and show them to people on
+screens, all of it pretending to be an SMS that was never sent. All three are
+gone. **Every code SAAHAA uses is now a person's own permanent SAAHAA code.**
+
+- **At the door.** A job used to carry four random digits the customer had to
+  find at the exact moment somebody was standing at her gate. The pro now asks
+  for her own code — `C…`, the one on her screen, the same one every job, known
+  to nobody who has not actually met her. Jobs booked before this release keep
+  their old number and still work; nothing had to be migrated.
+- **Signing up as a pro.** Step one used to generate four digits, print them on
+  the screen, and ask the pro to type them back — proving nothing at all. It now
+  confirms the number they signed up with and **hands them their code**, saying
+  what it is for. That is why nobody has to receive a code later.
+- **The reference.** They read back the pro's own code, which the pro gave them.
+
+The reason this matters beyond tidiness: **there is no SMS rail on the launch
+plan any more.** Not deferred — removed. A DLT-registered sender is money,
+weeks of paperwork and a vendor, and it would only ever have delivered numbers
+people already hold. The one code SAAHAA still issues is the owner-read password
+reset, which is a phone call, and is not sent either.
+
+That turns into a promise the terms now make plainly: **SAAHAA never sends you a
+code.** Not by SMS, not by email, not by any message. Anyone who says a code is
+coming from us is not us.
+
+### Fixed — the small things that made it feel complicated
+
+Walked as somebody who had never seen it, on a 375px screen.
+
+- **The same four categories were printed twice on the home screen**, one screen
+  apart, doing the same thing — because when you had no history the header fell
+  back to the suggestions the list below already showed. The header row now
+  appears only when it carries something the list cannot: what you booked before.
+- **The splash never said what the app was for.** A wordmark, a motto and five
+  abstract pillars. It now says, in one line, that you can book a plumber and
+  order from the shops on your street.
+- **Two promises the product could not keep.** "Close the app. We'll message
+  you." — it messages nobody; what is true, and better, is that nothing is lost
+  by leaving. And a button labelled "Checkout" that opened the cart.
+- **A badge claiming a verification that never happened.** The first rung said
+  "Phone Verified" for a step that verified nothing. It says "Number confirmed".
+- **In-house metaphor used as functional labels**: "Send to the circle" now
+  names its destination — *Ask 5 plumbing pros for their price*. "Why this
+  circle holds" → "Why this is safe". "Or say it in one tap" → "Or pick what you
+  need". "Open now", over a list mixing people and shops, → "Free near you right
+  now". The motto stays a motto.
+- Your code's second job is now stated where you find the code.
+
+### Added
+- `core/selftests.doorcode.js`. Writing it found a hole in the code I had just
+  written: two empty strings compared equal, so an order carrying no code would
+  have been opened by an empty field. Fixed, and pinned.
+
 ## [8.3.0] — 2026-09-09 — "What we say we do"
 
 An audit of the product from three angles — is it satisfying, does it serve the

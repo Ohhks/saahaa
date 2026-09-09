@@ -373,15 +373,16 @@ function proEarnings(p, orders, paid, earned, held, paidOut) {
    Tier 3 (Background Checked) and tier 4 (Certified) are earned mechanically:
    jobs + rating + vouches + a reference who confirms by code. Every line is
    have/need with a check or a cross, and nobody has to approve anything.
-   The reference's code goes by SMS in production; until that rail is wired
-   it is shown on screen, the same honest sandbox the phone step uses. */
+   Nothing here is texted to anybody, in sandbox or in production. The code the
+   reference quotes is the pro's own permanent SAAHAA code — the pro passes it
+   on themselves, which is why this product needs no SMS rail at all. */
 
 let shownRefCode = '';
 /** Called by app.js after autoverify.sendReferenceCode — shows the code. */
 export function showReferenceCode(code) {
   shownRefCode = code ? String(code) : '';
   if (!code) { toast('Name a reference first', 'warn'); return; }
-  toast(`Reference code ${code} — sandbox: shown here because SMS is not wired yet`);
+  toast(`Give ${code} to your reference — it is your own SAAHAA code`);
 }
 
 const okIcon  = ok => `<span aria-hidden="true" style="display:inline-flex;color:${ok ? 'var(--success)' : 'var(--danger)'}">${icon(ok ? 'check' : 'cross', { size: 14 })}</span>`;
@@ -391,31 +392,34 @@ const standingLine = (l, right = '') => `<div class="stdline">
     <span class="micro num" style="flex:0 0 auto;color:${l.ok ? 'var(--success)' : 'var(--ink-2)'}">${right || `${l.have} / ${l.need}`}</span>
   </div>`;
 
-/* the reference line has three states: not named → the form; named, no code
-   → send it; code sent → type it back. Confirmed is just a green line. */
+/* The reference line has three states: not named → the form; named → show the
+   pro their own code to pass on; passed on → type back what the reference read
+   out. Confirmed is just a green line.
+
+   NOTHING IS TEXTED. The code the reference quotes is the pro's own permanent
+   SAAHAA code — see domain/autoverify.js. */
 function referenceBlock(p, line) {
   const bg = backgroundRecord(p) || {};
   if (bg.refConfirmed) return standingLine(line, `confirmed${bg.refName ? ` · ${esc(bg.refName)}` : ''}`);
   if (!bg.refName) return `${standingLine(line, 'not yet')}
     <div style="margin-top:12px">
-      <p class="micro muted" style="margin-bottom:10px">Someone who has seen your work — a past customer or an employer. They get a 4-digit code; you type it back here.</p>
+      <p class="micro muted" style="margin-bottom:10px">Someone who has seen your work — a past customer or an employer. You give them your SAAHAA code; when we ring them they read it back, and you type it in here.</p>
       <div class="field"><input id="obRefName" placeholder=" "><label>A reference (past customer or employer)</label></div>
       <div class="field" style="margin-top:10px"><input id="obRefPhone" placeholder=" " inputmode="numeric" maxlength="10"><label>Their 10-digit number</label></div>
       <label class="tiny" style="display:flex;gap:8px;align-items:flex-start;margin:10px 0">
         <input type="checkbox" id="obConsent" style="margin-top:3px"> I consent to SAAHAA verifying my background, including police verification where required for in-home work.</label>
       <button class="btn btn-secondary btn-block" data-act="ob.bg">Save my reference</button>
     </div>`;
-  if (!bg.refCode) return `${standingLine(line, `${esc(bg.refName)} · no code yet`)}
-    <button class="btn btn-secondary btn-block" style="margin-top:10px" data-act="ref.send">Send your reference their code</button>`;
-  return `${standingLine(line, `${esc(bg.refName)} · code sent`)}
+  if (!bg.refCode) return `${standingLine(line, `${esc(bg.refName)} · not passed on yet`)}
+    <button class="btn btn-secondary btn-block" style="margin-top:10px" data-act="ref.send">Show me the code to give ${esc(bg.refName)}</button>`;
+  return `${standingLine(line, `${esc(bg.refName)} · waiting on them`)}
     <div style="margin-top:12px">
-      ${shownRefCode ? `<p class="tiny" style="margin-bottom:8px">Their code: <b class="num" style="font-size:20px;letter-spacing:.15em">${esc(shownRefCode)}</b>
-        <span class="micro muted" style="display:block">Sandbox: shown here because the SMS rail is not wired yet. In production only your reference sees it.</span></p>` : ''}
+      <p class="tiny" style="margin-bottom:8px">Give ${esc(bg.refName)} this code: <b class="num" style="font-size:20px;letter-spacing:.12em">${esc(shownRefCode || bg.refCode)}</b>
+        <span class="micro muted" style="display:block">It is your own SAAHAA code — nothing is texted to anybody. When we ring them, they read it back; type what they said below.</span></p>
       <div class="row" style="flex-wrap:wrap;gap:8px;align-items:stretch">
-        <div class="field grow" style="min-width:140px"><input id="refCode" inputmode="numeric" maxlength="4" placeholder=" "><label>4-digit code from your reference</label></div>
+        <div class="field grow" style="min-width:160px"><input id="refCode" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder=" " style="letter-spacing:.1em;text-transform:uppercase"><label>What your reference read back</label></div>
         <button class="btn btn-primary" style="align-self:flex-end" data-act="ref.confirm">Confirm</button>
       </div>
-      <button class="btn btn-ghost btn--sm" style="margin-top:6px" data-act="ref.send">Send a new code</button>
     </div>`;
 }
 

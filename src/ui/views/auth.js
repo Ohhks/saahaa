@@ -8,7 +8,7 @@
    1. SIGN IN IS MOBILE + PASSWORD. A name is not an identifier — two Ramesh
       Kumars on one street could not both sign in, and nobody remembers whether
       they typed "Ramesh" or "Ramesh Kumar" six weeks ago. The number is the
-      identity everywhere else in this app (OTP, payouts, the shop's own
+      identity everywhere else in this app (the door code, payouts, the shop's own
       board), so it is the identity here too. The internal `key` is unchanged,
       so every record that points at it still resolves.
 

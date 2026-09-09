@@ -740,7 +740,7 @@ function escrow(st) {
     right: tierPill(o.escrowTier),
     facts: facts([
       `${(o.evidence || []).length} photo${(o.evidence || []).length === 1 ? '' : 's'}`,
-      o.otpVerified ? 'OTP verified' : 'no OTP',
+      o.otpVerified ? 'code verified at the door' : 'no door code yet',
       esc((ESCROW[o.escrowTier || 'STANDARD'] || {}).label || ''),
     ]),
     actions: `<button class="btn btn--primary btn--sm grow" data-act="admin.release" data-id="${o.id}" data-pct="1">Release 100%</button>

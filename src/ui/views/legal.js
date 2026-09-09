@@ -96,13 +96,17 @@ function terms() {
        its own wallet and its own history, and they never mix. What one number may not hold is two of the
        same kind.`,
       'Your SAAHAA ID is a name, not a secret — it identifies the account; the password is what opens it.',
+      `That same ID is the code you read out at your door. <b>SAAHAA never sends you a code</b> — not by
+       SMS, not by email, not by any message at all. If anyone tells you a code is coming from us,
+       or asks you to read one out over the phone, it is not us. The only person who should ever
+       hear your code is the professional standing in front of you.`,
       'You must be 18 or older to book, sell or take work. Anyone 13 or older may browse.',
       'Keep your password to yourself; what is done from your account counts as done by you.',
     ])),
     sec('How a booking works', ul([
       'The professional quotes a price. It is locked before you confirm.',
       'Your payment is held by SAAHAA while the work is done.',
-      'You get a 4-digit code; the professional enters it on arrival, which proves the right person came.',
+      'Your SAAHAA code is the code: you read it out at the door, the professional types it in, and that proves the right person came. It is the same code every time and nothing is ever texted to you.',
       'At least one photo of the finished work is required; without it the money is never released automatically.',
       'You confirm the work and the money goes to the professional. If you do nothing, most jobs release by themselves — at once, or after 6 or 24 hours, depending on the size of the job and the professional’s record; higher-risk jobs wait for the owner.',
     ])),
@@ -117,7 +121,7 @@ function terms() {
       cut and the rest is the rider’s. These are today’s values; an order keeps the numbers it
       was booked with.`)),
     sec('If you are a partner', ul([
-      'Verification is a ladder: Phone Verified, ID Verified, Background Checked, SAAHAA Certified. Each rung raises what you can take on.',
+      'Verification is a ladder: Number confirmed, ID Verified, Background Checked, SAAHAA Certified. Each rung raises what you can take on.',
       `You stake ${STAKE_PCT}% of the job (${M.fmt(MIN_STAKE)} to ${M.fmt(MAX_STAKE)}) when work starts. It comes back in full when the job settles cleanly and is forfeited on an upheld dispute.`,
       `Part of each payout is held for ${HOLDBACK_DAYS} days against returns and disputes, then released by itself.`,
       'Never ask a customer to pay you outside SAAHAA, and never share a phone number or UPI id in chat to do so. This one rule ends an account immediately.',
@@ -207,9 +211,10 @@ function privacy() {
         with counts. When the backend is switched on, the same removal runs on the server as well,
         and this paragraph will say so.`),
     ].join('')),
-    sec('If you forget your password', p(`Your account is not lost. There is no mail or SMS rail
-      yet, so a reset is what a neighbourhood business does: you ring SAAHAA, the owner checks you
-      are who you say you are, and reads out a one-time code. It works once and expires in
+    sec('If you forget your password', p(`Your account is not lost. This is the one and only time
+      SAAHAA issues a code, and even then nothing is sent to you: there is no mail or SMS rail, so a
+      reset is what a neighbourhood business does. You ring SAAHAA, the owner checks you are who you
+      say you are, and reads out a one-time code. It works once and expires in
       ${recovery.TTL_MS / 60000} minutes. Only a hash of that code is stored — never the code
       itself — and both issuing it and using it are written to the audit log.`)),
     sec('Cookies', p(`None. The site uses the browser’s local storage to keep you signed in — that
@@ -333,7 +338,7 @@ function about() {
       'A public page for every verified partner, generated from their work and kept current by the platform. They edit three fields.',
       'The professional keeps 100% of their quote. SAAHAA’s charge sits on top and is paid by the customer.',
       'Shops list from a ready-made product list in minutes and pay a small capped fee — and on their first 30 orders the minimum charge is waived, so a tiny order costs them nothing at all.',
-      'Trust is mechanical: verification, a locked price, money held until the work is confirmed, a 4-digit arrival code, a photo before payout, a stake from the worker, and a hash-chained ledger that reconciles to zero.',
+      'Trust is mechanical: verification, a locked price, money held until the work is confirmed, the customer’s own code read out at the door, a photo before payout, a stake from the worker, and a hash-chained ledger that reconciles to zero.',
       'When more than one pro is free, the customer can ask for sealed rates, scored on trust and distance as much as price.',
     ])),
     sec('Who runs it', p(`SAAHAA is built and run by one owner in Hyderabad, starting with one pincode:

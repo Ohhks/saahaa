@@ -8,7 +8,7 @@
 
    The CONDUCT quiz is different: it is not a filter, it is the moment the pro
    reads the rules once, with attention, because a wrong answer costs them a
-   retry. OTP at the door, never cash outside, photo before payout. Pass is
+   retry. Their code at the door, never cash outside, photo before payout. Pass is
    5 of 6.
 
    Answers are the INDEX of the correct option. Options are shuffled at render
@@ -219,7 +219,7 @@ export const TRADE = {
 /* ── the rules of the house ────────────────────────────────── */
 export const CONDUCT = [
   { q: 'You arrive at the customer’s door. Before starting work you?',
-    o: ['Ask for their 4-digit code and enter it in the app', 'Start immediately', 'Call the office', 'Take a photo of the house'], a: 0 },
+    o: ['Ask for their SAAHAA code and enter it in the app', 'Start immediately', 'Call the office', 'Take a photo of the house'], a: 0 },
   { q: 'The customer offers to pay you cash directly and skip the app. You?',
     o: ['Refuse — payment is always through SAAHAA', 'Accept, it is more money', 'Accept half', 'Ask for UPI to your number'], a: 0 },
   { q: 'When is your money released to you?',

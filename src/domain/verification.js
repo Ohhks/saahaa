@@ -12,7 +12,7 @@
    machine, immediately, so a pro who starts at 9am can be taking jobs by
    9:20 — and the single owner touches nothing until tier 3.
 
-     phone     · OTP to their number                            AUTO
+     phone     · confirm their number, receive their code        AUTO
      identity  · Aadhaar / PAN / DL — we keep a HASH + last 4   AUTO (name-match: production)
      selfie    · one photo, liveness deferred to production     AUTO
      trade     · 5-question trade quiz, pass 4/5                AUTO
@@ -30,7 +30,6 @@
 
 import { getState, dispatch, me } from '../core/ctx.js';
 import { sha256 } from '../core/crypto.js';
-import { otp as makeOtp } from '../core/id.js';
 import { find } from '../core/registry.js';
 import * as audit from '../core/audit.js';
 import { toast } from '../ui/dom.js';
@@ -39,7 +38,7 @@ import { tradeBank, CONDUCT, shuffled, score, PASS, MAX_ATTEMPTS, LOCK_MS } from
 
 /* ── the chronology ────────────────────────────────────────── */
 export const STEPS = [
-  { id: 'phone',     n: 1, title: 'Confirm your number',   sub: 'A 4-digit code confirms your number.',                 mins: 1 },
+  { id: 'phone',     n: 1, title: 'Confirm your number',   sub: 'Type your number and collect your SAAHAA code.',       mins: 1 },
   { id: 'identity',  n: 2, title: 'Show us your ID',       sub: 'Aadhaar, PAN or licence. We keep only the last 4 digits.', mins: 2 },
   { id: 'selfie',    n: 3, title: 'One photo of you',      sub: 'For SAAHAA only — never shown to a customer.',              mins: 1 },
   { id: 'trade',     n: 4, title: 'Five trade questions',  sub: 'Things every real pro knows. Get 4 right.',                mins: 3 },
@@ -121,18 +120,26 @@ export function settle(p) {
   return p;
 }
 
-/* 1 · phone — the same virtual-OTP pattern the rest of the product uses.
-   Until the SMS rail is wired (docs/LAUNCH.md) the code is shown on screen. */
-export function sendPhoneCode(p) {
-  const code = makeOtp();
-  patchVerification(p, v => { v.phoneCode = code; v.phoneSentAt = Date.now(); return v; });
-  return code;
-}
+/* 1 · your number, and the code that comes with it.
+
+   THIS STEP USED TO BE A FAKE SMS: the app generated four digits, printed them
+   on the screen, and asked the pro to type them back. It proved nothing — it
+   only looked like the verification everyone expects. There is no SMS rail and
+   there is not going to be one, so the pretence is gone.
+
+   What the step does now is the thing that actually matters on day one: it
+   confirms the number the pro will be reached on, and hands them their SAAHAA
+   code. That code is permanent, it is theirs, and it is the ONLY code this
+   product uses — at a customer's door, on their public page, on a receipt.
+   Learning it here is why nobody ever has to receive a code later. */
 export function confirmPhone(p, entered) {
-  const v = rec(p);
-  if (!v.phoneCode) { toast('Send the code first', 'warn'); return false; }
-  if (String(entered).trim() !== String(v.phoneCode)) { toast('That code is not right', 'danger'); return false; }
-  markDone(p, 'phone', { mobileLast4: String(p.mobile || (me() || {}).mobile || '').slice(-4) });
+  const mine = String(p.mobile || (me() || {}).mobile || '');
+  const typed = String(entered == null ? '' : entered).replace(/[^\d]/g, '').slice(-10);
+  if (typed.length !== 10) { toast('Type your 10-digit mobile number', 'warn'); return false; }
+  if (mine && typed !== mine.replace(/[^\d]/g, '').slice(-10)) {
+    toast('That is not the number this account was opened with', 'danger'); return false;
+  }
+  markDone(p, 'phone', { mobileLast4: typed.slice(-4) });
   return true;
 }
 

@@ -101,7 +101,7 @@ const HOW = [
 
 const WHY = [
   { ic: 'lock', t: 'Money locked before you start', s: `The customer's payment is held the moment they book. You never do a job hoping to be paid.` },
-  { ic: 'phone', t: 'A code at the door', s: 'The customer reads you a 4-digit code when you arrive. It proves you were there, so nobody can claim you never came.' },
+  { ic: 'phone', t: 'Their code at the door', s: 'The customer reads you their SAAHAA code when you arrive, and you type it in. It proves you were there, so nobody can claim you never came. Nothing is texted — everyone already has their code.' },
   { ic: 'scale', t: 'Fair when there is a dispute', s: 'Your arrival code and your finished-work photo settle most complaints in your favour, automatically.' },
   { ic: 'trend', t: 'Your price, your call', s: 'Set your own rate. When several pros are free, you bid — and bidding fairly wins more often than bidding cheapest.' },
 ];

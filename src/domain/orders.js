@@ -21,6 +21,9 @@ const SERVICE_STAGES = [
   { id:'ASSIGNED',    label:'Pro accepted',       short:'Accepted',   owner:'worker',   to:['EN_ROUTE','MATCHING','CANCELLED'], tracker:true, tone:'ok', ico:'🤝' },
   { id:'SCHEDULED',   label:'Booked for later',   short:'Scheduled',  owner:'system',   to:['EN_ROUTE','CANCELLED','EXPIRED'], tracker:false, tone:'info' },
   { id:'EN_ROUTE',    label:'On the way to you',  short:'On the way', owner:'worker',   to:['ARRIVED','CANCELLED'], tracker:true, tone:'info', ico:'🛵' },
+  /* `needsOtp` is the old name for what is now the customer's own SAAHAA code
+     read out at the door — no code is generated or sent any more. The field
+     name is kept because orders in flight carry it. See domain/flow.js. */
   { id:'ARRIVED',     label:'Pro has arrived',    short:'Arrived',    owner:'worker',   to:['IN_PROGRESS','CANCELLED','DISPUTED'], tracker:true, tone:'info', ico:'📍', needsOtp:true },
   { id:'IN_PROGRESS', label:'Work in progress',   short:'Working',    owner:'worker',   to:['AWAITING_APPROVAL','WORK_DONE','DISPUTED'], tracker:true, tone:'info', ico:'🔨' },
   { id:'AWAITING_APPROVAL', label:'Extra work — your approval needed', short:'Approve?', owner:'customer', to:['IN_PROGRESS','WORK_DONE','DISPUTED'], tracker:false, tone:'warn' },

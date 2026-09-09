@@ -214,7 +214,11 @@ export function render() {
       <button type="button" class="btn btn--secondary btn--sm idcopy tap" data-code="${esc(myCode)}"
         aria-label="Copy your ${esc(roleWord)} ID, ${esc(myCode)}">Copy</button>
     </div>
-    <p class="micro muted" style="margin-top:6px">Sign in with this ID or with your mobile number — either one works.
+    <!-- This code does TWO jobs and people only ever discover the first one.
+         Saying both here is why nobody in this product ever waits for a code. -->
+    <p class="micro muted" style="margin-top:6px">Two things this does. It signs you in — this ID or
+      your mobile number, either one works. And it is the code you read out at your door, so the pro
+      can prove they turned up. It is the same code every time, so nothing is ever texted to you.
       It is a name, not a secret: your password is the secret.</p>` : '';
 
   const otherBlock = others.length ? `

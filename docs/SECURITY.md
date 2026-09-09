@@ -242,7 +242,7 @@ Accordingly:
   constraint.
 - Writes are **idempotent by key** (`rpc_calls(idempotency_key, fn_name,
   caller_id)`), so a retried tap cannot double-pay.
-- OTPs are server-issued and server-checked, with `otp_rate_limit` per user and
+- The door code is checked server-side, with a rate limit per user and
   a "this code is not yours to see" guard (`42501`) on read.
 - Automation (`0003_automation.sql`) calls the **same** `SECURITY DEFINER`
   functions inside one transaction — cron gets no privileged side door.
@@ -317,7 +317,7 @@ credential back in, CI goes red.
 | Photos are "kept on the person's own device" forever | They are kept until something reclaims them: `flow.sweepPhotos()` → `photos.gc(referenced(state))` drops anything unreferenced, and `fresh.js` calls `photos.gc([])` on both a demo purge and a Fresh start. A picture whose row is deleted does not linger. |
 | The CSP protects the app | It removes whole classes of attack, and it cannot protect a user from their own DevTools. It is defence in depth, not a boundary. |
 | Vouches, ratings and settled jobs are evidence | In local mode they are rows in localStorage; a user can write themselves three settled jobs and two vouches in DevTools. In Supabase mode the same rules must be `SECURITY DEFINER` RPCs (settled-job check, one-vouch uniqueness, same-trade tier check) or they are decoration. A ring of real accounts can also vouch each other up; the owner's suspend and kill switch are the answer, not the code. |
-| The reference "confirmed by code" | The 4-digit code is generated in the browser and shown on the pro's screen until the SMS rail exists. It proves the pro typed the code, not that a reference read it to them. `bgReference` can be turned off and `bgVouches` raised instead. |
+| The reference "confirmed by code" | The code is the pro's own SAAHAA code, which they pass to their reference; nothing is sent, by design. It proves the pro typed a code they already knew, not that a reference read it to them — the same limit the four random digits had. `bgReference` can be turned off and `bgVouches` raised instead. |
 | The gateway is a payment rail | `core/gateway.js` in `MODE 'sim'` moves no money at all. A `collect()` is a receipt the app wrote to itself; it is labelled sandbox everywhere precisely so nobody mistakes it for a payment. |
 | The treasury's *Reconciles* line proves the money is there | It proves the ledger sums to the identity it was built to sum to. Against a bank balance it proves nothing until the settlement webhook posts the legs (`docs/PRODUCTION.md` §3). |
 

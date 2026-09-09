@@ -8,7 +8,7 @@
 
    TIER 3 · BACKGROUND CHECKED, granted when ALL of these hold:
      · the ladder is complete (tier 2)
-     · at least `bgJobs` REAL jobs settled cleanly (OTP + photo, no upheld
+     · at least `bgJobs` REAL jobs settled cleanly (code + photo, no upheld
        dispute) — countedJobs, the number the provisional cap already uses
      · average rating ≥ `bgRating` over those jobs
      · zero upheld disputes
@@ -16,7 +16,7 @@
        Checked (tier ≥ 3) pro in the SAME trade, or a customer who has had a
        job with this pro settle. One vouch per person, ever.
      · the reference the pro named has confirmed by code (the reference gets
-       a 4-digit code; until the SMS rail exists it is shown on screen, the
+       the pro's own SAAHAA code; it is shown on screen, the
        same honest sandbox the phone step uses)
 
    TIER 4 · SAAHAA CERTIFIED, granted when the numbers hold (25 jobs,
@@ -63,19 +63,27 @@ export function vouch(partnerId) {
   return { ok: true, vouch: v };
 }
 
-/* ── the reference's code ───────────────────────────────────── */
+/* ── the reference's code ─────────────────────────────────────
+   The reference does not need the app and there is no SMS rail, so the code
+   here is the pro's OWN SAAHAA code — the same one on their public page and
+   the same one a customer's door check uses. The pro gives it to the person
+   vouching for them; when that person is rung, they read it back. Nothing is
+   generated and nothing has to be delivered. */
 export function sendReferenceCode(p) {
   const bg = V.backgroundRecord(p);
   if (!bg || !bg.refName) return null;
-  const code = makeOtp();
+  const code = String(p.code || (getState().users.find(u => u.key === p.userKey) || {}).code || '') || makeOtp();
   V.patchBackground(p, b => ({ ...b, refCode: code, refCodeAt: Date.now(), refConfirmed: false }));
   audit.record('verify.refCodeSent', { partner: p.id }, p.userKey);
-  return code;                    // shown on screen until the SMS rail exists
+  return code;
 }
+const sameCode = (a, b) =>
+  String(a == null ? '' : a).replace(/[\s-]/g, '').toUpperCase() ===
+  String(b == null ? '' : b).replace(/[\s-]/g, '').toUpperCase();
 export function confirmReference(p, entered) {
   const bg = V.backgroundRecord(p);
   if (!bg || !bg.refCode) return false;
-  if (String(entered || '').trim() !== String(bg.refCode)) { audit.record('verify.refCodeWrong', { partner: p.id }, p.userKey); return false; }
+  if (!sameCode(entered, bg.refCode)) { audit.record('verify.refCodeWrong', { partner: p.id }, p.userKey); return false; }
   V.patchBackground(p, b => ({ ...b, refConfirmed: true, refConfirmedAt: Date.now(), refCode: null }));
   audit.record('verify.refConfirmed', { partner: p.id }, p.userKey);
   return true;

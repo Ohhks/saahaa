@@ -45,11 +45,14 @@ You are one person. This list is ordered so that nothing needs you twice.
     becomes an Order + Checkout, `payout()` a Route transfer or a Payout.
     Until then it runs as a sandbox UPI and every screen that moves money says
     so. Do not accept cards until UPI works end to end.
-11. **SMS OTP** for partner verification step 1 and for the reference's
-    4-digit code (any DLT-registered sender). Until that sender is live both
-    codes are generated and shown on the partner's own screen — the ladder is
-    real, but nothing is texted. This is the shortest of the rails still to
-    wire (see *Rails still to wire* below).
+11. ~~**SMS OTP**~~ — **struck out, deliberately and for good (8.4.0).**
+    There is no SMS rail on this list any more, because the product no longer
+    has anything to send. Every code it uses is a permanent SAAHAA code the
+    person already has: the customer reads theirs out at the door, the pro
+    passes theirs to a reference. A DLT-registered sender costs money, takes
+    weeks of paperwork, and would only have delivered numbers that people
+    already hold. Do not re-add it. The one exception is the owner-issued
+    password reset, which is read out on a phone call and is not sent either.
 12. **First ten pros** — walk them through the seven steps in person. The
     ladder needs nothing from you at all: Background Checked and Certified are
     earned from real jobs, ratings, vouches and the reference's code.
@@ -67,8 +70,8 @@ what is missing.
 
 | Step | What happens today | What wires it |
 |---|---|---|
-| Phone verification | The code is generated and shown on the partner's screen | A DLT-registered SMS sender (step 11) |
-| The reference's code | The 4-digit code is generated and shown on the pro's screen, for the pro to pass to the reference | The same SMS sender (step 11) |
+| Phone verification | The pro confirms the number they signed up with and is handed their permanent SAAHAA code | **Nothing — this is finished.** No sender is needed |
+| The reference's code | The pro's own SAAHAA code, which they pass to their reference themselves | **Nothing — this is finished.** No sender is needed |
 | UPI payout id | The id is format-checked and saved | `razorpay-payout` turns it into a RazorpayX fund account on the first payout; penny-drop validation (`/v1/fund_accounts/validations`) before that is the next step (step 10) |
 | Money in and out | `src/core/gateway.js` in `MODE 'sim'`: a collect or a payout succeeds at once, moves no real money, and is labelled *Sandbox UPI* on the screen and `upi-sim` on the ledger leg — customer top-ups, booking shortfalls, worker stake top-ups, every take-out | The four Edge Functions in `supabase/functions/`: `razorpay-order` + `razorpay-verify` behind `collect()`, `razorpay-payout` behind `payout()`, `razorpay-webhook` as the server's own record (`gateway_events`, `gateway_payments`, migration 0004). Deploy, set secrets, then switch a device with `?payments=razorpay&rzkey=…&fnurl=…` — `supabase/README.md`, `docs/PRODUCTION.md` §7. Payouts stay fail-closed until a Route account map or RazorpayX is configured |
 | Withdraw fees / Remit GST | The treasury posts the leg and audits it; nothing reaches a bank or the GST portal | `razorpay-webhook` already stores every `settlement.processed` in `gateway_events`; posting the `FEE_WITHDRAW` leg from that row is the lead's, and the GSTR-3B challan stays manual (`docs/PRODUCTION.md` §3) |
