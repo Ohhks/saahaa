@@ -30,6 +30,7 @@ import * as gateway from '../../core/gateway.js';
 import { getPricing } from '../../domain/settings.js';
 import { cancelSplit } from '../../domain/pricing.js';
 import { markupFor, ESCROW } from '../../domain/trust.js';
+import { t } from '../i18n.js';
 import { header, emptyBlock, SYS_CSS } from './shops.js';
 
 /* How the order was paid. EVERYONE PAYS SAAHAA: the wallet is drawn first
@@ -459,7 +460,7 @@ export function renderChat(orderId) {
       <button class="btn btn--primary ch-send" data-act="chat.send" data-id="${esc(o.id)}" aria-label="Send">↑</button>
     </div>
     <p class="micro muted ch-foot">Phone numbers and payment ids are hidden automatically. Keep the money in SAAHAA:
-      it is held until you confirm the work, and it is the only thing a dispute can be settled from.</p>`
+      it is held until you confirm the work — or until the deadline shown on the job — and it is the only thing a dispute can be settled from.</p>`
     : `<p class="micro muted ch-foot">${s ? 'This thread belongs to the customer and the pro on this order.' : 'Sign in to reply.'}</p>`}
     <div style="height:20px"></div>
   </main>${SYS_CSS}`;
@@ -582,7 +583,7 @@ function actionPanel(o, r) {
     if (s === 'MATCHING')    return panel('New job for you', B('stage.accept', 'Accept this job'));
     if (s === 'ASSIGNED')    return panel('Head to the customer', `${whereTo(o)}${B('stage.enroute', 'Start travelling')}
       <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--color-accent-400)"
-        data-act="worker.cancel" data-id="${o.id}">I cannot do this job</button>`);
+        data-act="worker.cancel" data-id="${o.id}">${esc(t('job.cannotDo'))}</button>`);
 
     /* THE WORST DEAD END IN THE PRODUCT. A dispute raised against him showed
        the header "under review" and nothing else: not the reason, not that a
@@ -600,6 +601,9 @@ function actionPanel(o, r) {
         <p class="micro muted" style="margin-top:10px">${mine
           ? 'Nobody is paid while this is open. The owner reads both sides, usually within 24 hours.'
           : 'Nothing is decided yet and nothing is held against you for one complaint. Put your side on the record — the owner reads both, usually within 24 hours. If it is upheld, your stake goes to the customer and it counts against SAAHAA Certified.'}</p>
+        ${o.disputeReason === 'Code would not verify at the door' ? `
+          <button class="btn btn--primary btn--block" style="margin-top:10px"
+            data-act="code.retry" data-id="${o.id}">Let me try the code again</button>` : ''}
         <button class="btn btn--secondary btn--block" style="margin-top:10px"
           data-act="nav.chat" data-id="${o.id}">Put my side on the record</button>
         ${(o.evidence || []).length ? `<p class="micro muted" style="margin-top:8px">Your ${(o.evidence || []).length} piece${(o.evidence || []).length === 1 ? '' : 's'} of evidence ${(o.evidence || []).length === 1 ? 'is' : 'are'} attached to this job and the owner can see ${(o.evidence || []).length === 1 ? 'it' : 'them'}.</p>` : ''}`);
@@ -608,46 +612,47 @@ function actionPanel(o, r) {
        customer is looking at, without the controls. */
     if (s === 'EN_ROUTE')    return panel('Arrived?',
       `${whereTo(o)}${mapCard(o, { interactive: false, id: 'jobMap' })}
-       <div style="height:12px"></div>${B('stage.arrived', "I've arrived")}`);
-    if (s === 'ARRIVED')     return panel('Ask the customer for their SAAHAA code', `
-      ${mapCard(o, { interactive: false, id: 'jobMap' })}
+       <div style="height:12px"></div>${B('stage.arrived', "I've arrived")}
+       <!-- EN_ROUTE is the stage where "I cannot come" actually happens — a
+            breakdown, a job overrunning — and it was the one stage with no
+            cancel control, which left no-showing as the only way out. -->
+       <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--color-accent-400)"
+         data-act="worker.cancel" data-id="${o.id}">${esc(t('job.cannotDo'))}</button>`);
+    if (s === 'ARRIVED')     return panel(t('door.pro.title'), `
+      ${whereTo(o)}${mapCard(o, { interactive: false, id: 'jobMap' })}
       <div style="height:12px"></div>
       <!-- The hint gives the SHAPE, never a specimen. An example like "C20262001"
            is a real person's code — the first customer of 2026 — so printing one
            here would hand the pro a code they might not have been given. -->
-      <p class="tiny muted" style="margin:0 0 10px">It starts with <b class="num">C</b> and has eight
-        digits after it. It is on their screen, and it is the same one every time you work for them.</p>
+      <p class="tiny muted" style="margin:0 0 10px">${esc(t('door.pro.shape'))}</p>
       <div class="field" style="margin-bottom:14px">
         <input id="otpCode" data-role="otp" autocapitalize="characters" autocomplete="off"
           spellcheck="false" maxlength="12" placeholder=" "
           style="font-family:var(--font-mono,inherit);letter-spacing:.12em;text-transform:uppercase">
-        <label>Their SAAHAA code</label>
+        <label>${esc(t('door.pro.field'))}</label>
       </div>
       <!-- The code is what LOCKS the stake. Saying so afterwards is telling
            somebody their money moved; saying it here is asking them. -->
-      <p class="tiny muted" style="margin:0 0 12px">Entering this code starts the job and locks
-        ${M.fmt(W.stakeFor(o.deal))} of your own money. Every rupee of it comes back the moment the
-        customer confirms the work.</p>
-      ${B('otp.submit', 'Verify & start work')}
+      <p class="tiny muted" style="margin:0 0 12px">${esc(t('door.pro.stake', { amount: M.fmt(W.stakeFor(o.deal)) }))}</p>
+      ${B('otp.submit', t('door.pro.submit'))}
       <!-- A PRO COULD NOT CANCEL. The agreement he signs says "I will cancel
            early if I cannot come, never just not show up", and the conduct quiz
            marks that as the right answer — while the app gave him no control to
            do it at any stage. His only options were to no-show (stake forfeit,
            trust penalty) or to talk the customer into cancelling for him. -->
       <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--color-accent-400)"
-        data-act="worker.cancel" data-id="${o.id}">I cannot do this job</button>`);
+        data-act="worker.cancel" data-id="${o.id}">${esc(t('job.cannotDo'))}</button>`);
     /* The camera IS the step. The label-only path stays — a pro whose camera
        is broken must still be able to finish a paid job — but it is folded
        away, because a word is not evidence and should not look like it. */
-    if (s === 'IN_PROGRESS') return panel('Photograph the finished work', `
+    if (s === 'IN_PROGRESS') return panel(t('job.photoNeeded'), `
       ${o.stake ? `<p class="tiny" style="margin-bottom:10px"><span class="state state--held">${M.fmt(o.stake.need)} locked</span>
         <span class="muted">from your wallet for this job${o.stake.onCredit ? ` (${M.fmt(o.stake.onCredit)} on credit against this payout)` : ''} — it comes back in full when the customer confirms.</span></p>` : ''}
       <div class="row" style="gap:8px;margin-bottom:10px">
         <button class="btn btn--primary grow" data-act="photo.evidence" data-id="${o.id}" data-label="Before">${icon('camera', { size: 16 })} Before</button>
         <button class="btn btn--primary grow" data-act="photo.evidence" data-id="${o.id}" data-label="After">${icon('camera', { size: 16 })} After</button>
       </div>
-      <p class="micro muted" style="margin-bottom:12px">Your camera opens. The customer sees the picture on their order and confirms
-        against it — that is what releases the money to you.</p>
+      <p class="micro muted" style="margin-bottom:12px">${esc(t('job.photoWhy'))}</p>
       ${(o.evidence || []).length ? `${evidenceTiles(o)}
         <p class="micro muted" style="margin:8px 0 12px">${(o.evidence || []).length} attached${
           shot(o) < (o.evidence || []).length ? ` · ${(o.evidence || []).length - shot(o)} without a photograph` : ''}</p>`
@@ -676,11 +681,9 @@ function actionPanel(o, r) {
   }
 
   if (r.isCustomer) {
-    if (s === 'ARRIVED') return panel('Read your code out to your pro', `
+    if (s === 'ARRIVED') return panel(t('door.customer.title'), `
       ${codeBig(o.otp)}
-      <p class="tiny muted" style="text-align:center;margin-top:8px">
-        This is your own SAAHAA code — the same one every job, so there is never a code to wait for.
-        Read it out only once they are at your door. Them typing it is proof the right person came.</p>`);
+      <p class="tiny muted" style="text-align:center;margin-top:8px">${esc(t('door.customer.body'))}</p>`);
     if (s === 'WORK_DONE') return panel('Work finished — confirm to release payment', `
       ${(o.evidence || []).length ? `${evidenceTiles(o)}
         <p class="micro muted" style="margin:8px 0 12px">${shot(o)
@@ -688,6 +691,11 @@ function actionPanel(o, r) {
           : 'Your pro could not attach a photograph, so this is a note, not a picture. Report an issue if the work is not done.'}</p>` : ''}
       <div class="m-kv" style="margin-bottom:10px"><span>Held by SAAHAA for ${esc(o.partnerName)}</span>
         <span><b class="num">${M.fmt(o.deal)}</b> <span class="state state--held">not yet released</span></span></div>
+      <!-- SHE WAS NEVER TOLD THE CLOCK EXISTED. The pro's screen showed the
+           release window and hers did not, while nine screens promised the
+           money moved only when she confirmed. If a deadline exists she has to
+           be the first to know it, not the last. -->
+      ${releaseLine(o)}
       ${B('release.full', `Confirm & release ${M.fmt(o.deal)}`)}
       <button class="btn btn--ghost btn--block" style="margin-top:8px;color:var(--color-accent-400)"
         data-act="dispute.open" data-id="${o.id}">Something was wrong</button>`);
@@ -731,13 +739,20 @@ function actionPanel(o, r) {
        and the machine's own tracker; the cancel button is untouched and still
        one tap away. */
     if (['MATCHING','ASSIGNED','EN_ROUTE'].includes(s)) {
-      const first = String(o.partnerName || 'Your pro').split(' ')[0];
+      /* NOBODY HAS ACCEPTED AT MATCHING. The 900ms fake was removed from the
+         stage machine and left here: the header, the ETA and the code line all
+         read o.partnerName, which is written at booking time, so an unaccepted
+         job showed a named tradesman 0.4 km away — and if the sweep then
+         refunded it, told her he had cancelled. No name until it is true. */
+      const accepted = s !== 'MATCHING';
+      const first = accepted ? String(o.partnerName || 'Your pro').split(' ')[0] : 'Your pro';
       const trk = trackerFor(o.kind), i = trackerIndex(o);
       const next = trk[i + 1];
       const title = s === 'MATCHING' ? `Finding a pro for you`
         : s === 'ASSIGNED' ? `${first} has accepted`
         : `${first} is on the way`;
-      const line = s === 'MATCHING' ? `As soon as one accepts, this screen shows their name and how far away they are.`
+      const line = s === 'MATCHING'
+        ? `As soon as one accepts, this screen shows their name and how far away they are. If nobody takes it within ${Math.round(flow.ACCEPT_WINDOW_MS / 60000)} minutes, the booking ends by itself and every rupee comes straight back to you.`
         : s === 'EN_ROUTE' ? `About ${o.eta || etaMins(kmOf(o))} minutes away. Tap MAP above to watch.`
         : `They set out next — you will see them move on the map.`;
       return panel(title, `
@@ -745,12 +760,12 @@ function actionPanel(o, r) {
         <ol class="m-steps" style="gap:8px;margin-bottom:12px">
           ${next ? `<li class="m-step pend"><span class="m-step__dot"></span>
             <span class="m-step__t">Then: ${esc(next.label)}</span></li>` : ''}
-          ${o.otp ? `<li class="m-step pend"><span class="m-step__dot"></span>
+          ${o.otp && accepted ? `<li class="m-step pend"><span class="m-step__dot"></span>
             <span class="m-step__t">Read ${esc(first)} your code <b class="num">${esc(o.otp)}</b> at your door — never before</span></li>` : ''}
           <li class="m-step pend"><span class="m-step__dot"></span>
             <span class="m-step__t">${M.fmt(o.customerPays)} is held by SAAHAA. ${esc(first)} is paid only after you confirm the work</span></li>
         </ol>
-        ${(s === 'ASSIGNED' || s === 'EN_ROUTE') ? `
+        ${(s === 'ASSIGNED' || s === 'EN_ROUTE') && Date.now() - (o.stageTs || 0) > NO_SHOW_AFTER_MS ? `
           <!-- THE MISSING ESCAPE. When a pro simply does not turn up, the only
                control here used to be Cancel — which at EN_ROUTE hands 40% of
                her money to a journey nobody made. WORKER_NO_SHOW (full refund
@@ -760,6 +775,24 @@ function actionPanel(o, r) {
             data-act="noshow.open" data-id="${o.id}">${esc(first)} never arrived</button>` : ''}
         <button class="btn btn--ghost btn--block" style="color:var(--color-accent-400)"
           data-act="cancel.open" data-id="${o.id}">Cancel this booking</button>`);
+    }
+
+    /* A REFUNDED ORDER SHOWED HER THE BILL SHE PAID AND NOTHING ELSE. The money
+       was genuinely back in her wallet — the ledger proved it — and the screen
+       still read "You pay ₹450 … held until you confirm", so the only
+       reasonable conclusion was that she was out the money. */
+    if (s === 'CANCELLED' || s === 'NO_MATCH' || s === 'REFUNDED') {
+      const back = o.refund != null ? o.refund : o.customerPays;
+      const why = o.cancelRule === 'WORKER_NO_SHOW' ? 'Your pro did not arrive.'
+        : o.cancelRule === 'WORKER_CANCEL' ? 'Your pro could not make it, and told us rather than not turning up.'
+        : o.noMatchAt ? 'Nobody was free to take this one, so it ended by itself.'
+        : 'This booking was cancelled.';
+      return panel('Your money is back', `
+        <p class="tiny" style="margin-bottom:10px">${esc(why)}</p>
+        <div class="m-kv"><span>Back in your SAAHAA wallet</span><span class="num">${M.fmt(back)}</span></div>
+        ${o.goodwill ? `<div class="m-kv"><span>Credit for the trouble</span><span class="num">${M.fmt(o.goodwill)}</span></div>` : ''}
+        <p class="micro muted" style="margin-top:10px">Spend it on the next booking or take it out from My SAAHAA — it is yours either way.</p>
+        <button class="btn btn--secondary btn--block" style="margin-top:10px" data-act="nav.home">Find someone else</button>`);
     }
 
     /* A DISPUTED JOB USED TO BE A DEAD END FOR THE CUSTOMER TOO — this branch
@@ -784,7 +817,22 @@ function actionPanel(o, r) {
         <span class="tiny">${esc(l.name)} <span class="micro muted">× ${esc(l.qty)}</span>
           ${l.status === 'unavailable' ? '<span class="tag tag-accent">Refunded</span>' : l.status === 'substituted' ? '<span class="tag tag-neutral">Similar</span>' : ''}</span>
         ${['unavailable', 'substituted'].includes(l.status) ? '' : `<button class="btn btn--ghost btn--sm" data-act="retail.out"
-          data-id="${o.id}" data-line="${l.lineId}">Not in stock</button>`}</div>`).join('')}
+          data-id="${o.id}" data-line="${l.lineId}">Not in stock</button>`}</div>
+        ${l.variableWeight && !['unavailable', 'substituted'].includes(l.status) ? `
+        <!-- THE SCALE. This screen was called "Weigh and pack" and had nothing to
+             weigh with: pickedQty was never set by any control, so loose goods
+             were always charged at the estimate the customer was shown. -->
+        <div class="row" style="gap:8px;align-items:center;padding:0 0 8px">
+          <span class="micro muted grow">Ordered ${esc(l.qty)} — what did it actually weigh?</span>
+          <input class="input" style="width:92px" type="number" min="0" step="0.05"
+            inputmode="decimal" data-role="picked" data-id="${o.id}" data-line="${l.lineId}"
+            value="${l.pickedQty != null ? l.pickedQty : l.qty}">
+        </div>` : ''}`).join('')}
+      ${o.overEstimate ? `<p class="m-note" style="margin:8px 0 0">This weighs out at ${M.fmt(o.weighedTotal)} —
+        ${M.fmt(o.overEstimate)} more than she agreed to. <b>She is not charged the extra.</b> Give her the
+        weight she paid for, or message her and let her decide before you pack it.</p>` : ''}
+      ${o.reweighed ? `<p class="m-note" style="margin:8px 0 0">Weighed lighter than the estimate — her bill
+        has come down to ${M.fmt(o.customerPays)} and the difference goes back to her automatically.</p>` : ''}
       <div style="height:10px"></div>${B('stage.packed', 'Weighed & packed')}`);
     if (s === 'R_SUB_PENDING') return panel('Waiting for the customer', '<p class="tiny muted">They are choosing a substitute or a refund. No reply in 90 seconds means a refund for that item.</p>');
     if (s === 'R_PACKED')   return o.mode === 'pickup'
@@ -822,6 +870,32 @@ function whereTo(o) {
       Message the customer for the door number before you set out.</p>`}
     <button class="btn btn--ghost btn--sm" style="margin-top:8px" data-act="nav.chat" data-id="${esc(o.id)}">Message the customer</button>
   </div>`;
+}
+
+/* HOW LONG BEFORE "THEY NEVER ARRIVED" IS A FAIR THING TO SAY. The button used
+   to appear the instant a job was assigned, and because nothing was recorded
+   against the pro it was a repeatable ₹100 credit farm: book, tap, full refund
+   plus the credit, repeat. A real no-show takes at least as long as the journey
+   she was quoted, plus a grace period for traffic. */
+const NO_SHOW_AFTER_MS = 20 * 60 * 1000;
+
+/* What the customer is told about the deadline on her own job. A job under
+   review has no clock at all and must not pretend to; one with a window states
+   the hour, because "auto-releases" without a number is not information. */
+function releaseLine(o) {
+  const tier = ESCROW[o.escrowTier] || null;
+  if (!tier || !isFinite(tier.holdMs)) {
+    return `<p class="tiny" style="margin:0 0 10px;opacity:.85">A person at SAAHAA is checking this job before
+      any money moves. Nothing releases on a timer while that is open.</p>`;
+  }
+  const at = (o.releaseAt || 0);
+  const left = at - Date.now();
+  if (left <= 0) return `<p class="tiny" style="margin:0 0 10px;opacity:.85">Confirm to release it now.</p>`;
+  const h = Math.floor(left / 3600e3), m = Math.round((left % 3600e3) / 60000);
+  const when = h ? `${h}h ${m}m` : `${m} min`;
+  return `<p class="tiny" style="margin:0 0 10px;opacity:.85">Confirm when you are happy with the work.
+    If you do nothing, this releases by itself in <b>${when}</b> — so look at the pictures before then,
+    or report a problem and the money stops where it is.</p>`;
 }
 
 /* the "what happens next" block: a strong moment, so it is ink-inverted */

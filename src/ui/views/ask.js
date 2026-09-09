@@ -73,8 +73,8 @@ const avatar = (name, size = 40, dim = false) =>
 /* the strip that never scrolls away: who holds the money, and what it is */
 const honest = (held, pid) => `<p class="m-note" style="margin:0 calc(-1 * var(--gutter));border-bottom:2px solid var(--color-divider)">
   Every price below is the worker's own rate plus SAAHAA's charge. ${held
-    ? `Your ${M.fmt(payP(held, pid))} stays held by SAAHAA until you confirm the work — nothing is paid to anyone directly.`
-    : 'You pay SAAHAA; the money is held until you confirm the work.'}</p>`;
+    ? `Nothing is charged while you wait. Your ${M.fmt(payP(held, pid))} match is reserved, so asking cannot cost you it.`
+    : 'You pay SAAHAA; the money is held until you confirm the work, or until the wait on that job runs out.'}</p>`;
 
 /* ── entry point: the row under Confirm — 1d "Request a job" ────
    BELOW the Confirm button, never above, never a modal. The engine takes a
@@ -289,7 +289,7 @@ function choosing(req) {
             <p class="micro muted">Your held price · first match</p></div></div>
         <button class="btn btn--secondary btn--sm" data-act="ask.held" data-id="${req.id}">Book ${M.fmt(payP(held, req.held && req.held.partnerId))}</button>
       </div></div>` : ''}
-    <p class="micro muted" style="margin-top:12px">Whoever you pick, you pay SAAHAA and the money is held until you confirm the work.</p>`);
+    <p class="micro muted" style="margin-top:12px">Whoever you pick, you pay SAAHAA and the money is held until you confirm the work — or until the wait on that job runs out.</p>`);
 }
 
 function heroReply(req, b, held, showCounter) {
@@ -400,7 +400,7 @@ export function showReceipt(req, paid, workerName) {
       // loss — it is a confirmed good price, and it must read as one.
       ? `<p class="m-note" style="margin-top:10px">Your held price was already the best rate. Nothing lost.</p>`
       : `<div class="m-kv m-kv--total"><span>You saved</span><span class="num" style="color:var(--color-accent)">${M.fmt(gapP(s.amount, bid))}</span></div>`}
-    <p class="tiny muted" style="margin-top:14px">${esc(workerName)} is booked. SAAHAA holds ${M.fmt(payP(paid, bid))} until you confirm the work.</p>
+    <p class="tiny muted" style="margin-top:14px">${esc(workerName)} is booked. SAAHAA holds ${M.fmt(payP(paid, bid))} until you confirm the work, or until the wait shown on the job runs out.</p>
     <button class="btn btn--primary btn--lg btn--block" style="margin-top:20px;justify-content:flex-start" data-act="sheet.close">Done</button>
   </div>${SYS_CSS}`);
 }

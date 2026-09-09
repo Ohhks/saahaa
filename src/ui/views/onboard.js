@@ -24,6 +24,7 @@
    console to start listing. */
 
 import { esc, toast, closeSheet } from '../dom.js';
+import { t, lang } from '../i18n.js';
 import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, me, myShop } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
@@ -88,8 +89,8 @@ const obCSS = `<style>
    is not, so the view states the step's real purpose until that string is
    corrected in the domain. Nothing else overrides its step. */
 const subOf = s => s.id === 'selfie'
-  ? 'For SAAHAA only — it is never shown to a customer.'
-  : s.sub;
+  ? t('ob.s3.s')
+  : (s.k ? t(s.k + '.s') : s.sub);
 
 const stepHeader = (title, right) => `<header class="apphdr ob__hdr">
     <button class="btn btn-ghost tap" style="min-width:44px" data-act="nav.back" aria-label="Back">${icon('back', { size: 18 })}</button>
@@ -118,7 +119,7 @@ export function render() {
   const cur = r.next;
   const minsLeft = V.STEPS.filter(s => !r.done.includes(s.id)).reduce((n, s) => n + s.mins, 0);
   return `${obCSS}
-  ${stepHeader('Getting you verified', `Step ${cur.n} of ${V.STEPS.length}`)}
+  ${stepHeader(t('ob.title'), `Step ${cur.n} of ${V.STEPS.length}`)}
   <div class="ob__bar" aria-hidden="true"><i style="width:${Math.max(4, r.pct)}%"></i></div>
   <main class="wrap ob" style="padding-bottom:40px">
     <div class="ob__step">
@@ -134,19 +135,19 @@ export function render() {
       <div>
         ${r.done.includes('phone') ? draftPage(p, cat) : ''}
         <div style="padding-top:16px">
-          <span class="eyebrow">The seven steps</span>
+          <span class="eyebrow">${esc(t('ob.steps'))}</span>
           <div style="margin-top:6px">
           ${V.STEPS.map(s => {
             const done = r.done.includes(s.id);
             const isCur = cur.id === s.id;
             return `<div class="obl ${done ? 'done' : isCur ? 'cur' : 'pend'}">
               <span class="obl__n">${done ? icon('check', { size: 12 }) : s.n}</span>
-              <span class="grow tiny" style="min-width:0"><b>${esc(s.title)}</b>${isCur ? `<span class="micro muted" style="display:block">${esc(subOf(s))}</span>` : ''}</span>
+              <span class="grow tiny" style="min-width:0"><b>${esc(s.k ? t(s.k + '.t') : s.title)}</b>${isCur ? `<span class="micro muted" style="display:block">${esc(subOf(s))}</span>` : ''}</span>
               <span class="micro muted" style="flex:none">${done ? 'done' : `${s.mins} min`}</span>
             </div>`;
           }).join('')}
           </div>
-          <p class="micro muted" style="margin-top:10px">Jobs open the moment step 7 is done. Nobody has to approve you.</p>
+          <p class="micro muted" style="margin-top:10px">${esc(t('ob.free'))}</p>
         </div>
       </div>
     </div>
@@ -269,16 +270,13 @@ function stepPanel(p, id, cat) {
        pro will be reached on, and hands them the one code they will use for
        everything after this — see domain/verification.js for why. */
     case 'phone': return `<div class="ob__form">
-      <p class="tiny muted">Type the number you opened this account with. Nothing is texted to you —
-        SAAHAA never sends codes.</p>
+      <p class="tiny muted">${esc(t('ob.noCode'))}</p>
       <div class="field"><input id="obPhone" inputmode="numeric" maxlength="10" placeholder=" "
         autocomplete="tel-national"><label>Your 10-digit mobile number</label></div>
       ${myCode(p) ? `<div class="card" style="padding:12px;margin-top:12px">
-        <div class="m-cap" style="margin:0 0 4px">And this is your SAAHAA code</div>
+        <div class="m-cap" style="margin:0 0 4px">${esc(t('ob.yourCode'))}</div>
         <b class="num" style="font-size:24px;letter-spacing:.12em">${esc(myCode(p))}</b>
-        <p class="micro muted" style="margin:6px 0 0">It is yours for good. Customers type it at their
-          door to confirm you turned up, and it is printed on your public page. There is never another
-          code to wait for.</p></div>` : ''}
+        <p class="micro muted" style="margin:6px 0 0">${esc(t('ob.yourCodeBody'))}</p></div>` : ''}
       </div>
       ${foot('<button class="btn btn-primary" data-act="ob.confirmphone">Confirm my number</button>')}`;
 
@@ -354,6 +352,9 @@ function quizPanel(p, kind, title) {
     ? `${MAX_ATTEMPTS} tries, and ${st.left} still left. If all ${MAX_ATTEMPTS} are wrong the ladder waits ${lockHours} hours before you can try again — so read each one slowly. Nothing else you have done is lost.`
     : 'No limit on tries here. A wrong answer just shows you the rule and lets you try again, so nothing is lost by getting one wrong.';
   return `<div class="ob__form" style="gap:0">
+    ${kind === 'trade' && lang() !== 'en'
+      ? `<p class="m-note" style="margin:0 0 10px">${esc(t('ob.quizEnglish'))}</p>` : ''}
+    ${Number.isFinite(st.left) ? `<p class="micro muted" style="margin:0 0 8px">${esc(t('ob.quizWarn'))}</p>` : ''}
     <div class="between" style="gap:8px"><b class="tiny">${title}</b>
       <span class="tag tag-neutral" style="flex:none">need ${PASS[kind]} of ${bank.length}${Number.isFinite(st.left) ? ` · ${st.left} ${st.left === 1 ? 'try' : 'tries'} left` : ''}</span></div>
     <p class="${Number.isFinite(st.left) ? 'tiny' : 'micro muted'}" style="margin-top:8px${Number.isFinite(st.left) ? ';border-left:3px solid var(--color-accent);padding-left:10px' : ''}">${esc(stakes)}</p>

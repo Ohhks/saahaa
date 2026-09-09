@@ -205,6 +205,10 @@ register('reducer', { id:'admin', slice:'admin', reduce(s = {}, a) {
 }});
 
 register('reducer', { id:'meta', slice:'seeded', reduce(s = false, a) {
+  /* `seed/reset` exists so a demo purge can also forget that a seed happened.
+     Without it ?demo=1 worked exactly once per device: the purge removed the
+     roster and left this true, so nothing ever re-seeded. */
+  if (a.type === 'seed/reset') return false;
   return a.type === 'seed/done' ? true : s;
 }});
 

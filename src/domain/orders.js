@@ -38,7 +38,12 @@ const SERVICE_STAGES = [
   { id:'SETTLED',     label:'Paid & settled',     short:'Settled',    owner:'system',   to:['RATED','DISPUTED'], tracker:true, tone:'ok', ico:'💰' },
   { id:'RATED',       label:'Rated',              short:'Rated',      owner:'customer', to:['CLOSED'], tracker:false, tone:'ok' },
   { id:'PARTIAL',     label:'Partly released',    short:'Partial',    owner:'system',   to:['CLOSED'], tracker:false, tone:'warn' },
-  { id:'DISPUTED',    label:'Under review',       short:'Disputed',   owner:'admin',    to:['SETTLED','PARTIAL','REFUNDED','CLOSED'], tracker:false, tone:'bad', ico:'⚖️' },
+  /* ARRIVED is reachable again. Three mistyped characters at a gate used to end
+     the booking permanently for both people: the only exits were the owner's
+     three money buttons, none of which is "let him try again", so a pro whose
+     customer read the code out correctly two seconds later still had a dead
+     job and she had to rebook from scratch. */
+  { id:'DISPUTED',    label:'Under review',       short:'Disputed',   owner:'admin',    to:['SETTLED','PARTIAL','REFUNDED','CLOSED','ARRIVED'], tracker:false, tone:'bad', ico:'⚖️' },
   { id:'REFUNDED',    label:'Refunded',           short:'Refunded',   owner:'system',   to:['CLOSED'], tracker:false, tone:'warn' },
   { id:'CANCELLED',   label:'Cancelled',          short:'Cancelled',  owner:'either',   to:[], tracker:false, tone:'bad', terminal:true },
   { id:'EXPIRED',     label:'Expired',            short:'Expired',    owner:'system',   to:[], tracker:false, tone:'soft', terminal:true },

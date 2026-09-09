@@ -334,7 +334,13 @@ const catGlyph = c => hasIcon(c.id) ? icon(c.id, { size: 14 }) : '';
    sub-service and the same locked price are one tap from Home. */
 function againChip() {
   if (!me()) return '';
-  const o = myOrders().find(x => x.kind === 'service' && x.partnerId && x.partnerName);
+  /* THIS OFFERED THE PRO WHO NEVER CAME. Orders are newest-first and this took
+     the first with a partner on it, whatever became of it — so a job that was
+     auto-cancelled because nobody accepted, or closed by a dispute, still put
+     that name on the home screen as a recommendation. Only a job that actually
+     finished is a recommendation. */
+  const o = myOrders().find(x => x.kind === 'service' && x.partnerId && x.partnerName
+    && ['SETTLED', 'RATED', 'CLOSED', 'PARTIAL'].includes(x.stage));
   if (!o) return '';
   const first = String(o.partnerName).split(' ')[0];
   return `<button class="chip" data-act="book.sub" data-id="${esc(o.catId)}"
@@ -519,15 +525,36 @@ function mostBooked() {
   </div>`;
 }
 
+/* EMERGENCY, FOR REAL. There is no urgency attribute in the catalogue and there
+   does not need to be one: at 9pm with a burst pipe the only question is who
+   can be here soonest. This scrolls to the people who are actually free now,
+   nearest first — the section that already answers it — instead of running a
+   text search for the word "repair" and calling it urgent. */
+export function showFreeNow() {
+  setSearch('');
+  setTimeout(() => {
+    const el = document.getElementById('freeNow');
+    if (!el) return;
+    const y = Math.max(0, el.getBoundingClientRect().top + window.scrollY - 64);
+    const from = window.scrollY;
+    try { window.scrollTo({ top: y, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, y); }
+    setTimeout(() => { if (Math.abs(window.scrollY - from) < 2 && Math.abs(y - from) > 8) window.scrollTo(0, y); }, 240);
+  }, 60);
+}
+
 function openNow() {
   const st = getState();
   const here = myPlace();
-  const pros = st.partners.filter(p => !p.suspended && p.online !== false && (p.tier | 0) >= 1)
+  /* LISTED BUT UNBOOKABLE. This ignored the category's own minTier, so a
+     tier-1 pro appeared on Home and his page rendered "Not yet verified" with
+     zero controls — no back, no alternatives, nothing but the tab bar. */
+  const bookable = p => { const c = get('category', p.cat); return (p.tier | 0) >= ((c && c.minTier) || 1); };
+  const pros = st.partners.filter(p => !p.suspended && p.online !== false && bookable(p))
     .map(p => ({ p, km: kmBetween(here, p.loc || p.area) })).sort((a, b) => a.km - b.km).slice(0, 4);
   const shops = st.shops.filter(s => s.isOpen && s.status === 'active')
     .map(s => ({ s, km: kmBetween(here, s.loc || s.area) })).sort((a, b) => a.km - b.km).slice(0, 3);
   if (!pros.length && !shops.length) return '';
-  return `<div class="sec">
+  return `<div class="sec" id="freeNow">
     <div class="between" style="margin-bottom:8px">
       <p class="m-cap" style="margin:0">Free near you right now</p>
       <div class="row" style="gap:14px">
@@ -745,7 +772,7 @@ export function render() {
             <ul class="m-steps" style="gap:8px">
               <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">Every pro is verified in stages — you always see which</span></li>
               <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">Price locked before you book</span></li>
-              <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">SAAHAA holds the money until you confirm the work</span></li>
+              <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">SAAHAA holds the money until you confirm — and tells you the deadline if you do not</span></li>
               <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">The pro keeps the whole of their price</span></li>
             </ul>
           </div>
@@ -761,7 +788,11 @@ export function render() {
         return `<div class="sec rise rise-${Math.min(5, gi + 2)}">
           <div class="between" style="margin-bottom:8px">
             <p class="m-cap" style="margin:0;display:flex;align-items:center;gap:6px">${icon(GROUP_ICON[g.id] || 'groupHome', { size: 14 })} ${esc(g.label)}</p>
-            <span class="meta">${list.length} live</span></div>
+            <!-- this counted the CATEGORIES in the group, so a fresh install
+                 read "7 live" above seven tiles each saying nobody is listed -->
+            <span class="meta">${(() => { const n = st.partners.filter(p => !p.suspended && p.online !== false
+              && list.some(c => c.id === p.cat)).length;
+              return n ? n + ' free now' : list.length + ' trades'; })()}</span></div>
           <div class="grid3">${list.map(c => tileHtml(c)).join('')}</div></div>`;
       }).join('')}
 
@@ -1237,7 +1268,7 @@ function cancelLine() {
    indivisible unit, and the bill the customer is about to pay, line by line.
    This is the single most important trust element in the product. */
 export function heroCard(catId, p, sub = null) {
-  const pv = flow.previewBooking(catId, p);
+  const pv = flow.previewBooking(catId, p, sub);   // the sub is the job: it must reach the price
   const t = tier(p.tier);
   const q = pv.quote;
   const pct = Math.round((q.uplift / Math.max(1, q.deal)) * 100);
@@ -1273,7 +1304,7 @@ export function heroCard(catId, p, sub = null) {
     ${kv(`SAAHAA charge · ${pct}% on top, incl. GST`, M.fmt(q.uplift))}
     ${kv('You pay', M.fmt(q.customerPays), 'm-kv--total')}
     <p class="tiny" style="margin-top:8px;opacity:.85;line-height:1.5">${esc(p.name)} receives the full ${M.fmt(q.deal)}. SAAHAA's charge is on top and paid by you.
-      The whole ${M.fmt(q.customerPays)} is paid to SAAHAA now and held until you confirm the work — nothing goes to anyone directly.</p>
+      The whole ${M.fmt(q.customerPays)} is paid to SAAHAA now and held until you confirm the work — nothing goes to anyone directly. If you do not confirm, the job screen shows you exactly when it releases by itself.</p>
 
     <p class="m-cap" style="margin-top:14px;opacity:.8">How you pay</p>
     ${me() ? `${kv('From your SAAHAA wallet', M.fmt(fromWallet))}${kv(`Via ${esc(gateway.label().split(' — ')[0])}`, M.fmt(viaGateway))}`
@@ -1300,6 +1331,18 @@ export function heroCard(catId, p, sub = null) {
          confirmBooking() sends them to #/auth. The label now says what the tap
          does, and the intent is kept so signing in comes back to this price
          instead of dropping them on an empty Home. -->
+    <!-- LOCKED, OR AN ESTIMATE — AND WHICH ONE IT IS. Every sub-service used to
+         quote the category's base under a promise that the price could not
+         change. For a tap washer that is true and worth saying. For a pipeline
+         replacement no honest tradesperson quotes it unseen, so the app stops
+         pretending and says the pro confirms on the day, with her approval
+         before any work starts. -->
+    ${(pv.size || {}).survey ? `
+      <p class="m-note" style="margin:0 0 12px">This is a job that has to be seen to be priced.
+        ${M.fmt(q.customerPays)} is the estimate; ${esc(String(p.name).split(' ')[0])} confirms it when they
+        arrive and <b>nothing starts until you approve the number</b>. If it is more than you want to spend,
+        you cancel there and then and pay nothing.</p>` : ''}
+
     <!-- WHERE, EXACTLY. The booking used to carry only an area name, so the pro
          was sent to a neighbourhood centroid. It is asked once and remembered:
          a returning customer sees it filled in and never types it again. -->
@@ -1333,7 +1376,7 @@ export function showAlternates(catId, sub = null) {
     <p class="tiny muted" style="margin:0 0 6px">
       Ranked on trust, distance and a fair price — never on price alone.</p>
     ${list.map((p, i) => {
-      const pv = flow.previewBooking(catId, p);
+      const pv = flow.previewBooking(catId, p, sub);
       return `<button class="m-row" data-act="book.confirm" data-id="${catId}" data-pid="${p.id}" data-sub="${esc(sub || '')}">
         <span class="avatar avatar--md">${esc(p.name[0])}</span>
         <div class="grow" style="min-width:0">
@@ -1363,12 +1406,24 @@ export async function confirmBooking(catId, partnerId, sub) {
   /* Remember where they are before booking, so the order carries a real address
      and the next booking has it filled in already. Saved on the account, not on
      the order alone — a person types their own door number once. */
-  const val = id => ((document.getElementById(id) || {}).value || '').trim();
-  const addr = val('bkAddr'), mark = val('bkMark');
+  /* THIS DESTROYED SAVED DATA. It read the two fields unconditionally — but the
+     "Someone else" list books straight from a row and renders no address
+     inputs, so `addr` came back '' and this wrote the empty string over the
+     address the customer had already given, on her account AND her session.
+     The next order then told the pro "this booking was taken before addresses
+     were collected", seconds after she made it.
+
+     A field that is not on the screen has said nothing. Only a field that
+     exists may change what is stored. */
+  const field = id => document.getElementById(id);
   const s0 = me() || {};
-  if (addr !== (s0.address || '') || mark !== (s0.landmark || '')) {
-    dispatch({ type: 'user/patch', payload: { key: s0.key, patch: { address: addr, landmark: mark } } });
-    saveSession({ ...s0, address: addr, landmark: mark });
+  if (field('bkAddr')) {
+    const addr = (field('bkAddr').value || '').trim();
+    const mark = ((field('bkMark') || {}).value || '').trim();
+    if (addr !== (s0.address || '') || mark !== (s0.landmark || '')) {
+      dispatch({ type: 'user/patch', payload: { key: s0.key, patch: { address: addr, landmark: mark } } });
+      saveSession({ ...s0, address: addr, landmark: mark });
+    }
   }
   const o = await flow.bookService({ catId, partner: p, sub });
   /* the need has been served: leaving the query in place meant the next visit

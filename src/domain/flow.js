@@ -8,6 +8,7 @@ import { appendBlock } from '../core/crypto.js';
 import * as audit from '../core/audit.js';
 import * as M from '../core/money.js';
 import { find } from '../core/registry.js';
+import { subSize } from './catalog.services.js';
 import { applyTransition, canTransition } from './orders.js';
 import { acct, holdbackFor, balanceOf } from './ledger.js';
 import * as gateway from '../core/gateway.js';
@@ -17,6 +18,8 @@ import { quoteService, quoteRetail, compareWithApps, releaseService, cancelSplit
 import { lockedMatch, rankShops, kmBetween, etaMins } from './match.js';
 import { escrowTier, markupFor, trustScore } from './trust.js';
 import { toast } from '../ui/dom.js';
+import { t } from '../ui/i18n.js';
+import * as flags from '../core/flags.js';
 
 /* ── ledger (double-entry, hash-chained) ───────────────────── */
 /* Serialised. The chain head used to be read BEFORE `await digest(...)`, so
@@ -74,10 +77,13 @@ export async function customerTopUp(paise) {
    stayed put for ever and there was no account to send it to. A marketplace
    holding a kirana's takings with no way out is not a marketplace. */
 export function shopWallet(shopId) {
-  const legs = (getState().ledger || []).flatMap(e => e.legs || []);
-  const key = acct.shop(shopId);
-  const balance = legs.filter(l => l.account === key).reduce((n, l) => n + (l.delta | 0), 0);
-  return { balance: Math.max(0, balance) };
+  /* I INVENTED A LEDGER SHAPE THAT DOES NOT EXIST. This walked `e.legs`, and
+     entries have no `legs` array — they are {partyA, partyB, amountPaise}. So
+     it returned 0 for every shop, for ever: the withdraw button shipped
+     permanently disabled over a real balance, and the "fix" was a control that
+     could not work. `balanceOf` is the one function that already knows how to
+     read this ledger; there was never a reason to write a second one. */
+  return { balance: Math.max(0, balanceOf(getState().ledger || [], acct.shop(shopId))) };
 }
 
 export async function shopWithdraw(shopId, paise) {
@@ -123,22 +129,55 @@ export function findMatch(catId, opts = {}) {
   const st = getState();
   const cat = find('category', catId);
   const deal = opts.deal || (cat && cat.base) || 50000;
-  return lockedMatch(st.partners, { catId, area: opts.area || myArea(), dealPaise: deal });
+  /* Refusing a self-booking at the confirm step is the backstop. Not offering
+     it in the first place is the fix: a pro browsing his own trade should never
+     see himself presented as his own best match. */
+  const s0 = me();
+  const pool = s0 ? st.partners.filter(p => p.userKey !== s0.key && !sameMobile(p, s0)) : st.partners;
+  return lockedMatch(pool, { catId, area: opts.area || myArea(), dealPaise: deal });
 }
 
 export function previewBooking(catId, partner, sub) {
   const cat = find('category', catId);
-  const deal = partner ? partner.ask : (cat && cat.base) || 50000;
+  /* The sub-service is what the job actually is, so it has to reach the price.
+     A tap washer and a pipeline replacement quoted the same figure before this. */
+  const size = subSize(catId, sub);
+  const base = partner ? partner.ask : (cat && cat.base) || 50000;
+  const deal = Math.round(base * size.x);
   const q = quoteService(deal, { markup: markupFor(partner || {}) });
   const cmp = compareWithApps(deal);
-  return { cat, partner, sub, deal, quote: q, compare: cmp };
+  return { cat, partner, sub, deal, quote: q, compare: cmp, size };
+}
+
+/* One person, two accounts: identity.js lets a number hold a C… and a P…, so
+   "is this me?" is a question about the human, not the row. */
+const digitsOf = v => String(v == null ? '' : v).replace(/\D/g, '').slice(-10);
+function sameMobile(partner, session) {
+  const users = getState().users || [];
+  const pu = users.find(u => u.key === partner.userKey) || {};
+  const a = digitsOf(pu.mobile || partner.mobile), b = digitsOf(session.mobile);
+  return !!a && a === b;
 }
 
 export async function bookService({ catId, partner, sub, deal, slot }) {
   const s = me();
   if (!s) throw new Error('Please sign in first');
+  /* NOBODY MAY BOOK THEMSELVES. Without this a pro appears as his own "best
+     match", books the job, types his OWN code at the door — the code check is
+     the customer's code, which on a self-booking is his — attaches a photo of
+     anything, and the sweep releases it. Cost: 8% of a price he sets himself.
+     Every job counts towards Background Checked and SAAHAA Certified, so the
+     whole automatic trust ladder was farmable, and the one thing the door code
+     is supposed to prove — that he was standing in front of somebody — proved
+     nothing at all. One number can hold both a C… and a P… account, so this
+     compares the person, not the account. */
+  if (partner && (partner.userKey === s.key || sameMobile(partner, s))) {
+    toast('You cannot book yourself. Pick another professional.', 'warn');
+    throw new Error('self-booking refused');
+  }
   const cat = find('category', catId);
-  const price = deal ?? partner.ask;
+  const size = subSize(catId, sub);
+  const price = deal ?? Math.round(partner.ask * size.x);
   const q = quoteService(price, { markup: markupFor(partner) });
   const km = kmBetween(s.area, partner.area);
   const now = Date.now();
@@ -165,6 +204,9 @@ export async function bookService({ catId, partner, sub, deal, slot }) {
        She already knows it, it is the same every job, and the pro typing it is
        proof he is standing in front of her. The FIELD NAME does not change, so
        jobs booked before this release keep their old number and still work. */
+    /* a job nobody can honestly quote unseen is booked as a visit at this
+       estimate; the pro confirms on arrival and she approves before work starts */
+    pricedOnSite: !!size.survey,
     otp: String(s.code || '') || makeOtp(), otpVerified: false, evidence: [], escrowed: q.customerPays,
   };
   dispatch({ type: 'order/add', payload: order });
@@ -176,10 +218,45 @@ export async function bookService({ catId, partner, sub, deal, slot }) {
   bumpAgg({ escrow: getState().agg.escrow + q.customerPays });
   audit.record('booking.created', { id: order.id, catId, deal: q.deal }, s.key);
 
-  // The hero card is a pro who has ALREADY accepted, so the demo mirrors
-  // reality: acceptance lands in a moment, not never.
-  setTimeout(() => advance(order.id, 'ASSIGNED', {}), 900);
+  /* "PRO ACCEPTED" USED TO BE A 900ms TIMER. Nobody had accepted anything — the
+     customer was told a named tradesperson had taken her job while he was
+     possibly asleep, with no timeout, no re-offer and no way to report it. A
+     fabricated status is worse than an honest wait, because she stops looking
+     for alternatives.
+
+     Under ?demo=1 the simulation stays, because a demo with nobody on the other
+     end shows nothing. In production the order sits at MATCHING until a real
+     pro taps Accept, and if none does within the window it becomes NO_MATCH and
+     she is paid back in full. */
+  if (flags.isOn('SIM_MARKET')) setTimeout(() => advance(order.id, 'ASSIGNED', {}), 900);
   return order;
+}
+
+/* How long a booking waits for a real pro before the customer gets her money
+   back. Long enough for a phone in a pocket, short enough that nobody's evening
+   is spent waiting on a screen that says "finding". */
+export const ACCEPT_WINDOW_MS = 10 * 60 * 1000;
+
+/* THE ESCALATION THAT NEVER RAN. `match.js` builds a ladder of alternates with
+   a per-pro window and nothing in the product ever read it, so an unaccepted
+   booking waited for ever. This is the floor under that: whatever else happens,
+   a job nobody took is refunded rather than left open. */
+export async function sweepUnaccepted(now = Date.now()) {
+  const waited = o => (now - (o.stageTs || o.createdAt || now)) > ACCEPT_WINDOW_MS;
+  const stale = getState().orders.filter(o => o.stage === 'MATCHING' && waited(o));
+  for (const o of stale) {
+    advance(o.id, 'NO_MATCH', { noMatchAt: now });
+    await cancelOrder(o.id, 'BEFORE_ACCEPT');          // nobody accepted: she is made whole
+    audit.record('booking.noMatch', { id: o.id, waitedMs: now - (o.stageTs || 0) }, 'system');
+  }
+  /* A SHOP THAT NEVER PICKS UP THE ORDER. The retail side had no timeout at
+     all, so her money sat held with no shop working and no way out. */
+  const shopStale = getState().orders.filter(o => o.stage === 'R_PLACED' && waited(o));
+  for (const o of shopStale) {
+    await refundRetail(o.id, 'The shop did not pick this up in time');
+    audit.record('order.shopNoResponse', { id: o.id, waitedMs: now - (o.stageTs || 0) }, 'system');
+  }
+  return stale.length + shopStale.length;
 }
 
 /* ── stage machine driver ──────────────────────────────────── */
@@ -213,7 +290,7 @@ export function verifyOtp(orderId, entered) {
     const fails = (o.otpFails || 0) + 1;
     dispatch({ type: 'order/patch', payload: { id: orderId, patch: { otpFails: fails } } });
     audit.record('otp.failed', { id: orderId, fails });
-    toast(fails >= 3 ? 'Too many wrong codes — a person will look at this' : 'Wrong code', 'danger');
+    toast(fails >= 3 ? t('door.tooMany') : t('door.wrong'), 'danger');
     /* THIS USED TO MOVE THE ORDER TO DISPUTED AND OPEN NO DISPUTE. The stage
        said "under review", the owner's queue read "No open disputes", and the
        customer's money and the pro's payout sat frozen with no record, no
@@ -383,6 +460,10 @@ export async function walletWithdraw(partnerId, paise) {
   if (amt > w.available) { toast(`You can withdraw up to ${M.fmt(w.available)}`, 'warn'); return null; }
   if (amt < MIN_WITHDRAW) { toast(`The smallest withdrawal is ${M.fmt(MIN_WITHDRAW)}`, 'warn'); return null; }
   const pUpi = ((getState().partners.find(x => x.id === partnerId) || {}).verification || {}).upi || '';
+  /* The shop path refused without a destination and this one did not, so the
+     screen said "sent to your UPI" while the VPA was an empty string. On a live
+     rail that is a payout into nowhere. */
+  if (!pUpi) { toast('Add the UPI id you want to be paid into first', 'warn'); return null; }
   const r = await gateway.payout({ paise: amt, purpose: 'earnings', key: partnerId, upi: pUpi });
   if (!r.ok) { toast('Could not send that right now', 'danger'); return null; }
   await ledger('WITHDRAW', amt, acct.partner(partnerId), acct.world(), { via: r.via, ref: r.ref });
@@ -486,6 +567,20 @@ export async function cancelOrder(orderId, ruleId) {
   const pc = getState().partners.find(p => p.id === o.partnerId) || {};
   const split = cancelSplit(o.deal, ruleId, { markup: markupFor(pc) });
   if (!advance(orderId, 'CANCELLED', { cancelRule: ruleId, refund: split.refund, cancelledAt: Date.now() })) return;
+  /* THE SHEET PROMISED "it is recorded against them, so it cannot happen
+     quietly twice" AND NOTHING WAS RECORDED. A genuine no-show has no stake to
+     forfeit either — the stake locks when the door code is entered, which by
+     definition never happened — so the consequence to the pro was exactly zero
+     and the customer's ₹100 credit was free money for anyone who asked. */
+  if (ruleId === 'WORKER_NO_SHOW' || ruleId === 'WORKER_CANCEL') {
+    const pid = o.partnerId;
+    const p0 = getState().partners.find(x => x.id === pid);
+    if (p0) {
+      const field = ruleId === 'WORKER_NO_SHOW' ? 'noShows' : 'workerCancels';
+      dispatch({ type: 'partner/patch', payload: { id: pid, patch: { [field]: ((p0[field] | 0) + 1) } } });
+      audit.record('partner.' + field, { partner: pid, orderId: o.id }, 'system');
+    }
+  }
   if ((ruleId === 'WORKER_CANCEL' || ruleId === 'WORKER_NO_SHOW') && o.stake) await forfeitStake(o, ruleId);
   else if (o.stake) await returnStake(o);          // the customer cancelled after work began — not the worker's fault
   if (split.refund) await ledger('REFUND', split.refund, acct.escrow(o.id), acct.customer(o.customerKey), { ruleId });
@@ -528,8 +623,32 @@ export const PARTNER_DISPUTE_REASONS = [
   'Nobody was at home', 'They would not give me their code', 'The job is bigger than quoted',
   'I cannot safely do this work', 'Wrong address', 'They asked me to work off the app',
 ];
-export const reasonsFor = role => (role === 'partner' || role === 'shop')
-  ? PARTNER_DISPUTE_REASONS : DISPUTE_REASONS;
+/* A KIRANA IS NOT STANDING AT A DOORSTEP. Lumping 'shop' in with 'partner'
+   offered a shopkeeper packing an order "Nobody was at home" and "They would
+   not give me their code" — the same class of bug as giving the pro the
+   customer's list, one role over. */
+export const SHOP_DISPUTE_REASONS = [
+  'The item is out of stock and there is no substitute', 'The address is not reachable for delivery',
+  'The customer refused the delivery', 'The order came in after we closed',
+  'The basket is too large for us to fulfil', 'They asked us to deal off the app',
+];
+export const reasonsFor = role => role === 'shop' ? SHOP_DISPUTE_REASONS
+  : role === 'partner' ? PARTNER_DISPUTE_REASONS : DISPUTE_REASONS;
+/* Let them try the code again. Only for a job stuck by a mistyped code — never
+   for a real complaint, which is somebody's money and not a typo. The fail
+   count resets so the pro is not one keystroke from the same dead end. */
+export function retryDoorCode(orderId) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o || o.stage !== 'DISPUTED' || o.disputeReason !== 'Code would not verify at the door') return null;
+  const open = (getState().disputes || []).find(d => d.orderId === orderId && d.status === 'OPEN');
+  if (open) dispatch({ type: 'dispute/resolve', payload: { id: open.id, patch: { status: 'RESOLVED', outcome: 'retry' } } });
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { otpFails: 0, disputed: false, disputeReason: null } } });
+  advance(orderId, 'ARRIVED', {});
+  audit.record('order.codeRetry', { orderId }, me() && me().key);
+  toast('Try the code again — ask them to read it out slowly.');
+  return true;
+}
+
 export function raiseDispute(orderId, reason, note, opts = {}) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return;
@@ -650,7 +769,12 @@ export async function placeRetailOrder(mode = 'rider') {
   bumpAgg({ escrow: getState().agg.escrow + q.customerPays });
   clearCart();
   audit.record('retail.placed', { id: order.id, shopId: q.shop.id, total: q.customerPays }, s.key);
-  setTimeout(() => advance(order.id, 'R_ACCEPTED', {}), 1100);
+  /* THE SAME BUG AS THE SERVICE SIDE, AND I MISSED IT. This auto-accepted a
+     grocery order 1.1s after it was placed — "Sri Lakshmi Kirana accepted"
+     with nobody in the shop having touched a phone — and unlike the service
+     path it had no timeout either, so an order nobody picked sat at R_ACCEPTED
+     with her money held for ever. Gated on the demo flag like its twin. */
+  if (flags.isOn('SIM_MARKET')) setTimeout(() => advance(order.id, 'R_ACCEPTED', {}), 1100);
   return order;
 }
 
@@ -662,6 +786,56 @@ export async function placeRetailOrder(mode = 'rider') {
    choice; no reply means we refund that item" — is honoured here. */
 
 /** Shop: an item is not available. The line's own policy decides. */
+/* "WEIGH AND PACK" HAD NOTHING TO WEIGH WITH. `pickedQty` was written once as
+   null, read once by quoteRetail, and never set by any screen — so loose rice,
+   meat and vegetables were always charged at the estimate the customer saw,
+   under a line telling her it was "(est.) until weighed". Either the shop
+   absorbed the difference or she was overcharged; nobody could tell which.
+
+   Setting it re-quotes the order off the real weight. It can only be set while
+   the shop is picking, and it cannot silently increase what she agreed to pay:
+   anything above the estimate needs her approval, exactly like extra work on a
+   service job. */
+export function setPickedQty(orderId, lineId, qty) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o || o.stage !== 'R_PICKING') return null;
+  const n = Math.max(0, Number(qty) || 0);
+  const lines = (o.lines || []).map(l => l.lineId === lineId ? { ...l, pickedQty: n } : l);
+  const shop = getState().shops.find(x => x.id === o.shopId) || {};
+  const first = (shop.ordersCompleted || 0) < FREE_FIRST_ORDERS;
+  const q = quoteRetail(lines, { catId: shop.catId, km: o.km, mode: o.mode, firstOrders: first });
+  /* THE WEIGHT HAS TO REACH THE MONEY. The first version stored `weighedTotal`
+     and settled off the old estimate anyway, so a shop typing a real weight
+     changed nothing at all and somebody quietly ate the difference. It also
+     printed "she has to approve the difference" beside an approval step that
+     did not exist.
+
+     What happens now: weighing LESS is passed straight back to her, because
+     nobody should pay for rice they did not get. Weighing MORE is never taken
+     silently — the order is capped at what she agreed and the surplus is
+     recorded, so the shop can ask her in the chat or hand over the smaller
+     amount. A marketplace may reduce a price on its own; it may not raise one. */
+  const agreed = o.customerPays | 0;
+  const under = q.customerPays < agreed;
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: {
+    lines,
+    weighedTotal: q.customerPays,
+    overEstimate: Math.max(0, q.customerPays - agreed),
+    /* only a reduction moves the money without asking her */
+    ...(under ? {
+      customerPays: q.customerPays,
+      itemsTotal: q.itemsTotal,
+      platformFee: q.platformFee,
+      gst: q.platformFeeGst,
+      shopPayout: q.shopPayout,
+      riderPayout: q.riderPayout,
+      reweighed: true,
+    } : {}),
+  } } });
+  ctx.render();
+  return q;
+}
+
 export function markLineUnavailable(orderId, lineId) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o || o.kind !== 'retail' || o.stage !== 'R_PICKING') return null;

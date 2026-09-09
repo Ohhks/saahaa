@@ -6,6 +6,86 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [8.7.0] — 2026-09-10 — "Two of those fixes were decoration"
+
+8.6.0's fixes went back to the same two agents to be checked rather than
+believed. They came back at 6/10 and 6.5/10 — and the most useful thing they
+found was that two of the repairs I had just shipped were narrative only: the
+comment argued the case was closed and the mechanism was not there.
+
+### Fixed — the fixes that did not work
+
+- **A shop still could not withdraw a rupee.** `shopWallet()` walked a `legs`
+  array that this ledger has never had, so it returned ₹0 for every shop for
+  ever — the button shipped permanently disabled over a real balance.
+  `balanceOf()` already knew how to read the ledger; there was never a reason
+  to write a second one. Verified: ₹7,327 → ₹6,327, refused without a UPI id.
+- **The weighed weight changed no money.** `setPickedQty` stored a number and
+  `settleRetail` settled off the old estimate, under a sentence promising an
+  approval step nobody had built. Now a lighter weight really does cost less,
+  and a heavier one is never taken silently — the order is capped at what she
+  agreed and the shop is told to ask her.
+- **A translated string nobody renders is not a translation.** The language
+  layer shipped 53 keys and rendered 24. Telugu existed for all seven
+  onboarding steps, every money word, the door-code errors, and the note saying
+  the trade quiz is only in English — all dead, so a pro switching to Telugu
+  got two translated paragraphs marooned in an English sign-up. All 53 render
+  now, and `tools/lint-i18n.mjs` fails the build on a dead or undefined key.
+  It caught two more the moment it was written.
+
+### Fixed — what the re-audits found that the first pass never reached
+
+- **A pro could book himself**, type his own code at the door, photograph
+  anything, and let the sweep release it — farming the automatic ladder to
+  Background Checked and Certified at 8% of a price he set. The one thing the
+  door code exists to prove, proved nothing. The matcher no longer offers you
+  yourself and the booking refuses it, comparing the person rather than the
+  account, since one number may hold both.
+- **Three mistyped characters killed a booking permanently.** DISPUTED had no
+  way back to the doorstep, so a pro whose customer read the code out correctly
+  two seconds later still had a dead job. There is a retry now — only for a
+  code typo, never for a real complaint.
+- **A data-destroying bug of mine.** Booking through "Someone else" read the
+  address fields unconditionally, and that path renders none — so it wrote an
+  empty string over the address she had already saved, on her account and her
+  session. A field that is not on the screen has said nothing.
+- **The address labels were invisible**, at a contrast ratio of 1.00: the panel
+  inverts its background and the field labels kept their dark ink. The whole
+  address fix was funnelled through two boxes nobody could read.
+- **My `SUB_SIZE` table had 11 keys matching no sub that exists**, including
+  three "priced on site" flags on dead names, so a full house move was still
+  quoted as a locked price. Nine categories had no table at all. All 118 subs
+  are sized deliberately now, and a test fails on a typo, an unsized sub, or a
+  category whose biggest and smallest job cost the same.
+- **I fixed the fake acceptance for services and missed retail entirely** — a
+  grocery order still accepted itself 1.1s in, with no timeout and no refund,
+  so an order nobody picked held her money for ever.
+- **The fabrication moved rather than left.** The 900ms timer went from the
+  stage machine and the order header still printed a name at MATCHING: a
+  tradesman "0.4 km away" before anyone accepted, who then appeared to have
+  cancelled. No name until it is true.
+- **The no-show button was a ₹100 credit farm** — available the instant a job
+  was assigned, with nothing recorded against the pro, so the sheet's promise
+  that "it is recorded against them" was false. It needs a real wait now, and
+  it increments `noShows`.
+
+### Fixed — the money screens
+The customer sees **her own release clock** (the pro's screen had it and hers
+did not, while nine screens promised nothing moved without her) · a refunded
+order says **"Your money is back"** instead of showing the bill she paid · "Sent
+to UPI" reads the ledger instead of the owner's manual tick · a pro cannot
+withdraw with no UPI on file · the shop owns its **own** minimum-order and
+free-delivery dials rather than absorbing a ₹49 ride it never agreed to · every
+shop fee line counts down the free 30 · a shop gets a shopkeeper's dispute
+reasons, not a doorstep tradesman's · the pro can cancel at EN_ROUTE, which is
+where "I cannot come" actually happens.
+
+### Fixed — `?demo=1` was a one-shot
+Opening the app once without it — running `?selftest=1`, which the README lists
+one line above — purged the roster and left `seeded: true`, so the demo never
+came back and the device read "0 pros · 0 shops" for ever. It also silently
+broke `tools/shots.py`.
+
 ## [8.6.0] — 2026-09-10 — "The promises it could not keep"
 
 Three agents audited this build independently: one walked every customer

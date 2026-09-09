@@ -20,6 +20,7 @@
    No new action, no app.js change. */
 
 import { $, esc, sheet, updateSheet, sheetOpen, closeSheet, toast, ratingStars, timeAgo } from '../dom.js';
+import { t } from '../i18n.js';
 import { icon, hasIcon } from '../icons.js';
 import * as ID from '../../domain/identity.js';
 import { ctx, getState, dispatch, me, myPartner, myShop, myOrders } from '../../core/ctx.js';
@@ -301,8 +302,8 @@ function walletCard(p) {
     <p class="micro muted" style="margin-top:6px">If Available is empty, the stake is taken from the job's own payout instead — you are never asked for money you do not have, and you never pay to start.</p>
     <p class="micro muted" style="margin-top:6px"><b>Pending</b> is your ${HOLDBACK_PCT}% holdback: ${HOLDBACK_PCT} paise in every rupee paid to you waits ${HOLDBACK_DAYS} days and then moves to Available by itself. It never grows past ${M.fmt(HOLDBACK_CAP)} in total, it is not a fee, and nobody has to approve it.</p>
     <div class="row" style="gap:8px;margin-top:10px">
-      <button class="btn btn-secondary grow" data-act="wallet.topup" data-id="${p.id}">Add money</button>
-      <button class="btn btn-ghost grow" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${w.available < flow.MIN_WITHDRAW ? 'disabled' : ''}>Withdraw${w.available >= flow.MIN_WITHDRAW ? ' ' + M.fmt(w.available) : ''}</button>
+      <button class="btn btn-secondary grow" data-act="wallet.topup" data-id="${p.id}">${esc(t('money.add'))}</button>
+      <button class="btn btn-ghost grow" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${w.available < flow.MIN_WITHDRAW ? 'disabled' : ''}>${esc(t('money.withdraw'))}${w.available >= flow.MIN_WITHDRAW ? ' ' + M.fmt(w.available) : ''}</button>
     </div>`;
 }
 
@@ -350,7 +351,7 @@ function proEarnings(p, orders, paid, earned, held, paidOut) {
          always allowed Rs.10 — the floor existed only here, written as a raw
          100000 in three places, and it locked a plumber's first Rs.520 job
          behind a second one. -->
-    ${w.available < flow.MIN_WITHDRAW ? `<p class="micro muted" style="margin-top:6px">The smallest withdrawal is ${M.fmt(flow.MIN_WITHDRAW)}.</p>` : ''}
+    ${w.available < flow.MIN_WITHDRAW ? `<p class="micro muted" style="margin-top:6px">${esc(t('money.minWithdraw', { amount: M.fmt(flow.MIN_WITHDRAW) }))}</p>` : ''}
 
     <div class="con2">
       <div>
@@ -525,7 +526,12 @@ export function renderPartner() {
   // moment a customer said thank you
   const paid = orders.filter(o => o.settledAt && (o.workerPayout || 0) > 0);
   const earned = paid.reduce((n, o) => n + (o.workerPayout || 0), 0);
-  const paidOut = paid.filter(o => o.paidOut).reduce((n, o) => n + (o.workerPayout || 0), 0);
+  /* THIS COUNTED THE OWNER'S MANUAL FLAG, NOT WHAT LEFT. A pro who had actually
+     withdrawn ₹468 still read "Sent to UPI ₹0", and an order the owner ticked
+     read as landed when nothing was sent — so the panel's own promise that "a
+     job only moves left to right, it never counts twice" was false in both
+     directions. The ledger knows what left; ask it. */
+  const paidOut = W.walletOf(getState().ledger, p.id, p).withdrawn | 0;
   const held = orders.filter(o => o.stage === 'WORK_DONE').reduce((n, o) => n + o.deal, 0);
   const a = avg(p);
   const open = auction.openRequestsForPartner(p);
@@ -783,7 +789,7 @@ function shopWalletLine(s) {
 
 function shopOrders(orders) {
   const live = orders.filter(LIVE_RETAIL);
-  if (!live.length) return empty('No orders right now', 'New orders appear here with a 60-second accept timer.');
+  if (!live.length) return empty('No orders right now', 'New orders appear here the moment they are placed.');
   return `${kick('Live orders', `<span class="tag tag-accent">${live.length} open</span>`)}
     ${live.map(orderRow).join('')}`;
 }
@@ -1130,7 +1136,12 @@ function shopMoney(s, orders) {
     <div class="con2">
       <div>
         <div class="feeline"><span>Orders (${done.length} settled)</span><b class="num">${M.fmt(gross)}</b></div>
-        <div class="feeline"><span>SAAHAA fee · ${cat.takePct}%, capped ${M.fmt(cat.takeCapPaise)}</span><b class="num">− ${M.fmt(fee)}</b></div>
+        <!-- SIX SCREENS TOLD A SHOP IT PAID 3% WHILE IT PAID NOTHING. The free
+             thirty is the best thing on offer to a kirana and only one screen
+             counted it down. -->
+        <div class="feeline"><span>SAAHAA fee · ${flow.freeOrdersLeft(s)
+          ? `free for your next ${flow.freeOrdersLeft(s)} order${flow.freeOrdersLeft(s) === 1 ? '' : 's'}`
+          : `${cat.takePct}%, capped ${M.fmt(cat.takeCapPaise)}`}</span><b class="num">− ${M.fmt(fee)}</b></div>
         <div class="feeline"><span>Delivery you absorbed · to the rider</span><b class="num">− ${M.fmt(rider)}</b></div>
         ${dispatch ? `<div class="feeline"><span>Delivery you absorbed · dispatch</span><b class="num">− ${M.fmt(dispatch)}</b></div>` : ''}
         <div class="feeline"><span>Listing fee</span><b class="num">₹0</b></div>
@@ -1141,7 +1152,9 @@ function shopMoney(s, orders) {
           <div style="font:800 30px/1 var(--font-heading);margin:8px 0 6px;font-variant-numeric:tabular-nums">${M.fmt(agg)}</div>
           <p style="font-size:12px;opacity:.92">at ${Math.round(AGG_COMMISSION * 100)}% of ${M.fmt(gross)}. SAAHAA took ${M.fmt(fee)} — you kept ${M.fmt(Math.max(0, agg - fee))} more.</p>
         </div>
-        <p class="micro muted">SAAHAA takes ${cat.takePct}% because a kirana's own margin on staples is only 3–6% — a bigger cut would cost you more than the item earns.</p>
+        <p class="micro muted">${flow.freeOrdersLeft(s)
+          ? `Your first ${flow.FREE_FIRST_ORDERS} orders cost you nothing at all — no percentage and no minimum. After that, `
+          : ''}SAAHAA takes ${cat.takePct}% because a kirana's own margin on staples is only 3–6% — a bigger cut would cost you more than the item earns.</p>
       </div>
       <div>
         ${shopWalletLine(s)}
@@ -1276,11 +1289,22 @@ function shopSetup(s) {
       </div>
     </div>
     <p class="micro muted" style="padding:8px 0">One photograph of your shutter or your counter. A customer scrolling a list stops at the shop they recognise from the street.</p>
-    ${line('Minimum order', `<b class="num">${M.fmt(s.minOrder)}</b>`)}
-    ${line('Free delivery above', `<b class="num">${M.fmt(s.freeDeliveryAbove)}</b>`)}
+    <!-- SIGNUP COMMITTED THIS SHOP TO AN OFFER IT NEVER MADE. minOrder ₹149 and
+         freeDeliveryAbove ₹499 were written silently at sign-up, and both were
+         rendered here as read-only text — so a kirana absorbed the whole rider
+         cost on every basket over ₹499 under a rule nobody explained and it
+         could not withdraw. They are its own dials now. -->
+    ${line('Minimum order', `<input class="input" style="width:110px;text-align:right" type="number" min="0" step="10"
+      inputmode="numeric" data-role="shopmin" data-id="${esc(s.id)}" value="${Math.round((s.minOrder || 0) / 100)}">`)}
+    ${line('Free delivery above', `<input class="input" style="width:110px;text-align:right" type="number" min="0" step="50"
+      inputmode="numeric" data-role="shopfree" data-id="${esc(s.id)}" value="${Math.round((s.freeDeliveryAbove || 0) / 100)}">`)}
+    <p class="micro muted" style="padding:6px 0 0">Above that basket size <b>you</b> pay the delivery, out of your
+      margin — that is what makes it free for the customer. Set it to 0 to switch the offer off entirely.</p>
     ${line('Prep time', `<b>${s.prepMins} min</b>`)}
     ${line('Delivery radius', `<b>${s.radiusKm} km</b>`)}
-    ${line('SAAHAA fee', `<b>${cat.takePct}% · capped ${M.fmt(cat.takeCapPaise)} an order</b>`)}
+    ${line('SAAHAA fee', `<b>${flow.freeOrdersLeft(s)
+      ? `₹0 — ${flow.freeOrdersLeft(s)} free order${flow.freeOrdersLeft(s) === 1 ? '' : 's'} left, then ${cat.takePct}%`
+      : `${cat.takePct}% · capped ${M.fmt(cat.takeCapPaise)} an order`}</b>`)}
     ${s.fssai ? line('FSSAI', `<b class="tiny">${esc(s.fssai)}</b>`) : ''}
     ${s.drugLicence ? line('Drug licence', `<b class="tiny">${esc(s.drugLicence)}</b>`) : ''}
 

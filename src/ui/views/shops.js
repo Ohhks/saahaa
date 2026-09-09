@@ -462,7 +462,7 @@ export function renderCart() {
       <p class="m-cap">How you pay</p>
       <div class="m-kv"><span>From your SAAHAA wallet</span><span class="num">${M.fmt(fromWallet)}</span></div>
       <div class="m-kv"><span>${esc(gatewayLine())}</span><span class="num">${M.fmt(viaGateway)}</span></div>
-      <p class="micro muted" style="margin-top:6px">You pay SAAHAA. The money is held until you confirm the delivery, then the shop is paid.
+      <p class="micro muted" style="margin-top:6px">You pay SAAHAA. The money is held until you confirm the delivery — or until the wait shown on the order runs out — and only then is the shop paid.
         An item the shop cannot supply is refunded to your wallet.</p>
     </div>
 
@@ -471,8 +471,15 @@ export function renderCart() {
         <div class="m-bar__t">${n} item${n === 1 ? '' : 's'} · ${M.fmt(q.customerPays)}</div>
         <div class="m-bar__m">${deliveryLine(q)}</div>
       </div>
-      <button class="btn btn--primary" data-act="cart.place">Place order</button>
+      <!-- THE MINIMUM WAS ONLY REVEALED AFTER SHE COMMITTED. The button was fully
+           enabled on a below-minimum basket and produced a transient toast that
+           changed nothing on screen. Say the gap, in rupees, before the tap. -->
+      <button class="btn btn--primary" data-act="cart.place"
+        ${q.itemsTotal < (q.shop.minOrder || 0) ? 'disabled' : ''}>Place order</button>
     </div>
+    ${q.itemsTotal < (q.shop.minOrder || 0)
+      ? `<p class="m-note" style="margin-top:8px">${M.fmt((q.shop.minOrder || 0) - q.itemsTotal)} more to reach
+          ${esc(q.shop.name)}&rsquo;s ${M.fmt(q.shop.minOrder)} minimum.</p>` : ''}
     <button class="btn btn--ghost btn--block" style="margin-top:8px" data-act="cart.clear">Empty cart</button>
     </div>
     </div>

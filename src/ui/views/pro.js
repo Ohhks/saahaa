@@ -215,7 +215,7 @@ export function render(id) {
           <div class="pro__rate" style="margin-top:6px"><span>${esc(cat.name)} · typical job</span><strong>${M.fmt(p.ask)}</strong></div>
           ${subs.map(x => `<div class="pro__rate"><span>${esc(x)}</span><span class="muted">On quote</span></div>`).join('')}
           <div class="pro__rate" style="border-top:1px solid var(--color-divider);margin-top:6px;padding-top:10px"><span>Customer pays on a ${M.fmt(q.deal)} job</span><strong>${M.fmt(q.customerPays)}</strong></div>
-          <p class="micro muted" style="margin-top:6px">${esc(first)} sets these prices. SAAHAA adds ${q.markupPct}% on top for the customer — nothing comes out of ${esc(first)}'s price. Price locked before booking, money held until you confirm the work.</p>
+          <p class="micro muted" style="margin-top:6px">${esc(first)} sets these prices. SAAHAA adds ${q.markupPct}% on top for the customer — nothing comes out of ${esc(first)}'s price. Price locked before booking; money held until you confirm the work, or until the deadline the job shows you.</p>
         </div>
 
         <div class="pro__sec">

@@ -55,6 +55,7 @@ python tools/smoke-dist.py; SM=$?
 [ $SM -eq 0 ] && ok "the built bundle boots and paints in a real browser"
 python tools/check-version.py    || fail "version / CHANGELOG mismatch"
 python tools/lint-migrations.py  || fail "migration lint failed"
+node   tools/lint-i18n.mjs       || fail "a translated string nobody renders is not a translation"
 node   tools/test-node.mjs       || fail "domain tests failed at the gate"
 
 echo "=== PRE-FLIGHT PASSED — safe to publish ==="

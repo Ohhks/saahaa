@@ -17,6 +17,85 @@ export const UNITS = {
 };
 
 /* group -> which home-screen rail a tile appears under */
+/* WHY EVERY JOB IN A CATEGORY USED TO COST THE SAME.
+   `subs` were bare strings, so "Tap & mixer repair" and "Pipeline replacement"
+   both quoted the category's base — under a screen promising "the price cannot
+   change without your approval" and a home page promising "price locked before
+   you book". One of those two jobs was going to end with the pro walking away
+   or the price moving, and either way the lock was a lie.
+
+   These are RELATIVE SIZES, not prices. The rupee figure is still the pro's own
+   ask times the owner's dials; this only says that a tank clean is a bigger
+   piece of work than a washer. Anything not listed is 1.0. A sub marked
+   `survey` is one no honest tradesperson quotes unseen — the app says so and
+   asks for approval on the day instead of pretending to lock a number.
+
+   Tune these in one place; no screen may hardcode a multiplier. */
+export const SUB_SIZE = {
+  plumbing: { 'Tap & mixer repair': 0.7, 'Leak detection': 0.9, 'Blocked drain / sink': 0.9,
+              'Toilet & flush repair': 1.0, 'Motor & pump': 1.4, 'Overhead tank cleaning': 1.6,
+              'Geyser install': 1.3, 'Pipeline replacement': { x: 2.2, survey: true } },
+  electrical: { 'Fan install / repair': 0.8, 'Switchboard & socket': 0.7, 'MCB / fuse trip': 0.8,
+                'Inverter & battery': { x: 1.6, survey: true },
+                'Light & chandelier fitting': 0.9, 'Doorbell & CCTV point': 1.2,
+                'Wiring fault trace': { x: 1.5, survey: true } },
+  appliance: { 'AC service (split / window)': 0.8, 'AC install / uninstall': { x: 1.4, survey: true },
+               'Gas refill': 1.2, 'Fridge repair': 1.1, 'Washing machine repair': 1.0,
+               'Microwave & OTG': 0.8, 'Water purifier service': 0.7, 'Chimney deep clean': 1.1 },
+  cleaning: { 'Full home deep clean': { x: 2.4, survey: true }, 'Bathroom deep clean': 0.8,
+              'Kitchen deep clean': 1.1, 'Sofa & carpet shampoo': 1.0,
+              'Post-construction clean': { x: 2.6, survey: true }, 'Water tank clean': 1.2,
+              'Move-in / move-out': { x: 2.2, survey: true }, 'Balcony & windows': 0.7 },
+  pest: { 'Cockroach gel': 0.8, 'General pest (2/3 BHK)': 1.2,
+          'Termite treatment': { x: 2.0, survey: true }, 'Bed bugs': 1.4,
+          'Mosquito fogging': 0.9, 'Rodent control': 1.2, 'Herbal child-safe pack': 1.3 },
+  repair: { 'Furniture assembly': 1.0, 'Door & lock repair': 0.8, 'Drilling / wall mounting': 0.6,
+            'Curtain rod fitting': 0.6, 'Modular kitchen repair': { x: 1.6, survey: true },
+            'Wardrobe & hinge fix': 0.9, 'Bed & sofa repair': 1.1,
+            'False ceiling patch': { x: 1.4, survey: true } },
+  moving: { 'House shifting (1/2/3 BHK)': { x: 3.0, survey: true }, 'Single item shift': 0.6,
+            'Mini-truck / tempo on demand': 1.6, 'Packers & packing material': { x: 1.8, survey: true },
+            'Intra-city parcel pickup': 0.5, 'Loading-unloading labour': 0.9, 'Bike taxi parcel': 0.4 },
+  vehicle: { 'Bike service at home': 0.9, 'Car wash (dry / foam)': 0.7, 'Interior detailing': 1.8,
+             'Battery jumpstart': 0.5, 'Flat tyre & puncture': 0.5, 'RSA towing': { x: 1.6, survey: true },
+             'Periodic service pickup-drop': 1.4 },
+  help: { 'Daily maid (sweep / mop / utensils)': 1.0, 'Cook (veg / non-veg)': 1.2,
+          'Full-time housekeeping': { x: 2.4, survey: true }, 'Elder companion': 1.6,
+          'Baby sitter': 1.4, 'Driver on call': 1.1 },
+  salon: { 'Waxing (full / half)': 0.9, 'Facial & cleanup': 1.0, 'Haircut & styling': 0.7,
+           'Manicure & pedicure': 0.9, 'Threading & face wax': 0.4,
+           'Bridal & party makeup': { x: 3.0, survey: true }, 'Hair spa & colour': 1.6,
+           'Mens grooming & beard': 0.6 },
+  wellness: { 'Full body massage': 1.0, 'Ayurvedic / abhyanga': 1.3, 'Physiotherapy session': 1.2,
+              'Yoga trainer': 0.9, 'Personal fitness trainer': 1.0, 'Post-natal massage': 1.2 },
+  health: { 'Nurse visit (injection / dressing)': 0.7, 'Blood sample collection': 0.5,
+            'Doctor teleconsult': 0.5, 'Clinical physiotherapy': 1.1,
+            'Elder care attendant (12/24h)': { x: 3.0, survey: true }, 'BP & sugar check': 0.4,
+            'Equipment rental (oxygen, bed)': { x: 1.8, survey: true } },
+  pet: { 'Dog grooming & bath': 1.0, 'Vet home visit': 1.5, 'Dog walking': 0.35,
+         'Boarding / day care': { x: 1.8, survey: true }, 'Vaccination': 0.9,
+         'Cat grooming': 0.9, 'Pet taxi': 0.6, 'Aquarium cleaning': 0.9 },
+  tutor: { 'School tuition (Class 1-10)': 0.9, 'IIT-JEE / NEET': 2.0,
+           'SSC / Banking / Govt exams': 1.4, 'Spoken English': 0.9,
+           'Music (keyboard / guitar / vocal)': 1.1, 'Dance': 1.0,
+           'Coding for kids': 1.3, 'Abacus & handwriting': 0.7 },
+  events: { 'Birthday decoration': 1.2, 'Catering (per plate)': { x: 2.0, survey: true },
+            'Tent, chairs & lighting': { x: 1.8, survey: true },
+            'Photographer / videographer': 2.2, 'DJ & sound': 1.6,
+            'Pandit / priest services': 1.0, 'Mehndi artist': 0.9,
+            'House-warming & pooja setup': { x: 1.6, survey: true } },
+  laundry: { 'Wash & fold (per kg)': 0.6, 'Dry cleaning (per garment)': 0.8, 'Steam iron': 0.4,
+             'Shoe cleaning': 0.7, 'Saree roll / fall / pico': 0.6,
+             'Blouse & alteration stitching': 1.0, 'Curtain cleaning': 1.2 },
+};
+
+/** The multiplier for a sub-service, and whether it must be seen to be priced. */
+export function subSize(catId, sub) {
+  const e = (SUB_SIZE[catId] || {})[sub];
+  if (e == null) return { x: 1, survey: false };
+  return typeof e === 'number' ? { x: e, survey: false } : { x: e.x, survey: !!e.survey };
+}
+
 export const GROUPS = [
   { id: 'home',  label: 'Home & Repairs',     ico: '🏠' },
   { id: 'care',  label: 'Care & Wellbeing',   ico: '💗' },

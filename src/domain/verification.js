@@ -37,14 +37,18 @@ import { TIERS } from './trust.js';
 import { tradeBank, CONDUCT, shuffled, score, PASS, MAX_ATTEMPTS, LOCK_MS } from './quiz.js';
 
 /* ── the chronology ────────────────────────────────────────── */
+/* Each step carries its English words AND the key that translates them. The
+   domain must not import the UI, so it hands the view a key rather than a
+   translated string — `ui/i18n.js` had Telugu and Hindi for all seven steps and
+   nothing ever rendered them, because onboard.js printed `s.title` directly. */
 export const STEPS = [
-  { id: 'phone',     n: 1, title: 'Confirm your number',   sub: 'Type your number and collect your SAAHAA code.',       mins: 1 },
-  { id: 'identity',  n: 2, title: 'Show us your ID',       sub: 'Aadhaar, PAN or licence. We keep only the last 4 digits.', mins: 2 },
-  { id: 'selfie',    n: 3, title: 'One photo of you',      sub: 'For SAAHAA only — never shown to a customer.',              mins: 1 },
-  { id: 'trade',     n: 4, title: 'Five trade questions',  sub: 'Things every real pro knows. Get 4 right.',                mins: 3 },
-  { id: 'conduct',   n: 5, title: 'How SAAHAA works',      sub: 'Six questions on the rules. Get 5 right.',                 mins: 2 },
-  { id: 'payout',    n: 6, title: 'Where to pay you',      sub: 'Your UPI id. You send your earnings here whenever you like.',           mins: 1 },
-  { id: 'agreement', n: 7, title: 'Agree and go',          sub: 'One tap. You are a SAAHAA pro.',                           mins: 1 },
+  { id: 'phone',     n: 1, k: 'ob.s1', title: 'Confirm your number',   sub: 'Type your number and collect your SAAHAA code.',       mins: 1 },
+  { id: 'identity',  n: 2, k: 'ob.s2', title: 'Show us your ID',       sub: 'Aadhaar, PAN or licence. We keep only the last 4 digits.', mins: 2 },
+  { id: 'selfie',    n: 3, k: 'ob.s3', title: 'One photo of you',      sub: 'For SAAHAA only — never shown to a customer.',              mins: 1 },
+  { id: 'trade',     n: 4, k: 'ob.s4', title: 'Five trade questions',  sub: 'Things every real pro knows. Get 4 right.',                mins: 3 },
+  { id: 'conduct',   n: 5, k: 'ob.s5', title: 'How SAAHAA works',      sub: 'Six questions on the rules. Get 5 right.',                 mins: 2 },
+  { id: 'payout',    n: 6, k: 'ob.s6', title: 'Where to pay you',      sub: 'Your UPI id. You send your earnings here whenever you like.',           mins: 1 },
+  { id: 'agreement', n: 7, k: 'ob.s7', title: 'Agree and go',          sub: 'One tap. You are a SAAHAA pro.',                           mins: 1 },
 ];
 export const CORE_IDS = STEPS.map(s => s.id);
 export const VERIFIED_TIER = 2;

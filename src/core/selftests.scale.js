@@ -19,6 +19,7 @@
 import { describe, it, expect } from './selftest.js';
 import { defaultState } from '../domain/state.js';
 import * as registry from '../core/registry.js';
+import SERVICES, { SUB_SIZE, subSize } from '../domain/catalog.services.js';
 
 /* Reducers register themselves when domain/state.js is imported, so they can be
    driven here exactly as the store drives them. */
@@ -95,5 +96,51 @@ describe('scale · the state a fresh device starts from', () => {
       expect(Array.isArray(s[k])).toBeTrue();
     }
     for (const k of ['carts', 'chats']) expect(typeof s[k]).toBe('object');
+  });
+});
+
+/* A PRICE TABLE KEYED BY RETYPED STRINGS IS A TABLE WITH TYPOS IN IT.
+   The first version of SUB_SIZE had eleven keys matching no sub that existed —
+   including three `survey: true` flags on dead names, so a full house move was
+   quoted as a locked price under a promise that the price could not change.
+   Nothing on screen showed it; every one of those subs silently fell back to
+   1.0. This is the check that makes that impossible to ship again. */
+describe('pricing · every sub-service has a deliberate size', () => {
+  const withSubs = SERVICES.filter(c => Array.isArray(c.subs) && c.subs.length);
+
+  it('no size table key is a typo — every key names a sub that exists', () => {
+    const broken = [];
+    for (const c of withSubs) {
+      for (const key of Object.keys(SUB_SIZE[c.id] || {})) {
+        if (!c.subs.includes(key)) broken.push(c.id + ' :: ' + key);
+      }
+    }
+    expect(broken).toHaveLength(0);
+  });
+
+  it('every sub in every category is sized on purpose, not by falling back', () => {
+    const unsized = [];
+    for (const c of withSubs) {
+      const tbl = SUB_SIZE[c.id] || {};
+      for (const sub of c.subs) if (tbl[sub] == null) unsized.push(c.id + ' :: ' + sub);
+    }
+    expect(unsized).toHaveLength(0);
+  });
+
+  it('a dog walk does not cost the same as a vet visit', () => {
+    /* the shape of the bug: within one category, the biggest job must not
+       price the same as the smallest, or "price locked" is a lie for one of them */
+    const flat = [];
+    for (const c of withSubs) {
+      const xs = c.subs.map(sub => subSize(c.id, sub).x);
+      if (Math.max(...xs) === Math.min(...xs)) flat.push(c.id);
+    }
+    expect(flat).toHaveLength(0);
+  });
+
+  it('a job nobody can quote unseen is flagged, not priced as if it were locked', () => {
+    /* at least one survey job must exist, or the mechanism is decoration */
+    const surveys = withSubs.flatMap(c => c.subs.filter(sub => subSize(c.id, sub).survey));
+    expect(surveys.length).toSatisfy(n => n > 5, 'found ' + surveys.length + ' survey-priced jobs');
   });
 });

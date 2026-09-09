@@ -6,6 +6,8 @@ import { ctx, getState, dispatch, me, restoreSession, myArea, saveSession, myPar
 import { createStore, combineFromRegistry } from './core/store.js';
 import * as persist from './core/persist.js';
 import * as bus from './core/bus.js';
+import { CONTACT } from './core/config.js';
+import * as i18n from './ui/i18n.js';
 import * as registry from './core/registry.js';
 import * as flags from './core/flags.js';
 import * as audit from './core/audit.js';
@@ -40,6 +42,7 @@ import './core/selftests.erase.js';
 import './core/selftests.recovery.js';
 import './core/selftests.doorcode.js';
 import './core/selftests.scale.js';
+import './core/selftests.i18n.js';
 
 /* ui */
 import { mount, action, initActions, toast, sheet, closeSheet, esc, stickyToast } from './ui/dom.js';
@@ -86,12 +89,14 @@ const ROUTES = {
   legal:     p => legal.render(p),          // #/legal/terms · privacy · refunds · contact · about
 };
 
+/* The label is looked up at render time, not baked in here, so switching
+   language repaints the tab bar with everything else. */
 const NAV = [
-  ['home',    'navHome',   'Home'],
-  ['shops',   'navShops',  'Shops'],   // a shopfront, not a cart: 🛒 means "my basket"
-  ['orders',  'navOrders', 'Orders'],
-  ['earn',    'navEarn',   'Earn'],    // a rupee coin, not 💰 which reads "my wallet"
-  ['account', 'navYou',    'You'],
+  ['home',    'navHome',   'nav.home'],
+  ['shops',   'navShops',  'nav.shops'],   // a shopfront, not a cart: 🛒 means "my basket"
+  ['orders',  'navOrders', 'nav.orders'],
+  ['earn',    'navEarn',   'nav.earn'],    // a rupee coin, not 💰 which reads "my wallet"
+  ['account', 'navYou',    'nav.you'],
 ];
 
 let history = [];
@@ -148,9 +153,8 @@ function storageBanner() {
   const failed = persist.saveFailed && persist.saveFailed();
   if (failed) {
     return `<div class="sysbar sysbar--bad" role="alert">
-      <b>This device is full — your last changes were not saved.</b>
-      <span>Everything on screen after this point may disappear when you reopen the app.
-        Free some space on the phone, or ask the owner to export and clear old data.</span>
+      <b>${esc(i18n.t('warn.deviceFull'))}</b>
+      <span>${esc(i18n.t('warn.deviceFullBody'))}</span>
     </div>`;
   }
   const u = persist.usage ? persist.usage() : { pct: 0 };
@@ -227,9 +231,9 @@ function topBar() {
 function navBar() {
   const cur = currentTab();
   return `<nav class="nav on-plum" role="tablist">
-    ${NAV.map(([id, ic, label]) => `<button role="tab" aria-selected="${cur === id}"
-      data-act="nav.tab" data-tab="${id}" aria-label="${label}">
-      <span class="ic">${icon(ic, { size: 22 })}</span>${label}</button>`).join('')}
+    ${NAV.map(([id, ic, lk]) => `<button role="tab" aria-selected="${cur === id}"
+      data-act="nav.tab" data-tab="${id}" aria-label="${esc(i18n.t(lk))}">
+      <span class="ic">${icon(ic, { size: 22 })}</span>${esc(i18n.t(lk))}</button>`).join('')}
   </nav>`;
 }
 
@@ -291,6 +295,7 @@ function wireActions() {
   A('sheet.close', () => closeSheet());
 
   /* theme + brand */
+  A('lang.set', d => { i18n.setLang(d.lang); render(); });
   A('theme.toggle', () => {
     const cur = document.documentElement.getAttribute('data-theme');
     const next = cur === 'dark' ? 'light' : 'dark';
@@ -318,7 +323,11 @@ function wireActions() {
   A('book.sub',      d => home.openCategory(d.id, d.sub, d.pid || null));  // the chosen sub used to be dropped
   A('book.others',   d => home.showAlternates(d.id, d.sub || null));
   A('book.confirm',  d => home.confirmBooking(d.id, d.pid, d.sub));
-  A('quick.emergency', () => { home.setSearch('repair'); render(); toast('Showing urgent-capable trades'); });
+  /* THIS SEARCHED FOR THE WORD "repair" AND TOASTED "Showing urgent-capable
+     trades". For a burst pipe at 9pm it was worse than typing "plumber": no
+     online filter, no arrival sort, no urgency in the data model at all. It now
+     does the only thing that helps — who can be here soonest, right now. */
+  A('quick.emergency', () => { home.showFreeNow(); render(); });
   A('quick.nearby',    () => go('shops'));
 
   /* ── ask rates (the P2P auction, in the customer's words) ──── */
@@ -392,15 +401,27 @@ function wireActions() {
      No mail and no SMS rail yet, so a reset is what a neighbourhood business
      actually does: ring the owner, they check who you are, they read out a
      one-time code. See domain/recovery.js for why it is built this way. */
+  /* THIS PROMISED A CHANNEL THAT DOES NOT EXIST. The sheet said "the number to
+     ring is on the Contact page", and CONTACT.phone is empty until the owner
+     fills it in — so a pro locked out of his livelihood was sent to a page
+     reading "Phone: not yet set", with no other route back in. A screen must
+     not offer a way to reach somebody that nobody can walk. */
   A('auth.forgot', () => sheet('Forgotten your password?', `
-    <p class="tiny muted" style="margin-bottom:12px">Your account is not lost. Ring SAAHAA — the owner
-      checks it is you and reads out a one-time code that lasts half an hour. Type it here with the
-      new password you want.</p>
+    ${!(CONTACT.phone || CONTACT.email) ? `<p class="m-note" style="margin-bottom:12px">
+      <b>SAAHAA has not published a contact number yet.</b> A reset needs the owner to check who you are
+      and read you a code, and there is no way to reach them from this screen until that number is set.
+      If you can reach the owner another way, they can issue you a code from the admin console — type it
+      below when they do.</p>` : ''}
+    <p class="tiny muted" style="margin-bottom:12px">Your account is not lost. ${CONTACT.phone || CONTACT.email
+      ? 'Ring SAAHAA — the owner checks it is you and reads out a one-time code that lasts half an hour. Type it here with the new password you want.'
+      : 'When you can reach the owner, they check it is you and read out a one-time code that lasts half an hour. Type it here with the new password you want.'}</p>
     <div class="field"><input id="rcWho" type="text" autocomplete="username" autocapitalize="characters" placeholder=" "><label>Mobile number or SAAHAA ID</label></div>
     <div class="field"><input id="rcCode" type="text" autocomplete="one-time-code" autocapitalize="characters" placeholder=" "><label>The code you were read out</label></div>
     <div class="field"><input id="rcPass" type="password" autocomplete="new-password" placeholder=" "><label>Your new password</label></div>
     <button class="btn btn-primary btn--block" data-act="auth.forgot.do">Set my new password</button>
-    <p class="micro muted" style="margin-top:10px">The number to ring is on the <a class="more" href="#/legal/contact">Contact page</a>.</p>`)),
+    <p class="micro muted" style="margin-top:10px">${CONTACT.phone
+      ? `Ring <b>${esc(CONTACT.phone)}</b> — also on the <a class="more" href="#/legal/contact">Contact page</a>.`
+      : 'No number is published yet, so this code has to come from the owner directly.'}</p>`)),
   A('auth.forgot.do', async () => {
     const val = id => (document.getElementById(id) || {}).value || '';
     const pw = val('rcPass');
@@ -578,11 +599,12 @@ function wireActions() {
   A('noshow.open',      d => ordersView.openNoShow(d.id));
   A('noshow.confirm',   async d => { await flow.cancelOrder(d.id, 'WORKER_NO_SHOW'); closeSheet(); render(); });
   A('worker.cancel',    d => sheet('Cannot do this job?', `
-    <p>Say so now rather than not turning up. The customer is refunded in full and gets her booking back;
+    <p>Say so now rather than not turning up. The customer is refunded in full and can book somebody else;
       you keep your stake, and this is recorded as a cancellation, not a no-show.</p>
     <p class="micro muted" style="margin-top:10px">Not turning up costs you the stake and a trust penalty. This does not.</p>
     <button class="btn btn-primary btn--block" style="margin-top:14px" data-act="worker.cancel.do" data-id="${esc(d.id)}">Cancel this job</button>
     <button class="btn btn--ghost btn--block btn--sm" style="margin-top:6px" data-act="sheet.close">Keep the job</button>`));
+  A('code.retry', d => { flow.retryDoorCode(d.id); render(); });
   A('worker.cancel.do', async d => { await flow.workerCancel(d.id); closeSheet(); render(); });
   A('cancel.confirm',d => { flow.cancelOrder(d.id, d.rule); closeSheet(); render(); });
 
@@ -707,6 +729,19 @@ function wireInputs() {
     const v = String(t.value).trim();
     if (t.dataset.role === 'price' && v) { partner.priceEdit(t.dataset.id, v); render(); }
     if (t.dataset.role === 'stock' && v) { partner.stockEdit(t.dataset.id, v); render(); }
+    /* the weight the shop actually put on the scale — committed on blur, like a
+       price, so typing "1.25" does not re-quote the order three times */
+    if (t.dataset.role === 'picked' && v) { flow.setPickedQty(t.dataset.id, t.dataset.line, v); }
+    /* the shop's own delivery dials, committed on blur like a price */
+    if (t.dataset.role === 'shopmin' && v !== '') {
+      ctx.store.dispatch({ type: 'shop/patch', payload: { id: t.dataset.id, patch: { minOrder: Math.max(0, Number(v) || 0) * 100 } } });
+      toast('Minimum order saved'); render();
+    }
+    if (t.dataset.role === 'shopfree' && v !== '') {
+      const n = Math.max(0, Number(v) || 0) * 100;
+      ctx.store.dispatch({ type: 'shop/patch', payload: { id: t.dataset.id, patch: { freeDeliveryAbove: n } } });
+      toast(n ? 'Free-delivery threshold saved' : 'Free delivery is off — the customer pays it'); render();
+    }
   });
 }
 let rt = null, pt = null;
@@ -759,6 +794,14 @@ async function boot() {
   let purged = false;
   { const cleaned = fresh.purgeIfDemoResidue(store.getState(), demoMode);
     if (cleaned !== store.getState()) { store.replaceState(cleaned, 'demo-purge'); persist.flush(persist.KEYS.state); purged = true; console.info('[saahaa] demo roster removed — production starts empty'); } }
+
+  /* ?demo=1 WAS A ONE-SHOT, AND THE README HANDED YOU THE GUN. Opening the app
+     once without ?demo — running ?selftest=1, say, which the README lists one
+     line above ?demo=1 — purged the roster and left `seeded: true`, so ?demo=1
+     never seeded again and the device read "0 pros · 0 shops" for ever. It
+     also silently broke tools/shots.py. A purge that removes the demo data must
+     also clear the flag that says demo data exists. */
+  if (purged && !demoMode) store.dispatch({ type: 'seed/reset' });
 
   if (!store.getState().seeded) {
     /* Production starts EMPTY. The demo seed (example customers, pros, shops,
@@ -835,8 +878,21 @@ async function boot() {
     });
   }
   // the WORK_DONE screen promises auto-release; this is what keeps it
-  flow.sweepAutoRelease().then(n => { if (n) { console.info('[saahaa] auto-released', n); render(); } });
-  flow.sweepHoldbacks().then(n => { if (n) { console.info('[saahaa] holdbacks released', n); render(); } });
+  /* THE SWEEPS ONLY EVER RAN AT BOOT, so "auto-releases in 6h" and "released
+     after 7 days" quietly meant "the next time somebody opens the app". On a
+     phone that can be days. They run on a timer now as well, so a promise with
+     an hour count on it is kept by the clock rather than by a page load.
+     (A real backend runs these server-side; until then this is the honest
+     approximation, and it is cheap — each is a filter over a bounded list.) */
+  const sweepAll = () => {
+    flow.sweepAutoRelease().then(n => { if (n) { console.info('[saahaa] auto-released', n); render(); } });
+    flow.sweepHoldbacks().then(n => { if (n) { console.info('[saahaa] holdbacks released', n); render(); } });
+    flow.sweepUnaccepted().then(n => { if (n) { console.info('[saahaa] unaccepted refunded', n); render(); } });
+  };
+  sweepAll();
+  setInterval(sweepAll, 60 * 1000);
+  /* coming back to a phone that slept for hours must not wait for the next tick */
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) sweepAll(); });
   /* Pictures outlive the records that pointed at them — a deleted product, a
      closed shop. They cost a device's storage until something collects them. */
   { const n = flow.sweepPhotos(); if (n) console.info('[saahaa] reclaimed', n, 'unused photo(s)'); }

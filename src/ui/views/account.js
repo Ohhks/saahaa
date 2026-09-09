@@ -15,6 +15,7 @@
    things. */
 
 import { esc, ratingStars, timeAgo, clockTime, delegate, toast } from '../dom.js';
+import * as i18n from '../i18n.js';
 import { icon, hasIcon } from '../icons.js';
 import * as ID from '../../domain/identity.js';
 import { getState, me, myArea, myOrders } from '../../core/ctx.js';
@@ -133,7 +134,7 @@ function walletSection(key, orders) {
         <button id="cwOut" class="btn btn--secondary" data-act="cwallet.withdraw" ${w.balance < 1000 ? 'disabled' : ''}>Take out</button>
       </div>
       <p class="micro muted" style="margin-top:8px">Minimum ₹10 either way. Taking out sends it to your UPI. You pay SAAHAA for every order;
-        the money is held here until you confirm the work, then the pro or shop is paid.</p>
+        the money is held here until you confirm the work — or, if you do not, until the wait on that job runs out. Only then is the pro or shop paid.</p>
     </div>
 
     ${legs.length ? `<p class="m-cap" style="margin-top:14px">Recent</p>
@@ -340,6 +341,18 @@ export function render() {
 
     <div>
     <div class="sec" id="acSettings">
+      <!-- THE APP WAS ENGLISH-ONLY while a pro's own page defaults their
+           languages to "Telugu, Hindi". The picker is here, and it says
+           plainly that nobody whose first language this is has checked the
+           translation yet — an app should not imply a review it has not had. -->
+      <div style="padding:10px 0;border-bottom:1px solid var(--color-divider)">
+        <div class="m-cap" style="margin:0 0 6px">${esc(i18n.t('lang.pick'))}</div>
+        <div class="chiprow" style="flex-wrap:wrap">
+          ${i18n.LANGS.map(l => `<button class="chip${i18n.lang() === l.id ? ' on' : ''}"
+            data-act="lang.set" data-lang="${l.id}" lang="${l.id}">${esc(l.native)}</button>`).join('')}
+        </div>
+        ${i18n.unreviewed() ? `<p class="micro muted" style="margin-top:6px">${esc(i18n.t('lang.unreviewed'))}</p>` : ''}
+      </div>
       <p class="m-cap">Settings</p>
       ${setRow('area.pick', 'Addresses', pinned ? `${esc(myArea())} · pinned` : esc(myArea()))}
       ${infoRow('Payment methods', `Wallet · ${esc(gateway.label().split(' — ')[0])}`)}
