@@ -237,52 +237,43 @@ export function choosePlace(d) {
   toast(`Serving ${p.label}`);
 }
 
-/* ══════════════ THE HEADER THAT GETS OUT OF THE WAY ═════════════
-   Home's header carries four things a customer needs on arrival — where they
-   are, who they are, the ask, and the ask box — and exactly one thing they
-   need while scanning results: the box. So on the way down everything but
-   the box folds away; on the way back up it returns.
+/* ── the pinned search bar ─────────────────────────────────────
+   What the header used to do: shrink itself. It was `position:sticky` and IN
+   THE FLOW, so collapsing it took 340px out of the document — every element
+   below leapt up by 340px at the moment it fired. Animating that leap over
+   260ms (the first version) re-laid-out the page on every frame of it;
+   removing the animation (the second) turned it into one hard jump. Both
+   read as the page stuttering under your thumb, because both moved the
+   content you were reading.
 
-   Hysteresis, not a threshold. A bare `y > 80` toggles twice a frame on a
-   trackpad at exactly 80px: the collapse changes the header height, which
-   changes the scroll position, which uncollapses it.
+   Nothing moves now. The tall header is ordinary flow content and simply
+   scrolls away, which costs the browser nothing. A separate bar carrying only
+   the search field is `position:fixed` — outside the flow entirely — and
+   fades in once the real one has gone. Showing it changes no layout: only
+   `transform` and `opacity`, both of which the compositor does without
+   touching the page.
 
-   TRAVEL was 12px, which is inside the noise of a single trackpad flick and a
-   phone's momentum scroll — so the header collapsed and expanded over and over
-   while you scrolled, and every flip resized a sticky header and re-laid-out
-   everything under it. That is the stutter. It now takes a deliberate gesture
-   in one direction, and the collapse waits until the folding part is a screen
-   behind you, so the snap is never something you are looking at. */
-const COLLAPSE_AT = 220, TRAVEL = 72, TOP = 24;
-let hdrY = 0, hdrDir = 0, hdrAnchor = 0, hdrCompact = false;
-let hdrEl = null;
+   The band (show past the header, hide 60px earlier) exists so the bar cannot
+   flicker on and off while you hover the boundary. */
+const PIN_BAND = 60;
+let hdrEl = null, pinEl = null, hdrH = 0, pinOn = false;
 
-/* Deliberately synchronous. Reading scrollY inside a scroll handler costs
-   nothing — the browser has just computed it — and the only write is a class
-   toggle that happens when the state actually changes. Deferring this to
-   requestAnimationFrame would make the header depend on a frame ever arriving,
-   which is not true in every context the app runs in. */
+function measurePin() {
+  hdrEl = document.querySelector('.hdr--home');
+  pinEl = document.querySelector('.pinbar');
+  hdrH = hdrEl ? hdrEl.offsetHeight : 0;
+  if (pinEl) pinEl.classList.toggle('on', pinOn);   // the bar is rebuilt by every render
+}
+
+/* Deliberately synchronous and free: reading scrollY inside a scroll handler
+   costs nothing, the height is measured once per render rather than per event,
+   and the class is written only when the state actually changes. */
 function onHdrScroll() {
   const y = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
-  const d = y - hdrY;
-  /* the anchor is where the direction TURNED, which is the previous position,
-     not this one — anchoring on `y` makes a single large jump (an in-page
-     anchor, a restored scroll position) look like no travel at all */
-  if (d > 0 && hdrDir <= 0) { hdrDir = 1; hdrAnchor = hdrY; }
-  if (d < 0 && hdrDir >= 0) { hdrDir = -1; hdrAnchor = hdrY; }
-  hdrY = y;
-  if (y <= TOP) hdrCompact = false;
-  else if (hdrDir > 0 && y > COLLAPSE_AT && y - hdrAnchor >= TRAVEL) hdrCompact = true;
-  else if (hdrDir < 0 && hdrAnchor - y >= TRAVEL) hdrCompact = false;
-  applyHdr();
-}
-function applyHdr() {
-  /* cached: querySelector on every scroll event is work for nothing, and the
-     class is only written when it differs, so no style invalidation either */
-  if (!hdrEl || !hdrEl.isConnected) hdrEl = document.querySelector('.hdr--home');
-  if (!hdrEl) return;
-  if (hdrEl.classList.contains('hdr--compact') !== hdrCompact)
-    hdrEl.classList.toggle('hdr--compact', hdrCompact);
+  if (!hdrEl || !hdrEl.isConnected || !pinEl || !pinEl.isConnected) measurePin();
+  if (!pinEl || !hdrH) return;
+  const want = pinOn ? y > hdrH - PIN_BAND : y > hdrH;
+  if (want !== pinOn) { pinOn = want; pinEl.classList.toggle('on', pinOn); }
 }
 window.addEventListener('scroll', onHdrScroll, { passive: true });
 
@@ -524,9 +515,19 @@ export function render() {
 
   // the header is rebuilt by every render; re-apply whatever the scroll
   // position already decided, so a re-render never pops it back open
-  setTimeout(applyHdr, 0);
+  setTimeout(() => { measurePin(); onHdrScroll(); }, 0);
 
   return `
+  <div class="pinbar">
+    <div class="wrap pinbar__in">
+      <div class="search">
+        ${icon('search', { size: 18 })}
+        <input id="qPin" type="search" data-role="search" value="${esc(search)}"
+               placeholder="Search a service or shop"
+               aria-label="Search services, shops, products and your orders">
+      </div>
+    </div>
+  </div>
   <header class="hdr hdr--home">
     <div class="wrap inner">
       <button class="loc tap grow" data-act="area.pick" aria-label="Change where you are served">
@@ -673,8 +674,8 @@ export function render() {
     /* .hdr is display:flex in tokens.css — on Home the location row and the
        red band are stacked blocks, not two columns, so the flex context must
        be cancelled here or the hero collapses to a third of the width. */
-    .hdr--home{display:block;position:sticky;top:0;z-index:var(--z-header)}
-    @media (min-width:768px){ .hdr--home{top:calc(var(--topbar-h) + var(--tabs-h))} }
+    /* ordinary flow: it scrolls away like any other content, and costs nothing */
+    .hdr--home{display:block;position:relative}
     .hdr--home .inner{padding:11px var(--gutter)}
     .hdr--home .hero{padding:0 0 var(--sp-5)}
     .hdr--home .hero__title{font:800 27px/1.08 var(--font-heading);margin:10px 0 4px}
@@ -688,19 +689,25 @@ export function render() {
       .hdr--home .hero__title{font-size:36px}
     }
 
-    /* THE COLLAPSE. The old rule animated max-height, padding and margin —
-       all of them LAYOUT properties — on a sticky header, so for 260ms after
-       every flip the browser re-laid-out the whole page, frame after frame.
-       The folding parts are now simply not there when compact: one reflow per
-       gesture instead of sixteen, and nothing to animate mid-scroll. The
-       search bar, which is what stays, keeps its own transition because it
-       only ever changes its own box. */
-    .hdr--home .inner,
-    .hdr--home .hdr__fold{ opacity:1 }
-    .hdr--home.hdr--compact .inner,
-    .hdr--home.hdr--compact .hdr__fold{ display:none }
-    .hdr--home.hdr--compact .hero{padding-bottom:8px}
-    .hdr--home.hdr--compact .m-ask{padding-top:8px}
+    /* The pinned bar. Fixed, so it is outside the flow and can never move the
+       page; only transform and opacity animate, so showing it is a compositor
+       job with no layout and no paint of the content behind it. visibility
+       keeps it out of the tab order while hidden, and is delayed on the way
+       out so the slide still plays.
+       (No backticks in here: this comment lives inside a template literal.) */
+    .pinbar{position:fixed;top:0;left:0;right:0;z-index:calc(var(--z-header) + 1);
+      background:var(--bg);border-bottom:2px solid var(--color-divider);
+      transform:translateY(-100%);opacity:0;visibility:hidden;
+      transition:transform .18s ease, opacity .16s ease, visibility 0s linear .18s}
+    .pinbar.on{transform:none;opacity:1;visibility:visible;
+      transition:transform .18s ease, opacity .16s ease, visibility 0s}
+    .pinbar__in{padding:8px var(--gutter)}
+    .pinbar .search{margin:0}
+    @media (min-width:768px){
+      .pinbar{top:calc(var(--topbar-h) + var(--tabs-h))}
+      .pinbar__in{padding-left:0;padding-right:0}
+    }
+    @media (prefers-reduced-motion:reduce){ .pinbar{transition:none} }
     .hdr--home.hdr--compact .hero__search{height:44px}
     @media (prefers-reduced-motion: reduce){
       .hdr--home .inner,.hdr--home .hdr__fold,.hdr--home .hero,

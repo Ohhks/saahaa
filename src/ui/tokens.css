@@ -256,9 +256,9 @@ p.micro > a.micro{padding-block:17px}
 /* The collapse lives in views/home.js beside the markup it folds — it used to
    be declared here too, with different durations, and the two disagreed. */
 .hdr--home .hero{padding:var(--sp-8) var(--gutter) var(--sp-6)}
-.hdr--home.hdr--compact .inner,.hdr--home.hdr--compact .hdr__fold{display:none}
-.hdr--home.hdr--compact .hero{padding-top:var(--sp-4);padding-bottom:var(--sp-4)}
-.hdr--home.hdr--compact .hero__search{height:44px;margin-top:0}
+/* The home header no longer collapses — shrinking a sticky, in-flow header
+   moved the whole page under the reader's thumb. A fixed .pinbar carrying the
+   search field takes over instead; it lives in views/home.js beside its markup. */
 .hdr--home .loc b{display:block;max-width:60vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .loc{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-height:44px;line-height:1.15}
 .hero{background:var(--bg);color:var(--ink-1);padding:var(--sp-8) 0 var(--sp-6)}

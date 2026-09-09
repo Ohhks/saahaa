@@ -1,0 +1,68 @@
+<!doctype html><meta charset=utf-8><title>jank probe</title>
+<!-- SAAHAA · how smooth the home screen actually is, measured in a real engine.
+
+     Runs the app in an iframe, scrolls it the way a thumb does — a frame at a
+     time — and records how long each frame took. A frame budget is 16.7ms; a
+     frame over ~32ms is a visible hitch. It also counts long tasks and how many
+     times the app re-rendered mid-scroll, because a re-render during a scroll is
+     the most expensive thing the page can do.
+
+     Run it with REAL time (no --virtual-time-budget, or rAF never fires):
+
+       chrome --headless=new --disable-gpu --hide-scrollbars --window-size=900,900 \
+         --user-data-dir=<tmp> --dump-dom --timeout=60000 \
+         http://127.0.0.1:8772/docs/design/jank-probe.html
+
+     Not shipped — nothing under docs/ is deployed (tools/build.py --site). -->
+<style>html,body{margin:0;font:13px monospace}iframe{width:420px;height:760px;border:0}</style>
+<div id=out>running…</div>
+<iframe id=f src="/index.html?demo=1"></iframe>
+<script>
+const done = t => { document.getElementById('out').textContent = 'RESULT ' + JSON.stringify(t); document.title = 'done'; };
+addEventListener('load', async () => {
+  const f = document.getElementById('f'), w = f.contentWindow, d = f.contentDocument;
+  await new Promise(r => setTimeout(r, 4000));                 // let it boot and settle
+  const sp = d.querySelector('.splash'); if (sp) sp.remove();
+  d.documentElement.style.scrollBehavior = 'auto';
+  await new Promise(r => setTimeout(r, 800));
+
+  // count re-renders: every full mount swaps #app's children
+  let renders = 0;
+  const app = d.getElementById('app');
+  if (app) new w.MutationObserver(m => { for (const x of m) if (x.type === 'childList' && x.addedNodes.length) renders++; })
+    .observe(app, { childList: true });
+
+  // long tasks inside the app's own window
+  const longs = [];
+  try { new w.PerformanceObserver(l => l.getEntries().forEach(e => longs.push(Math.round(e.duration))))
+    .observe({ entryTypes: ['longtask'] }); } catch (e) {}
+
+  // scroll a frame at a time, like a thumb, and time every frame
+  const frames = [];
+  const max = Math.max(0, d.documentElement.scrollHeight - w.innerHeight);
+  await new Promise(resolve => {
+    let y = 0, last = performance.now(), n = 0;
+    const step = () => {
+      const now = performance.now();
+      if (n++) frames.push(now - last);
+      last = now;
+      y += 14;                                                  // ~840px/s, an ordinary flick
+      w.scrollTo(0, Math.min(y, max));
+      if (y < Math.min(max, 1600) && n < 240) w.requestAnimationFrame(step); else resolve();
+    };
+    w.requestAnimationFrame(step);
+  });
+
+  frames.sort((a, b) => a - b);
+  const at = p => Math.round(frames[Math.floor(frames.length * p)] || 0);
+  done({
+    frames: frames.length,
+    medianMs: at(.5), p95Ms: at(.95), worstMs: Math.round(frames[frames.length - 1] || 0),
+    hitchesOver32ms: frames.filter(x => x > 32).length,
+    hitchesOver50ms: frames.filter(x => x > 50).length,
+    longTasks: longs.length, longTaskMs: longs.slice(0, 8),
+    rendersDuringScroll: renders,
+    scrolled: Math.round(w.scrollY), docH: d.documentElement.scrollHeight,
+  });
+});
+</script>
