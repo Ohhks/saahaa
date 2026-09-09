@@ -44,6 +44,7 @@ import * as flow from '../../domain/flow.js';
 import * as V from '../../domain/verification.js';
 import * as settings from '../../domain/settings.js';
 import * as treasury from '../../domain/treasury.js';
+import * as recovery from '../../domain/recovery.js';
 import * as autoverify from '../../domain/autoverify.js';
 import * as fresh from '../../domain/fresh.js';
 import * as gateway from '../../core/gateway.js';
@@ -383,7 +384,10 @@ function dash(st) {
    neutral for a shop. */
 const PIN_ORDER = gmap.PINS.accent, PIN_PARTNER = gmap.PINS.ink, PIN_SHOP = gmap.PINS.neutral;
 
-const legendDot = (c, label) => `<span><span class="ad-dot" aria-hidden="true" style="background:${c}"></span>${esc(label)}</span>`;
+/* `c` is a constant from gmap.PINS today. Whitelisting it costs nothing and
+   means a future caller cannot put anything else into a style attribute. */
+const legendDot = (c, label) => `<span><span class="ad-dot" aria-hidden="true" style="background:${
+  /^#[0-9a-f]{3,8}$/i.test(String(c)) ? c : 'currentColor'}"></span>${esc(label)}</span>`;
 
 function liveMap(st) {
   const liveOrders = st.orders.filter(o => !stage(o.stage).terminal);
@@ -422,12 +426,14 @@ function mapPoints(st) {
   };
   st.orders.filter(o => !stage(o.stage).terminal).slice(0, 120).forEach((o, i) =>
     push(o.customerLoc || o.customerArea, o.id, i, PIN_ORDER, o.kind === 'retail' ? 'S' : 'J',
-      `${esc(o.customerName || 'Customer')} · ${esc(stage(o.stage).label || o.stage)} · ${M.fmt(o.customerPays)}`));
+      /* ui/map.js escapes the label at the sink; escaping here too printed
+                 "Ram &amp;amp; Co" in the popup. Pass the plain text. */
+      `${o.customerName || 'Customer'} · ${stage(o.stage).label || o.stage} · ${M.fmt(o.customerPays)}`));
   st.partners.filter(p => p.online !== false && !p.suspended).slice(0, 120).forEach((p, i) =>
     push(p.loc || p.area, p.id, i, PIN_PARTNER, 'P',
-      `${esc(p.name)} · ${esc(get('category', p.cat).name || '')} · ${esc(p.area || '')}`));
+      `${p.name} · ${get('category', p.cat).name || ''} · ${p.area || ''}`));
   st.shops.slice(0, 80).forEach((s, i) =>
-    push(s.loc || s.area, s.id, i, PIN_SHOP, 'K', `${esc(s.name)} · ${esc(s.area || '')}`));
+    push(s.loc || s.area, s.id, i, PIN_SHOP, 'K', `${s.name} · ${s.area || ''}`));
   return pts;
 }
 
@@ -825,6 +831,7 @@ function people(st) {
         <td class="nowrap">${pill(tier(p.tier).label, tier(p.tier).tone)}</td>
         <td class="nowrap">${pill(`${t.score} · ${t.band.label}`, t.band.tone)}</td>
         <td class="act">
+          <button class="btn btn--ghost btn--sm" data-act="admin.reset" data-key="${esc(p.userKey || '')}">Reset password</button>
           <button class="btn btn--ghost btn--sm" data-act="admin.suspend" data-id="${p.id}">
             ${p.suspended ? 'Unsuspend' : 'Suspend'}</button>
           ${(p.tier | 0) >= 4 ? '<span class="pill pill--gold">Top tier</span>'
@@ -1515,6 +1522,27 @@ export function approve(id, target) {
   if (V.approveTier(p, t, 'admin')) toast(`${p.name} → ${tier(t).label}`);
   ctx.render();
 }
+/* A person rings because they cannot get in. The owner checks who they are and
+   reads out this code; it lasts half an hour and works once. The app shows it
+   here and never again — only its hash is stored (domain/recovery.js). */
+export async function resetPassword(key) {
+  if (!key) { toast('That account has no sign-in to reset', 'warn'); return; }
+  const r = await recovery.issue(key, 'admin');
+  if (!r.ok) { toast(r.reason || 'Could not issue a reset', 'danger'); return; }
+  sheet('Read this code out', `
+    <p class="tiny muted" style="margin-bottom:12px">For ${esc(r.account.name)}${r.account.code ? ' · ' + esc(r.account.code) : ''}.
+      Check it is really them before you read it out.</p>
+    <div class="card" style="text-align:center;padding:18px">
+      <div class="m-cap" style="margin:0 0 6px">One-time code</div>
+      <b style="font:800 34px/1 var(--font-heading);letter-spacing:.14em">${esc(r.code)}</b>
+    </div>
+    <p class="tiny muted" style="margin-top:12px">It works once and expires in ${recovery.TTL_MS / 60000} minutes.
+      They enter it on the sign-in screen under &ldquo;Forgotten it?&rdquo; with the new password they want.
+      This code is not shown again — issue another if it is missed.</p>
+    <button class="btn btn--block" style="margin-top:12px" data-act="sheet.close">Done</button>`);
+  ctx.render();
+}
+
 export function suspend(id) {
   const p = getState().partners.find(x => x.id === id); if (!p) return;
   dispatch({ type: 'partner/patch', payload: { id, patch: { suspended: !p.suspended } } });

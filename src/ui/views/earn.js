@@ -34,6 +34,8 @@ import { icon } from '../icons.js';
 import { me } from '../../core/ctx.js';
 import { live } from '../../core/registry.js';
 import * as M from '../../core/money.js';
+import { MIN_STAKE } from '../../domain/wallet.js';
+import { HOLDBACK_PCT, HOLDBACK_DAYS } from '../../domain/ledger.js';
 import { header } from './shops.js';
 import { renderPartner, renderShopAdmin } from './partner.js';
 
@@ -169,6 +171,22 @@ function invite() {
     </div>
 
     <div style="margin-top:var(--sp-6)">${worked(pct)}</div>
+
+    <!-- THE TWO THINGS A PRO USED TO MEET BY SURPRISE (8.2). Nothing here is a
+         charge, and both come back — but a tradesperson who reads "you keep
+         100%" and then watches money lock on his first job has been ambushed
+         by his own app. Stake and holdback are named here, with the rupees,
+         before he signs up. Every figure is the engine's. -->
+    <div style="margin-top:var(--sp-6)">
+      <span class="eyebrow">Two things that are not charges — and are not surprises either</span>
+      <div class="ern__cost" style="margin-top:6px"><span class="muted">Held while a job is running</span>
+        <strong>${M.fmt(MIN_STAKE)}+ · back in full when you finish</strong></div>
+      <div class="ern__cost"><span class="muted">Held after each payout</span>
+        <strong>${HOLDBACK_PCT}% for ${HOLDBACK_DAYS} days · then yours</strong></div>
+      <p class="micro muted" style="padding:8px 0 0">Neither is a fee and neither is asked for up front — if your wallet is empty
+        the running-job amount comes out of that job's own payout. They exist so a customer's money is safe with a
+        stranger, which is the reason they hand it over at all.</p>
+    </div>
 
     <div class="ern__two">
       <div>

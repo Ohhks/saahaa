@@ -41,7 +41,7 @@ import { tradeBank, CONDUCT, shuffled, score, PASS, MAX_ATTEMPTS, LOCK_MS } from
 export const STEPS = [
   { id: 'phone',     n: 1, title: 'Confirm your number',   sub: 'A 4-digit code confirms your number.',                 mins: 1 },
   { id: 'identity',  n: 2, title: 'Show us your ID',       sub: 'Aadhaar, PAN or licence. We keep only the last 4 digits.', mins: 2 },
-  { id: 'selfie',    n: 3, title: 'One photo of you',      sub: 'Customers see this face at the door.',                     mins: 1 },
+  { id: 'selfie',    n: 3, title: 'One photo of you',      sub: 'For SAAHAA only — never shown to a customer.',              mins: 1 },
   { id: 'trade',     n: 4, title: 'Five trade questions',  sub: 'Things every real pro knows. Get 4 right.',                mins: 3 },
   { id: 'conduct',   n: 5, title: 'How SAAHAA works',      sub: 'Six questions on the rules. Get 5 right.',                 mins: 2 },
   { id: 'payout',    n: 6, title: 'Where to pay you',      sub: 'Your UPI id. Money lands here after every job.',           mins: 1 },

@@ -33,7 +33,7 @@ import { getPricing } from '../../domain/settings.js';
 import * as photoUI from '../photo.js';
 import * as flow from '../../domain/flow.js';
 import * as V from '../../domain/verification.js';
-import { PASS, MAX_ATTEMPTS } from '../../domain/quiz.js';
+import { PASS, MAX_ATTEMPTS, LOCK_MS } from '../../domain/quiz.js';
 import { tier, PROVISIONAL_CAP, PROVISIONAL_JOBS } from '../../domain/trust.js';
 import * as M from '../../core/money.js';
 
@@ -80,6 +80,17 @@ const obCSS = `<style>
   @media (min-width:1024px){ .ob__hdr.apphdr{padding-left:var(--sp-10);padding-right:var(--sp-10)} .ob__two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--sp-9);align-items:start} }
 </style>`;
 
+/* THE SELFIE IS PRIVATE (8.2). `domain/verification.js:44` still carries the
+   pre-8.2 line "Customers see this face at the door." — which is now the
+   opposite of the truth: `partner.selfie` proves identity and is never
+   published, and the public portrait (`partner.photo`) is a separate,
+   deliberate choice. A screen may not tell a pro their face is public when it
+   is not, so the view states the step's real purpose until that string is
+   corrected in the domain. Nothing else overrides its step. */
+const subOf = s => s.id === 'selfie'
+  ? 'For SAAHAA only — it is never shown to a customer.'
+  : s.sub;
+
 const stepHeader = (title, right) => `<header class="apphdr ob__hdr">
     <button class="btn btn-ghost tap" style="min-width:44px" data-act="nav.back" aria-label="Back">${icon('back', { size: 18 })}</button>
     <div class="grow t" style="min-width:0">${esc(title)}</div>
@@ -113,7 +124,7 @@ export function render() {
     <div class="ob__step">
       <span class="eyebrow">${esc(cat.name)} · ${esc(r.tier.label)} · about ${minsLeft} min left</span>
       <div class="ob__title" style="margin-top:6px">${esc(cur.title)}</div>
-      <div class="ob__sub">${esc(cur.sub)}</div>
+      <div class="ob__sub">${esc(subOf(cur))}</div>
     </div>
 
     <div class="ob__two">
@@ -130,7 +141,7 @@ export function render() {
             const isCur = cur.id === s.id;
             return `<div class="obl ${done ? 'done' : isCur ? 'cur' : 'pend'}">
               <span class="obl__n">${done ? icon('check', { size: 12 }) : s.n}</span>
-              <span class="grow tiny" style="min-width:0"><b>${esc(s.title)}</b>${isCur ? `<span class="micro muted" style="display:block">${esc(s.sub)}</span>` : ''}</span>
+              <span class="grow tiny" style="min-width:0"><b>${esc(s.title)}</b>${isCur ? `<span class="micro muted" style="display:block">${esc(subOf(s))}</span>` : ''}</span>
               <span class="micro muted" style="flex:none">${done ? 'done' : `${s.mins} min`}</span>
             </div>`;
           }).join('')}
@@ -282,13 +293,13 @@ function stepPanel(p, id, cat) {
        if the camera is cancelled or the device is out of room: verification is
        not held hostage by a picture, and My page can add one later. */
     case 'selfie': {
-      const shot = photoUI.url(p.photo);
+      const shot = photoUI.url(p.selfie);
       return `<div class="ob__form">
       <div class="row" style="gap:14px">
         <div class="thumb" style="width:96px;height:96px;display:grid;place-items:center;overflow:hidden;color:var(--color-neutral-700)">${
           shot ? `<img src="${shot}" alt="The photo you took of yourself" style="display:block;width:100%;height:100%;object-fit:cover">`
                : icon('camera', { size: 40 })}</div>
-        <p class="tiny muted">Face straight, good light, no cap or glasses. This is what the customer sees at the door.</p>
+        <p class="tiny muted">Face straight, good light, no cap or glasses. This one is for SAAHAA only — it proves you are you, and it is never shown to a customer. The photo on your public page is a separate choice you make from My page.</p>
       </div>
       </div>
       ${foot(`<button class="btn btn-primary" data-act="ob.selfie">${shot ? 'Use this photo' : 'Take my photo'}</button>`)}`;
@@ -317,15 +328,27 @@ function quizPanel(p, kind, title) {
     const mins = Math.ceil((st.lockedUntil - Date.now()) / 60000);
     return `<div class="ob__form"><div class="card" style="border-color:var(--warn)">
       <b>Three tries used.</b>
-      <p class="tiny muted" style="margin-top:6px">Come back in ${mins > 60 ? Math.ceil(mins / 60) + ' hours' : mins + ' minutes'} and try again. Read the questions slowly — there is no trick.</p></div></div>
+      <p class="tiny muted" style="margin-top:6px">Come back in ${mins > 60 ? Math.ceil(mins / 60) + ' hours' : mins + ' minutes'} and try again. Read the questions slowly — there is no trick.</p>
+      <p class="tiny muted" style="margin-top:6px">Nothing you have already done is lost. Your number, your ID and your photo stay done, and the ladder starts again from this step.</p></div></div>
       ${foot('')}`;
   }
   const bank = V.quizFor(p, kind);
   const mine = answers[kind] || [];
   const answered = bank.filter((_, i) => Number.isInteger(mine[i])).length;
+  /* WHAT IT COSTS TO GUESS, SAID BEFORE THEY ANSWER (8.2). The trade quiz is a
+     filter: three wrong attempts and the ladder stops for a day. A pro who
+     learns that from the lock screen learns it too late — a lost day of work is
+     the single most expensive thing this ladder can do to somebody. Both
+     numbers come from domain/quiz.js, never typed. The conduct quiz cannot
+     lock anyone, and saying so is what stops it feeling like the same trap. */
+  const lockHours = Math.round(LOCK_MS / 3600e3);
+  const stakes = Number.isFinite(st.left)
+    ? `${MAX_ATTEMPTS} tries, and ${st.left} still left. If all ${MAX_ATTEMPTS} are wrong the ladder waits ${lockHours} hours before you can try again — so read each one slowly. Nothing else you have done is lost.`
+    : 'No limit on tries here. A wrong answer just shows you the rule and lets you try again, so nothing is lost by getting one wrong.';
   return `<div class="ob__form" style="gap:0">
     <div class="between" style="gap:8px"><b class="tiny">${title}</b>
       <span class="tag tag-neutral" style="flex:none">need ${PASS[kind]} of ${bank.length}${Number.isFinite(st.left) ? ` · ${st.left} ${st.left === 1 ? 'try' : 'tries'} left` : ''}</span></div>
+    <p class="${Number.isFinite(st.left) ? 'tiny' : 'micro muted'}" style="margin-top:8px${Number.isFinite(st.left) ? ';border-left:3px solid var(--color-accent);padding-left:10px' : ''}">${esc(stakes)}</p>
     ${kind === 'conduct' && lastWrong.length ? `<div class="card" style="margin-top:10px;border-left:3px solid var(--color-accent)">
       <b class="micro">The rules you missed:</b>
       ${lastWrong.map(w => `<p class="micro" style="margin-top:4px">${esc(w.right)}</p>`).join('')}</div>` : ''}
@@ -369,6 +392,7 @@ function verified(p, r, cat) {
             <button class="btn btn-secondary grow" style="justify-content:flex-start" data-act="pro.open" data-id="${p.id}">View page</button>
           </div>
         </div>
+        ${portraitOffer(p)}
         <div class="ob__kv"><span class="muted">You paid to get here</span><b>₹0</b></div>
         <div class="ob__kv" style="border-top:0;padding-top:4px"><span class="muted">You keep of every quote</span><b>100%</b></div>
       </div>
@@ -401,6 +425,39 @@ function verified(p, r, cat) {
   </main>`;
 }
 
+/* A FACE ON THE PAGE, AT THE ONE MOMENT THEY CARE (8.2).
+   Step 3's photo is the SELFIE: private, identity only. The public page's
+   portrait is `partner.photo` — a separate, deliberate choice — so a pro who
+   has just finished the ladder has a page with a letter where a face should
+   be, and the page is the entire reason he joined. Offering the photo he took
+   ninety seconds ago is one tap; the word "public" is in the button and in
+   the line under it, because copying a private photo onto a public page must
+   never happen by accident. `photo.publish` (app.js) copies selfie → photo;
+   `photo.pro` takes a different one. Both already registered. */
+function portraitOffer(p) {
+  const pub = photoUI.url(p.photo);
+  const sel = photoUI.url(p.selfie);
+  if (pub) return `<div class="ob__box">
+      <span class="eyebrow">Your page photo</span>
+      <div class="row" style="gap:12px;margin-top:8px">
+        <img src="${pub}" alt="The photo on your public page" style="width:64px;height:64px;object-fit:cover;flex:none;border:2px solid var(--color-text)">
+        <p class="tiny muted grow" style="min-width:0">This is the face customers see on your page. Change it any time from My page.</p>
+      </div></div>`;
+  return `<div class="ob__box">
+    <span class="eyebrow">Your page has no photo yet</span>
+    <div class="row" style="gap:12px;margin-top:8px">
+      ${sel ? `<img src="${sel}" alt="The photo you took for verification" style="width:64px;height:64px;object-fit:cover;flex:none;border:2px solid var(--color-text)">`
+            : `<span class="thumb" style="width:64px;height:64px;flex:none;display:grid;place-items:center;color:var(--color-neutral-700)">${icon('camera', { size: 26 })}</span>`}
+      <p class="tiny muted grow" style="min-width:0">A page with a face is booked more often than a page with a letter. Your verification photo is private and stays that way unless you put it up yourself.</p>
+    </div>
+    <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
+      ${sel ? `<button class="btn btn-primary grow" style="justify-content:flex-start" data-act="photo.publish" data-id="${esc(p.id)}">Show this photo publicly</button>` : ''}
+      <button class="btn btn-secondary grow" style="justify-content:flex-start" data-act="photo.pro" data-id="${esc(p.id)}">${sel ? 'Take a different one' : 'Add a photo for my page'}</button>
+    </div>
+    ${sel ? '<p class="micro muted" style="margin-top:8px">Tapping that puts this exact photo on your public page, where anyone with your link can see it.</p>' : ''}
+  </div>`;
+}
+
 function certifiedCard(p) {
   const e = V.certifiedEligible(p);
   const row = (ok, label) => `<div class="obl ${ok ? 'done' : 'pend'}" style="padding:6px 0"><span class="obl__n">${ok ? icon('check', { size: 12 }) : ''}</span><span class="tiny">${label}</span></div>`;
@@ -415,11 +472,13 @@ function certifiedCard(p) {
    cancel or a full device still finishes the step — the ladder is about who
    somebody is, and it is not the place to strand a pro over storage. */
 async function takeSelfie(p) {
-  if (photoUI.url(p.photo)) { V.submitSelfie(p); toast('Photo saved'); ctx.render(); return; }
+  if (photoUI.url(p.selfie)) { V.submitSelfie(p); toast('Photo saved'); ctx.render(); return; }
   const r = await photoUI.pick({ maxEdge: 560 });
-  if (r && r.ok) { flow.setPartnerPhoto(p.id, r.id); toast('Photo saved'); }
-  else if (r && !r.cancelled && r.reason) toast(`${r.reason} — the step is done; add a photo later from My page`, 'warn');
-  else toast('No photo yet — the step is done; add one later from My page');
+  /* Kept as the SELFIE, which is private. Publishing it as the face on their
+     page is a separate, deliberate choice on My page — see domain/flow.js. */
+  if (r && r.ok) { flow.setPartnerSelfie(p.id, r.id); toast('Photo saved — it stays private'); }
+  else if (r && !r.cancelled && r.reason) toast(`${r.reason} — the step is done; you can add it later`, 'warn');
+  else toast('No photo yet — the step is done; you can add it later');
   V.submitSelfie(p);
   ctx.render();
 }

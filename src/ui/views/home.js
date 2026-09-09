@@ -39,6 +39,8 @@ import * as photo from '../photo.js';
 const GROUP_ICON = { home: 'groupHome', care: 'groupCare', life: 'groupLife', shops: 'groupShops' };
 
 let search = '';
+/* what a guest was about to book when the app sent them to sign in */
+let pendingBooking = null;
 /* Recent searches live in module memory only — no store, no persistence, no
    invented "history" feature. Keystrokes collapse: p / pl / plu / plum fold
    into the longest form the user actually reached, so the row never fills up
@@ -303,7 +305,11 @@ function supplyLine(c) {
   if (c.kind === 'retail') return `${st.shops.filter(x => x.catId === c.id && x.isOpen).length} open now`;
   const pool = st.partners.filter(p => p.cat === c.id && !p.suspended);
   const online = pool.filter(p => p.online !== false).length;
-  return online ? `${online} nearby` : pool.length ? `${pool.length} nearby` : 'New here — be first';
+  /* "New here — be first" is an invitation to a WORKER, and it was being read
+     by a customer standing in front of a broken fan — on the tile and again in
+     the booking sheet's Available capsule. Say the fact; the invitation to
+     list has its own section further down the page. */
+  return online ? `${online} nearby` : pool.length ? `${pool.length} nearby, none online` : 'Nobody listed yet';
 }
 
 /* a category tile: the mockup's bordered box — icon, name, supply line */
@@ -318,6 +324,23 @@ function tileHtml(c, wide = false) {
 /* a category's chip glyph is its SVG icon — never the registry's emoji, which
    renders as tofu or fragments on the phones this app is for (see icons.js) */
 const catGlyph = c => hasIcon(c.id) ? icon(c.id, { size: 14 }) : '';
+
+/* ── the second visit ──────────────────────────────────────────
+   "Book again" used to carry data-act="nav.orders": it read like one tap back
+   to the same worker and delivered the order list instead — and a signed-in
+   customer with no orders at all was offered it, straight into an empty
+   screen. It now books: `book.sub` already accepts a pinned partner
+   (app.js:260 → openCategory(catId, sub, pid)), so the same pro, the same
+   sub-service and the same locked price are one tap from Home. */
+function againChip() {
+  if (!me()) return '';
+  const o = myOrders().find(x => x.kind === 'service' && x.partnerId && x.partnerName);
+  if (!o) return '';
+  const first = String(o.partnerName).split(' ')[0];
+  return `<button class="chip" data-act="book.sub" data-id="${esc(o.catId)}"
+      data-sub="${esc(o.sub || '')}" data-pid="${esc(o.partnerId)}">
+    <span class="chip__ic" aria-hidden="true">${icon('refresh', { size: 14 })}</span>Book ${esc(first)} again</button>`;
+}
 
 /* a suggestion chip is a real destination, never a decorative word */
 function smartChip(label, catId, ico) {
@@ -423,7 +446,10 @@ function proRow(p, km) {
 }
 function shopRow(s, km) {
   const cat = get('category', s.catId) || { name: '' };
-  const n = getState().products.filter(p => p.shopId === s.id && p.active).length;
+  /* "in stock" has to mean in stock: this counted every active line, so a shop
+     whose shelves were empty still advertised its whole catalogue. Same count
+     as the shops list uses (views/shops.js shopRow). */
+  const n = getState().products.filter(p => p.shopId === s.id && p.active && (!p.trackStock || p.stockQty > 0)).length;
   return `<button class="m-row" data-act="shop.open" data-id="${esc(s.id)}">
     ${faceThumb(s.photo, s.catId, s.name)}
     <div class="grow" style="min-width:0">
@@ -544,6 +570,16 @@ export function render() {
   // position already decided, so a re-render never pops it back open
   setTimeout(() => { measurePin(); onHdrScroll(); }, 0);
 
+  /* THE BOOKING A GUEST WAS SENT AWAY FROM. Signing in lands on Home, and the
+     priced sheet the person had in front of them was gone — the whole journey
+     had to be walked again from the search box. One re-open, only for the
+     person who asked for it, only within 15 minutes, then forgotten. */
+  if (pendingBooking && s) {
+    const b = pendingBooking;
+    pendingBooking = null;
+    if (Date.now() - b.ts < 15 * 60000) setTimeout(() => openCategory(b.catId, b.sub, b.partnerId), 0);
+  }
+
   return `
   <div class="pinbar">
     <div class="wrap pinbar__in">
@@ -588,8 +624,12 @@ export function render() {
           ${q ? `<button class="btn btn--ghost btn--sm tap" data-act="search.clear" aria-label="Clear search">${icon('cross', { size: 16 })}</button>` : ''}
         </div>
         <div class="hdr__fold">
+          <!-- This button opens the booking sheet for the best match. It used
+               to say "Send to the circle", which is what the ASK does on the
+               next screen — a different thing, at a different price, on a
+               12-minute clock. A label must name its own destination. -->
           ${best ? `<button class="btn btn--primary btn--block" style="justify-content:flex-start;margin-top:10px"
-              data-act="cat.open" data-id="${best.id}">Send to the circle → ${esc(best.name)}</button>` : ''}
+              data-act="cat.open" data-id="${best.id}">See who is free · ${esc(best.name)}</button>` : ''}
           ${!q ? `<div class="chiprow" style="margin-top:10px;flex-wrap:wrap">
             ${recentChips.length
               ? recentChips.map(x => smartChip(x.t, x.c.id, icon('refresh', { size: 14 }))).join('')
@@ -615,8 +655,7 @@ export function render() {
           <div class="sec">
             <p class="m-cap">Or say it in one tap</p>
             <div class="chiprow" style="flex-wrap:wrap">
-              ${s ? `<button class="chip" data-act="nav.orders">
-                       <span class="chip__ic" aria-hidden="true">${icon('refresh', { size: 14 })}</span>Book again</button>` : ''}
+              ${againChip()}
               <button class="chip" data-act="quick.emergency">
                 <span class="chip__ic" aria-hidden="true">${icon('siren', { size: 14 })}</span>Emergency</button>
               <button class="chip" data-act="quick.nearby">
@@ -812,7 +851,7 @@ function geoOf(loc) {
 function nearRow(it) {
   const act = it.kind === 'shop' ? 'shop.open' : 'pro.open';
   const line = it.kind === 'shop'
-    ? `${getState().products.filter(p => p.shopId === it.id && p.active).length} items · ${esc(it.cat.name)} · ${it.km} km`
+    ? `${getState().products.filter(p => p.shopId === it.id && p.active && (!p.trackStock || p.stockQty > 0)).length} items in stock · ${esc(it.cat.name)} · ${it.km} km`
     : `${esc(it.cat.name)} · ${it.km} km · ~${etaMins(it.km)} min`;
   const rating = it.kind === 'shop' ? Number(it.raw.ratingAvg) : avgOf(it.raw);
   return `<button class="m-row" data-act="${act}" data-id="${esc(it.id)}">
@@ -1060,15 +1099,41 @@ export function openCategory(catId, sub = null, pinnedId = null) {
     <p class="tiny muted" style="margin-bottom:12px">${esc(c.blurb || '')}</p>
     <p class="m-cap">What exactly do you need?</p>
     <div class="chiprow" style="flex-wrap:wrap;gap:8px;margin-bottom:18px">${subs}</div>
-    ${hero ? heroCard(catId, hero, sub) : `
-      <div class="empty empty--smart"><h3 style="font-size:17px">No pro free right now</h3>
-      <p style="margin-top:6px">Nobody in ${esc(myArea())} is online for this. Try another area or check back shortly.</p>
-      <button class="btn btn--secondary" style="margin-top:12px" data-act="area.pick">Change area</button></div>`}
+    ${hero ? heroCard(catId, hero, sub) : noMatchBlock(c)}
     ${m.alternates.length ? `
       <button class="btn btn--ghost btn--block" style="margin-top:10px"
         data-act="book.others" data-id="${catId}" data-sub="${esc(sub || '')}">See ${m.alternates.length} other pros</button>` : ''}
     ${SYS_CSS}
   `);
+}
+
+/* NOBODY FREE IS NOT A DEAD END. The old block said "No pro free right now"
+   and offered one button — Change area — which on an empty store leads to
+   another empty store. It never said which of the two facts was true (nobody
+   has listed this trade at all, or the ones who have are offline), and it
+   never offered the trades that ARE free this minute. Everything here is read
+   off the store; the four controls are all actions app.js already routes. */
+function noMatchBlock(c) {
+  const st = getState();
+  const pool = st.partners.filter(p => p.cat === c.id && !p.suspended).length;
+  const free = services()
+    .filter(x => x.id !== c.id)
+    .map(x => ({ x, n: st.partners.filter(p => p.cat === x.id && !p.suspended && p.online !== false).length }))
+    .filter(v => v.n).sort((a, b) => b.n - a.n).slice(0, 4);
+  return `<div class="empty empty--smart">
+    <h3 style="font-size:17px">${pool ? 'Nobody is free for this right now' : 'Nobody has listed this trade here yet'}</h3>
+    <p style="margin-top:6px">${pool
+      ? `${pool} ${pool === 1 ? 'pro is' : 'pros are'} listed for ${esc(c.name)} around ${esc(myArea())}, and none of them is online this minute. Nothing has been charged.`
+      : `Nobody around ${esc(myArea())} is offering ${esc(c.name)} yet.`}</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px">
+      <button class="btn btn--secondary" data-act="area.pick">Change area</button>
+      <button class="btn btn--secondary" data-act="nav.nearby">See who is on the map</button>
+      ${pool ? '' : `<button class="btn btn--ghost" data-act="partner.join">I do this work</button>`}
+    </div>
+    ${free.length ? `<p class="m-cap" style="margin-top:18px">Free in ${esc(myArea())} right now</p>
+      <div class="chiprow" style="justify-content:center;flex-wrap:wrap;gap:8px">
+        ${free.map(v => smartChip(v.x.name, v.x.id, catGlyph(v.x))).join('')}</div>` : ''}
+  </div>`;
 }
 
 /* Why THIS pro — read straight off the fields the matcher already produced.
@@ -1159,9 +1224,13 @@ export function heroCard(catId, p, sub = null) {
       </p>
     </details>
 
+    <!-- A guest tapping "Confirm booking · Rs.543" was not booking anything:
+         confirmBooking() sends them to #/auth. The label now says what the tap
+         does, and the intent is kept so signing in comes back to this price
+         instead of dropping them on an empty Home. -->
     <button class="btn btn--primary btn--lg btn--block" style="justify-content:flex-start" data-act="book.confirm"
             data-id="${catId}" data-pid="${p.id}" data-sub="${esc(sub || '')}">
-      Confirm booking · ${M.fmt(q.customerPays)}
+      ${me() ? 'Confirm booking' : 'Sign in to book'} · ${M.fmt(q.customerPays)}
     </button>
     <p class="micro" style="margin-top:8px;opacity:.75">${cancelLine()}</p>
 
@@ -1200,10 +1269,18 @@ export function showAlternates(catId, sub = null) {
 }
 
 export async function confirmBooking(catId, partnerId, sub) {
-  if (isGuest()) { toast('Sign in to book'); ctx.go('auth'); return; }
+  if (isGuest()) {
+    pendingBooking = { catId, partnerId, sub: sub || null, ts: Date.now() };
+    toast('Sign in to book — we will bring you back to this price');
+    ctx.go('auth');
+    return;
+  }
   const p = getState().partners.find(x => x.id === partnerId);
   if (!p) return;
   const o = await flow.bookService({ catId, partner: p, sub });
+  /* the need has been served: leaving the query in place meant the next visit
+     to Home opened on "Results for fan" instead of Home */
+  search = '';
   closeSheet();
   ctx.go('order', o.id);
   toast('Booked. Your pro is on the way.');

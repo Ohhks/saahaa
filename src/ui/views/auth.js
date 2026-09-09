@@ -188,7 +188,8 @@ function loginForm() {
          stays so the UI contract guard can see it was not silently dropped. -->
   </div>
   <div class="au__foot"><button class="btn btn-primary btn--lg" data-act="auth.login">Sign in</button>
-    <p class="micro muted" style="margin-top:10px">Nothing else to remember. New here? <button class="more" data-act="auth.tab" data-tab="signup">Create an account</button></p></div>`;
+    <p class="micro muted" style="margin-top:10px">Nothing else to remember. New here? <button class="more" data-act="auth.tab" data-tab="signup">Create an account</button></p>
+    <p class="micro muted" style="margin-top:2px">Forgotten it? <button class="more" data-act="auth.forgot">Get back into your account</button></p></div>`;
 }
 
 /* ── which side are you on ────────────────────────────────────

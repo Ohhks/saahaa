@@ -248,3 +248,24 @@ describe('security · no password ships in this repo', () => {
       'no service-role key and no JWT baked into the bootstrap block');
   });
 });
+
+/* ── what the screens promise is hidden, hidden ──────────────────
+   The chat says contact details are masked. The rule used to be \b\d{10}\b,
+   which is not how anyone writes a phone number: "98765 43210" went through
+   in the clear, unflagged and unaudited, while the screen said otherwise. */
+import { maskContact } from '../domain/flow.js';
+describe('chat masking · a number written the way people write it is still a number', () => {
+  it('masks every ordinary way of typing ten digits', () => {
+    ['call 9876543210', 'call 98765 43210', 'ring 98765-43210',
+     'my no is +91 98765 43210', 'whatsapp 91 98765 43210'].forEach(t =>
+      expect(maskContact(t)).toSatisfy(s => !/\d{5}/.test(s), 'no run of digits survives: ' + t));
+  });
+  it('masks e-mail and UPI ids too', () => {
+    expect(maskContact('mail ravi.k@gmail.com')).toContain('•••@•••');
+    expect(maskContact('pay ravi@okaxis')).toContain('@•••');
+  });
+  it('leaves ordinary sentences with numbers alone — it is a mask, not a censor', () => {
+    ['the price is 350 rupees', 'order 4471 at 9 am', '2 items, 40 left', 'flat 302, 3rd floor']
+      .forEach(t => expect(maskContact(t)).toBe(t));
+  });
+});

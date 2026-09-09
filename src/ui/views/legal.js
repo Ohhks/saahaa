@@ -4,9 +4,16 @@
    These pages are what a payment gateway reads before it activates a
    merchant, and what a customer reads before they trust us with a rupee. So
    every number on them is READ from the engine, never typed here: the refund
-   table is CANCEL_RULES, the charges are getPricing(), the company details
-   are CONTACT, and the sandbox banner is gateway.isSandbox(). If the owner
-   pushes a new dial, the page changes with it; the page cannot lie.
+   table is CANCEL_RULES, the charges are getPricing(), the picture budget is
+   photos.MAX_TOTAL / MAX_ONE, the company details are CONTACT, the sandbox
+   banner is gateway.isSandbox() and the device-local banner is hasSupabase().
+   If the owner pushes a new dial, the page changes with it; the page cannot lie.
+
+   THE SAME DISCIPLINE APPLIES TO SENTENCES. A claim on the Privacy page is
+   only allowed here if there is a mechanism behind it — a storage key, an if
+   statement, a CSP directive. Where no mechanism exists the page says so in
+   what the deletion section says (it now describes the removal a person can perform)
+   rather than describing an intention in the present tense.
 
    MODERNIST. A reading column in the system: the segmented page nav as
    .seg, 2px rules between sections, h2 section heads, the table in .table. */
@@ -14,15 +21,17 @@
 import { esc } from '../dom.js';
 import { header, SYS_CSS } from './shops.js';
 import * as gateway from '../../core/gateway.js';
-import { CONTACT } from '../../core/config.js';
+import { CONTACT, hasSupabase } from '../../core/config.js';
+import * as photos from '../../core/photos.js';
 import { CANCEL_RULES } from '../../domain/pricing.js';
+import * as recovery from '../../domain/recovery.js';
 import { getPricing } from '../../domain/settings.js';
 import { MIN_STAKE, MAX_STAKE, STAKE_PCT } from '../../domain/wallet.js';
 import { HOLDBACK_DAYS } from '../../domain/ledger.js';
 import * as M from '../../core/money.js';
 
 export const PAGES = ['terms', 'privacy', 'refunds', 'contact', 'about'];
-export const UPDATED = '7 September 2026';
+export const UPDATED = '9 September 2026';
 
 const TITLES = {
   terms:   'Terms & Conditions',
@@ -57,6 +66,19 @@ function banner() {
   </p>`;
 }
 
+/* The second honest banner, on the same principle as the first. Until a
+   backend is configured (core/config.js hasSupabase()) every account, order,
+   rupee and picture is in this browser's own storage and has never been sent
+   anywhere. A privacy policy that describes a server nobody is talking to yet
+   is a lie of tense, so the page says which one it is, every time. */
+function localBanner() {
+  if (hasSupabase()) return '';
+  return `<p id="legalLocalBanner" class="m-note lg-banner" role="status">
+    <b>Your data is on this device:</b> no SAAHAA server holds it yet, and nothing
+    you enter here is sent to one.
+  </p>`;
+}
+
 /* ── TERMS ────────────────────────────────────────────────── */
 function terms() {
   const P = getPricing();
@@ -68,7 +90,12 @@ function terms() {
       a price, and where the money is held until the work is confirmed. Using SAAHAA means you
       accept these terms.`)),
     sec('Your account', ul([
-      'You sign in with your mobile number and a password. One number is one account.',
+      'You sign in with your mobile number, or with the SAAHAA ID your account was given, and a password.',
+      `One number may hold up to three accounts: one customer (<b class="num">C…</b>), one professional
+       (<b class="num">P…</b>) and one shop (<b class="num">S…</b>). Each has its own ID, its own password,
+       its own wallet and its own history, and they never mix. What one number may not hold is two of the
+       same kind.`,
+      'Your SAAHAA ID is a name, not a secret — it identifies the account; the password is what opens it.',
       'You must be 18 or older to book, sell or take work. Anyone 13 or older may browse.',
       'Keep your password to yourself; what is done from your account counts as done by you.',
     ])),
@@ -77,7 +104,7 @@ function terms() {
       'Your payment is held by SAAHAA while the work is done.',
       'You get a 4-digit code; the professional enters it on arrival, which proves the right person came.',
       'At least one photo of the finished work is required; without it the money is never released automatically.',
-      'You confirm the work and the money goes to the professional. If you do nothing, most jobs release by themselves after 6 or 24 hours; higher-risk jobs wait for the owner.',
+      'You confirm the work and the money goes to the professional. If you do nothing, most jobs release by themselves — at once, or after 6 or 24 hours, depending on the size of the job and the professional’s record; higher-risk jobs wait for the owner.',
     ])),
     sec('What SAAHAA charges', p(`On a service the professional keeps 100% of the price they quoted.
       SAAHAA’s charge is <b>${esc(P.serviceMarkupPct)}%</b> laid on top of that quote and paid by
@@ -96,7 +123,7 @@ function terms() {
       'Never ask a customer to pay you outside SAAHAA, and never share a phone number or UPI id in chat to do so. This one rule ends an account immediately.',
     ])),
     sec('What you may not do', ul([
-      'Hold more than one account, or book, bid or list under a false name, trade or identity.',
+      'Hold a second account of the same kind — a second customer, professional or shop account, on this number or another one — or book, bid or list under a false name, trade or identity.',
       'Arrange anything illegal or unsafe, or post reviews, vouches or ratings that are not your own honest experience.',
       'Interfere with the service, other users’ data or the ledger.',
     ])),
@@ -119,42 +146,82 @@ function terms() {
 
 /* ── PRIVACY ──────────────────────────────────────────────── */
 function privacy() {
+  /* the picture budget is core/photos.js's, never a typed number: if the
+     device budget moves, this paragraph moves with it */
+  const totalMb = +(photos.MAX_TOTAL / (1024 * 1024)).toFixed(1);
+  const oneKb = Math.floor(photos.MAX_ONE / 1024);
   return [
     sec('What we store', ul([
-      'For everyone: your name, mobile number, the place you set, your orders, the ratings you give and receive, and every money movement on your account (the ledger).',
-      'For partners, in addition: a hash of your ID document plus its last 4 digits (never the number itself), a selfie, your UPI id, and the name and last 4 digits of the phone number of the person you gave as a reference.',
-      'For shops: the shop name, address and product list you publish.',
-      'Order photos and chat messages, because they are the evidence a dispute is decided on.',
+      'For everyone: your name, mobile number, the SAAHAA ID your account was given, the place you set — both its name and its map coordinates — your orders, the ratings you give and receive, and every money movement on your account (the ledger).',
+      'For partners, in addition: a hash of your ID document plus its last 4 digits (never the number itself), a verification photograph of your face, your UPI id, and the name and last 4 digits of the phone number of the person you gave as a reference.',
+      'For shops: the shop name, address, licence numbers and product list you publish.',
+      'Order photographs and chat messages, because they are the evidence a dispute is decided on.',
+      'A random id for the device, stamped on the audit entry for every privileged action, so a change can be traced to the machine that made it. It is generated by this app; it is not a browser fingerprint and it is not your phone.',
     ])),
-    sec('Where it lives', p(`Today the app keeps this data on your own device, in the browser’s
-      local storage. When the backend is switched on it will be kept in a Supabase database
-      (hosted in the cloud, protected by row-level security so each account can only read its own
-      rows). Both are true right now: your device holds the data, and the backend is being wired.
-      This page will say so when that changes.`)),
+    sec('Pictures', ul([
+      `The bytes stay on the device that took them. Each picture is its own storage key, outside the
+       shared data blob; the shop row, the product row or the order carries the picture’s id, never
+       the picture. There is a hard budget — <b>${esc(String(totalMb))}MB</b> of pictures on a device
+       and <b>${esc(String(oneKb))}KB</b> for any one of them. Over that we refuse and say so; we
+       never delete somebody else’s picture to make room for yours.`,
+      'Every picture is redrawn in your browser and re-encoded before it is stored, so what is kept carries none of the EXIF the camera wrote into the original — not the time, not the model, and not the GPS position.',
+      'Public to anyone who can open the page: a shop’s front, a product’s picture, a professional’s portrait and the photographs in their work gallery. Publishing one is a deliberate tap, and it can be removed the same way.',
+      'Part of an order, so its two parties and the owner can see it: the before and after photographs of finished work. At least one is required before money is released.',
+      'Private: a professional’s verification photograph. It is stored separately from the portrait and is drawn on exactly one screen — their own verification step. It is never on a public page. A professional may choose to publish it as their portrait; that is a second, separate tap, and it is theirs to make.',
+      'A picture nothing points at any more — a deleted product, a closed shop — is reclaimed automatically, and the owner’s Fresh start removes every picture on the device with everything else.',
+    ])),
+    sec('Where it lives', p(`Today the app keeps all of this on your own device, in the browser’s
+      local storage — the data in one key, each picture in its own. No SAAHAA server holds a copy,
+      because there is not one connected yet. When the backend is switched on it will be kept in a
+      Supabase database (hosted in the cloud, protected by row-level security so each account can
+      only read its own rows), and the banner at the top of this page will stop appearing. Both
+      halves of that sentence are true right now: your device holds the data, and the backend is
+      being wired.`)),
     sec('Who sees what', ul([
-      'A customer sees a professional’s name, badge, rating, jobs done and public page. Never their ID, selfie, UPI id or reference.',
-      'A professional sees the customer’s name and place only for a job they have been booked on, and only while the job is open.',
-      'The owner of SAAHAA can see accounts, orders, disputes and the ledger, to run the service and settle disputes. Every such action is written to an audit log.',
-      'Nobody buys your data. It is not sold, rented or shared for advertising, and there are no third-party trackers or analytics scripts on this site.',
+      'A customer sees a professional’s name, badge, rating, jobs done, portrait, work photographs, reviews and public page. Never their ID document, their verification photograph, their UPI id or their reference.',
+      'A professional looking at open requests sees the area, the job and the fair price — not who posted it. The customer’s name reaches them only when they have the job.',
+      'A professional or a shop sees the customer’s name and area for a job they were booked on. That does not vanish when the job ends: it stays on their own settled-jobs, payout and repeat-customer lists, the way an invoice book does. They never see your mobile number, your exact coordinates, or any order that was not theirs.',
+      'The owner of SAAHAA can see every account, order, dispute, chat and ledger entry on the device the app is running on, because that is what settling a dispute takes. What the owner does — a suspension, a release, a refund, a wipe — is written to an audit log with the device and the time. Looking is not logged; only doing is.',
+      'Nobody buys your data. It is not sold, rented or shared for advertising, and no third-party tracker, analytics script or advertising pixel is loaded by this site. The one future exception is named below.',
     ])),
     sec('Third parties that necessarily receive something', ul([
-      'Map tiles come from OpenStreetMap and place search from Nominatim. When you search a place, the text you typed and the coordinates you look at are sent to them. No order id or account detail goes with it.',
-      'When the Razorpay rail is live, Razorpay receives what it needs to take a payment: the amount, an order reference, and whatever you type into its checkout. Until then, payments are a sandbox and nothing leaves this site.',
+      'The map draws its tiles from OpenStreetMap, and every tile is a request — so OpenStreetMap can see which piece of the map you are looking at, and when. No order id, account detail or page address travels with it: the site sets a referrer policy that sends only the origin.',
+      'Searching for a place sends exactly the text you typed to Nominatim, OpenStreetMap’s geocoder.',
+      'Tapping “use my location” is different, and worth reading twice. It reads your device’s position to six decimal places — a precision of about ten centimetres — and sends those coordinates to Nominatim to get the name of the place back. That is where you actually are at that moment, not an approximate area. If you would rather not send it, type the place or tap an area instead: neither of those tells anyone where you are.',
+      'When the Razorpay rail is switched on, Razorpay’s checkout script loads on the payment screen and receives what it needs to take a payment — the amount, an order reference, whatever you type into its checkout, and its own usage telemetry. It is the only third-party script the app will ever load, and it loads only on that screen. Today payments are a sandbox: the script is never fetched and nothing leaves this site.',
       'The typeface is served from this site; no font server sees your visit.',
     ])),
-    sec('How long, and how to delete', p(`We keep account and order data for as long as the account
-      exists, and ledger entries for as long as the law requires a business to keep its books.
-      You can ask for your account to be removed (see Contact); we delete what we can and keep only
-      what accounts and tax law oblige us to keep. The owner’s Fresh start wipes a whole device
-      clean and is itself audited.`)),
-    sec('Cookies', p(`None. The site uses the browser’s local storage to keep you signed in and
-      to hold your data, and nothing else. There is no advertising cookie and no cross-site
-      tracking.`)),
+    sec('How long, and how to delete', [
+      p(`You can remove your own account, from My SAAHAA, without asking anyone. It shows you what
+        will happen before it happens, in three honest parts, because not all of it can simply
+        vanish:`),
+      ul([
+        '<b>Removed</b> — the things that are you: the account itself (name, number, password, place, your ID), your pictures, the words of your messages, the text of your reviews.',
+        '<b>Emptied but kept</b> — a professional page, a shop, and the name stamped on an order. Other people’s records point at these; deleting them would tear a hole in the history of the customer who paid or the shop that was paid. They become “Removed account”, with the number, UPI id and verification record cleared, and they stop trading.',
+        '<b>Kept, and why</b> — the ledger. It is double-entry and hash-chained: removing one leg breaks every hash after it and the books stop reconciling. It is also what a business is obliged to keep. What remains there is an account number with nobody behind it — no name, no mobile, no address.',
+      ]),
+      p(`The removal is written to the audit log with those counts, so it can be shown to have
+        happened. Clearing this site’s storage in your browser also removes everything on this
+        device. The owner can additionally suspend a professional, and can wipe a whole device with
+        Fresh start — a snapshot first, then every account, order, rupee and picture gone, recorded
+        with counts. When the backend is switched on, the same removal runs on the server as well,
+        and this paragraph will say so.`),
+    ].join('')),
+    sec('If you forget your password', p(`Your account is not lost. There is no mail or SMS rail
+      yet, so a reset is what a neighbourhood business does: you ring SAAHAA, the owner checks you
+      are who you say you are, and reads out a one-time code. It works once and expires in
+      ${recovery.TTL_MS / 60000} minutes. Only a hash of that code is stored — never the code
+      itself — and both issuing it and using it are written to the audit log.`)),
+    sec('Cookies', p(`None. The site uses the browser’s local storage to keep you signed in — that
+      session expires after 30 days — and to hold your data and your pictures. Nothing else. There
+      is no advertising cookie and no cross-site tracking.`)),
     sec('Children', p(`You may browse SAAHAA from 13. You must be 18 to book, sell or take work. We
       do not knowingly hold an account for anyone under 18; if you believe we do, write to us and
       it will be removed.`)),
     sec('Privacy requests', p(`Write to the email on the Contact page to see what we hold about you,
-      correct it, or have it deleted. Requests are answered by the owner within 30 days.`)),
+      correct it, or have it deleted. Requests are answered by the owner within 30 days. While the
+      data is on your own device the fastest of those is yours already: everything held about you is
+      in this browser, and you can clear it yourself.`)),
   ].join('');
 }
 
@@ -239,8 +306,10 @@ function contact() {
       days.`)),
     sec('Privacy and account removal', p(`Write to the same email from the number your account is
       under, or from the email you gave us if you gave one. We confirm what we hold, correct what
-      is wrong, and remove the account within 30 days, keeping only what accounts and tax law
-      oblige a business to keep. See the Privacy page for the full list.`)),
+      is wrong, and remove the account within 30 days — by hand, because there is no delete button
+      in the app yet — keeping only what accounts and tax law oblige a business to keep. While your
+      data is on your own device you can also simply clear this site’s storage in your browser,
+      which removes all of it at once. See the Privacy page for the full list.`)),
     sec('Security', p(`If you have found a way to get at money or data that you should not be able to,
       please tell us by email before telling anyone else. The security model is published honestly
       in the repository (docs/SECURITY.md).`)),
@@ -263,7 +332,7 @@ function about() {
     sec('Locally, professionally', ul([
       'A public page for every verified partner, generated from their work and kept current by the platform. They edit three fields.',
       'The professional keeps 100% of their quote. SAAHAA’s charge sits on top and is paid by the customer.',
-      'Shops list from a ready-made product list in minutes and pay a small capped fee, nothing on their first 30 orders.',
+      'Shops list from a ready-made product list in minutes and pay a small capped fee — and on their first 30 orders the minimum charge is waived, so a tiny order costs them nothing at all.',
       'Trust is mechanical: verification, a locked price, money held until the work is confirmed, a 4-digit arrival code, a photo before payout, a stake from the worker, and a hash-chained ledger that reconciles to zero.',
       'When more than one pro is free, the customer can ask for sealed rates, scored on trust and distance as much as price.',
     ])),
@@ -287,6 +356,7 @@ export function render(page = 'terms') {
   ${header(TITLES[id], 'SAAHAA · locally, professionally')}
   <main class="wrap lg-page" id="legalPage" data-page="${id}">
     ${banner()}
+    ${localBanner()}
     ${nav(id)}
     <p class="card-kicker" style="margin-top:var(--sp-8)">Last updated ${esc(UPDATED)}</p>
     <h1 class="lg-h1">${esc(TITLES[id])}</h1>

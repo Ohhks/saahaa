@@ -133,7 +133,7 @@ export function referenced(state = {}) {
   const take = v => { if (v) out.push(v); };
   (state.shops || []).forEach(s => { take(s.photo); (s.gallery || []).forEach(take); });
   (state.products || []).forEach(p => take(p.photo));
-  (state.partners || []).forEach(p => { take(p.photo); (p.work || []).forEach(take); });
+  (state.partners || []).forEach(p => { take(p.photo); take(p.selfie); (p.work || []).forEach(take); });
   (state.orders || []).forEach(o => (o.evidence || []).forEach(e => take(e && e.photo)));
   return out;
 }

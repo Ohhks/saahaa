@@ -39,6 +39,10 @@ const LEG_LABEL = {
   PAYMENT_IN: 'Paid in', TOPUP: 'Paid in', ESCROW_IN: 'Held for order', ESCROW_LOCK: 'Held for order',
   REFUND: 'Refund', CANCEL: 'Refund', RELEASE: 'Refund', WITHDRAW: 'Taken out', GOODWILL: 'Goodwill credit',
 };
+/* A kind nobody has named yet must not reach a customer as ESCROW_RELEASE.
+   The machine's word, turned back into words: "Escrow release". */
+const legWord = kind => LEG_LABEL[kind] ||
+  String(kind || 'Movement').toLowerCase().replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
 
 /** Signed movement of `account` in one ledger entry — both shapes the book has used. */
 function deltaFor(e, account) {
@@ -134,7 +138,7 @@ function walletSection(key, orders) {
 
     ${legs.length ? `<p class="m-cap" style="margin-top:14px">Recent</p>
       ${legs.map(({ e, d }) => `<div class="m-kv" style="border-bottom:1px solid var(--color-divider)">
-          <span class="tiny muted">${esc(LEG_LABEL[e.kind] || e.kind)} · ${timeAgo(e.ts)}</span>
+          <span class="tiny muted">${esc(legWord(e.kind))} · ${timeAgo(e.ts)}</span>
           <b class="num" style="font-size:13px;color:${d < 0 ? 'var(--ink-2)' : 'var(--success)'}">${d < 0 ? '−' : '+'}${M.fmt(Math.abs(d))}</b></div>`).join('')}
       <p class="micro muted" style="margin-top:6px">Read-only. Every line is hash-chained — it can be verified, never edited.</p>`
     : `<p class="micro muted" style="margin-top:10px">Nothing has moved yet. Money you commit sits with SAAHAA and is released by you.
@@ -348,6 +352,12 @@ export function render() {
       ${setRow('nav.admin', 'Admin console', '')}
       <button class="btn btn--ghost btn--block" style="margin-top:12px;justify-content:flex-start;color:var(--danger)"
         data-act="auth.logout">${icon('signout', { size: 16 })} Sign out</button>
+      <!-- The privacy page promises a person can have their data removed, so the
+           promise has somewhere to be kept. The sheet shows exactly what goes,
+           what is emptied but kept because someone else's record points at it,
+           and what stays because the books must balance. -->
+      <button class="btn btn--ghost btn--block" style="margin-top:6px;justify-content:flex-start;color:var(--danger)"
+        data-act="account.erase">${icon('trash', { size: 16 })} Remove my account</button>
     </div>
     </div>
     </div>

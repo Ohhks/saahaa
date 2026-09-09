@@ -190,9 +190,26 @@ export function setProductPhoto(productId, photoId) {
   dispatch({ type: 'product/patch', payload: { id: productId, patch: { photo: photoId || null } } });
   ctx.render(); return true;
 }
+/* THE VERIFICATION SELFIE IS NOT THE PUBLIC PORTRAIT.
+   They were one field. The ladder asked for a picture to prove who somebody is
+   — "this is what the customer sees at the door" — and it was then published on
+   their public page to anyone browsing, while the privacy policy promised a
+   customer never sees a pro's selfie. One photograph, two purposes, and the
+   person photographed was told only about the first.
+
+   `selfie` proves identity and stays private. `photo` is the face a pro
+   chooses to trade under. A pro may use the same picture for both, but only by
+   saying so. */
+export function setPartnerSelfie(partnerId, photoId) {
+  const p = getState().partners.find(x => x.id === partnerId); if (!p) return false;
+  if (p.selfie && p.selfie !== photoId && p.selfie !== p.photo) photos.remove(p.selfie);
+  dispatch({ type: 'partner/patch', payload: { id: partnerId, patch: { selfie: photoId || null } } });
+  ctx.render(); return true;
+}
+
 export function setPartnerPhoto(partnerId, photoId) {
   const p = getState().partners.find(x => x.id === partnerId); if (!p) return false;
-  swapPhoto(p.photo, photoId);
+  if (p.photo !== p.selfie) swapPhoto(p.photo, photoId);   // shared with the selfie? keep the bytes
   dispatch({ type: 'partner/patch', payload: { id: partnerId, patch: { photo: photoId || null } } });
   ctx.render(); return true;
 }
@@ -748,18 +765,30 @@ export function setProductPrice(productId, pricePaise) {
 function bumpAgg(patch) { dispatch({ type: 'agg/bump', payload: patch }); }
 export function sendChat(orderId, text) {
   const s = me(); if (!s || !text.trim()) return;
-  const flagged = /\b\d{10}\b|@(ok|ybl|paytm|upi|axl)|\bcash\b|\bgpay\b|\bphonepe\b/i.test(text);
+  /* The scan and the masker must agree: a number the scan misses is stored in
+     the clear, however good the masker is. Both use PHONE_RE now. */
+  const flagged = maskContact(text) !== text || /\bcash\b|\bgpay\b|\bphonepe\b/i.test(text);
   const msg = { id: nid('m'), name: s.name, role: s.role, text: flagged ? maskContact(text) : text,
                 ts: Date.now(), flagged };
   dispatch({ type: 'chat/add', payload: { orderId, msg } });
   if (flagged) { audit.record('fraud.offplatform', { orderId, by: s.key }); toast('Phone numbers and payment IDs are hidden — keep payments in SAAHAA so both sides stay protected.', 'warn'); }
   return msg;
 }
-/* What the screens promise is masked, masked. The e-mail rule runs FIRST:
-   the UPI rule would otherwise eat the domain and leave the name readable. */
-const maskContact = t => t
+/* What the screens promise is masked, masked.
+
+   The e-mail rule runs FIRST: the UPI rule would otherwise eat the domain and
+   leave the name readable.
+
+   The number rule used to be `\b\d{10}\b`, which nobody types. "98765 43210",
+   "98765-43210" and "+91 98765 43210" all sailed through unmasked, unflagged
+   and unaudited — the screens said contact details were hidden while the
+   commonest way of writing one was not. Ten digits with anything or nothing
+   between them now count as a number, and the +91 in front goes with it. */
+const PHONE_RE = /(?:\+?91[\s-]*)?(?:\d[\s-]*){10}/g;
+const isPhone = s => (s.match(/\d/g) || []).length >= 10;
+export const maskContact = t => t
   .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '•••@•••')
-  .replace(/\b\d{10}\b/g, '••••••••••')
+  .replace(PHONE_RE, m => (isPhone(m) ? '••••••••••' : m))
   .replace(/@(ok|ybl|paytm|upi|axl)\w*/gi, '@•••');
 
 export { trustScore, rankShops, quoteService, compareWithApps, M as money };

@@ -36,7 +36,7 @@ import { progressCard } from './onboard.js';
 import { readiness, blocker, backgroundRecord } from '../../domain/verification.js';
 import * as W from '../../domain/wallet.js';
 import * as autoverify from '../../domain/autoverify.js';
-import { acct, balanceOf } from '../../domain/ledger.js';
+import { acct, balanceOf, HOLDBACK_PCT, HOLDBACK_CAP, HOLDBACK_DAYS } from '../../domain/ledger.js';
 import * as gateway from '../../core/gateway.js';
 /* pictures: core/photos.js keeps the bytes and the device budget, ui/photo.js
    asks for the file and shrinks it. This console only draws and offers taps —
@@ -204,6 +204,47 @@ function myRates(p) {
         <span class="tag ${cls}">${esc(txt)}</span></button>`; }).join('')}`;
 }
 
+/* THE FIRST-JOB BLOCK (8.2). A verified pro with no leads used to get one grey
+   box saying "stay online" and six hundred pixels of nothing — the app's
+   answer to "how do I get work?" was "wait". That is the exact moment the
+   plumber in docs/PROBLEM.md gives up on it, and it is also the moment the
+   product's real promise applies: he now HAS a page, and the whole growth loop
+   is him sending it to the forty households already in his head. So the empty
+   list offers the three things that actually produce a first booking, in the
+   order they pay off, using controls that already exist. It disappears the
+   moment there is a lead to look at instead. */
+function firstJobBlock(p) {
+  const shots = (p.work || []).length;
+  /* Only the PUBLIC portrait counts. The verification selfie is private and a
+     page carrying one still shows a letter to every customer. */
+  const hasFace = !!photoSrc(p.photo);
+  const canPublish = !hasFace && !!photoSrc(p.selfie);
+  const row = (done, title, body, btn) => `<div class="lrow" style="align-items:flex-start">
+      <span class="lrow__bar ${done ? '' : 'hot'}"></span>
+      <div class="grow" style="min-width:0">
+        <div class="lrow__t">${esc(title)}</div>
+        <div class="lrow__m">${esc(body)}</div>
+        <div style="margin-top:8px">${btn}</div>
+      </div>
+      <span class="tag ${done ? 'tag-neutral' : 'tag-accent'}" style="flex:none">${done ? 'done' : 'do this'}</span>
+    </div>`;
+  return `${kick('How the first job arrives')}
+    <p class="micro muted" style="padding:2px 0 6px">Nobody has searched for you yet. The forty people who already know your work are the fastest way to change that — your page is built, and it is yours to send.</p>
+    ${row(false, 'Send your page to people who know you',
+      'One link on WhatsApp. They book, they pay through SAAHAA, and the job counts on your record.',
+      `<button class="btn btn-primary" style="justify-content:flex-start" data-act="pro.share" data-id="${esc(p.id)}">Copy my link / share</button>`)}
+    ${row(hasFace, 'Put your face on the page',
+      hasFace ? 'Your page has a photo. A stranger can see who is coming.'
+        : canPublish ? 'Your page still shows a letter. The photo you took to verify yourself is private — one tap makes that same photo public on your page.'
+        : 'A page with a letter instead of a face is the one people scroll past.',
+      canPublish
+        ? `<button class="btn btn-primary" style="justify-content:flex-start" data-act="photo.publish" data-id="${esc(p.id)}">Show my verification photo publicly</button>`
+        : `<button class="btn btn-secondary" style="justify-content:flex-start" data-act="pro.open" data-id="${esc(p.id)}">Open my page</button>`)}
+    ${row(shots > 0, 'Photograph one finished job',
+      shots > 0 ? `${shots} photo${shots === 1 ? '' : 's'} of your work are on your page.` : 'Pictures of work you have already done are what win the next one — an old job counts.',
+      `<button class="btn btn-secondary" style="justify-content:flex-start" data-act="photo.work" data-id="${esc(p.id)}">Add a work photo</button>`)}`;
+}
+
 function proLeads(p, open, gate) {
   const r = readiness(p);
   return `${progressCard(p)}
@@ -212,8 +253,10 @@ function proLeads(p, open, gate) {
     ${open.length ? open.map(x => leadRow(x, p)).join('')
       + '<p class="micro muted" style="padding:10px 0">Sending less than the fair price lowers your chance. It does not raise it.</p>'
       : empty('No open requests right now', r.canWork && p.online !== false
-          ? `Stay online — requests near ${p.area} land here the moment they are posted.`
+          ? `You are online. Requests near ${p.area} land here the moment they are posted — nothing to watch for.`
+          : p.online === false ? 'You are offline, so nothing will reach this phone. Turn the switch at the top back on.'
           : 'Go online once you are verified, and requests near you land here.')}
+    ${!open.length && r.canWork ? firstJobBlock(p) : ''}
     ${myRates(p)}`;
 }
 
@@ -255,6 +298,8 @@ function walletCard(p) {
     ${w.debt ? `<p class="tiny" style="margin-top:8px;color:var(--warn)">${M.fmt(w.debt)} owed from a job you left — recovered from your next payout.</p>` : ''}
     <p class="micro muted" style="margin-top:8px">${esc(gateway.label())}</p>
     <p class="micro muted" style="margin-top:6px">When a job starts, ${M.fmt(W.MIN_STAKE)} (or ${W.STAKE_PCT}% of the job, up to ${M.fmt(W.MAX_STAKE)}) locks from Available. Finish the job and every rupee of it comes back with your full payout. Walk out and it goes to the customer.</p>
+    <p class="micro muted" style="margin-top:6px">If Available is empty, the stake is taken from the job's own payout instead — you are never asked for money you do not have, and you never pay to start.</p>
+    <p class="micro muted" style="margin-top:6px"><b>Pending</b> is your ${HOLDBACK_PCT}% holdback: ${HOLDBACK_PCT} paise in every rupee paid to you waits ${HOLDBACK_DAYS} days and then moves to Available by itself. It never grows past ${M.fmt(HOLDBACK_CAP)} in total, it is not a fee, and nobody has to approve it.</p>
     <div class="row" style="gap:8px;margin-top:10px">
       <button class="btn btn-secondary grow" data-act="wallet.topup" data-id="${p.id}">Add money</button>
       <button class="btn btn-ghost grow" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${w.available < 100000 ? 'disabled' : ''}>Withdraw${w.available >= 100000 ? ' ' + M.fmt(w.available) : ''}</button>
@@ -427,7 +472,7 @@ function proPage(p, t, a, cat) {
     <div>
       ${kick('Rating and trust', `<span class="tag tag-accent">${esc(t.band.label)}</span>`)}
       <div class="capsules" style="grid-template-columns:repeat(2,1fr)">
-        ${capsule('Rating', a.toFixed(1), ratingStars(a), 'gold')}
+        ${capsule('Rating', avgLabel(a), a == null ? '<span class="meta">no ratings yet</span>' : ratingStars(a), 'gold')}
         ${capsule('Jobs done', String(p.completed), '', 'soft')}
         ${capsule('Trust', `${t.score}<span class="meta">/100</span>`, esc(t.band.label), 'info')}
         ${capsule('Your rate', M.fmt(p.ask), 'you keep 100%', 'ok')}
@@ -510,7 +555,7 @@ export function renderPartner() {
     <div class="stat3 bleed">
       ${capsule('New leads', String(open.length), '', '')}
       ${capsule("Today's jobs", String(inbox.length), '', '')}
-      ${winRate == null ? capsule('Rating', a.toFixed(1), '', '') : capsule('Win rate', `<span class="em">${winRate}%</span>`, '', '')}
+      ${winRate == null ? capsule('Rating', avgLabel(a), a == null ? '<span class="meta">not rated yet</span>' : '', '') : capsule('Win rate', `<span class="em">${winRate}%</span>`, '', '')}
     </div>
     <div class="utabs bleed" role="tablist" aria-label="Pro console">
       ${PRO_TABS.map(([k, l]) => `<button type="button" role="tab" aria-selected="${proTab === k ? 'true' : 'false'}"
@@ -521,7 +566,14 @@ export function renderPartner() {
   </main>`;
 }
 
-const avg = p => { const r = p.ratings || []; return r.length ? r.reduce((a, x) => a + x.stars, 0) / r.length : 4.5; };
+/* NO INVENTED RATING (8.2). This returned 4.5 when a pro had no ratings at
+   all, so a plumber who had never been booked opened his own console and read
+   "Rating 4.5 ★★★★★". A number nobody gave him is a lie on the one screen he
+   trusts, and the public page (views/pro.js) has always shown 0 for the same
+   pro — the two disagreed. null means "nobody has rated you yet", and every
+   caller says that in words. */
+const avg = p => { const r = p.ratings || []; return r.length ? r.reduce((a, x) => a + x.stars, 0) / r.length : null; };
+const avgLabel = a => a == null ? '—' : a.toFixed(1);
 
 /* ══════════════ SHOP CONSOLE ══════════════ */
 /* Four tabs a shopkeeper thinks in — TODAY · ITEMS · ORDERS · MONEY — with
@@ -655,13 +707,22 @@ function liveBlock(s) {
   </div>`;
 }
 
+/* WHAT SHE KEEPS, BEFORE SHE ACCEPTS (8.2). The row showed only what the
+   CUSTOMER pays — basket plus delivery plus fee — so a kirana owner deciding
+   in sixty seconds read a number that was never hers, and the fee first
+   appeared days later on the Money screen. `shopPayout` and `platformFee` are
+   written when the order is placed (domain/flow.js:512), so the honest number
+   is available at exactly the moment the decision is made. */
 function orderRow(o) {
   const st = stage(o.stage);
   const placed = o.stage === 'R_PLACED';
+  const yours = o.shopPayout | 0;
+  const fee = o.platformFee | 0;
   return `<div class="lrow lrow--c">
     <div class="grow" style="min-width:0">
-      <div class="lrow__t">${esc(o.customerName)} · ${M.fmt(o.customerPays)}</div>
+      <div class="lrow__t">${esc(o.customerName)} · ${yours ? `${M.fmt(yours)} to you` : M.fmt(o.customerPays)}</div>
       <div class="lrow__m">${o.lines.length} item${o.lines.length === 1 ? '' : 's'} · ${o.mode === 'pickup' ? 'pickup' : 'delivery'} · ${esc(o.customerArea)}, ${o.km} km · ${placed ? timeAgo(o.createdAt) : esc(st.short)}</div>
+      ${yours ? `<div class="lrow__m">Customer pays ${M.fmt(o.customerPays)} · SAAHAA fee ${M.fmt(fee)} already taken off</div>` : ''}
     </div>
     ${placed ? `<button class="btn btn-primary" style="flex:none" data-act="stage.accept" data-id="${o.id}">Accept</button>` : ''}
     <button class="btn ${placed ? 'btn-ghost' : 'btn-secondary'}" style="flex:none" data-act="order.open" data-id="${o.id}">${placed ? 'Open' : 'Track'}</button>
@@ -736,7 +797,7 @@ function pickerCall(items) {
   <div class="pickbox" style="margin-top:12px">
     <span class="eyebrow" style="display:block;margin-bottom:8px">Add without typing</span>
     <button class="btn btn-secondary btn-block" style="justify-content:flex-start" data-act="cat.picker">${icon('plus', { size: 16 })} Pick from the ready list</button>
-    <p class="micro muted" style="margin-top:8px">Tap an item, change the price, set stock. About six seconds each. Nothing goes live until you set a stock count. Anything the ready list does not have, you add yourself — picture, name, price.</p>
+    <p class="micro muted" style="margin-top:8px">Tap an item and it is on your storefront straight away, at the suggested price with 10 in stock — change either on the row below. Set stock to 0 and it hides itself until you have it again. Anything the ready list does not have, you add yourself — picture, name, price.</p>
   </div>
   <button class="fab" data-act="cat.picker" aria-label="Add items from the ready list">${icon('plus', { size: 22 })}
     <span class="fab__count">${items.length}</span></button>`;

@@ -38,7 +38,7 @@ purely local). Turning that on is the single change that moves SAAHAA from
 | Admin backoff after 3 fails, 30-min lockout after 5 | `core/adminauth.js` | Slows an over-the-shoulder guesser on a real device. Erased by `localStorage.clear()`. |
 | User login gate: 5 free fails, then 30 s doubling to a 15-minute ceiling, **per mobile** | `core/security.js` | Makes credential stuffing on a shared or stolen phone slow and visible. The 15-minute **cap is deliberate**: an unbounded lockout is a denial-of-service an attacker can point at a victim's own account. Erased by `localStorage.clear()`. |
 | Password quality: ≥ 8 chars, not all digits, not one of the 50 most-guessed, not the user's own mobile, not one repeated character | `core/security.js` → `passwordProblem()` | The only place refusing a weak password helps is the moment it is chosen. That is exactly where this runs. |
-| One mobile → one spelling → one account | `core/security.js` → `normaliseMobile()` | `+91 98765 43210`, `098765-43210` and `9876543210` collapse to one identity. Prevents duplicate accounts and split order histories — a **data-integrity** win, not a security one. |
+| One mobile → one spelling; one account **per role** | `core/security.js` → `normaliseMobile()`, `domain/identity.js`, `views/auth.js` `doSignup()` | `+91 98765 43210`, `098765-43210` and `9876543210` collapse to one number. Since 8.1 that number may carry **three** accounts — `C…` customer, `P…` professional, `S…` shop — each with its own password, wallet and history; `doSignup()` refuses a second of the same kind. The login gate counts fails against the **number**, so a `C…`/`P…` code cannot be used to dodge it. The account code is a name, not a credential: printed whole, never masked. |
 | Free text is stripped of control, zero-width and bidi-override characters and length-capped | `core/security.js` → `safeText()` | A shop cannot register a name containing `U+202E` that renders as a different name. This is a **storage** rule; it deliberately does **not** escape markup. |
 | Only `http:`/`https:` ever becomes a link | `core/security.js` → `isSafeUrl()` | Blocks `javascript:`, `data:`, `blob:`, `vbscript:`, `file:` — including the `java\tscript:` form the HTML parser un-mangles for you. |
 | **Every** user string escaped at render | `ui/dom.js` → `esc()` | The XSS boundary. It is only as good as its coverage — see §3. |
@@ -46,8 +46,14 @@ purely local). Turning that on is the single change that moves SAAHAA from
 | Admin session in `sessionStorage`, 15-min idle, 8-hour absolute cap, step-up re-auth above ₹5,000 | `core/adminauth.js` | Dies with the tab. Good hygiene on a shared laptop. |
 | Every privileged action in an append-only audit log | `core/audit.js` | Makes admin actions reconstructible. Also editable by the operator — it is a **record**, not evidence. |
 | Ledger entries hash-chained (SHA-256, `prev → hash`) | `core/crypto.js`, verified in Admin → Finance | Detects **accidental** corruption and a naive edit instantly. An attacker recomputes the whole chain in about a minute, because the chain is verified by the same client that writes it. See §7. |
-| Chat scanned for phone numbers and UPI handles | `domain/*` | Protects both sides: off-platform payment is where the customer loses recourse and the worker loses the dispute trail. |
+| Chat scanned for phone numbers and UPI handles | `domain/flow.js` → `sendChat()`, `maskContact()` | Deters a careless share and writes a `fraud.offplatform` audit entry. **Evadable by spacing the digits** — see §3, open finding 3. Do not sell it as protection. |
 | **No photo, no auto-release** | `domain/flow.js` | The single highest-value anti-fraud rule in the product. |
+| **Pictures live outside the state blob**, one storage key each; a record holds an id, never bytes | `core/photos.js` | Writing one picture writes one key, so a shop front never rides along with every keystroke's state flush. It also means a wipe or a `gc()` can reclaim them precisely. |
+| **Picture budget: 3MB per device, 90KB per picture — refuse, never evict** | `core/photos.js` → `MAX_TOTAL`, `MAX_ONE`, `put()` | localStorage is ~5MB for the whole origin, shared with the state, the audit log and the backups. Over budget the app says so; it never deletes somebody else's published picture to make room. |
+| **Only a real raster data URL is ever handed to an `<img>`** | `core/photos.js` → `isPhotoUrl()` | The store is user-editable. A value that is not `data:image/(jpeg|png|webp);base64,…` is treated as missing, so a hostile store cannot turn a picture slot into a `javascript:` or SVG sink. |
+| **EXIF is destroyed, not stripped** | `ui/photo.js` → `encode()` | Every picture is redrawn into a canvas and re-encoded as JPEG. What is stored is a new file: no camera model, no timestamp, and — the one that matters — **no GPS tag**. The Privacy page states this; it is a property of the pipeline, not a promise. |
+| **The verification photograph is not the public portrait** | `domain/flow.js` → `setPartnerSelfie()` / `setPartnerPhoto()`; rendered only in `views/onboard.js` | `partner.selfie` is captured by the ladder and drawn on exactly one screen — the pro's own. `partner.photo` is a separate field, published deliberately. Grep confirms no public view reads `selfie`. This is what makes the Privacy page's "never their verification photograph" true; **if the two fields are ever merged again, that sentence becomes a lie.** |
+| **Test runs cannot eat a real device's pictures** | `core/photos.js` → `useShelf()` | The in-app suite runs against real storage. A suite calling `gc()` used to delete every real picture on the device. The shelf is now swappable and the tests keep their own. |
 | **Fresh start**: the owner types FRESH, re-enters the password (step-up), a snapshot is taken first, the wipe is audited with counts | `domain/fresh.js`, Admin → System & audit | A wipe cannot be a slip of the finger or a quiet one. The credential and the dials survive it, so the device is still the owner's afterwards. Same caveat as everything else here: the operator's own DevTools can clear storage without any of it. |
 | **Treasury actions** — Withdraw fees (`PLATFORM:fee → WORLD:bank`) and Remit GST (`PLATFORM:gst → WORLD:tax`): step-up re-auth, never more than earned / held, audited (`treasury.withdraw`, `treasury.remitGst`) | `domain/treasury.js`, Admin → Finance | The two actions that move the company's own money need the password again, and the ledger refuses an amount the books do not support. Every figure on the treasury screen is a replay of the ledger, so it cannot disagree with the books it is read from. |
 | **Vouches: one per person, per pro, ever.** Only a customer who has had a job with that pro settle, or a Background-Checked pro in the same trade; never yourself; never while suspended | `domain/autoverify.js` → `canVouch()` | Stops one account from vouching a friend up to tier 3 alone. What it does **not** stop is a ring of accounts — see §7. |
@@ -62,25 +68,27 @@ Set in `index.html` as a `<meta http-equiv>`:
 ```
 default-src 'self';
 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-font-src https://fonts.gstatic.com;
-script-src 'self';
-img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org;
+font-src 'self';
+script-src 'self' https://checkout.razorpay.com;
+img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.razorpay.com;
 media-src blob:;
-connect-src 'self' https://nominatim.openstreetmap.org;
-worker-src 'self'; manifest-src 'self'; frame-src 'none';
+connect-src 'self' https://nominatim.openstreetmap.org https://api.razorpay.com
+            https://lumberjack.razorpay.com https://*.functions.supabase.co https://*.supabase.co;
+worker-src 'self'; manifest-src 'self';
+frame-src https://api.razorpay.com https://checkout.razorpay.com;
 object-src 'none'; base-uri 'none'; form-action 'none';
 upgrade-insecure-requests
 ```
 
-**`script-src 'self'` with no `'unsafe-inline'` and no `'unsafe-eval'` is the
+**No `'unsafe-inline'` and no `'unsafe-eval'` in `script-src` is the
 load-bearing line.** Leaflet is vendored under `/vendor/leaflet` precisely so it
 can stay closed — no CDN, and a tradesperson's phone does not depend on a third
 party's uptime. There is no `eval` and no `new Function` anywhere in `src/`.
 
-Three consequences worth knowing:
+Five consequences worth knowing:
 
 1. **Inline `onclick=` handlers do not run.** Any markup that relies on one is
-   dead code that fails silently. (There is one today — see §3, finding 3.)
+   dead code that fails silently.
 2. **`style-src` still needs `'unsafe-inline'`**, because every view uses
    `style=""` attributes. This is the policy's honest weak point: CSS-injection
    based data exfiltration is not blocked by it, and `esc()` is an HTML-context
@@ -88,56 +96,101 @@ Three consequences worth knowing:
    reaches a `style` attribute as unprotected.
 3. **`frame-ancestors` and HSTS are ignored inside a `<meta>` tag.** They are
    real headers or they are nothing — see §5.
+4. **`script-src` is no longer only `'self'`.** `checkout.razorpay.com` is
+   allowed so `ui/checkout.js` can load Razorpay Checkout, and
+   `lumberjack.razorpay.com` is allowed in `connect-src` because that script
+   posts its own usage telemetry there. **That is the one third-party script
+   the product will ever run**, it runs only on the payment screen, and in
+   `MODE 'sim'` it is never fetched at all. The Privacy page states exactly
+   this; do not widen the allowance without changing that page in the same
+   commit.
+5. **`style-src` still names `https://fonts.googleapis.com` while `font-src` is
+   `'self'`.** Archivo is vendored under `/vendor/fonts` and no Google Fonts
+   stylesheet is linked, so no font server sees a visit — the Privacy page says
+   so and it is true. The stale `style-src` entry is a leftover: harmless, but
+   it should be dropped so the policy cannot be read as permission.
 
 `<meta name="referrer" content="strict-origin-when-cross-origin">` is set so no
 path, query string or order id leaks to OpenStreetMap in a `Referer`.
 
+### What actually leaves the device
+
+With no Supabase configured (`core/config.js` `BAKED` is empty, so `hasSupabase()`
+is false on a stock build) the app makes exactly three kinds of outbound request,
+and every one of them is to OpenStreetMap:
+
+| Call | What is sent | Where |
+|---|---|---|
+| Tile load | the tile's z/x/y — i.e. **which piece of the map is on screen**, and when | `ui/map.js` `mapInto()` |
+| `geocode(q)` | **the text the person typed**, verbatim, URL-encoded | `ui/map.js` |
+| `reverse(lat,lng)` | **the device's own position to six decimal places** (~10 cm), taken from `locate()` | `ui/map.js` |
+
+The third is the sharp one and is easy to under-describe. `locate()` calls
+`navigator.geolocation.getCurrentPosition({enableHighAccuracy:true})` and
+`reverse()` posts those coordinates to a third party to get a place name back.
+That is a precise real-time position, not an area, and it happens on a single
+tap labelled "use my location". The Privacy page says so in those terms, and
+names the two alternatives that send nothing (type the place; tap an area).
+
+`<meta name="referrer" content="strict-origin-when-cross-origin">` keeps the
+path, the query string and any order id out of the `Referer` on all three.
+Nominatim is called at most once per user action and never per keystroke, with a
+1.1 s floor between calls (`polite()`), as its usage policy asks.
+
+Everything else — accounts, orders, the ledger, chat, pictures — stays in this
+browser until a Supabase URL and anon key are configured. Say that on screen
+wherever it matters; the legal pages carry a `#legalLocalBanner` that appears
+whenever `hasSupabase()` is false, on the same principle as the sandbox banner.
+
 ---
 
-## 3. Known XSS findings — open, in this codebase
+## 3. XSS findings — the five that were open, and what is open now
 
 The escaping discipline in the views is good: names, chat, review text, product
 names, addresses, dispute reasons, audit details and geocoder labels are all
 routed through `esc()`, and the shared helpers `header()`, `pill()`, `avatar()`,
 `emptyBlock()`, `smartChip()`, `secHead()` and `money()` escape their own
-arguments. The audit found these exceptions.
+arguments.
 
-1. **`src/ui/map.js:80` — `m.bindPopup(o.label)`.** Leaflet renders a string
-   popup as **HTML**. Two call sites pass an unescaped label:
-   - `src/ui/views/home.js:192` — `label: c.label || myArea()`
-   - `src/ui/views/auth.js:229` — `label: suPlace.label`
+### Closed since the 7 September audit — verified in the code, not assumed
 
-   Both labels come from Nominatim (`shortLabel()` over OSM `address` /
-   `display_name`) — text **any OpenStreetMap contributor can edit** — and the
-   auth one is then persisted as the user's `area`. This is a real stored-XSS
-   path. Fix at the sink (`m.bindPopup(esc(o.label))`), which covers every
-   caller; then drop the now-redundant pre-escaping in
-   `src/ui/views/admin.js:310, 313, 315`, which would otherwise double-escape.
+1. **`ui/map.js` `bindPopup`** now escapes at the sink: `m.bindPopup(esc(o.label))`.
+   That closes the stored-XSS path through Nominatim labels — text any
+   OpenStreetMap contributor can edit — for every caller at once, including the
+   `area` persisted at sign-up.
+2. **`pinIcon()`** whitelists the colour against the `PINS` palette (with a
+   legacy map) and escapes the glyph before either reaches the `divIcon` HTML.
+3. **`app.js` boot-error message** is escaped inline (`app.js:702`), on a path
+   where `esc()` may not have loaded.
+4. **The boot-recovery button** no longer uses an inline `onclick=`; there is no
+   `onclick` attribute anywhere in `src/`.
+5. **`--tile-accent`** is gone from `views/home.js`, so no user-reachable value
+   is interpolated into a CSS custom property there.
 
-2. **`src/app.js:619` — `<p>${String(err.message)}</p>`** written straight into
-   `#app.innerHTML` on boot failure. Error text can carry attacker-influenced
-   content (a hostile `?sb=` / `?key=` value, a parse error echoing stored data).
-   `esc()` may not have loaded on this path, so inline a five-line escape here.
+### Open
 
-3. **`src/app.js:621` — `<button onclick="localStorage.clear();location.reload()">`.**
-   Not an XSS, a **live bug**: the CSP forbids inline handlers, so the only
-   recovery button on the boot-failure screen does nothing. Insert the markup,
-   then `addEventListener`.
-
-4. **`src/ui/map.js:59–63` — `pinIcon()`** interpolates `o.color` and `o.glyph`
-   raw into an SVG string that becomes `divIcon({html})`. Every current caller
-   passes a module constant, so it is not exploitable today — it is one careless
-   call site away. Whitelist the colour (`/^#[0-9a-f]{3,8}$/i`) and escape the glyph.
-
-5. **`src/ui/views/home.js:84` — `style="--tile-accent:${esc(c.accent)}"`.**
-   `esc()` is an HTML escape and does not make a CSS context safe. `c.accent` is
-   developer-supplied registry data, so this is hygiene rather than a live bug.
-
-6. **Double-escaping (cosmetic, not a vulnerability).** `header()` escapes both
-   its arguments, so a pre-escaped caller renders `Ram &amp;amp; Co`:
-   `src/ui/views/pro.js:67`. Note the opposite case at
-   `src/ui/views/partner.js:249` — that file's `capsule()` does **not** escape
-   its `d` slot, so the `esc()` there is correct and must not be "cleaned up".
+1. **Double-escaping in the admin map (cosmetic, not a vulnerability).**
+   `views/admin.js:425, 427, 429` build pin labels with `esc()` and hand them to
+   `map.js` `pin()`, which now escapes them again at the sink. A shop called
+   `Ram & Co` renders in the popup as `Ram &amp;amp; Co`. The fix prescribed
+   when `bindPopup` was hardened — drop the caller's pre-escaping — was never
+   applied. Remove the `esc()` calls in those three lines; the sink covers them.
+2. **`views/admin.js:386 `legendDot(c, label)`** interpolates `c` raw into a
+   `style` attribute. Every caller passes a module constant (`PIN_ORDER`,
+   `PIN_PARTNER`, `PIN_SHOP`), so it is hygiene rather than a live bug — the
+   same class as the `--tile-accent` finding that was just closed. Whitelist it
+   (`/^#[0-9a-f]{3,8}$/i`) so it cannot regress.
+3. **The off-platform chat scan is trivially evaded.** `domain/flow.js:768,777`
+   flags and masks on `\d{10}`, an e-mail pattern, and the UPI handle
+   suffixes. `98765 43210`, `98765-43210` and `nine eight seven…` match none of
+   them, so the message is neither masked, flagged, nor audited as
+   `fraud.offplatform`. `core/security.js` already has `normaliseMobile()`,
+   which collapses exactly those spellings — the flag test should normalise the
+   message the same way before matching. **Until it does, do not describe the
+   scan as protection**: it deters a careless share, it does not stop a
+   determined one. The legal pages state the rule ("never share a phone number
+   or UPI id in chat") rather than promising the mask works, which is the
+   correct posture.
 
 ### Helpers whose slots are raw markup by contract
 
@@ -147,19 +200,20 @@ the list to check on every new call site:
 | Helper | Raw slots |
 |---|---|
 | `ui/dom.js` · `sheet(title, bodyHtml)` | `bodyHtml` (title is escaped) |
-| `views/admin.js` · `capsule(k, v, d, …)` | `v` |
+| `views/admin.js` · `capsule(k, v, d, tone)` | `v` |
 | `views/admin.js` · `cmd({title, sub, right, facts, actions})` | all five |
-| `views/partner.js`, `views/pro.js`, `views/earn.js` · `capsule(k, v, d, …)` | all three |
+| `views/partner.js` · `capsule(k, v, d, tone)` | all three |
 | `views/account.js` · `card(title, eyebrow, body, opts)` | `body`, `opts.right` |
 | `views/partner.js` · `line(k, v)` (in `shopSetup`) | both |
+| `views/legal.js` · `sec(title, body)`, `p(html)`, `ul(items)` | `body`, `html`, each item |
 
 ### Clean
 
 No `eval`, no `new Function`, no `document.write`, no `javascript:` href, no
-`target="_blank"` anywhere in `src/`. Every `innerHTML` write outside
-`ui/dom.js` is either a static string or already `esc()`-wrapped, with the two
-exceptions listed above. Every interpolated HTML **attribute** in the views
-carries a number, a generated id, or a fixed enum — none carry raw user text.
+`onclick=`, no `target="_blank"` anywhere in `src/`. Every `innerHTML` write
+outside `ui/dom.js` is either a static string or already `esc()`-wrapped. Every
+interpolated HTML **attribute** in the views carries a number, a generated id,
+or a fixed enum — none carry raw user text.
 
 ---
 
@@ -256,6 +310,11 @@ credential back in, CI goes red.
 | OTPs are generated and checked in the browser (local mode) | Present in JS memory. Real OTPs must be server-generated, SMS-delivered from a DLT-registered sender, validated server-side — which is exactly what the Supabase path already does. |
 | The hash chain is verified by the same client that writes it | An attacker recomputes the whole chain in about a minute. Tamper-evidence needs a signature the client cannot forge. |
 | Names, mobiles and areas sit in localStorage | Under the DPDP Act 2023 there is no consent record, no erasure path and no breach-notification route in local mode. |
+| Names, mobiles, **exact coordinates** and pictures sit in localStorage | Sign-up stores `loc: {lat, lng}` to six decimal places for every user, partner and shop. It is the same store any user with DevTools can read and edit. |
+| The Privacy page's "you can ask for your account to be removed" | Honest, but manual. **Nothing in the product deletes one person's account.** `domain/state.js:50` has a `user/remove` reducer that nothing dispatches; `views/admin.js` can suspend a *partner* only. The only real erasure is the owner's Fresh start (the whole device) and a viewer clearing their own browser storage. The Privacy page now says exactly that instead of implying a button exists. |
+| The owner's access is fully audited | `core/audit.js` records **actions**, not reads. Browsing the admin console — every account, order, chat and ledger row on the device — leaves no entry. The Privacy page says "looking is not logged; only doing is". |
+| A pro or shop sees a customer's details "only while the job is open" | It was never true. `views/partner.js:224, 309, 1067, 1078, 1130` keep the customer's name and area on the pro's settled-jobs list, the shop's payout lists and a derived repeat-customer roster, indefinitely. The behaviour is defensible — it is an invoice book — so the page was corrected to describe it rather than the code changed to hide it. |
+| Photos are "kept on the person's own device" forever | They are kept until something reclaims them: `flow.sweepPhotos()` → `photos.gc(referenced(state))` drops anything unreferenced, and `fresh.js` calls `photos.gc([])` on both a demo purge and a Fresh start. A picture whose row is deleted does not linger. |
 | The CSP protects the app | It removes whole classes of attack, and it cannot protect a user from their own DevTools. It is defence in depth, not a boundary. |
 | Vouches, ratings and settled jobs are evidence | In local mode they are rows in localStorage; a user can write themselves three settled jobs and two vouches in DevTools. In Supabase mode the same rules must be `SECURITY DEFINER` RPCs (settled-job check, one-vouch uniqueness, same-trade tier check) or they are decoration. A ring of real accounts can also vouch each other up; the owner's suspend and kill switch are the answer, not the code. |
 | The reference "confirmed by code" | The 4-digit code is generated in the browser and shown on the pro's screen until the SMS rail exists. It proves the pro typed the code, not that a reference read it to them. `bgReference` can be turned off and `bgVouches` raised instead. |
@@ -364,12 +423,15 @@ Nothing on this list is optional, and the order is the order.
 - [ ] Every write path goes through a `SECURITY DEFINER` RPC. No table takes a direct write from the browser.
 - [ ] `service_role` key confirmed absent from the repo *and* from git history.
 
-**The five open code findings in §3**
-- [ ] `map.js` `bindPopup` escaped at the sink; `admin.js` pre-escaping removed.
-- [ ] `app.js` boot-error message escaped.
-- [ ] `app.js` boot-recovery button rewired off `onclick=` (it is broken today).
-- [ ] `pinIcon()` colour whitelisted, glyph escaped.
-- [ ] `--tile-accent` reviewed as a CSS context.
+**The open code findings in §3** (the five from the 7 September audit are closed)
+- [ ] `admin.js:425, 427, 429` pre-escaping removed — the `map.js` sink now escapes, so these double-escape.
+- [ ] `admin.js:386` `legendDot()` colour whitelisted as a CSS context.
+- [ ] `flow.js` chat flag normalises the message (`normaliseMobile()`) before matching, so `98765 43210` is caught.
+
+**Privacy, and the sentences that depend on the code**
+- [ ] `partner.selfie` and `partner.photo` stay separate fields. Merging them makes the Privacy page false.
+- [ ] An erasure path exists for one account, not just the whole device — DPDP, and the Contact page's 30-day promise.
+- [ ] Any new host in the CSP is reflected on the Privacy page in the same commit.
 
 **Headers and platform**
 - [ ] `_headers` deployed with `frame-ancestors`, HSTS, `nosniff`, `Permissions-Policy`.

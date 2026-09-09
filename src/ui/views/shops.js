@@ -92,6 +92,12 @@ export const SYS_CSS = `<style>
   .bestmatch .m-cap,.on-plum .m-cap,.bestmatch .m-row__m,.on-plum .m-row__m{color:color-mix(in srgb,var(--color-bg) 68%,transparent)}
   .bestmatch .m-row__t,.on-plum .m-row__t,.bestmatch .m-kv .muted,.on-plum .m-kv .muted{color:inherit}
   .bestmatch .m-kv--total,.on-plum .m-kv--total,.bestmatch .m-row,.on-plum .m-row{border-color:color-mix(in srgb,var(--color-bg) 28%,transparent)}
+  /* A step list on the ink ground: .m-step.pend paints its label var(--ink-3),
+     which IS the ground here — the "what happens next" list on an order was
+     ink on ink and could not be read at all. Same treatment as .m-cap above. */
+  .on-plum .m-step.pend .m-step__t{color:color-mix(in srgb,var(--color-bg) 82%,transparent)}
+  .on-plum .m-step__m{color:color-mix(in srgb,var(--color-bg) 68%,transparent)}
+  .on-plum .m-step.pend .m-step__dot{border-color:color-mix(in srgb,var(--color-bg) 55%,transparent)}
   .m-sec{padding:12px 0} .m-sec + .m-sec{border-top:2px solid var(--color-divider)}
   .m-kv{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;align-items:baseline}
   .m-kv--total{font:800 17px/1.2 var(--font-heading);padding-top:9px;margin-top:4px;border-top:1px solid var(--color-divider)}
@@ -195,13 +201,23 @@ function cartBar(shop) {
   const sameShop = cart.shopId === shop.id;
   return `<div class="m-bar">
     <div class="grow">
-      <div class="m-bar__t">${n} item${n === 1 ? '' : 's'} · ${M.fmt(q.itemsTotal)}</div>
-      <div class="m-bar__m">${sameShop
-        ? (q.deliveryFee ? `Free delivery over ${M.fmt(q.shop.freeDeliveryAbove)}` : 'Delivery is free on this order')
-        : `In your cart from ${esc(q.shop.name)}`}</div>
+      <div class="m-bar__t">${n} item${n === 1 ? '' : 's'} · ${M.fmt(q.customerPays)}</div>
+      <div class="m-bar__m">${sameShop ? deliveryLine(q) : `In your cart from ${esc(q.shop.name)}`}</div>
     </div>
     <button class="btn btn--primary" data-act="nav.cart">Checkout</button>
   </div>`;
+}
+
+/* WHAT THE DELIVERY ACTUALLY COSTS. The bar printed the basket total and, under
+   it, "Free delivery over Rs.499" — the threshold, never the fee, never the
+   gap. So the number on the bar (items) and the number at checkout (items +
+   delivery) disagreed, and the one line that could have explained the
+   difference didn't. Both come off the same quote now. */
+function deliveryLine(q) {
+  if (!q.deliveryFee) return 'Delivery is free on this order';
+  const gap = (q.shop.freeDeliveryAbove | 0) - (q.itemsTotal | 0);
+  return `Includes ${M.fmt(q.deliveryFee)} delivery` +
+    (gap > 0 ? ` · ${M.fmt(gap)} more and it is free` : '');
 }
 
 /* ── shop list — 1a "Search & filters" ─────────────────────── */
@@ -252,7 +268,10 @@ function shopRow(s) {
     ${thumb(cat.id, 52, s.photo)}
     <div class="grow" style="min-width:0">
       <div class="m-row__t">${esc(s.name)}</div>
-      <div class="m-row__m">${products.length} items listed · ${s.km} km · ~${s.eta} min · min order ${M.fmt(s.minOrder)}</div>
+      <!-- the same count Home shows, under the same words: this row said
+           "listed" while counting only what is in stock, and the storefront
+           it opens says "All · 41" about the whole catalogue -->
+      <div class="m-row__m">${products.length} items in stock · ${s.km} km · ~${s.eta} min · min order ${M.fmt(s.minOrder)}</div>
       <div class="m-row__tags">
         <span class="tag tag-accent">${esc(s.ratingAvg)} ★</span>
         <span class="tag ${s.isOpen ? 'tag-neutral' : ''}">${s.isOpen ? 'Open now' : 'Closed'}</span>
@@ -323,7 +342,13 @@ export function renderShop(shopId) {
         <p class="m-cap">${esc(a)}</p>
         <div class="m-grid2" style="border-top:1px solid var(--color-divider)">${items.filter(p => p.aisle === a).map(p => productCard(p, lineFor(p))).join('')}</div>
       </div>`).join('')
-      : emptyBlock('Nothing listed yet', 'This shop has not added products for this search.')}
+      : q
+        ? emptyBlock(`Nothing here matches “${shopFilter.trim()}”`,
+            `${s.name} lists ${allItems.length} item${allItems.length === 1 ? '' : 's'}, none of them under that word.`,
+            '<button class="btn btn--secondary" data-aisle="">Show everything</button>')
+        : emptyBlock('Nothing listed yet',
+            `${s.name} has not put any products on its shelf so far.`,
+            '<button class="btn btn--secondary" data-act="nav.shops">Other shops near you</button>')}
 
     ${cartBar(s)}
     <div style="height:24px"></div>
@@ -444,7 +469,7 @@ export function renderCart() {
     <div class="m-bar" style="margin-top:0">
       <div class="grow">
         <div class="m-bar__t">${n} item${n === 1 ? '' : 's'} · ${M.fmt(q.customerPays)}</div>
-        <div class="m-bar__m">${q.deliveryFee ? `Free delivery over ${M.fmt(q.shop.freeDeliveryAbove)}` : 'Delivery is free on this order'}</div>
+        <div class="m-bar__m">${deliveryLine(q)}</div>
       </div>
       <button class="btn btn--primary" data-act="cart.place">Place order</button>
     </div>

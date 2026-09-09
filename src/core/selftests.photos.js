@@ -114,13 +114,17 @@ describe('photos · orphans are collected, live pictures are not', () => {
     expect(P.has(b)).toBeFalse();
     clear();
   });
+  it('a verification selfie is referenced, so the boot sweep never eats it', () => {
+    const ids = P.referenced({ partners: [{ selfie: 'v1' }] });
+    expect(ids).toEqual(['v1']);
+  });
   it('referenced() finds every id a state points at', () => {
     const ids = P.referenced({
       shops: [{ photo: 's1', gallery: ['s2', 's3'] }],
       products: [{ photo: 'p1' }, {}],
-      partners: [{ photo: 'w1', work: ['w2'] }],
+      partners: [{ photo: 'w1', selfie: 'v1', work: ['w2'] }],
       orders: [{ evidence: [{ photo: 'e1' }, { label: 'no photo' }] }],
     });
-    expect(ids.sort()).toEqual(['e1', 'p1', 's1', 's2', 's3', 'w1', 'w2']);
+    expect(ids.sort()).toEqual(['e1', 'p1', 's1', 's2', 's3', 'v1', 'w1', 'w2']);
   });
 });

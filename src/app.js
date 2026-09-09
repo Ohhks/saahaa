@@ -35,6 +35,8 @@ import './core/selftests.security.js';
 import './core/selftests.auto.js';
 import './core/selftests.identity.js';
 import './core/selftests.photos.js';
+import './core/selftests.erase.js';
+import './core/selftests.recovery.js';
 
 /* ui */
 import { mount, action, initActions, toast, sheet, closeSheet, esc, stickyToast } from './ui/dom.js';
@@ -55,6 +57,9 @@ import * as account from './ui/views/account.js';
 import * as legal from './ui/views/legal.js';
 import * as checkout from './ui/checkout.js';
 import * as photo from './ui/photo.js';
+import * as erase from './domain/erase.js';
+import * as recovery from './domain/recovery.js';
+import * as security from './core/security.js';
 
 /* ══════════════ ROUTES ══════════════ */
 const ROUTES = {
@@ -324,6 +329,75 @@ function wireActions() {
       `<button class="chip" data-act="wallet.topup.do" data-id="${d.id}" data-amt="${r * 100}">₹${r}</button>`).join('')}</div>`));
   A('wallet.topup.do',  d => flow.walletTopUp(d.id, Number(d.amt)).then(() => { closeSheet(); render(); }));
   A('wallet.withdraw',  d => flow.walletWithdraw(d.id, Number(d.amt)).then(render));
+
+  /* ── the right to be removed ────────────────────────────────
+     The privacy page promises a person can have their data deleted, so the
+     product has to be able to do it. The plan is shown BEFORE anything
+     happens, in three honest parts: what goes, what is emptied but kept
+     because somebody else's record points at it, and what stays because the
+     ledger is hash-chained and a business must keep its books. */
+  /* ── forgetting the password ────────────────────────────────
+     No mail and no SMS rail yet, so a reset is what a neighbourhood business
+     actually does: ring the owner, they check who you are, they read out a
+     one-time code. See domain/recovery.js for why it is built this way. */
+  A('auth.forgot', () => sheet('Forgotten your password?', `
+    <p class="tiny muted" style="margin-bottom:12px">Your account is not lost. Ring SAAHAA — the owner
+      checks it is you and reads out a one-time code that lasts half an hour. Type it here with the
+      new password you want.</p>
+    <div class="field"><input id="rcWho" type="text" autocomplete="username" autocapitalize="characters" placeholder=" "><label>Mobile number or SAAHAA ID</label></div>
+    <div class="field"><input id="rcCode" type="text" autocomplete="one-time-code" autocapitalize="characters" placeholder=" "><label>The code you were read out</label></div>
+    <div class="field"><input id="rcPass" type="password" autocomplete="new-password" placeholder=" "><label>Your new password</label></div>
+    <button class="btn btn-primary btn--block" data-act="auth.forgot.do">Set my new password</button>
+    <p class="micro muted" style="margin-top:10px">The number to ring is on the <a class="more" href="#/legal/contact">Contact page</a>.</p>`)),
+  A('auth.forgot.do', async () => {
+    const val = id => (document.getElementById(id) || {}).value || '';
+    const pw = val('rcPass');
+    const why = security.passwordProblem(pw, val('rcWho'));
+    if (why) { toast(why, 'danger'); return; }
+    const r = await recovery.redeem(val('rcWho'), val('rcCode'), pw);
+    if (!r.ok) { toast(r.reason, 'danger'); return; }
+    closeSheet();
+    toast(`Password changed for ${r.account.code || r.account.name}. Sign in with it now.`);
+    auth.setAuthTab('login'); go('auth');
+  });
+  A('admin.reset', d => admin.resetPassword && admin.resetPassword(d.key));
+
+  A('account.erase', () => {
+    const s = me();
+    if (!s) { toast('Sign in first', 'warn'); return; }
+    const plan = erase.erasePlan(s.key);
+    const row = (k, v) => `<div class="between tiny" style="padding:4px 0"><span class="muted">${esc(k)}</span><b>${esc(String(v))}</b></div>`;
+    sheet('Remove my account', `
+      <p class="tiny muted" style="margin-bottom:12px">This cannot be undone. Here is exactly what happens to
+        ${esc(s.name)} (${esc(s.code || s.key)}).</p>
+      <p class="m-cap" style="margin:0 0 4px">Removed</p>
+      ${row('Your account', 'name, number, password, place')}
+      ${row('Your pictures', plan.removed.photos)}
+      ${row('Reviews you wrote', plan.removed.reviewsWritten)}
+      ${row('Your messages', 'the words and your name')}
+      <p class="m-cap" style="margin:12px 0 4px">Emptied, but kept</p>
+      <p class="micro muted" style="margin:0 0 6px">Other people's records point at these — deleting them would tear a hole in someone else's history.</p>
+      ${row('Your pro pages', plan.deIdentified.pros)}
+      ${row('Your shops', plan.deIdentified.shops)}
+      ${row('Orders you were part of', plan.deIdentified.orders)}
+      <p class="m-cap" style="margin:12px 0 4px">Kept</p>
+      ${row('Ledger entries', plan.kept.ledgerLegs)}
+      <p class="micro muted" style="margin:0 0 12px">${esc(plan.kept.reason)}. What stays is an account number with nobody behind it.</p>
+      <div class="field"><input id="eraseWord" type="text" autocomplete="off" autocapitalize="characters" placeholder=" "><label>Type REMOVE to confirm</label></div>
+      <button class="btn btn--block" style="border-color:var(--danger);color:var(--danger)" data-act="account.erase.do">Remove my account</button>
+      <button class="btn btn--ghost btn--block" style="margin-top:6px" data-act="sheet.close">Keep my account</button>`);
+  });
+  A('account.erase.do', () => {
+    const s = me();
+    const word = (document.getElementById('eraseWord') || {}).value || '';
+    if (word.trim().toUpperCase() !== 'REMOVE') { toast('Type REMOVE in the box to confirm', 'danger'); return; }
+    const r = erase.eraseAccount(s.key, 'self');
+    if (!r.ok) { toast(r.reason || 'Could not remove that account', 'danger'); return; }
+    closeSheet();
+    auth.logout();
+    toast('Your account is removed. What is left is a number in the books with nobody behind it.');
+    go('home');
+  });
   /* ── contracts for the parallel build: each action calls an export the
         owning view provides (auth/home/orders/admin). Registered here so the
         views never touch app.js. ── */
@@ -364,6 +438,8 @@ function wireActions() {
   A('photo.shop',    d => withPhoto({ maxEdge: 900 }, id => flow.setShopPhoto(d.id, id)));
   A('photo.product', d => withPhoto({ maxEdge: 560 }, id => flow.setProductPhoto(d.id, id)));
   A('photo.pro',     d => withPhoto({ maxEdge: 560 }, id => flow.setPartnerPhoto(d.id, id)));
+  A('photo.selfie',  d => withPhoto({ maxEdge: 560 }, id => flow.setPartnerSelfie(d.id, id)));   // verification only, never published
+  A('photo.publish', d => { const p = getState().partners.find(x => x.id === d.id); if (p && p.selfie) { flow.setPartnerPhoto(d.id, p.selfie); toast('That photo is on your page now'); } render(); });
   A('photo.work',    d => withPhoto({ maxEdge: 900 }, id => flow.addWorkPhoto(d.id, id)));
   A('photo.workdrop',d => { flow.removeWorkPhoto(d.id, d.photo); render(); });
   /* Taking a picture back off. Setting null frees the bytes (domain/flow.js),

@@ -25,8 +25,11 @@ import * as gmap from '../map.js';
 import * as photo from '../photo.js';
 import * as flow from '../../domain/flow.js';
 import * as M from '../../core/money.js';
+import * as W from '../../domain/wallet.js';
 import * as gateway from '../../core/gateway.js';
 import { getPricing } from '../../domain/settings.js';
+import { cancelSplit } from '../../domain/pricing.js';
+import { markupFor } from '../../domain/trust.js';
 import { header, emptyBlock, SYS_CSS } from './shops.js';
 
 /* How the order was paid. EVERYONE PAYS SAAHAA: the wallet is drawn first
@@ -86,6 +89,10 @@ function endsOf(o) {
   return { cust, them: sh.loc || sh.area || o.shopArea, colour: PIN.shop,
            name: o.shopName || sh.name || 'The shop', role: 'Shop' };
 }
+
+/* the live distance between the two ends — coordinates where the order has
+   them, area names where it does not */
+const kmOf = o => { const e = endsOf(o); return kmBetween(e.cust, e.them); };
 
 function mapCard(o, { interactive = true, id = 'orderMap' } = {}) {
   const e = endsOf(o);
@@ -306,10 +313,16 @@ export function renderDetail(orderId) {
           <div class="sec">
             <p class="m-cap">The bill</p>
             <div class="m-kv"><span>${esc(cat.name)} · ${esc(o.sub || cat.unit)} — ${esc(o.partnerName)}'s price</span><span class="num">${M.fmt(o.deal)}</span></div>
-            <div class="m-kv"><span class="muted">SAAHAA charge · ${pct}% on top</span><span class="num">${M.fmt(o.platformFee)}</span></div>
-            <div class="m-kv"><span class="muted">GST on that charge</span><span class="num">${M.fmt(o.gst)}</span></div>
+            <!-- "SAAHAA charge · 8% on top" sat beside the platform fee alone,
+                 which is not 8% of anything on this screen: the 8% is the fee
+                 PLUS the GST under it. Two lines that can be added up, and the
+                 percentage stated once, over the sum it actually describes. -->
+            <div class="m-kv"><span class="muted">SAAHAA platform fee</span><span class="num">${M.fmt(o.platformFee)}</span></div>
+            <div class="m-kv"><span class="muted">GST on that fee</span><span class="num">${M.fmt(o.gst)}</span></div>
             <div class="m-kv m-kv--total"><span>${payer}${o.provisional ? ' (est.)' : ''}</span><span class="num">${M.fmt(o.customerPays)}</span></div>
-            <p class="micro muted" style="margin-top:8px">${esc(paidWith(o))}. ${esc(o.partnerName)} receives the full ${M.fmt(o.deal)} —
+            <p class="micro muted" style="margin-top:8px">The fee and its GST together are ${M.fmt((o.platformFee | 0) + (o.gst | 0))} —
+              the ${pct}% SAAHAA adds on top of the quote.</p>
+            <p class="micro muted" style="margin-top:6px">${esc(paidWith(o))}. ${esc(o.partnerName)} receives the full ${M.fmt(o.deal)} —
               SAAHAA holds it until ${confirms} the work and never takes a cut of their quote.</p>
             ${o.saved && !(isPartner || isShop) ? `<p class="micro" style="margin-top:6px;color:var(--color-accent)">You saved ${M.fmt(o.saved)} against a commission app — and your pro was paid more.</p>` : ''}
             ${o.saved && (isPartner || isShop) ? `<p class="micro" style="margin-top:6px;color:var(--color-accent)">You keep the whole ${M.fmt(o.deal)}. SAAHAA's charge was paid on top, by the customer.</p>` : ''}
@@ -578,7 +591,13 @@ function actionPanel(o, r) {
       <div style="height:12px"></div>
       <div class="otp-row" style="justify-content:center;margin-bottom:14px">
         ${[0,1,2,3].map(i => `<input id="otp${i}" inputmode="numeric" maxlength="1" data-role="otp" class="input" style="width:56px">`).join('')}
-      </div>${B('otp.submit', 'Verify & start work')}`);
+      </div>
+      <!-- The code is what LOCKS the stake. Saying so afterwards is telling
+           somebody their money moved; saying it here is asking them. -->
+      <p class="tiny muted" style="margin:0 0 12px">Entering this code starts the job and locks
+        ${M.fmt(W.stakeFor(o.deal))} of your own money. Every rupee of it comes back the moment the
+        customer confirms the work.</p>
+      ${B('otp.submit', 'Verify & start work')}`);
     /* The camera IS the step. The label-only path stays — a pro whose camera
        is broken must still be able to finish a paid job — but it is folded
        away, because a word is not evidence and should not look like it. */
@@ -625,7 +644,7 @@ function actionPanel(o, r) {
       <div class="m-kv" style="margin-bottom:10px"><span>Held by SAAHAA for ${esc(o.partnerName)}</span>
         <span><b class="num">${M.fmt(o.deal)}</b> <span class="state state--held">not yet released</span></span></div>
       ${B('release.full', `Confirm & release ${M.fmt(o.deal)}`)}
-      <button class="btn btn--ghost btn--block" style="margin-top:8px;color:var(--danger)"
+      <button class="btn btn--ghost btn--block" style="margin-top:8px;color:var(--color-accent-400)"
         data-act="dispute.open" data-id="${o.id}">Something was wrong</button>`);
     /* 1d RATINGS & REVIEWS. Tapping a star posts the rating; the engine stores
        stars only, so there are no "what was good" chips and no text box —
@@ -645,7 +664,7 @@ function actionPanel(o, r) {
       </div>`);
     }
     if (s === 'R_DELIVERED') return panel('Delivered — confirm', `${B('retail.settle', 'Confirm delivery')}
-      <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--danger)"
+      <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--color-accent-400)"
         data-act="retail.return" data-id="${o.id}">Something was wrong — return this order</button>`);
     if (s === 'R_PICKUP_READY') return panel('Ready at the shop — collect it', `
       <p class="tiny muted" style="margin-bottom:10px">Show this code at the counter.</p>
@@ -660,9 +679,35 @@ function actionPanel(o, r) {
         </div></div>`).join('')}
       <p class="micro muted">No reply in 90 seconds means that item is refunded automatically.</p>`);
     if (s === 'R_RETURN') return panel('Return requested', '<p class="tiny muted">The shop or SAAHAA confirms the return; your money comes back in full.</p>');
-    if (['MATCHING','ASSIGNED','EN_ROUTE'].includes(s))
-      return panel('Need to cancel?', `<button class="btn btn--ghost btn--block" style="color:var(--danger)"
-        data-act="cancel.open" data-id="${o.id}">Cancel this booking</button>`);
+    /* THE PANEL IS CALLED "WHAT HAPPENS NEXT" AND IT SAID "Need to cancel?".
+       For the whole of the wait — matching, accepted, travelling, which is
+       most of the time a customer spends on this screen — the only thing the
+       product offered was a way out. Everything below is read off the order
+       and the machine's own tracker; the cancel button is untouched and still
+       one tap away. */
+    if (['MATCHING','ASSIGNED','EN_ROUTE'].includes(s)) {
+      const first = String(o.partnerName || 'Your pro').split(' ')[0];
+      const trk = trackerFor(o.kind), i = trackerIndex(o);
+      const next = trk[i + 1];
+      const title = s === 'MATCHING' ? `Finding a pro for you`
+        : s === 'ASSIGNED' ? `${first} has accepted`
+        : `${first} is on the way`;
+      const line = s === 'MATCHING' ? `As soon as one accepts, this screen shows their name and how far away they are.`
+        : s === 'EN_ROUTE' ? `About ${o.eta || etaMins(kmOf(o))} minutes away. Tap MAP above to watch.`
+        : `They set out next — you will see them move on the map.`;
+      return panel(title, `
+        <p class="tiny" style="margin-bottom:12px">${esc(line)}</p>
+        <ol class="m-steps" style="gap:8px;margin-bottom:12px">
+          ${next ? `<li class="m-step pend"><span class="m-step__dot"></span>
+            <span class="m-step__t">Then: ${esc(next.label)}</span></li>` : ''}
+          ${o.otp ? `<li class="m-step pend"><span class="m-step__dot"></span>
+            <span class="m-step__t">Give ${esc(first)} the code ${esc(o.otp)} at your door — never before</span></li>` : ''}
+          <li class="m-step pend"><span class="m-step__dot"></span>
+            <span class="m-step__t">${M.fmt(o.customerPays)} is held by SAAHAA. ${esc(first)} is paid only after you confirm the work</span></li>
+        </ol>
+        <button class="btn btn--ghost btn--block" style="color:var(--color-accent-400)"
+          data-act="cancel.open" data-id="${o.id}">Cancel this booking</button>`);
+    }
   }
 
   if (r.isShop) {
@@ -710,15 +755,29 @@ export function submitDispute(orderId, reason) {
   ctx.render();
 }
 
+/* CANCELLING WITHOUT A NUMBER. The sheet said "they keep a small travel
+   compensation" and "more than 2 hours before the slot" — a word for an
+   amount, and a slot this booking does not have. `cancelSplit()` is the same
+   function `flow.cancelOrder()` settles by, priced at the same markup the
+   booking was escrowed at, so the three lines below are exactly what will
+   happen when the button is pressed. */
 export function openCancel(orderId) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return;
   const rule = o.stage === 'MATCHING' ? 'BEFORE_ACCEPT' : o.stage === 'EN_ROUTE' ? 'EN_ROUTE' : 'AFTER_ACCEPT_2H';
+  const p = getState().partners.find(x => x.id === o.partnerId) || null;
+  const split = cancelSplit(o.deal, rule, { markup: markupFor(p) });
+  const first = String(o.partnerName || 'Your pro').split(' ')[0];
   sheet('Cancel booking?', `
-    <p>${rule === 'BEFORE_ACCEPT' ? 'No pro has accepted yet — you get a full refund.'
-        : rule === 'EN_ROUTE' ? 'Your pro is already travelling. They keep a small travel compensation.'
-        : 'More than 2 hours before the slot — full refund.'}</p>
+    <p>${rule === 'BEFORE_ACCEPT' ? 'No pro has accepted this job yet.'
+        : rule === 'EN_ROUTE' ? `${esc(first)} is already travelling to you.`
+        : `${esc(first)} has accepted but has not set out yet.`}</p>
+    <div class="m-kv" style="margin-top:14px"><span>You paid</span><span class="num">${M.fmt(o.customerPays)}</span></div>
+    ${split.worker ? `<div class="m-kv"><span class="muted">${esc(first)} keeps, for the journey</span><span class="num">${M.fmt(split.worker)}</span></div>` : ''}
+    ${split.platform > 0 ? `<div class="m-kv"><span class="muted">SAAHAA keeps</span><span class="num">${M.fmt(split.platform)}</span></div>` : ''}
+    <div class="m-kv m-kv--total"><span>Back in your wallet</span><span class="num">${M.fmt(split.refund)}</span></div>
+    <p class="micro muted" style="margin-top:8px">It lands in your SAAHAA wallet, to spend on the next job or to take out to your UPI.</p>
     <button class="btn btn--danger btn--block" style="margin-top:16px"
-      data-act="cancel.confirm" data-id="${orderId}" data-rule="${rule}">Yes, cancel</button>
-    <button class="btn btn--ghost btn--block" style="margin-top:8px" data-act="sheet.close">Keep it</button>`);
+      data-act="cancel.confirm" data-id="${orderId}" data-rule="${rule}">Yes, cancel · ${M.fmt(split.refund)} back</button>
+    <button class="btn btn--ghost btn--block" style="margin-top:8px" data-act="sheet.close">Keep it</button>${SYS_CSS}`);
 }

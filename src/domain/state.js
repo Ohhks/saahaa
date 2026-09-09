@@ -157,9 +157,23 @@ register('reducer', { id:'disputes', slice:'disputes', reduce(s = [], a) {
 }});
 
 register('reducer', { id:'chats', slice:'chats', reduce(s = {}, a) {
-  if (a.type !== 'chat/add') return s;
-  const list = (s[a.payload.orderId] || []).concat([a.payload.msg]);
-  return { ...s, [a.payload.orderId]: list.slice(-200) };
+  if (a.type === 'chat/add') {
+    const list = (s[a.payload.orderId] || []).concat([a.payload.msg]);
+    return { ...s, [a.payload.orderId]: list.slice(-200) };
+  }
+  /* Erasure (domain/erase.js): the message stays so the other side's thread
+     still reads as a conversation, but the words and the name go — what a
+     person wrote is part of the person. */
+  if (a.type === 'chat/scrub') {
+    const who = a.payload.name;
+    const out = {};
+    for (const [oid, msgs] of Object.entries(s)) {
+      out[oid] = msgs.map(m => m.name === who
+        ? { ...m, name: 'Removed account', text: '(message removed)', scrubbed: true } : m);
+    }
+    return out;
+  }
+  return s;
 }});
 
 register('reducer', { id:'agg', slice:'agg', reduce(s = {}, a) {

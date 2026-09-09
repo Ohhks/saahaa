@@ -109,6 +109,17 @@ const proCSS = `<style>
   .pro__add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:none;
     border:2px solid var(--color-divider);color:var(--ink-3);font:800 11px/1 var(--font-heading);cursor:pointer}
   .pro__add:hover,.pro__add:focus-visible{border-color:var(--color-accent);color:var(--color-accent)}
+  /* THE PORTRAIT OFFER. Only the owner of the page ever sees it, only while
+     the page has no public photo and a private selfie exists, and the word
+     "public" is in the sentence and in the button — a private picture must
+     never become public by accident. */
+  .pro__use{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px var(--gutter);
+    border-bottom:2px solid var(--color-divider);background:var(--color-surface)}
+  .pro__use img{width:52px;height:52px;object-fit:cover;flex:none;border:2px solid var(--color-text)}
+  .pro__use b{font:800 13.5px/1.2 var(--font-heading)}
+  .pro__use p{font-size:11.5px;color:var(--ink-3);margin:4px 0 0}
+  @media (min-width:768px){ .pro__use{padding-left:var(--sp-8);padding-right:var(--sp-8)} }
+  @media (min-width:1024px){ .pro__use{padding-left:var(--sp-10);padding-right:var(--sp-10)} }
   .pro__id{padding:12px 0;border-bottom:2px solid var(--color-divider)}
   .pro__name{font:800 22px/1.1 var(--font-heading);letter-spacing:-.01em}
   .pro__line{font-size:12px;color:var(--ink-3);margin:5px 0 9px}
@@ -168,13 +179,21 @@ export function render(id) {
     ${mine ? `<button class="btn btn-secondary pro__cam tap" data-act="photo.pro" data-id="${esc(p.id)}">
       ${icon('camera', { size: 16 })}<span>${photo.url(p.photo) ? 'Change photo' : 'Add your photo'}</span></button>` : ''}
   </div>
+  ${mine && !photo.url(p.photo) && photo.url(p.selfie) ? `<div class="pro__use">
+    <img src="${photo.url(p.selfie)}" alt="The photo you took for verification">
+    <div class="grow" style="min-width:0">
+      <b>Use your verification photo here?</b>
+      <p>That photo is private today — only SAAHAA has seen it. Putting it here makes it <b>public</b>: anyone with your link sees it.</p>
+    </div>
+    <button class="btn btn-primary tap" style="flex:none" data-act="photo.publish" data-id="${esc(p.id)}">Make it public</button>
+  </div>` : ''}
   <main class="wrap" style="padding-top:0">
 
     <div class="pro__id">
       <div class="pro__name">${esc(p.name)}</div>
       <div class="pro__line">${esc(prof.tagline || subs.slice(0, 3).join(' · ') || cat.name)} · ${esc(p.area)}, ${km} km</div>
       <div class="row" style="gap:6px;flex-wrap:wrap">
-        <span class="tag tag-accent">${a ? `${a.toFixed(1)} ★ ` : ''}${p.completed || 0} jobs</span>
+        <span class="tag tag-accent">${a ? `${a.toFixed(1)} ★ ` : ''}${p.completed ? `${p.completed} jobs` : 'New on SAAHAA'}</span>
         ${t.badge ? `<span class="tag tag-neutral">${esc(t.badge)}</span>` : ''}
         <span class="tag tag-neutral">${esc(ts.band.label)}</span>
         ${p.online === false ? '<span class="tag tag-outline">Offline now</span>' : '<span class="tag tag-outline">Available</span>'}
