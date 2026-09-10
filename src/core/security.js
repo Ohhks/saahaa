@@ -224,6 +224,10 @@ export function safeText(s, max = 200) {
    http and https survive; javascript:, data:, blob:, vbscript: and file: do
    not. Note the pre-strip: "java\tscript:alert(1)" is a real bypass against
    naive prefix checks, because the HTML parser removes the tab for you. */
+/* dead-ok: isSafeUrl — no user-supplied URL reaches an href today (every one
+   is an internal hash, an owner-set CONTACT value, or a photo validated by
+   core/photos.js). The day a pro can publish a website link, this is the
+   function that must gate it. Kept, tested, and deliberately not deleted. */
 export function isSafeUrl(u) {
   if (typeof u !== 'string') return false;
   const s = u.replace(CONTROL, '').replace(INVISIBLE, '').replace(/\s/g, '');

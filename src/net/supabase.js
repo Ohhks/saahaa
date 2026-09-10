@@ -15,6 +15,9 @@
    Everything money-related goes through rpc() to a SECURITY DEFINER function.
    The client is never trusted to compute or move a rupee. */
 
+/* dead-ok: file — the Supabase client. Unreachable until the backend is
+   switched on; supabase/README.md is the switch-on guide. */
+
 import { emit } from '../core/bus.js';
 
 let CFG = { url: '', anonKey: '', schema: 'public' };

@@ -559,9 +559,16 @@ export async function confirmAndRelease(orderId, pct = 1) {
      a zero-value ESCROW_RELEASE block. The money was right; the record was a
      lie, and REFUNDED existed the whole time with no caller. */
   const endStage = pct >= 1 ? 'SETTLED' : pct <= 0 ? 'REFUNDED' : 'PARTIAL';
+  /* WHAT HE WAS ACTUALLY PAID, RECORDED ON THE ORDER. Nothing stored it, so
+     every screen went on rendering `o.deal` and told a pro paid ₹360 of a ₹600
+     job that he had "received the full ₹600". */
+  const open0 = (getState().disputes || []).find(d => d.orderId === orderId && !d.resolvedAt);
   const moved = advance(orderId, endStage, {
     releasedPct: pct, workerPayout: r.workerPayout, refund: r.refund,
     platformFee: r.platformFee, gst: r.gst, settledAt: Date.now(),
+    releasedPaise: r.workerPayout,
+    ...(open0 ? { disputeOutcome: pct >= 1 ? 'release' : pct <= 0 ? 'refund' : 'partial',
+                  disputeNote: open0.note || '' } : {}),
   });
   if (!moved) return;
 
@@ -836,6 +843,10 @@ export async function placeRetailOrder(mode = 'rider') {
     history: [{ stage: 'R_CART', at: now }, { stage: 'R_PLACED', at: now }],
     otp: String(s.code || '') || makeOtp(), evidence: [],   // the shopper's own code — see bookService
     agreedTotal: q.customerPays,   // what SHE agreed; never moves, so a reweigh has a fixed anchor and can be corrected freely
+    /* whether the shop paid for the ride out of its own margin (free-delivery
+       threshold) or she did — the statement was deducting the customer's
+       delivery from the shop because nothing recorded which it was */
+    shopAbsorbedDelivery: !!q.shopAbsorbs,
   };
   dispatch({ type: 'order/add', payload: order });
   // the customer's payment arrives from the world first; only then is it locked
@@ -906,7 +917,22 @@ export async function setPickedQty(orderId, lineId, qty) {
      6.0 kg against a 2 kg order drove escrow NEGATIVE and could then withdraw
      more than the customer ever paid. Everything downstream of the cap has to
      be recomputed from the capped total, not from the raw quote. */
-  const scale = q.customerPays > 0 ? capped / q.customerPays : 1;
+  /* AND SCALING EVERYTHING BY THE CAP WAS THE THIRD GENERATION OF THIS BUG.
+     A delivery fee is a flat distance band — it has nothing to do with how much
+     the rice weighed — but it was scaled down with the rest, so a shop typing
+     40 kg on a 3 kg order pushed the rider from ₹14.00 to ₹1.15 and took the
+     difference. Escrow still balanced, so no invariant caught it: the shop had
+     simply been handed a lever on somebody else's money.
+
+     What the cap may touch is what the WEIGHT determines — the basket, and the
+     commission taken from it. The ride and the dispatch cut are fixed by
+     distance and stay exactly where the quote put them, and the shop's payout
+     is whatever is left after them. Over-weighing can now only ever cost the
+     shop, which is the correct direction for a mistake it alone controls. */
+  const flatRider = q.riderPayout | 0;
+  const flatDispatch = Math.max(0, q.customerPays - q.itemsTotal - flatRider) | 0;
+  const room = Math.max(0, capped - flatRider - flatDispatch);
+  const scale = q.itemsTotal > 0 ? Math.min(1, room / q.itemsTotal) : 1;
   const cut = v => Math.round((v | 0) * scale);
 
   dispatch({ type: 'order/patch', payload: { id: orderId, patch: {
@@ -918,11 +944,15 @@ export async function setPickedQty(orderId, lineId, qty) {
     /* only the capped figure is ever charged, and the refund itself is posted
        once, at settlement, so correcting a typo costs nobody anything */
     customerPays: capped,
+    /* the weighed truth, kept as it is — a statement that reports a basket
+       nobody ever ordered is its own kind of lie */
+    weighedItemsTotal: q.itemsTotal,
     itemsTotal: cut(q.itemsTotal),
     platformFee: cut(q.platformFee),
     gst: cut(q.platformFeeGst),
-    shopPayout: cut(q.shopPayout),
-    riderPayout: cut(q.riderPayout),
+    shopPayout: Math.max(0, capped - flatRider - flatDispatch - cut(q.platformFee)),
+    riderPayout: flatRider,          // a distance band, never scaled by weight
+    overWeighAbsorbed: Math.max(0, q.customerPays - capped),
   } } });
   ctx.render();
   return q;
@@ -1006,6 +1036,21 @@ export async function acceptReturn(orderId) {
   if (heldBack) await ledger('REFUND', heldBack, acct.escrow(o.id), acct.customer(o.customerKey), { reason: 'return' });
   const a = getState().agg;
   bumpAgg({ refunds: a.refunds + o.customerPays, escrow: Math.max(0, a.escrow - (o.customerPays | 0)) });
+  /* NOTHING IN THE PRODUCT EVER INCREMENTED THIS. The free-first-30 was read in
+     three places and written in none, so every real shop stayed on order zero
+     for ever: SAAHAA collected no retail commission at all, the 3%-capped-₹25
+     branch was unreachable on any real install, and every "30 free orders left"
+     countdown was frozen at 30.
+
+     It survived four audits because each mode only ever exercised the branch
+     the other one got wrong — ?demo=1 seeds shops at 60–560 orders, so the demo
+     only ever showed the paid branch and a real install only ever showed the
+     free one. */
+  {
+    const sh = getState().shops.find(x => x.id === o.shopId);
+    if (sh) dispatch({ type: 'shop/patch', payload: { id: sh.id, patch: {
+      ordersCompleted: ((sh.ordersCompleted | 0) + 1) } } });
+  }
   advance(orderId, 'R_CLOSED', { closedAt: Date.now() });
   audit.record('retail.refunded', { id: o.id, amount: o.customerPays, reason: 'return' }, me() ? me().key : 'admin');
   toast(`${M.fmt(o.customerPays)} refunded for the return`);

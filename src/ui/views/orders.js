@@ -323,7 +323,12 @@ export function renderDetail(orderId) {
             <div class="m-kv m-kv--total"><span>${payer}${o.provisional ? ' (est.)' : ''}</span><span class="num">${M.fmt(o.customerPays)}</span></div>
             <p class="micro muted" style="margin-top:8px">The fee and its GST together are ${M.fmt((o.platformFee | 0) + (o.gst | 0))} —
               the ${pct}% SAAHAA adds on top of the quote.</p>
-            <p class="micro muted" style="margin-top:6px">${esc(paidWith(o))}. ${esc(o.partnerName)} receives the full ${M.fmt(o.deal)} —
+            <!-- "receives the full" kept printing after a partial resolution, so a
+                 pro paid ₹360 of a ₹600 job read that he had received all of it.
+                 A bill must describe what happened, not what was going to. -->
+            <p class="micro muted" style="margin-top:6px">${esc(paidWith(o))}. ${o.releasedPaise != null && o.releasedPaise < (o.deal | 0)
+              ? `${esc(o.partnerName)} received ${M.fmt(o.releasedPaise)} of the ${M.fmt(o.deal)} after this job was reviewed —`
+              : `${esc(o.partnerName)} receives the full ${M.fmt(o.deal)} —`}
               SAAHAA holds it until ${confirms} the work and never takes a cut of their quote.</p>
             ${o.saved && !(isPartner || isShop) ? `<p class="micro" style="margin-top:6px;color:var(--color-accent)">You saved ${M.fmt(o.saved)} against a commission app — and your pro was paid more.</p>` : ''}
             ${o.saved && (isPartner || isShop) ? `<p class="micro" style="margin-top:6px;color:var(--color-accent)">${esc(t('money.youKeep', { amount: M.fmt(o.deal) }))}</p>` : ''}
@@ -584,6 +589,25 @@ function actionPanel(o, r) {
     if (s === 'ASSIGNED')    return panel('Head to the customer', `${whereTo(o)}${B('stage.enroute', 'Start travelling')}
       <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--color-accent-400)"
         data-act="worker.cancel" data-id="${o.id}">${esc(t('job.cannotDo'))}</button>`);
+
+    /* HE WAS NEVER TOLD THE OUTCOME. After a 60% resolution his screen simply
+       lost its panel — no decision, no reason, no mention a complaint had
+       existed — while the bill above it still said he had received the full
+       amount. The one thing a person needs after a ruling is the ruling. */
+    if (['SETTLED', 'PARTIAL', 'REFUNDED', 'CLOSED'].includes(s) && o.disputeOutcome) {
+      const got = o.releasedPaise != null ? o.releasedPaise : o.deal;
+      return panel(o.disputeOutcome === 'release' ? 'Settled in your favour' : 'A decision was made on this job', `
+        <p class="tiny" style="margin-bottom:10px">${esc(o.disputeReason || 'A complaint was raised')}${
+          o.disputeNote ? ` — ${esc(o.disputeNote)}` : ''}</p>
+        <div class="m-kv"><span>Your quote</span><span class="num">${M.fmt(o.deal)}</span></div>
+        <div class="m-kv"><span>Paid to you</span><span class="num">${M.fmt(got)}</span></div>
+        ${got < (o.deal | 0) ? `<div class="m-kv"><span>Returned to the customer</span><span class="num">${M.fmt((o.deal | 0) - got)}</span></div>` : ''}
+        <p class="micro muted" style="margin-top:10px">${o.disputeDecidedNote
+          ? esc(o.disputeDecidedNote)
+          : 'The owner read both sides before deciding.'} ${got < (o.deal | 0)
+          ? 'An upheld complaint counts against SAAHAA Certified, and two of them put every future payout under review.'
+          : 'Nothing was held against you.'}</p>`);
+    }
 
     /* THE WORST DEAD END IN THE PRODUCT. A dispute raised against him showed
        the header "under review" and nothing else: not the reason, not that a

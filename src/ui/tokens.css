@@ -421,6 +421,8 @@ button.cmd{width:100%} .cmd:hover{border-color:var(--color-text);border-left-col
    zone that swallowed every click underneath it once any sheet had opened.
    visibility also takes it out of the tab order. */
 .sheet.on{transform:none;visibility:visible;pointer-events:auto;transition-delay:0s,0s,0s}
+/* dead-ok: grab — the drag handle is drawn for touch affordance and hidden
+   inside a sheet, which is dismissed by its own control and by the scrim. */
 .sheet .grab{display:none}
 .sheet__title,.sheet h3{font:800 20px/1.2 var(--font-heading);margin-bottom:var(--sp-5)}
 @media (min-width:768px){
@@ -447,6 +449,8 @@ button.cmd{width:100%} .cmd:hover{border-color:var(--color-text);border-left-col
 .skel{background:linear-gradient(90deg,var(--surface-2),var(--surface-3),var(--surface-2));background-size:200% 100%;animation:skel 1.2s linear infinite;min-height:14px}
 @keyframes skel{to{background-position:-200% 0}}
 .credo{margin:var(--sp-12) 0 var(--sp-8);padding-top:var(--sp-8);border-top:2px solid var(--color-divider);text-align:left}
+/* dead-ok: cmark — the credo mark is deliberately absent in the modernist
+   system; the markup stays so the older credo still renders elsewhere. */
 .credo .cmark{display:none} .credo .cw{font:800 var(--fs-2xl)/1.05 var(--font-heading);letter-spacing:-.02em}
 .pillars{display:flex;flex-wrap:wrap;gap:6px 14px;font:600 10px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
 .v{display:flex;flex-direction:column} .ic{display:inline-flex;align-items:center;justify-content:center} .from{font-size:11px;color:var(--ink-3)}

@@ -371,7 +371,12 @@ function proEarnings(p, orders, paid, earned, held, paidOut) {
           ${recent.map(o => `<tr><td>${esc(o.sub || (get('category', o.catId) || {}).name || 'Job')} · ${esc(o.customerName)}<span class="micro muted" style="display:block">${timeAgo(o.settledAt)}</span></td>
             <td class="num">${M.fmt(o.deal)}</td><td class="num">${M.fmt(o.workerPayout)}</td></tr>`).join('')}
           </tbody></table></div>
-          <p class="micro muted" style="margin-top:8px">Kept equals quoted on every line: nothing comes out of your price.</p>`
+          <!-- printed unconditionally, directly under a row reading "₹600 quoted,
+               ₹360 kept" — telling him in writing that the ₹240 he had just
+               lost to an upheld complaint could not have happened -->
+          <p class="micro muted" style="margin-top:8px">${paid.some(o => o.releasedPct != null && o.releasedPct < 1)
+            ? 'Kept equals quoted except where a job was reviewed and only part was released — those rows show what actually reached you.'
+            : 'Kept equals quoted on every line: nothing comes out of your price.'}</p>`
           : empty('No settled jobs yet', 'Every job you finish and the customer confirms lands here.')}
 
         ${kick('Where the money is')}
@@ -1121,20 +1126,36 @@ function shopStock(s, items) {
 }
 
 /* MONEY: settled to you, the fee lines, what an aggregator would have taken */
+const acctShop = id => 'SHOP:' + id;
+
 function shopMoney(s, orders) {
   const done = orders.filter(o => o.settledAt && o.shopPayout);   // by settlement, not by stage
   const now = new Date();
   const month = done.filter(o => ymOf(o.settledAt) === now.getFullYear() * 12 + now.getMonth());
   const sum = (list, f) => list.reduce((n, o) => n + (o[f] || 0), 0);
-  const gross = sum(done, 'itemsTotal'), fee = sum(done, 'platformFee'), net = sum(done, 'shopPayout');
-  /* THE STATEMENT WAS RS.5 AN ORDER SHORT OF ITS OWN TOTAL. `rider` summed
-     riderPayout — the rider's share alone — while the shop actually absorbs the
-     whole delivery cost, of which riderDispatchCut is SAAHAA's. Showing only
-     part of a deduction makes gross minus deductions disagree with the net on
-     the same panel, which is the one thing a money screen must never do. */
-  const riderPaid = sum(done, 'riderPayout');
-  const dispatch = Math.max(0, gross - fee - riderPaid - net);   // whatever is left is the dispatch cut
-  const rider = riderPaid;
+  /* THIS PANEL PRINTED "₹193 − ₹0 − ₹9 = ₹193" DIRECTLY BENEATH A COMMENT OF
+     MINE SAYING THAT GROSS MINUS DEDUCTIONS DISAGREEING WITH NET IS THE ONE
+     THING A MONEY SCREEN MUST NEVER DO. It summed order FIELDS and subtracted
+     lines that had never come out of the shop's share: on an ordinary rider
+     order the CUSTOMER pays the delivery, so the rider line was displayed as a
+     deduction and not applied.
+
+     A statement that reconciles by construction cannot drift. `net` is what the
+     ledger actually paid this shop; every deduction shown is one that genuinely
+     left its share, and the arithmetic on screen is the arithmetic that
+     happened. */
+  const legs = (getState().ledger || []).filter(e => (e.partyB || '') === acctShop(s.id) || (e.partyA || '') === acctShop(s.id));
+  const paidToShop = legs.filter(e => e.type === 'SHOP_PAYOUT')
+    .reduce((n, e) => n + (e.amountPaise != null ? e.amountPaise : e.amount || 0), 0);
+  const net = paidToShop || sum(done, 'shopPayout');
+  const fee = sum(done, 'platformFee');
+  /* the shop only absorbs the ride when free delivery triggered — otherwise she
+     paid it, and it was never the shop's to deduct */
+  const rider = sum(done.filter(o => o.shopAbsorbedDelivery), 'riderPayout');
+  const dispatch = 0;
+  /* gross is stated as what the deductions actually came out of, so the column
+     adds up in front of the person reading it */
+  const gross = net + fee + rider;
   const mNet = sum(month, 'shopPayout'), mGross = sum(month, 'itemsTotal');
   const cat = get('category', s.catId);
   const agg = Math.round(gross * AGG_COMMISSION);

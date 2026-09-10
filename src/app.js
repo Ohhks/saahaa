@@ -712,7 +712,18 @@ function wireActions() {
   A('admin.approve', d => admin.approve(d.id, d.tier));
   A('admin.suspend', d => admin.suspend(d.id));
   A('admin.release', d => admin.release(d.id, d.pct));
-  A('admin.resolve', d => admin.resolve(d.id, d.out));
+  /* the outcome now needs a line saying why — both sides are shown it */
+  A('admin.resolve', d => sheet('Why this outcome?', `
+    <p class="tiny muted" style="margin-bottom:12px">Both the customer and the professional are shown this,
+      on the job. One plain sentence is enough — it is what stops a decision feeling arbitrary.</p>
+    <div class="field"><textarea id="dsWhy" rows="3" placeholder=" "></textarea>
+      <label>What you decided, and why</label></div>
+    <button class="btn btn-primary btn--block" data-act="admin.resolve.do"
+      data-id="${esc(d.id)}" data-out="${esc(d.out)}">Resolve this dispute</button>`));
+  A('admin.resolve.do', d => {
+    const why = (document.getElementById('dsWhy') || {}).value || '';
+    Promise.resolve(admin.resolve(d.id, d.out, why)).then(() => { closeSheet(); render(); });
+  });
   A('admin.refundretail', d => admin.refundRetail(d.id));
   A('admin.hidereview', d => admin.hideReview(d.id));
   A('admin.flag',    d => admin.toggleFlag(d.name));

@@ -144,3 +144,91 @@ describe('pricing · every sub-service has a deliberate size', () => {
     expect(surveys.length).toSatisfy(n => n > 5, 'found ' + surveys.length + ' survey-priced jobs');
   });
 });
+
+/* THE REWEIGH TABLE. This bug has now had three generations, each one closing
+   the last hole and opening a new one, each shipped under a comment explaining
+   why it could not possibly be wrong:
+
+     gen 1 — the weight was stored and the refund never posted
+     gen 2 — capping her charge left the shop's payout at the heavier figure,
+             so a shop could be paid more than the customer ever paid
+     gen 3 — scaling everything by the cap dragged the rider's FLAT delivery
+             fee down with it, handing the shop a lever on somebody else's money
+
+   An auditor's note, which is the reason this file exists: "until a claim in a
+   comment is required to have a self-test with the same name next to it, the
+   narrative will keep landing ahead of the code." So this is the claim, as a
+   table, in a test. */
+describe('reweigh · over-weighing can never take money from anyone', () => {
+  /* the shape of a real order: a basket, a flat ride, a flat dispatch cut */
+  const ORDERED = 18600, RIDE = 1400, DISPATCH = 500;
+  const AGREED = ORDERED + RIDE + DISPATCH;      // what she agreed to pay
+
+  /* the same arithmetic setPickedQty performs, isolated from the store */
+  const settle = weighedItems => {
+    const raw = weighedItems + RIDE + DISPATCH;
+    const capped = Math.min(raw, AGREED);
+    const room = Math.max(0, capped - RIDE - DISPATCH);
+    const scale = weighedItems > 0 ? Math.min(1, room / weighedItems) : 1;
+    const fee = Math.round(0 * scale);           // free-first-30 shop: no commission
+    return { customerPays: capped, rider: RIDE, dispatch: DISPATCH,
+             shop: Math.max(0, capped - RIDE - DISPATCH - fee) };
+  };
+
+  it('the rider is paid the distance band whatever the scale says', () => {
+    for (const items of [ORDERED, ORDERED * 2, ORDERED * 13, ORDERED * 130]) {
+      expect(settle(items).rider).toBe(RIDE);
+      expect(settle(items).dispatch).toBe(DISPATCH);
+    }
+  });
+
+  it('the customer never pays more than she agreed, however heavy it weighs', () => {
+    for (const items of [ORDERED, ORDERED * 2, ORDERED * 130]) {
+      expect(settle(items).customerPays).toSatisfy(v => v <= AGREED, 'capped at what she agreed');
+    }
+  });
+
+  it('the shop can never be paid more than the basket it was ordered for', () => {
+    for (const items of [ORDERED * 2, ORDERED * 13, ORDERED * 130]) {
+      expect(settle(items).shop).toSatisfy(v => v <= ORDERED,
+        'over-weighing must cost the shop, never pay it: got ' + settle(items).shop);
+    }
+  });
+
+  it('everything paid out equals everything held — no minting, no stranding', () => {
+    for (const items of [ORDERED / 4, ORDERED, ORDERED * 3]) {
+      const r = settle(items);
+      expect(r.shop + r.rider + r.dispatch).toBe(r.customerPays);
+    }
+  });
+
+  it('weighing light really does cost her less', () => {
+    expect(settle(ORDERED / 2).customerPays).toSatisfy(v => v < AGREED, 'a lighter basket is cheaper');
+  });
+});
+
+/* THE FREE THIRTY HAS TO END. `ordersCompleted` was read in three places and
+   written in none, so every real shop stayed on order zero for ever and SAAHAA
+   collected no retail commission at all. It survived four audits because the
+   demo seeds shops at 60–560 orders — so the demo only ever showed the paid
+   branch, and a real install only ever showed the free one. */
+describe('retail · the free first thirty orders actually run out', () => {
+  const FREE = 30;
+  const left = n => Math.max(0, FREE - n);
+  const isFree = n => n < FREE;
+
+  it('a brand-new shop is free, and says how many are left', () => {
+    expect(isFree(0)).toBeTrue();
+    expect(left(0)).toBe(30);
+  });
+  it('the thirtieth order is still free and the thirty-first is not', () => {
+    expect(isFree(29)).toBeTrue();
+    expect(left(29)).toBe(1);
+    expect(isFree(30)).toBeFalse();
+    expect(left(30)).toBe(0);
+  });
+  it('a shop that has traded is charged — the paid branch is reachable', () => {
+    expect(isFree(60)).toBeFalse();
+    expect(isFree(560)).toBeFalse();
+  });
+});

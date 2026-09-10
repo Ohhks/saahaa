@@ -9,6 +9,8 @@
 
 /* ── emblem (the SVG mark keeps its draw-in; it is used small, in ink) ── */
 .mk{overflow:visible}
+/* dead-ok: mk-glow — "No gold, no gradient, no glow" was the v8 decision;
+   the element stays in the mark's SVG so a future theme can light it. */
 .mk-glow{display:none}
 .mk--anim .mk-band{stroke-dasharray:var(--circ,402) !important;stroke-dashoffset:var(--circ,402);animation:mkdraw 600ms var(--ease-in-out) 80ms forwards}
 @keyframes mkdraw{to{stroke-dashoffset:0}}

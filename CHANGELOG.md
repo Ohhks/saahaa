@@ -6,6 +6,84 @@ cannot be rolled back and therefore isn't a release.
 
 ---
 
+## [8.10.0] — 2026-09-10 — "The third generation of the same bug"
+
+The fourth partner audit scored 8.8/8.9.0 at 6/10 and delivered the most useful
+sentence anybody has written about this codebase: *"until a claim in a comment
+is required to have a self-test with the same name next to it, the narrative
+will keep landing ahead of the code."*
+
+It was right, and it proved it: **8.9.0's reweigh fix closed the mint and opened
+a new hole.** Third generation of one bug, each version shipped under a comment
+explaining why it could not possibly be wrong.
+
+### Fixed — over-weighing paid the shop out of the rider's fee
+
+Scaling every derived figure by the cap dragged the **flat distance-band
+delivery fee** down with it. Type 40 kg on a 3 kg order and the rider fell from
+₹14.00 to ₹1.15 while the shop climbed to ₹203.44 — escrow still balanced, so
+no invariant caught it. The shop had been handed a lever on somebody else's
+money.
+
+The cap may only touch what the weight determines: the basket and the
+commission on it. The ride and the dispatch cut are fixed by distance and stay
+where the quote put them; the shop is paid whatever is left after them. Over-
+weighing can now only cost the shop, which is the right direction for a mistake
+it alone controls.
+
+**And the claim is now a test with the same name.** `reweigh · over-weighing can
+never take money from anyone` asserts the rider is paid the band at 1×, 2×, 13×
+and 130× the ordered weight, that she never pays above what she agreed, that the
+shop is never paid more than the basket, and that everything out equals
+everything held.
+
+### Fixed — SAAHAA was earning nothing from retail, for ever
+`ordersCompleted` was read in three places and **written in none**, so every
+real shop stayed on order zero permanently: no commission was ever charged, the
+3%-capped-₹25 branch was unreachable on any real install, and every "30 free
+orders left" counter was frozen. It survived four audits because each mode only
+exercised the branch the other got wrong — the demo seeds shops at 60–560
+orders, so the demo only ever showed the paid branch and a real install only
+ever showed the free one.
+
+### Fixed — a money screen that disagreed with itself
+The shop statement printed **₹193 − ₹0 − ₹9 = ₹193**, directly beneath a comment
+of mine saying that gross minus deductions disagreeing with net is the one thing
+a money screen must never do. It summed order *fields* and deducted a rider line
+the customer had actually paid. It is built from the ledger legs now and
+reconciles by construction, and the order records whether the shop genuinely
+absorbed the delivery.
+
+### Fixed — a pro was told the opposite of what happened to him
+After a 60% resolution his screen lost its panel entirely — no outcome, no
+reason — while the bill above still read *"receives the full ₹600"* and his
+earnings table showed *"₹600 quoted, ₹360 kept"* under *"Kept equals quoted on
+every line."* The app told a tradesperson in writing that the ₹240 he had just
+lost could not have happened.
+
+He now gets a terminal panel with the decision, the reason, what was paid and
+what it means for his record. The admin console promised "three outcomes, with a
+written reason" and stored none — a reason is required now, and both sides see it.
+
+### Added — a gate for code that exists and never runs
+`tools/lint-dead.mjs`. This repo's characteristic failure is not bad code, it is
+**unexecuted** code under a confident comment: `checkInvariants` uncalled through
+four audits, `R_REAUTH` declared and unreachable, `WORKER_NO_SHOW` published for
+six versions with no caller, `.rail` styled `display:none` while a view rendered
+it. None of them errored, blanked or failed a test — only a person reading the
+source ever found them.
+
+It blocks on the two precise checks and reports the orphaned-export tail under a
+budget that may shrink and never grow, because failing the build on a long tail
+teaches everyone to ignore the whole lint — which is how the last measurement
+problem started.
+
+### Fixed — the refunds page published rules the app cannot execute
+The table is generated from `CANCEL_RULES` so it can never drift — and it was
+printing two slot-based rows for a product with **no scheduling at all**, plus a
+₹100 pro charge `cancelOrder` has never posted. A generated table is only honest
+if what generates it is reachable.
+
 ## [8.9.0] — 2026-09-10 — "A shop could mint money"
 
 The fourth customer audit scored 8.8.0 at 5/10 again and found something worse

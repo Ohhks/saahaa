@@ -26,6 +26,11 @@ const SERVICE_STAGES = [
      always had CANCEL_RULES.WORKER_NO_SHOW — a full refund plus a credit — and
      nothing could reach it. */
   { id:'ASSIGNED',    label:'Pro accepted',       short:'Accepted',   owner:'worker',   to:['EN_ROUTE','MATCHING','CANCELLED','DISPUTED'], tracker:true, tone:'ok', ico:'🤝' },
+  /* dead-ok: SCHEDULED — there is no slot picker, so every booking is
+     `slot: 'now'` and nothing can advance here. The stage is kept because the
+     machine is the design document for the product we are building, and the
+     refunds page no longer publishes the slot rules that depend on it
+     (ui/views/legal.js). Delete this note the day scheduling ships. */
   { id:'SCHEDULED',   label:'Booked for later',   short:'Scheduled',  owner:'system',   to:['EN_ROUTE','CANCELLED','EXPIRED'], tracker:false, tone:'info' },
   { id:'EN_ROUTE',    label:'On the way to you',  short:'On the way', owner:'worker',   to:['ARRIVED','CANCELLED','DISPUTED'], tracker:true, tone:'info', ico:'🛵' },
   /* `needsOtp` is the old name for what is now the customer's own SAAHAA code

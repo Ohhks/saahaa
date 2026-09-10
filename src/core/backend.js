@@ -14,6 +14,11 @@
    Adding a new operation: add it to OPS, implement it in both adapters, and
    the self-test suite will fail until you do. */
 
+/* dead-ok: file — the adapter registry for the server rail. Every export here
+   is staged for the day core/config.js carries a Supabase project; nothing in
+   the local-only product calls it, and that is the point rather than an
+   oversight. See docs/PRODUCTION.md. */
+
 import { emit } from './bus.js';
 import * as cfg from './config.js';
 

@@ -1559,9 +1559,16 @@ export async function release(id, pct) {
 export async function refundRetail(id) {
   return guardMoney(id, `Refunding ${M.fmt(orderAmount(id))} to the customer.`, async () => { await flow.refundRetail(id); ctx.render(); });
 }
-export async function resolve(id, outcome) {
+/* THE CONSOLE PROMISED "three outcomes, with a written reason" AND STORED NONE.
+   The signature took no reason and the dispute row kept none, so the pro on the
+   other end got a number with no explanation — and the screen that was supposed
+   to show him "the outcome and the reason" had nothing to show. */
+export async function resolve(id, outcome, reason) {
   const d = getState().disputes.find(x => x.id === id); if (!d) return;
+  const why = String(reason == null ? '' : reason).trim();
+  if (!why) { toast('Write a line saying why — both sides are told what you decided', 'warn'); return; }
   const ord = getState().orders.find(x => x.id === d.orderId);
+  dispatch({ type: 'dispute/resolve', payload: { id, patch: { decidedNote: why, outcome } } });
   // the money moves first; the dispute is marked resolved by the release
   // itself (confirmAndRelease / refundRetail both close the linked dispute)
   // confirmAndRelease bails on a retail order AFTER the dispute has already
@@ -1571,7 +1578,8 @@ export async function resolve(id, outcome) {
   else if (outcome === 'release') await flow.confirmAndRelease(d.orderId, 1);
   else if (outcome === 'partial') await flow.confirmAndRelease(d.orderId, 0.6);
   else await flow.confirmAndRelease(d.orderId, 0);
-  audit.record('dispute.resolved', { id, outcome }, 'admin');
+  ctx.store.dispatch({ type: 'order/patch', payload: { id: d.orderId, patch: { disputeDecidedNote: why, disputeOutcome: outcome } } });
+  audit.record('dispute.resolved', { id, outcome, reason: why }, 'admin');
   toast('Dispute resolved'); ctx.render();
 }
 export function hideReview(id) { dispatch({ type: 'review/hide', payload: { id } }); audit.record(audit.ACTIONS.REVIEW_HIDE, { id }, 'admin'); ctx.render(); }
