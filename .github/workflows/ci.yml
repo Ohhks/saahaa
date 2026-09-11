@@ -26,16 +26,13 @@ jobs:
         with: { python-version: '3.12' }
 
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
+        with: { node-version: '22' }
 
-      - name: Syntax-check every ES module
-        run: |
-          set -e
-          fail=0
-          for f in $(find src -name '*.js'); do
-            node --check "$f" || { echo "::error file=$f::Syntax error"; fail=1; }
-          done
-          exit $fail
+      # `node --check` parses these as CommonJS and passes files whose ES-module
+      # parse fails — a backtick inside a comment inside a template literal once
+      # shipped a blank screen through exactly this step. tools/lint-parse.mjs
+      # compiles all 82 modules with the real parser and runs inside preflight
+      # below, so this loop was both redundant and reassuring about nothing.
 
       - name: Domain test suite (Node)
         run: node tools/test-node.mjs

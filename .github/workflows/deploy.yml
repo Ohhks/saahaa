@@ -1,12 +1,19 @@
 # Build, gate, deploy. The gates run BEFORE the deploy, not after: a bundle that
 # fails preflight must never reach a phone.
 name: deploy
+# DEPLOY WAITS FOR THE CHECK THAT GATES THE BRANCH. Running on `push` meant
+# this raced CI: a bundle could reach Pages while "Lint, build, test" was still
+# running, which makes the required check decorative. It now starts only when CI
+# has finished, and only if it succeeded.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 jobs:
   ship:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
