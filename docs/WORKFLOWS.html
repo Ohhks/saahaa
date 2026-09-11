@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SAAHAA — every workflow</title>
+<style>
+:root{--ink:#1a1614;--ink2:#5c5450;--ink3:#8a807a;--bg:#faf7f4;--card:#fff;
+--line:#e7ded6;--plum:#5b2c4d;--gold:#b8862f;--ok:#2f7d4f;--warn:#b4531f;--danger:#9c2c2c;
+--mono:ui-monospace,"Cascadia Mono",Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 20px 80px}
+h1{font-size:30px;letter-spacing:-.02em;margin:0 0 4px}
+h2{font-size:20px;margin:40px 0 12px;padding-top:18px;border-top:2px solid var(--plum);letter-spacing:-.01em}
+h3{font-size:15px;margin:22px 0 8px;color:var(--plum);text-transform:uppercase;letter-spacing:.06em}
+p{margin:0 0 10px;color:var(--ink2)}
+.sub{color:var(--ink3);margin-bottom:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px;display:block;overflow-x:auto}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:#f3ece6;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink2)}
+td.num,th.num{text-align:right;font-family:var(--mono);white-space:nowrap}
+code{font-family:var(--mono);font-size:.88em;background:#f2ece7;padding:1px 5px;border-radius:4px}
+.flow{font-family:var(--mono);font-size:12.5px;line-height:1.75;background:#fdfbf9;border:1px solid var(--line);
+border-left:3px solid var(--plum);border-radius:8px;padding:12px 14px;margin:10px 0;overflow-x:auto;white-space:pre;color:var(--ink)}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;letter-spacing:.03em}
+.t-c{background:#e8f0fb;color:#1e4d8c}.t-p{background:#eaf5ec;color:#2f7d4f}
+.t-s{background:#fdf0e3;color:#8a5a12}.t-a{background:#f6e9f2;color:#5b2c4d}
+.note{border-left:3px solid var(--gold);background:#fdf8ee;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0}
+.warn{border-left:3px solid var(--danger);background:#fdf1f1;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:12px 0}
+.k{font-size:12px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em}
+.v{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--plum)}
+ol,ul{margin:0 0 10px;padding-left:22px;color:var(--ink2)}li{margin:3px 0}
+.toc{columns:2;column-gap:28px;font-size:14px}.toc a{color:var(--plum);text-decoration:none;display:block;padding:2px 0}
+.toc a:hover{text-decoration:underline}
+@media print{body{background:#fff}.card,.flow{break-inside:avoid}h2{break-before:auto}}
+</style></head><body><div class="wrap">
+
+<h1>SAAHAA — every workflow</h1>
+<p class="sub">Generated from the code at <code>github.com/Ohhks/saahaa</code>. Every number below is read out of
+the source, not from a plan — if the code and this page disagree, the code is right and this page is a bug.</p>
+
+<div class="card"><div class="toc">
+<a href="#ids">1 · Identity — one code per person</a>
+<a href="#signup">2 · Signing up (3 doors)</a>
+<a href="#login">3 · Signing in</a>
+<a href="#svc">4 · A service job, end to end</a>
+<a href="#ask">5 · Asking several pros (sealed bids)</a>
+<a href="#retail">6 · A shop order, end to end</a>
+<a href="#pay">7 · Payment — the manual UPI rail</a>
+<a href="#money">8 · Where the money goes</a>
+<a href="#earn">9 · Every way to earn</a>
+<a href="#cancel">10 · Cancellations, returns, disputes</a>
+<a href="#admin">11 · The admin — role and daily work</a>
+<a href="#ledger">12 · The ledger</a>
+</div></div>
+
+<h2 id="ids">1 · Identity — one code per person</h2>
+<p>There is <strong>no SMS rail anywhere in SAAHAA</strong>, by design. One permanent code does two jobs.</p>
+<table><tr><th>Code</th><th>Who</th><th>What it does</th></tr>
+<tr><td><code>C20262001</code></td><td><span class="tag t-c">customer</span></td><td>signs her in <em>and</em> is the door code she reads to the pro</td></tr>
+<tr><td><code>P20262001</code></td><td><span class="tag t-p">pro</span></td><td>signs him in; printed on his public page</td></tr>
+<tr><td><code>S20262001</code></td><td><span class="tag t-s">shop</span></td><td>signs the shop in</td></tr></table>
+<div class="note"><strong>Why it is safe to say out loud.</strong> The code is a <em>name</em>, not a secret — the password
+is the secret. It proves the pro was standing at her door because only she could tell him, in person, at the door.
+One mobile number may hold a customer account <em>and</em> a pro account, each with its own password and wallet.</div>
+
+<h2 id="signup">2 · Signing up — three doors</h2>
+
+<h3><span class="tag t-c">customer</span> — one step</h3>
+<div class="flow">name + 10-digit mobile + password (8+ chars, PBKDF2 · 250,000 iterations)
+  └─ pick your area
+     └─ C2026xxxx issued, shown once in a dialog with a Copy button
+        └─ live. No approval, no wait.</div>
+
+<h3><span class="tag t-p">pro</span> — setup, then 7 verification steps</h3>
+<div class="flow">trade · your rate · area · password
+  └─ 1 phone   2 identity (Aadhaar/PAN — stored as SHA-256 + last 4 only)
+     3 selfie  4 trade quiz (5 questions, 3 tries, 24h lock after 3 wrong)
+     5 conduct quiz (6 questions, cannot be failed — it teaches)
+     6 UPI id  7 agreement  ──▶ live immediately. Nobody approves you.</div>
+<div class="warn"><strong>Disclosed at step 7, before you agree:</strong> a ₹100 stake locks per job, 10% of each
+payout waits 7 days, and cancelling a started job costs ₹40. The <strong>₹1,500 cap on your first 3 jobs</strong>
+currently appears only on the "you are live" screen, <em>after</em> signing — a known gap, logged.</div>
+
+<h3><span class="tag t-s">shop</span> — name it, photograph it, list stock</h3>
+<div class="flow">shop name · category · FSSAI/drug licence (required for 5 of 8 categories)
+  └─ shopfront photo · place on the map
+     └─ S2026xxxx issued
+        └─ stock from a ready list — about six seconds an item</div>
+<p>Licence-gated categories: <strong>kirana, fruit &amp; veg, meat, dairy</strong> (FSSAI) and <strong>pharmacy</strong> (drug licence).
+Water &amp; gas, stationery and pet supplies are not.</p>
+
+<h2 id="login">3 · Signing in</h2>
+<div class="flow">mobile number OR SAAHAA ID  +  password
+  ├─ unknown id        →  "No account with that ID"
+  ├─ wrong password    →  "Wrong password"
+  └─ correct           →  straight in. No OTP is ever sent.</div>
+<p>A number holding two accounts is asked which one. Language (English / हिन्दी / తెలుగు) survives sign-out.</p>
+
+<h2 id="svc">4 · A service job, end to end</h2>
+<div class="flow">SHE                                    HE
+──────────────────────────────────     ─────────────────────────────
+browse category → pick the exact job
+  (no total is shown until she picks —
+   "there is no honest total until you
+    have said which one")
+choose a pro  →  THE BILL
+  his price + SAAHAA's 8% on top
+address (required) → Confirm
+      │
+      └──── pays by UPI (§7) ──────────▶  he sees the claim, confirms it
+                                              │
+                                          accepts → travelling → arrived
+                                              │
+      reads him her C-code at the door ──▶ types it. Wrong code is refused.
+                                              │
+                                          work → photo (or an honest note)
+                                              │
+      Confirm &amp; release  ◀──────────────  "work finished"
+              │
+              └─ escrow releases: his quote in full, minus a 10% holdback
+                 that reaches him after 7 days
+      rate 1–5 ★</div>
+
+<h2 id="ask">5 · Asking several pros — sealed bids</h2>
+<div class="flow">"Ask N pros for their price"  (offered only where it can actually save her money)
+  └─ request opens for 12 minutes
+     └─ each pro sees the job + a fair-price band, and sends ONE rate
+        · he can never bid above his own advertised price for that job
+        · he sees no other pro's number
+     └─ window closes → she picks any of them, or keeps her held price
+        └─ accepting creates the order at that rate</div>
+<div class="note">Accepting is the <em>last</em> thing that happens: the request is not closed, and rival bids are not
+rejected, until a job actually exists. A booking that fails leaves the ask answerable.</div>
+
+<h2 id="retail">6 · A shop order, end to end</h2>
+<div class="flow">basket → per-item substitution choice
+   (Similar brand OK / Ask me / Just refund — no reply in 90s = refund, never a silent swap)
+  └─ checkout → pays by UPI (§7)
+     └─ shop accepts → picks &amp; WEIGHS
+         ├─ weighed LIGHT  → her bill comes down, difference refunded
+         └─ weighed HEAVY  → "she is not charged the extra", shop is told the cost
+     └─ hands to rider (or delivers itself) → she reads her C-code at the door
+        └─ she confirms → settles. Or returns items (§10).</div>
+
+<h2 id="pay">7 · Payment — the manual UPI rail</h2>
+<p>Until volume pays for an aggregator licence, the rail is one UPI id and two humans.</p>
+<div class="flow">SHE                          THE PRO / SHOP            THE ADMIN
+────────────────────────     ──────────────────        ─────────────────────
+pays  saahaa@ptyes
+  exact amount + reference SAxxxxxx
+  (a upi:// link fills all three in)
+      │
+types the 12-digit UTR
+her bank gave her
+      │
+      ▼
+  ┌ CLAIMED ┐ ───────────▶ sees it on her phone
+  └─────────┘              confirms
+                                 │
+                                 ▼
+                          ┌ PRO_CHECKED ┐ ─────────▶ matches the UTR in the
+                          └─────────────┘            bank statement
+                          job may START                    │
+                          — no money has moved             ▼
+                                                    ┌ CLEARED ┐
+                                                    └─────────┘
+                                                    escrow funded.
+                                                    Pro payable next morning.</div>
+<table><tr><th>Rule</th><th>Why</th></tr>
+<tr><td>A UTR must be exactly 12 digits</td><td>that is what NPCI issues; nothing else is a UTR</td></tr>
+<tr><td><strong>One UTR, one live claim</strong></td><td>otherwise: pay once, claim two jobs. Enforced by a unique index in Postgres, not a check that two requests can both pass</td></tr>
+<tr><td>A claim posts no ledger entry</td><td>a claim that could write to the ledger is a way to mint money by typing</td></tr>
+<tr><td>A short payment is not a paid order</td><td>escrow is funded with what the statement showed, and the shortfall is recorded</td></tr>
+<tr><td>Clearing twice funds once</td><td>tired humans double-click at 7am</td></tr></table>
+<div class="warn"><strong>The risk this accepts, stated plainly.</strong> A pro starts work on a <em>claim</em> and is settled
+next morning on a <em>fact</em>. The gap is bounded to one job and is the reason the payout batch runs after the
+statement is read. There is no automated defence against a forged UTR — only two people. That is the real cost of
+running without a payment-aggregator licence.</div>
+
+<h2 id="money">8 · Where the money goes</h2>
+<h3>Services</h3>
+<div class="grid">
+<div class="card"><div class="k">SAAHAA adds</div><div class="v">8%</div><p style="margin:4px 0 0;font-size:13px">on top of his quote — 6% for tier-4 certified pros</p></div>
+<div class="card"><div class="k">The pro keeps</div><div class="v">100%</div><p style="margin:4px 0 0;font-size:13px">of what he quoted. The fee is never taken out of his price</p></div>
+</div>
+<p>Example: he quotes <strong>₹500</strong> → fee ₹34 + GST ₹6 → <strong>she pays ₹540</strong>, he receives ₹500.</p>
+<h3>Retail</h3>
+<table><tr><th>What</th><th class="num">Amount</th></tr>
+<tr><td>Commission on the basket</td><td class="num">3% (5% in some categories)</td></tr>
+<tr><td>Minimum per order</td><td class="num">₹5</td></tr>
+<tr><td>Cap per order</td><td class="num">₹25 (₹50 in some)</td></tr>
+<tr><td>First orders for a new shop</td><td class="num">30 free</td></tr>
+<tr><td>Dispatch cut on a delivered order</td><td class="num">₹5</td></tr></table>
+
+<h2 id="earn">9 · Every way to earn</h2>
+<table><tr><th>Who</th><th>Earns from</th><th>Terms</th></tr>
+<tr><td><span class="tag t-p">pro</span></td><td>his quoted price, in full</td><td>10% of each payout held 7 days, cumulative cap ₹500</td></tr>
+<tr><td><span class="tag t-p">pro</span></td><td>on-site repricing for survey jobs</td><td>she must approve; capped at 3× the estimate, and never above his tier cap</td></tr>
+<tr><td><span class="tag t-p">pro</span></td><td>journey money if she cancels en route</td><td>30% of the quote</td></tr>
+<tr><td><span class="tag t-s">shop</span></td><td>basket minus commission</td><td>first 30 orders free of commission</td></tr>
+<tr><td><span class="tag t-s">shop</span></td><td>the delivery it makes itself</td><td>₹19 charged, ₹14 to the shop, ₹5 dispatch to SAAHAA</td></tr>
+<tr><td><span class="tag t-a">SAAHAA</span></td><td>the 8% / 6% service markup</td><td>plus GST, itemised separately on every bill</td></tr>
+<tr><td><span class="tag t-a">SAAHAA</span></td><td>retail commission + dispatch</td><td>as above</td></tr>
+<tr><td><span class="tag t-a">SAAHAA</span></td><td>cancellation fees</td><td>₹40 from a pro who abandons a started job</td></tr></table>
+<h3>What is <em>not</em> a charge</h3>
+<p>The <strong>₹100 stake</strong> (or 5% of the job, capped ₹500) and the <strong>10% holdback</strong> both come back.
+Only the ₹40 cancellation fee is money that leaves for good — and the app says so in those words.</p>
+<h3>Withdrawing</h3>
+<p>Minimum <strong>₹10</strong>, to a UPI id, in full or in part. The maximum offered is always the maximum accepted —
+balances print to the paisa precisely so the number on the button is a number the validator will take.</p>
+
+<h2 id="cancel">10 · Cancellations, returns, disputes</h2>
+<table><tr><th>When</th><th class="num">She gets back</th><th class="num">He keeps</th></tr>
+<tr><td>Before a pro accepted</td><td class="num">100%</td><td class="num">—</td></tr>
+<tr><td>More than 2h before the slot</td><td class="num">100%</td><td class="num">—</td></tr>
+<tr><td>Within 2h of the slot</td><td class="num">90%</td><td class="num">5%</td></tr>
+<tr><td>Pro already on the way</td><td class="num">60%</td><td class="num">30%</td></tr>
+<tr><td>Pro did not arrive</td><td class="num">100% + ₹100 credit</td><td class="num">—</td></tr>
+<tr><td>Pro cancelled a started job</td><td class="num">100%</td><td class="num">− ₹40 fee</td></tr></table>
+<p><strong>Returns</strong> are per item, not whole-basket. The shop is told the exact amount before it accepts, and the
+commission is recomputed on what she actually kept. <strong>Complaints</strong> freeze the order on both sides and are
+confirmed before filing — one tap cannot file one by accident.</p>
+
+<h2 id="admin">11 · The admin — role and daily work</h2>
+<p>Reach it at <code>/#/admin</code>. Separate password, PBKDF2-hashed; the plaintext exists nowhere in the repo.</p>
+
+<h3>What only the admin can do</h3>
+<table><tr><th>Power</th><th>Why it is not delegated</th></tr>
+<tr><td><strong>Clear a payment</strong></td><td>the one action that funds escrow. A customer cannot clear her own; nor can the pro who is owed it</td></tr>
+<tr><td>Set the pricing dials</td><td>markup %, caps, floors — live, without a deploy</td></tr>
+<tr><td>Resolve a dispute</td><td>release, refund, or split, after reading both sides</td></tr>
+<tr><td>Fresh start</td><td>wipes people and money, keeps the credential and the dials</td></tr>
+<tr><td>Read the audit log</td><td>every decision, who made it, when</td></tr></table>
+
+<h3>The morning routine</h3>
+<div class="flow">1. open /#/admin  →  "Payments to clear"  (it is the first section, because a pro is waiting)
+2. for each row — UTR · amount · reference — search the bank statement:
+      found, right amount   →  Clear      escrow funds, pro becomes payable
+      found, less than bill →  Clear with the amount actually seen
+                               the shortfall is recorded; chase it
+      not found             →  Reject     she can fix a typo and claim again
+3. pay each due pro from the same account
+4. record YOUR transfer's UTR against the payout
+      └─ every rupee in has a UTR, every rupee out has a UTR, both on the ledger</div>
+
+<h3>What to watch in the first fortnight</h3>
+<ul>
+<li><strong>Claims with no matching statement line.</strong> One is a typo. Three from one person is a pattern.</li>
+<li><strong>The gap between pro-check and clear.</strong> Past a morning, the pro is carrying your risk.</li>
+<li><strong>Anyone paying a different UPI id.</strong> The screen names exactly one and says nobody will ever ask for another.</li>
+</ul>
+
+<h2 id="ledger">12 · The ledger</h2>
+<p>Double-entry, hash-chained, append-only — in Postgres a trigger raises on UPDATE or DELETE, because an
+append-only table that merely <em>promises</em> to be append-only is a comment.</p>
+<div class="flow">CUSTOMER ──ESCROW_IN──▶ ESCROW:ord ──┬──ESCROW_RELEASE──▶ PARTNER ──HOLDBACK──▶ HOLDBACK
+                                     ├──FEE─────────────▶ PLATFORM:fee
+                                     ├──GST─────────────▶ PLATFORM:gst
+                                     └──REFUND──────────▶ CUSTOMER
+
+every order:  ESCROW_IN  =  release + fee + gst  ( + rider + dispatch on retail )</div>
+<p>Money is stored as integer paise, never a float. Every partner sees his own passbook, to the paisa, with a line
+that states what the column adds up to and names each pocket it is split across.</p>
+
+<p class="sub" style="margin-top:34px;border-top:1px solid var(--line);padding-top:14px">
+Gates protecting all of the above: 301 unit tests · 30 rendered screens · 17 money journeys (186 assertions) ·
+34 payment-rail assertions · 27 Worker assertions. <code>bash tools/preflight.sh</code> runs every one.</p>
+
+</div></body></html>
