@@ -53,7 +53,7 @@ jobs:
             echo "Rollback: Actions -> Deploy to Pages -> Run workflow -> pick tag \`${{ steps.ver.outputs.tag }}\`."
           } >> NOTES.md
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           name: SAAHAA ${{ steps.ver.outputs.tag }}
           body_path: NOTES.md
