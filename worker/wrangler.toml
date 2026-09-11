@@ -1,0 +1,6 @@
+name = "saahaa-api"
+main = "index.js"
+compatibility_date = "2026-01-01"
+
+# Secrets are set with `wrangler secret put NAME` and never live in this file:
+#   SUPABASE_URL, SUPABASE_SERVICE_KEY, HOOK_SECRET, ADMIN_CODES, NOTIFY_URL

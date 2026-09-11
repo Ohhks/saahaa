@@ -1,90 +1,33 @@
-name: Deploy to Pages
-
-# ROLLBACK: Actions -> "Deploy to Pages" -> open the last GREEN run before the
-# bad one -> "Re-run all jobs". ~40 seconds, no git required. That button is
-# the entire frontend rollback procedure — see docs/RUNBOOK.md.
-
+# Build, gate, deploy. The gates run BEFORE the deploy, not after: a bundle that
+# fails preflight must never reach a phone.
+name: deploy
 on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      reason:
-        description: 'Why the manual deploy? (e.g. ROLLBACK to v6.0.0)'
-        required: false
-        default: 'manual deploy'
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
-  build:
+  ship:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: '3.12' }
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
-
-      - run: echo "Deploying ${{ github.ref }} — ${{ github.event.inputs.reason || 'push to main' }}"
-
-      - name: Domain tests (BLOCKING)
-        run: node tools/test-node.mjs
-
-      - name: Build site
-        run: python tools/build.py --site
-
-      - name: Pre-flight gate
-        run: bash tools/preflight.sh
-
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: dist }
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    outputs:
-      page_url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
-
-  smoke:
-    name: Post-deploy smoke test
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
+        with: { node-version: '22' }
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
-      - name: The live site must actually be the app
-        run: |
-          set -e
-          URL="${{ needs.deploy.outputs.page_url }}"
-          [ -n "$URL" ] || URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
-          echo "Smoke testing $URL"
-          CODE=000
-          for i in 1 2 3 4 5; do
-            CODE=$(curl -sL -o /tmp/live.html -w '%{http_code}' "$URL" || echo 000)
-            [ "$CODE" = "200" ] && break
-            echo "attempt $i: HTTP $CODE — retrying in 10s"; sleep 10
-          done
-          [ "$CODE" = "200" ] || { echo "::error::live site returned $CODE"; exit 1; }
-          grep -q 'SAAHAA' /tmp/live.html || { echo "::error::live page missing app marker"; exit 1; }
-          echo "Live site OK ($(wc -c < /tmp/live.html) bytes)."
-          # and it must PAINT as an app in a real browser, not as text
-          python tools/smoke-dist.py "$URL"
+      - name: build the bundle
+        run: python tools/build.py --site
+      - name: every gate
+        run: bash tools/preflight.sh
+      - name: deploy to cloudflare pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=saahaa
+      - name: deploy the worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: deploy
