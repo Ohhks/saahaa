@@ -25,6 +25,7 @@ import { kmBetween, etaMins, geoOf, nameOf } from '../../domain/match.js';
 import * as gmap from '../map.js';
 import * as photo from '../photo.js';
 import * as flow from '../../domain/flow.js';
+import * as PAY from '../../domain/payments.js';
 import * as flags from '../../core/flags.js';
 import * as M from '../../core/money.js';
 import * as W from '../../domain/wallet.js';
@@ -878,10 +879,23 @@ const EV_CSS = `<style>
    on a hard-coded id list */
 function actionPanel(o, r) {
   const s = o.stage;
+  /* the manual rail's state for THIS order, read once and used by both sides */
+  const payClaim = PAY.paymentFor(o.id);
+  const payDue = !!o.awaitingPayment && (!payClaim || payClaim.state === 'AWAITING_UTR');
   const B = (act, label, cls = 'btn--primary') =>
     `<button class="btn ${cls} btn--lg btn--block" style="justify-content:flex-start" data-act="${act}" data-id="${o.id}">${label}</button>`;
 
   if (r.isPartner) {
+    /* HIS SIDE OF THE MANUAL RAIL. She says she has paid; he is standing there
+       and can see her bank app. His check is not proof — the statement is — but
+       it is the check that takes two seconds and lets the job start. */
+    if (payClaim && payClaim.state === 'CLAIMED') return panel(t('pay.didYouSee'), `
+      <div class="m-kv"><span>${esc(t('pay.utrShort'))}</span><span class="num">${esc(payClaim.utr)}</span></div>
+      <div class="m-kv m-kv--total"><span>${esc(t('pay.sheSent'))}</span><span class="num">${M.fmt2(payClaim.expected)}</span></div>
+      <p class="micro muted" style="margin:10px 0 0">${esc(t('pay.proCheckNote'))}</p>
+      ${B('pay.procheck.yes', t('pay.iSawIt'))}
+      <button class="btn btn--ghost btn--block btn--sm" style="margin-top:6px"
+        data-act="pay.procheck.no" data-id="${esc(o.id)}">${esc(t('pay.cannotSee'))}</button>`);
     if (s === 'MATCHING')    return panel(t('job.newForYou'), B('stage.accept', t('job.acceptThis')));
     if (s === 'ASSIGNED')    return panel(t('job.headToCustomer'), `${whereTo(o)}${B('stage.enroute', t('job.startTravelling'))}
       <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px;color:var(--color-accent-400)"
@@ -1082,6 +1096,28 @@ function actionPanel(o, r) {
   }
 
   if (r.isCustomer) {
+    /* NOTHING ELSE MATTERS UNTIL SHE HAS PAID. On the manual rail the order
+       exists and no money does, so this stands in front of every other panel:
+       one UPI id, the exact amount, a reference short enough to survive a bank
+       narration, and a button that opens her own UPI app with all three filled
+       in. Then the one number only her bank can give her. */
+    if (payDue || (payClaim && payClaim.state === 'CLAIMED')) {
+      const ins = PAY.instruction(o);
+      const waiting = payClaim && payClaim.state === 'CLAIMED';
+      return panel(t(waiting ? 'pay.checkingTitle' : 'pay.payTitle'), `
+        ${waiting ? `<p class="m-note" style="margin:0 0 12px">${esc(t('pay.waitingNote', { utr: payClaim.utr }))}</p>` : `
+        <div class="m-kv"><span>${esc(t('pay.payTo'))}</span><span class="num" style="user-select:text">${esc(ins.upi)}</span></div>
+        <div class="m-kv"><span>${esc(t('pay.reference'))}</span><span class="num" style="user-select:text">${esc(ins.reference)}</span></div>
+        <div class="m-kv m-kv--total"><span>${esc(t('pay.exactly'))}</span><span class="num">${esc(ins.amountText)}</span></div>
+        <a class="btn btn-primary btn--block" style="margin-top:14px" href="${esc(ins.link)}">${esc(t('pay.openUpiApp'))}</a>
+        <p class="micro muted" style="margin:10px 0 4px">${esc(t('pay.thenUtr'))}</p>
+        <div class="field">
+          <input id="utrBox" inputmode="numeric" maxlength="12" placeholder=" " autocomplete="off">
+          <label>${esc(t('pay.utrLabel'))}</label>
+        </div>
+        <button class="btn btn-primary btn--block" data-act="pay.claim" data-id="${esc(o.id)}">${esc(t('pay.iHavePaid'))}</button>
+        <p class="micro muted" style="margin-top:10px">${esc(t('pay.safetyNote'))}</p>`}`);
+    }
     /* THE MOMENT THE BOOKING SHEET PROMISED HER, FINALLY EXISTING. "He confirms
        it when they arrive and nothing starts until you approve the number" —
        and until now no screen ever showed her a number to approve. */

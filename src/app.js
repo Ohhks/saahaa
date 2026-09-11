@@ -29,6 +29,7 @@ import './core/migrations.js';
 import { defaultState } from './domain/state.js';
 import { buildSeed } from './domain/seed.js';
 import * as flow from './domain/flow.js';
+import * as PAY from './domain/payments.js';
 import * as W from './domain/wallet.js';
 import { CANCEL_RULES } from './domain/pricing.js';
 import * as auction from './domain/auction.js';
@@ -521,6 +522,25 @@ function wireActions() {
     toast(`Password changed for ${r.account.code || r.account.name}. Sign in with it now.`);
     auth.setAuthTab('login'); go('auth');
   });
+  /* ── the manual UPI rail ───────────────────────────────────
+     She claims, he checks, an admin clears. Only the last one funds escrow,
+     and it is the only one of the three that touches the ledger. */
+  A('pay.claim', d => {
+    const el = document.getElementById('utrBox');
+    const r = PAY.claimUtr(d.id, el ? el.value : '');
+    toast(r.ok ? i18n.t('pay.claimThanks') : r.reason, r.ok ? 'ok' : 'danger');
+    render();
+  });
+  A('pay.procheck.yes', d => { PAY.proCheck(d.id, true); toast(i18n.t('pay.proThanks')); render(); });
+  A('pay.procheck.no',  d => { PAY.proCheck(d.id, false); toast(i18n.t('pay.proFlagged'), 'warn'); render(); });
+  A('pay.admin.clear', async d => {
+    const r = PAY.adminClear(d.id, { ok: true });
+    if (r.ok) await flow.fundClearedOrder(d.id, r.payment ? r.payment.seen : null);
+    toast(r.ok ? `Cleared — escrow funded` : r.reason, r.ok ? 'ok' : 'danger');
+    render();
+  });
+  A('pay.admin.reject', d => { PAY.adminClear(d.id, { ok: false, note: 'not in the statement' }); toast('Rejected', 'warn'); render(); });
+
   A('admin.reset', d => admin.resetPassword && admin.resetPassword(d.key));
 
   A('account.erase', () => {

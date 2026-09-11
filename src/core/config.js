@@ -109,7 +109,10 @@ export function paymentsConfig() {
   } catch (e) {}
   const saved = o || persist.read(KEY_PAY, null) || {};
   const cfg = { ...PAYMENTS, ...saved };
-  cfg.mode = cfg.mode === 'razorpay' ? 'razorpay' : 'sim';
+  /* three rails now — the manual UPI one is what actually runs in production
+     until volume pays for an aggregator licence. Normalising it away here was
+     quietly defeating core/gateway.js, which had already learned about it. */
+  cfg.mode = cfg.mode === 'razorpay' ? 'razorpay' : cfg.mode === 'upi-manual' ? 'upi-manual' : 'sim';
   return cfg;
 }
 export function setPaymentsConfig({ mode, keyId, functionsUrl } = {}) {

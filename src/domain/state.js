@@ -22,6 +22,7 @@ export function defaultState() {
     chain:    { length: 0, lastHash: 'GENESIS' },
     reviews:  [],
     disputes: [],
+    payments: [],        // manual UPI claims: see domain/payments.js
     chats:    {},
     agg:      { serviceOrders:0, retailOrders:0, gmv:0, revenue:0, gst:0, refunds:0, escrow:0, saved:0 },
     admin:    { setupDone:false, salt:'', iterations:0, hash:'', changedAt:0 },
@@ -150,6 +151,21 @@ register('reducer', { id:'reviews', slice:'reviews', reduce(s = [], a) {
     case 'review/add':  return [a.payload].concat(s).slice(0, 500);
     case 'review/hide': return patch(s, a.payload.id, r => ({ ...r, hidden:true, hiddenAt:Date.now() }));
     default: return s;
+  }
+}});
+
+/* MANUAL UPI CLAIMS. A row here is what somebody SAID they paid until an admin
+   has read the statement. Never trimmed while unresolved: an uncleared claim is
+   a customer whose money is in limbo, and evicting the oldest would evict the
+   one that has waited longest — the same rule disputes follow above. */
+register('reducer', { id:'payments', slice:'payments', reduce(s = [], a) {
+  switch (a.type) {
+    case 'payment/add':   return [a.payload].concat(s);
+    case 'payment/patch': return s.map(p => p.id === a.payload.id
+      ? { ...p, ...(a.payload.patch || {}) } : p);
+    case 'seed/done':     return s;
+    case 'state/replace': return (a.payload && a.payload.payments) || [];
+    default:              return s;
   }
 }});
 

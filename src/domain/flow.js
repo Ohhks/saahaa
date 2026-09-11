@@ -226,6 +226,24 @@ function sameMobile(partner, session) {
   return !!a && a === b;
 }
 
+/** MONEY THE BANK HAS ACTUALLY SEEN. Called once an admin has matched a UTR to
+    the statement (domain/payments.js holds the decision; this posts the legs).
+    Idempotent on purpose: clearing twice is a thing tired humans do at 7am, and
+    it must not fund escrow twice. */
+export async function fundClearedOrder(orderId, seenPaise = null) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o) return null;
+  if (!o.awaitingPayment) return null;                 // already funded, or not a manual order
+  const amt = seenPaise == null ? (o.customerPays | 0) : (seenPaise | 0);
+  if (amt <= 0) return null;
+  await ledger('ESCROW_IN', amt, 'CUSTOMER:' + o.customerKey, 'ESCROW:' + o.id,
+               { via: 'upi-manual', orderId });
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { awaitingPayment: false, collected: amt } } });
+  bumpAgg({ escrow: getState().agg.escrow + amt });
+  audit.record('payment.escrowFunded', { orderId, paise: amt }, me() ? me().key : 'admin');
+  return amt;
+}
+
 export async function bookService({ catId, partner, sub, deal, slot }) {
   const s = me();
   if (!s) throw new Error('Please sign in first');
@@ -300,12 +318,21 @@ export async function bookService({ catId, partner, sub, deal, slot }) {
     otp: String(s.code || '') || makeOtp(), otpVerified: false, evidence: [], escrowed: q.customerPays,
   };
   dispatch({ type: 'order/add', payload: order });
-  // the customer's money is in their SAAHAA wallet first (wallet balance, then the gateway for the rest); only then is it locked
-  const paid = await fund(s.key, q.customerPays, 'service', { orderId: order.id });
-  dispatch({ type: 'order/patch', payload: { id: order.id, patch: { paidFromWallet: paid.fromWallet, collected: paid.collected } } });
-  await ledger('ESCROW_IN', q.customerPays, 'CUSTOMER:' + s.key, 'ESCROW:' + order.id,
-               { catId, deal: q.deal, fee: q.platformFee, gst: q.gst });
-  bumpAgg({ escrow: getState().agg.escrow + q.customerPays });
+  /* ON THE MANUAL RAIL THERE IS NOTHING TO COLLECT YET. She has not paid when
+     she taps Confirm -- she is about to, in her own bank's app -- so booking
+     records an order AWAITING PAYMENT and funds no escrow. Escrow is posted by
+     `fundClearedOrder` when an admin has matched the UTR to the statement.
+     Anything else would let a tap create money the bank has never seen. */
+  if (gateway.isManual()) {
+    dispatch({ type: 'order/patch', payload: { id: order.id, patch: { awaitingPayment: true } } });
+  } else {
+    // the customer's money is in their SAAHAA wallet first (wallet balance, then the gateway for the rest); only then is it locked
+    const paid = await fund(s.key, q.customerPays, 'service', { orderId: order.id });
+    dispatch({ type: 'order/patch', payload: { id: order.id, patch: { paidFromWallet: paid.fromWallet, collected: paid.collected } } });
+    await ledger('ESCROW_IN', q.customerPays, 'CUSTOMER:' + s.key, 'ESCROW:' + order.id,
+                 { catId, deal: q.deal, fee: q.platformFee, gst: q.gst });
+    bumpAgg({ escrow: getState().agg.escrow + q.customerPays });
+  }
   audit.record('booking.created', { id: order.id, catId, deal: q.deal }, s.key);
 
   /* "PRO ACCEPTED" USED TO BE A 900ms TIMER. Nobody had accepted anything — the

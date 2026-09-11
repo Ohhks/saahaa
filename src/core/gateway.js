@@ -27,11 +27,22 @@ import { nid } from './id.js';
 import { paymentsConfig } from './config.js';
 import { accessToken } from '../net/supabase.js';
 
-export const mode = () => paymentsConfig().mode === 'razorpay' ? 'razorpay' : 'sim';
+/* THREE RAILS, NOT TWO. `sim` is the honest sandbox; `razorpay` is the PSP we
+   have not earned yet; `upi-manual` is what actually runs until volume pays for
+   a licence — she transfers to one UPI id herself and two humans confirm it.
+   The manual rail collects NOTHING here: there is no API to call, so `collect`
+   must not pretend to succeed. domain/payments.js records the claim and
+   flow.fundClearedOrder posts the legs once an admin has read the statement. */
+export const mode = () => {
+  const m = paymentsConfig().mode;
+  return m === 'razorpay' ? 'razorpay' : m === 'upi-manual' ? 'upi-manual' : 'sim';
+};
 export const isSandbox = () => mode() === 'sim';
+export const isManual = () => mode() === 'upi-manual';
 export const VIA = 'upi-sim';                                    // the sandbox leg label (kept for tests and old legs)
-export const via = () => isSandbox() ? 'upi-sim' : 'razorpay';
-export const label = () => isSandbox()
+export const via = () => isSandbox() ? 'upi-sim' : isManual() ? 'upi-manual' : 'razorpay';
+export const label = () => isManual() ? 'UPI — you pay SAAHAA directly'
+  : isSandbox()
   ? 'Sandbox UPI — no real money moves yet'
   : 'UPI · cards · net banking via Razorpay';
 

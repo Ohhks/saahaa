@@ -27,6 +27,7 @@
 import { mount, esc, toast, timeAgo, clockTime, sheet, closeSheet, delegate, $ } from '../dom.js';
 import { icon } from '../icons.js';
 import { ctx, getState, dispatch } from '../../core/ctx.js';
+import * as PAY from '../../domain/payments.js';
 import { get, namespaces, count } from '../../core/registry.js';
 import * as adminauth from '../../core/adminauth.js';
 import * as audit from '../../core/audit.js';
@@ -287,6 +288,22 @@ export function render() {
      render path, never blocking it, and never able to break it. */
   scheduleMap();
 
+  /* THE MORNING LIST. Every payment a pro has vouched for and nobody has yet
+     matched to the bank statement. This is the screen that decides whether a
+     pro gets paid today, so it shows the three things a statement is searched
+     by -- the UTR, the amount, the reference -- and nothing else. */
+  const payQueue = PAY.queue('PRO_CHECKED');
+  const payClaimed = PAY.queue('CLAIMED');
+  const payRow = (p, checked) => `<tr>
+    <td class="num" style="user-select:text">${esc(p.utr || '')}</td>
+    <td class="num">${M.fmt2(p.expected)}</td>
+    <td style="user-select:text">${esc(p.reference || '')}</td>
+    <td class="tiny muted">${checked ? 'pro checked' : 'awaiting pro'}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn--primary btn--sm" data-act="pay.admin.clear" data-id="${esc(p.orderId)}">Clear</button>
+      <button class="btn btn--ghost btn--sm" data-act="pay.admin.reject" data-id="${esc(p.orderId)}">Reject</button>
+    </td></tr>`;
+
   return `${ADMIN_CSS}
   <div class="ad">
   <header class="ad-hdr on-plum">
@@ -301,6 +318,19 @@ export function render() {
     </div>
   </header>
   <main class="wrap">
+    <!-- FIRST, BECAUSE A PRO IS WAITING ON IT. Everything else on this page can
+         wait a day; this is the list that decides whether somebody is paid this
+         morning for work they finished last night. -->
+    ${(payQueue.length || payClaimed.length) ? `<section class="ad-sec">
+      <h2 class="ad-h">Payments to clear <span class="pill pill--warn">${payQueue.length + payClaimed.length}</span></h2>
+      <p class="tiny muted" style="margin:0 0 8px">Match each UTR in the bank statement for ${esc(PAY.PAYEE_UPI)}, then clear it. Clearing funds escrow; a pro is paid from cleared money only.</p>
+      <div class="tablewrap"><table class="table"><thead><tr>
+        <th>UTR</th><th class="num">Amount</th><th>Reference</th><th>Stage</th><th></th>
+      </tr></thead><tbody>
+        ${payQueue.map(x => payRow(x, true)).join('')}
+        ${payClaimed.map(x => payRow(x, false)).join('')}
+      </tbody></table></div>
+    </section>` : ''}
     <div class="capsules ad-kpis">
       ${capsule('In flight', liveOrders, 'orders not yet settled', 'info')}
       ${capsule('Awaiting you', queued, 'approvals only you can give', queued ? 'warn' : 'soft')}
