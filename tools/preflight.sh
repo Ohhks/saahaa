@@ -82,5 +82,6 @@ node   tools/test-node.mjs       || fail "domain tests failed at the gate"
 node   tools/render-views.mjs    || fail "a screen does not build (tools/render-views.mjs)"
 node   tools/journey.mjs         || fail "a rupee did not arrive where it was meant to"
 node   tools/pay-journey.mjs     || fail "the manual UPI rail lets money be claimed twice (tools/pay-journey.mjs)"
+node   tools/worker-test.mjs    || fail "the Worker lets somebody clear money who must not (tools/worker-test.mjs)"
 
 echo "=== PRE-FLIGHT PASSED — safe to publish ==="
