@@ -29,6 +29,7 @@ import { getPricing } from '../../domain/settings.js';
 import { MIN_STAKE, MAX_STAKE, STAKE_PCT } from '../../domain/wallet.js';
 import { HOLDBACK_DAYS } from '../../domain/ledger.js';
 import * as M from '../../core/money.js';
+import { t, lang } from '../i18n.js';
 
 export const PAGES = ['terms', 'privacy', 'refunds', 'contact', 'about'];
 export const UPDATED = '9 September 2026';
@@ -363,6 +364,14 @@ export function render(page = 'terms') {
     ${banner()}
     ${localBanner()}
     ${nav(id)}
+    <!-- HALF-TRANSLATING A REFUND POLICY IS WORSE THAN NOT TRANSLATING IT.
+         The picker offers తెలుగు, and this page — Terms, Privacy, Refunds, the
+         three that decide what happens to her money — stayed English, so a
+         customer who switched language had every reason to believe she had
+         read it. The rest of the product speaks her language now; this page
+         says plainly that it does not yet, in her language, rather than
+         guessing at a translation of the one text that has to be exact. -->
+    ${lang() !== 'en' ? `<p class="m-note" style="margin-top:var(--sp-8)">${esc(t('legal.onlyEnglish'))}</p>` : ''}
     <p class="card-kicker" style="margin-top:var(--sp-8)">Last updated ${esc(UPDATED)}</p>
     <h1 class="lg-h1">${esc(TITLES[id])}</h1>
     ${BODY[id]()}

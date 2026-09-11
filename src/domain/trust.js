@@ -152,3 +152,30 @@ export const isProvisional = p => !!p && (p.tier | 0) >= 2 && (p.countedJobs ?? 
 export const effectiveCap = p => isProvisional(p) ? PROVISIONAL_CAP : tier(p && p.tier).capPaise;
 export const capOk = (partner, dealPaise) => dealPaise <= effectiveCap(partner);
 export { M as money };
+
+/* ── an unrated pro has no rating, and must not be given one ──────
+   Three separate screens invented a star figure for a partner nobody had ever
+   rated: the "open now" list printed 4.5 ★, the bid card printed 4.2 ★ — under
+   a comment reading "real stars from real ratings — never a rescaled score
+   component dressed up as a rating" — and the profile page, alone, printed the
+   truth. So the same new plumber was 4.5 in one list, 4.2 in another, and
+   unrated on his own page, and a customer choosing between two bids was
+   comparing a real average against a number the app made up.
+
+   `ratingScore` in domain/bidding.js also uses 4.2, and that one is correct and
+   stays: it is a Bayesian prior used to RANK, never shown to anybody. The rule
+   is only about what is displayed. `avg` is null until somebody has actually
+   rated, and every caller must render that absence rather than fill it in. */
+export function ratingOf(partner) {
+  const r = (partner && partner.ratings) || [];
+  return { count: r.length,
+           avg: r.length ? r.reduce((a, x) => a + x.stars, 0) / r.length : null };
+}
+/** What to show where a star figure would go when there is none yet: the real
+    thing we do know. "New" is honest; "4.5 ★" is not. */
+export function ratingLabel(partner) {
+  const { count, avg } = ratingOf(partner);
+  if (count) return `${avg.toFixed(1)} ★ · ${count}`;
+  const jobs = (partner && partner.completed) | 0;
+  return jobs ? `New · ${jobs} job${jobs === 1 ? '' : 's'}` : 'New';
+}

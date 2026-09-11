@@ -6,6 +6,12 @@ import { describe, it, expect } from './selftest.js';
 import * as L from '../domain/ledger.js';
 import * as BID from '../domain/bidding.js';
 import { quoteService, releaseService, GST_RATE } from '../domain/pricing.js';
+import * as M from '../core/money.js';
+import { ratingOf, ratingLabel } from '../domain/trust.js';
+import { CANCEL_RULES, cancelSplit } from '../domain/pricing.js';
+import * as W from '../domain/wallet.js';
+import { canTransition } from '../domain/orders.js';
+import '../domain/state.js';
 
 /* ── LEDGER ────────────────────────────────────────────────── */
 describe('ledger · nothing is created and nothing vanishes', () => {
@@ -354,5 +360,206 @@ describe('retail settlement · the dispatch cut is the residual, so escrow empti
     expect(q.freeDelivery).toBeTrue();
     expect(q.riderPayout).toSatisfy(n => n > 0, 'rider paid');
     expect(residual(q)).toSatisfy(n => n > 0, 'the cut is carved even when the customer pays nothing for delivery');
+  });
+});
+
+/* ── a rating nobody gave ──────────────────────────────────────
+   The same unrated plumber read 4.5 ★ in the "open now" list, 4.2 ★ on his bid
+   card and unrated on his own profile, because three screens each invented a
+   different fallback. A customer comparing two bids was comparing one real
+   average against one made-up number, on the most trust-loaded card in the
+   product — and the bid card carried a comment promising it never did that. */
+describe('ratings · an unrated pro is never given a score', () => {
+  const unrated = { id: 'p1', completed: 0, ratings: [] };
+  const newish  = { id: 'p2', completed: 4, ratings: [] };
+  const rated   = { id: 'p3', completed: 9, ratings: [{ stars: 5 }, { stars: 4 }] };
+
+  it('no ratings means no average — not 4.5, not 4.2, not zero-dressed-as-a-score', () => {
+    expect(ratingOf(unrated).avg).toBe(null);
+    expect(ratingOf(newish).avg).toBe(null);
+    expect(ratingOf(null).avg).toBe(null);
+    expect(ratingOf(unrated).count).toBe(0);
+  });
+
+  it('a real average is the real average, and carries how many gave it', () => {
+    expect(ratingOf(rated).avg).toBe(4.5);
+    expect(ratingOf(rated).count).toBe(2);
+    expect(ratingLabel(rated)).toBe('4.5 ★ · 2');
+  });
+
+  it('the label prints what we actually know instead of a star figure', () => {
+    expect(ratingLabel(unrated)).toBe('New');
+    expect(ratingLabel(newish)).toBe('New · 4 jobs');
+    expect(ratingLabel({ completed: 1, ratings: [] })).toBe('New · 1 job');
+  });
+
+  it('no label anywhere contains a star for somebody nobody rated', () => {
+    for (const p of [unrated, newish, { completed: 300, ratings: [] }]) {
+      expect(ratingLabel(p).includes('★')).toBe(false);
+    }
+  });
+});
+
+/* ── cancelling early must not cost what not turning up costs ──
+   The pro's sheet promised "you keep your stake, and this is recorded as a
+   cancellation, not a no-show", and the engine forfeited the stake to the
+   customer on WORKER_CANCEL exactly as it did on WORKER_NO_SHOW. A pro who did
+   the honest thing the agreement asks of him lost the same money as one who
+   simply did not turn up — so there was no reason left to cancel, which is the
+   entire behaviour the feature exists to buy. Meanwhile the Rs.100 the public
+   refunds page has charged him in writing since 8.0 was collected by nothing. */
+describe('cancellation · the honest route has to be the cheaper one', () => {
+  const DEAL = 52000;
+
+  it('the two rules are not the same act', () => {
+    const cancel = CANCEL_RULES.WORKER_CANCEL, noshow = CANCEL_RULES.WORKER_NO_SHOW;
+    expect(cancel.refundPct).toBe(1.00);
+    expect(noshow.refundPct).toBe(1.00);
+    /* she is made whole either way — the difference is what it costs HIM */
+    expect(cancel.workerFee | 0).toSatisfy(v => v > 0, 'an early cancel carries a real fee');
+  });
+
+  it('the published fee is a real number the app can charge', () => {
+    const s = cancelSplit(DEAL, 'WORKER_CANCEL');
+    expect(s.workerFee).toBe(CANCEL_RULES.WORKER_CANCEL.workerFee);
+    expect(s.workerFee).toBe(4000);               // Rs.40, as printed on the refunds page
+  });
+
+  it('a cancelled job still refunds her every paisa she paid', () => {
+    const q = quoteService(DEAL);
+    const s = cancelSplit(DEAL, 'WORKER_CANCEL');
+    expect(s.refund).toBe(q.customerPays);
+    expect(s.worker).toBe(0);
+  });
+
+  it('the fee is smaller than the SMALLEST stake, at every job size there is', () => {
+    /* the whole point: telling her now must cost him less than walking away.
+       Measuring that against one deal was not enough — the fee was Rs.100 and
+       equalled the stake on the ordinary Rs.520 job while passing at Rs.5,000.
+       `stakeFor` never returns below MIN_STAKE, so clearing that clears all. */
+    expect(CANCEL_RULES.WORKER_CANCEL.workerFee).toSatisfy(v => v < W.MIN_STAKE,
+      `Rs.${CANCEL_RULES.WORKER_CANCEL.workerFee / 100} fee vs the Rs.${W.MIN_STAKE / 100} floor stake`);
+    for (const deal of [20000, 52000, 150000, 500000, 2000000]) {
+      expect(CANCEL_RULES.WORKER_CANCEL.workerFee).toSatisfy(v => v < W.stakeFor(deal),
+        `cancelling must beat no-showing on a Rs.${deal / 100} job`);
+    }
+  });
+
+  it('he can actually reach the control from every stage he might need it', () => {
+    for (const stage of ['ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS']) {
+      expect(canTransition(stage, 'CANCELLED')).toBe(true);
+    }
+  });
+});
+
+/* ── the shapes the fifth audit found ─────────────────────────
+   Each of these is a claim the product made in writing and could not keep.
+   They are pinned as arithmetic and as state-machine edges, which is all that
+   can be pinned without a store — the journeys themselves are driven in the
+   browser. What matters is that a later edit cannot quietly close the door
+   again, because closing it fails here. */
+describe('cancellation · SAAHAA cannot keep money it never receives', () => {
+  it('every rule splits the whole customer price into three named parts', () => {
+    for (const rule of Object.keys(CANCEL_RULES)) {
+      for (const deal of [20000, 52000, 150000]) {
+        const q = quoteService(deal);
+        const s = cancelSplit(deal, rule);
+        expect(s.refund + s.worker + s.platform).toBe(q.customerPays,
+          `${rule} at ${deal}: ${s.refund}+${s.worker}+${s.platform} != ${q.customerPays}`);
+      }
+    }
+  });
+  it('the rules that keep a share actually have one to post', () => {
+    /* the bug: `platform` was computed, printed on the cancel sheet, and never
+       posted, so it stayed in the escrow of a CANCELLED order for ever */
+    expect(cancelSplit(52000, 'EN_ROUTE').platform).toSatisfy(v => v > 0, 'EN_ROUTE keeps a share');
+    expect(cancelSplit(52000, 'LATE_2H').platform).toSatisfy(v => v > 0, 'LATE_2H keeps a share');
+    expect(cancelSplit(52000, 'BEFORE_ACCEPT').platform).toBe(0, 'and an early cancel keeps nothing');
+  });
+});
+
+describe('on-site pricing · the promise on the booking sheet has edges to run on', () => {
+  it('a pro who has arrived can put a price up for approval', () => {
+    expect(canTransition('ARRIVED', 'AWAITING_APPROVAL')).toBe(true);
+  });
+  it('she can agree, and it goes back to the doorstep — not straight to work', () => {
+    /* approving a price is not starting the job: the code is still typed */
+    expect(canTransition('AWAITING_APPROVAL', 'ARRIVED')).toBe(true);
+  });
+  it('she can refuse, and the job ends there', () => {
+    expect(canTransition('AWAITING_APPROVAL', 'CANCELLED')).toBe(true);
+  });
+  it('a refusal is a rule that costs her nothing and holds nothing against him', () => {
+    const r = CANCEL_RULES.AFTER_ACCEPT_2H;
+    expect(r.refundPct).toBe(1);
+    expect(r.workerFee | 0).toBe(0);
+  });
+});
+
+describe('returns · a shop that says no is not overruled by a clock', () => {
+  it('a contested return can reach a person', () => {
+    expect(canTransition('R_RETURN', 'DISPUTED')).toBe(true);
+  });
+  it('and a disputed retail order can still be closed by the owner', () => {
+    expect(canTransition('DISPUTED', 'R_REFUNDED')).toBe(true);
+    expect(canTransition('DISPUTED', 'R_CANCELLED')).toBe(true);
+  });
+});
+
+/* ── the bills have to add up on screen ────────────────────────
+   A real order printed "₹685 + ₹46 + ₹8" under a total reading "You pay ₹740",
+   and the wallet passbook — labelled "hash-chained: verified, never edited" —
+   summed to minus one rupee against a printed balance of zero. Every paise
+   underneath was exact; only the display was wrong, which is the worst version:
+   a correct ledger failing its own published audit claim in front of somebody
+   who checks the arithmetic in her head.
+
+   Rounding is not distributive. These pin the only fix that works. */
+describe('money · what is printed must sum to what is printed', () => {
+  it('the parts add up to the total, on a bill that genuinely drifts', () => {
+    /* ₹685.50 + ₹10.50 + ₹10.50 = ₹706.50. Rounded independently that is
+       686 + 11 + 11 = ₹708 under a total printing ₹707 — the shape the audit
+       found on a live order. */
+    const parts = [68550, 1050, 1050];
+    const total = 70650;
+    const naive = parts.reduce((n, p) => n + Math.round(p / 100), 0);
+    expect(naive).toBe(708, 'rounding each part independently really does drift');
+    expect(Math.round(total / 100)).toBe(707, 'and the total rounds the other way');
+    const out = M.roundParts(parts, total);
+    expect(out.reduce((a, b) => a + b, 0)).toBe(70700, 'the parts now sum to the printed total');
+  });
+
+  it('it holds over a spread of awkward totals', () => {
+    let seed = 20260911;
+    const rnd = n => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) % n;
+    for (let i = 0; i < 300; i++) {
+      const n = 2 + rnd(4);
+      const parts = Array.from({ length: n }, () => 1 + rnd(90000));
+      const total = parts.reduce((a, b) => a + b, 0);
+      const out = M.roundParts(parts, total);
+      expect(out.reduce((a, b) => a + b, 0)).toBe(Math.round(total / 100) * 100,
+        `parts ${parts} did not sum to the rounded total ${total}`);
+      for (const p of out) expect(p % 100).toBe(0, 'every part is a whole rupee');
+    }
+  });
+
+  it('a rupee of drift lands where it shows least — never on the smallest line', () => {
+    /* moving ₹1 onto a ₹10.50 GST line is a 10% error on screen; onto ₹685.50
+       it is invisible and still true to the paise underneath */
+    const out = M.roundParts([68550, 1050, 1050], 70650);
+    expect(out[0]).toBe(68500, 'the correction went to the largest line');
+    expect(out[1]).toBe(1100, 'the small lines are left alone');
+    expect(out[2]).toBe(1100, 'both of them');
+  });
+
+  it('nothing is ever pushed below zero to make a total work', () => {
+    const out = M.roundParts([40, 60, 100000], 100100);
+    for (const p of out) expect(p >= 0).toBe(true, 'a negative line is not a rounding');
+  });
+
+  it('and it degrades honestly on the shapes a caller can pass', () => {
+    expect(M.roundParts([], 0).length).toBe(0);
+    expect(M.roundParts([12345]).reduce((a, b) => a + b, 0)).toBe(12300);
+    expect(M.fmtParts([68550, 1050, 1050], 70650).join(' ')).toBe('₹685 ₹11 ₹11');
   });
 });

@@ -34,7 +34,11 @@ import { find } from '../core/registry.js';
 import * as audit from '../core/audit.js';
 import { toast } from '../ui/dom.js';
 import { TIERS } from './trust.js';
-import { tradeBank, CONDUCT, shuffled, score, PASS, MAX_ATTEMPTS, LOCK_MS } from './quiz.js';
+import { HOLDBACK_PCT, HOLDBACK_DAYS } from './ledger.js';
+import { MIN_STAKE } from './wallet.js';
+import { CANCEL_RULES } from './pricing.js';
+import * as M from '../core/money.js';
+import { tradeBank, CONDUCT, conductFor, shuffled, score, PASS, MAX_ATTEMPTS, LOCK_MS } from './quiz.js';
 
 /* ── the chronology ────────────────────────────────────────── */
 /* Each step carries its English words AND the key that translates them. The
@@ -100,7 +104,17 @@ export function blocker(p) {
 
 /* ── writes ────────────────────────────────────────────────── */
 function patchVerification(p, fn) {
-  const cur = rec(p);
+  /* READ THE PARTNER AS HE IS NOW, NOT AS SOME SCREEN LAST SAW HIM. This read
+     the record off the object handed in, and a view holds the partner it
+     captured when it rendered. So a handler firing against a stale snapshot
+     rebuilt the whole verification record from an old copy and wrote it back:
+     an audit finished all seven steps, was told "You are live", then had trade,
+     conduct, payout and agreement silently vanish -- account stuck on
+     "verification pending", and recovery meant re-sitting a quiz that locks for
+     24 hours after three wrong attempts. His UPI went with it.
+     A partial write built on current state can only ever lose the field it is
+     setting; one built on a stale snapshot loses everything saved since. */
+  const cur = rec(partnerById(p.id) || p);
   const next = fn({ ...cur, steps: { ...cur.steps }, attempts: { ...cur.attempts } });
   dispatch({ type: 'partner/patch', payload: { id: p.id, patch: { verification: next } } });
   return partnerById(p.id);
@@ -177,8 +191,13 @@ export function submitSelfie(p) {
 /* 4 + 5 · the quizzes. Three attempts, then a 24-hour lock — long enough to
    stop guessing, short enough that an honest pro who misread is back
    tomorrow. */
-export function quizFor(p, kind) {
-  const bank = kind === 'trade' ? tradeBank(p.cat) : CONDUCT;
+/* `lang` only changes the WORDS. `conductFor` maps options positionally and
+   carries the correct index straight from the English bank, so the shuffle seed
+   and every answer index are identical in all three languages — which is why
+   `submitQuiz` below can score against the English bank and still be right, and
+   why a translation can never silently move the correct answer. */
+export function quizFor(p, kind, lang) {
+  const bank = kind === 'trade' ? tradeBank(p.cat) : conductFor(lang);
   const attempt = (rec(p).attempts[kind] || 0) + 1;
   return shuffled(bank, attempt * 7 + (kind === 'trade' ? 1 : 2));
 }
@@ -230,7 +249,73 @@ export const TERMS = [
   'I will take a clear photo of finished work before asking for release.',
   'I will cancel early if I cannot come, never just not show up.',
   'I understand my quote is exactly what I am paid, and the customer pays the fee.',
+  /* THE AGREEMENT NAMED EVERY DUTY HE TAKES ON AND NOT ONE THING SAAHAA CAN
+     TAKE FROM HIM. Five terms, all obligations, signed at step 7 -- and only
+     AFTERWARDS did the app mention a 10% holdback, a stake locked against a
+     live job, a cancellation fee, and that the fee is "added to what you owe if
+     your wallet is empty". An audit found the debt line flatly incompatible
+     with the "₹0 to join, ever" and "Cost per order ₹0" it had been recruited
+     on, and named it the reason it would not run a month's income through the
+     platform.
+
+     Every one of these is defensible. None of them was disclosed before he
+     committed, which is the only thing that made them indefensible. They are
+     terms six and seven now, in the language he reads, above the button. */
+  '{pct}% of each payout waits {days} days before it reaches me, and starting a job locks {stake} out of that same job’s payout. Both come back to me when the job ends cleanly.',
+  'If I cancel a job I have already started, {fee} is taken from my wallet — or added to what I owe, if my wallet is empty. SAAHAA never charges me to join, to be listed, or to be paid.',
 ];
+/* THE FIVE PROMISES HE SIGNS, IN THE LANGUAGE HE READS.
+   These are not marketing copy. Term 1 is the door code, term 2 is the rule
+   that keeps his money inside the escrow that protects him, term 4 is the one
+   the conduct quiz marks him on. He was asked to accept all five in English —
+   a language the onboarding itself acknowledges he may not read, two screens
+   earlier, in Telugu. Asking a man to agree to terms he cannot read is not
+   consent, and it is the single loudest complaint on the earning side.
+
+   The per-trade question banks in domain/quiz.js stay English for now and say
+   so honestly (`ob.quizEnglish`) — a plumbing question is about plumbing. The
+   rules are not; they are about what happens to his money. */
+const TERMS_I18N = {
+  hi: [
+    'काम शुरू करने से पहले दरवाज़े पर ही ग्राहक का कोड मैं डालूँगा।',
+    'SAAHAA के बाहर मैं कभी पैसा नहीं लूँगा।',
+    'पैसा माँगने से पहले पूरे हुए काम की साफ़ फ़ोटो लूँगा।',
+    'न आ पाऊँ तो पहले ही रद्द कर दूँगा — बिना बताए ग़ायब नहीं रहूँगा।',
+    'मैं समझता हूँ कि मेरा बताया रेट ही मुझे मिलेगा, और फ़ीस ग्राहक भरता है।',
+    'हर भुगतान का {pct}% सात नहीं, {days} दिन रुकता है, और काम शुरू करने पर उसी काम की कमाई से {stake} की ज़मानत रुक जाती है। काम ठीक से पूरा होने पर दोनों मुझे वापस मिल जाते हैं।',
+    'शुरू किया हुआ काम अगर मैं रद्द करूँ तो मेरे वॉलेट से {fee} लिए जाएँगे — वॉलेट ख़ाली हो तो वह मेरे बकाया में जुड़ जाएगा। जुड़ने, लिस्ट होने या पैसा पाने के लिए SAAHAA मुझसे कभी कुछ नहीं लेता।',
+  ],
+  te: [
+    'పని మొదలుపెట్టే ముందు, తలుపు దగ్గరే కస్టమర్ కోడ్‌ను నేను ఎంటర్ చేస్తాను.',
+    'సాహా బయట నేను ఎప్పుడూ డబ్బు తీసుకోను.',
+    'డబ్బు అడిగే ముందు, పూర్తయిన పనికి స్పష్టమైన ఫోటో తీస్తాను.',
+    'రాలేకపోతే ముందుగానే రద్దు చేస్తాను — ఏమీ చెప్పకుండా మానేయను.',
+    'నేను చెప్పిన రేటు ఎంతో నాకు అంతే వస్తుందని, ఫీజు కస్టమర్ కడతారని నాకు తెలుసు.',
+    'ప్రతి చెల్లింపులో {pct}% {days} రోజులు ఆగి నాకు చేరుతుంది, పని మొదలుపెట్టినప్పుడు అదే పని సంపాదన నుంచి {stake} ష్యూరిటీగా ఆగుతుంది. పని సవ్యంగా ముగిస్తే రెండూ నాకు తిరిగి వస్తాయి.',
+    'మొదలుపెట్టిన పనిని నేను రద్దు చేస్తే, నా వాలెట్ నుంచి {fee} తీసుకుంటారు — వాలెట్ ఖాళీగా ఉంటే నా బాకీలో కలుస్తుంది. చేరడానికి, జాబితాలో ఉండటానికి, డబ్బు అందుకోవడానికి సాహా నా దగ్గర ఎప్పుడూ ఏమీ తీసుకోదు.',
+  ],
+};
+/** The agreement in `lang`, falling back term by term — a missing translation
+    shows the English line rather than a blank promise. */
+export function termsFor(lang) {
+  const t = TERMS_I18N[lang];
+  /* AND THE TWO TERMS THAT COST HIM MONEY HAD NO NUMBERS IN THEM. He signed
+     "a tenth of each payout waits seven days" and "a fee is taken from my
+     wallet" -- then met ₹100, ₹40 and 10%/7 days for the first time on a door
+     screen, a cancel sheet and an Earnings tab, all AFTER he had committed. An
+     audit called this the single most misleading thing in the funnel.
+
+     The figures are read from the engine that charges them, so the terms cannot
+     drift from the rules: change MIN_STAKE or the cancel fee and this sentence
+     changes with it. */
+  const fill = str => String(str)
+    .replace('{pct}', String(HOLDBACK_PCT))
+    .replace('{days}', String(HOLDBACK_DAYS))
+    .replace('{stake}', M.fmt(MIN_STAKE))
+    .replace('{fee}', M.fmt((CANCEL_RULES.WORKER_CANCEL || {}).workerFee || 0));
+  return TERMS.map((en, i) => fill((t && t[i]) || en));
+}
+
 export function acceptAgreement(p) {
   markDone(p, 'agreement', { version: 1 });
   return true;

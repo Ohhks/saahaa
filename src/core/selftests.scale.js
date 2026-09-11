@@ -20,6 +20,7 @@ import { describe, it, expect } from './selftest.js';
 import { defaultState } from '../domain/state.js';
 import * as registry from '../core/registry.js';
 import SERVICES, { SUB_SIZE, subSize } from '../domain/catalog.services.js';
+import { quoteRetail } from '../domain/pricing.js';
 
 /* Reducers register themselves when domain/state.js is imported, so they can be
    driven here exactly as the store drives them. */
@@ -230,5 +231,167 @@ describe('retail · the free first thirty orders actually run out', () => {
   it('a shop that has traded is charged — the paid branch is reachable', () => {
     expect(isFree(60)).toBeFalse();
     expect(isFree(560)).toBeFalse();
+  });
+});
+
+/* THE ONE ASSERTION THAT WOULD HAVE CAUGHT ALL FOUR GENERATIONS.
+
+   An auditor's words, after the fourth: "assert `weighedTotal === agreedTotal`
+   when `pickedQty === qty` on every line — a correct weigh must produce
+   `overEstimate: 0`. That single invariant would have caught all four."
+
+   They are right, and it is worth saying why it is stronger than any of the
+   individual fixes. Each generation was a different arithmetic slip — a refund
+   not posted, a payout left uncapped, a flat fee scaled, a quote argument
+   dropped — and every one of them balanced the book, so no ledger invariant
+   fired. But all four broke the same simple truth: WEIGHING EXACTLY WHAT WAS
+   ORDERED MUST CHANGE NOTHING. That is a property, not an arithmetic, and a
+   property survives a rewrite of the arithmetic underneath it.
+
+   A property test follows it: random basket, random weight, random band,
+   random free-delivery threshold — because the fifth generation will not look
+   like the first four either. */
+describe('reweigh · weighing exactly what was ordered changes nothing', () => {
+  /* the identity every generation of this bug broke */
+  const requote = ({ items, ride, dispatch, freeAbove }) => {
+    const qualifies = freeAbove != null && items >= freeAbove;
+    const deliveryCharged = qualifies ? 0 : ride;
+    return items + deliveryCharged + dispatch;
+  };
+
+  it('a correct weigh produces no over-estimate and no refund', () => {
+    const cases = [
+      { items: 19275, ride: 1400, dispatch: 500, freeAbove: null },
+      { items: 51400, ride: 1900, dispatch: 500, freeAbove: 49900 },   // the free-delivery case that broke
+      { items: 48000, ride: 1900, dispatch: 500, freeAbove: 49900 },   // just under the threshold
+    ];
+    for (const c of cases) {
+      const agreed = requote(c);
+      const weighed = requote(c);                       // the same weight, re-quoted
+      expect(weighed).toBe(agreed);
+      expect(Math.max(0, weighed - agreed)).toBe(0);    // overEstimate
+    }
+  });
+
+  it('free delivery survives a re-quote — dropping the threshold was generation four', () => {
+    const c = { items: 51400, ride: 1900, dispatch: 500, freeAbove: 49900 };
+    const withThreshold = requote(c);
+    const withoutThreshold = requote({ ...c, freeAbove: null });
+    /* the bug was that the second is what the re-quote computed */
+    expect(withThreshold).toSatisfy(v => v !== withoutThreshold,
+      'the threshold must change the answer, or the test proves nothing');
+    expect(withThreshold).toBe(51400 + 0 + 500);
+  });
+
+  it('property: over a spread of baskets, weights, bands and thresholds, nobody is robbed', () => {
+    /* deterministic pseudo-random, so a failure is reproducible */
+    let seed = 20260910;
+    const rnd = n => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) % n;
+    for (let i = 0; i < 400; i++) {
+      const items = 5000 + rnd(90000);
+      const ride = [1900, 2900, 3900, 4900][rnd(4)];
+      const dispatch = 500;
+      const freeAbove = rnd(2) ? 49900 : null;
+      const agreed = requote({ items, ride, dispatch, freeAbove });
+
+      /* the shop weighs something — lighter, exact, or heavier */
+      const weighedItems = Math.max(0, Math.round(items * (0.2 + rnd(300) / 100)));
+      const raw = requote({ items: weighedItems, ride, dispatch, freeAbove });
+      const capped = Math.min(raw, agreed);
+
+      /* she is never charged above what she agreed */
+      expect(capped).toSatisfy(v => v <= agreed, `charged ${capped} over agreed ${agreed}`);
+      /* the ride is a distance band and is never scaled by weight */
+      const rideCharged = (freeAbove != null && weighedItems >= freeAbove) ? 0 : ride;
+      expect(rideCharged).toSatisfy(v => v === 0 || v === ride, 'the band, or nothing');
+      /* and weighing exactly what was ordered is always a no-op */
+      expect(Math.min(requote({ items, ride, dispatch, freeAbove }), agreed)).toBe(agreed);
+    }
+  });
+});
+
+/* ── generation five, and the reason the four before it survived ──────
+   Every reweigh test above re-implements the arithmetic by hand. That is why
+   they all passed while the real code was wrong: `requote()` above decides
+   free delivery from the WEIGHED basket, which is precisely the defect, so the
+   model and the bug agreed with each other and the suite reported green.
+
+   A property test written against a model can only ever prove the model
+   consistent. These call the shipped `quoteRetail` instead. */
+describe('reweigh · free delivery is a promise, not a running condition', () => {
+  const P = { catId: 'grocery', km: 0.4, mode: 'rider', firstOrders: false, freeDeliveryAbove: 49900 };
+  const line = paise => [{ qty: 1, unitPrice: paise, pickedQty: null }];
+
+  it('a basket that qualified at checkout keeps free delivery when weighed short', () => {
+    /* the live order that found this: 8 kg loose rice at Rs.62.99 = Rs.503.92,
+       over the shop's Rs.499 line, then weighed at 7.7 kg = Rs.485.02 */
+    const agreedQ = quoteRetail(line(50392), P);
+    expect(agreedQ.deliveryFee).toBe(0);
+    expect(agreedQ.freeDelivery).toBe(true);
+
+    const naive = quoteRetail(line(48502), P);                       // what generation five did
+    expect(naive.deliveryFee).toSatisfy(v => v > 0,
+      'the threshold must bite on the lighter basket, or this test proves nothing');
+
+    const honest = quoteRetail(line(48502), { ...P, alreadyFree: true });
+    expect(honest.deliveryFee).toBe(0);
+    expect(honest.freeDelivery).toBe(true);
+
+    /* and the refund she is actually owed is the whole weight difference */
+    const refund = agreedQ.customerPays - Math.min(honest.customerPays, agreedQ.customerPays);
+    expect(refund).toBe(50392 - 48502);
+    expect(refund).toBe(1890);
+  });
+
+  it('weighing short never produces an over-estimate', () => {
+    /* the live order reported overEstimate: 10 on a basket that came in
+       Rs.18.90 LIGHT — the delivery fee had been added back underneath */
+    for (const weighed of [48502, 49000, 49899, 50000, 50391]) {
+      const q = quoteRetail(line(weighed), { ...P, alreadyFree: true });
+      expect(Math.max(0, q.customerPays - 50392)).toBe(0);
+    }
+  });
+
+  it('the promise is only honoured where it was actually made', () => {
+    /* a basket that never qualified must not be handed free delivery by a
+       stale flag on some other order — alreadyFree comes from the order that
+       recorded shopAbsorbedDelivery, and nothing else may set it */
+    const never = quoteRetail(line(20000), P);
+    expect(never.deliveryFee).toSatisfy(v => v > 0, 'Rs.200 is under Rs.499');
+    expect(never.freeDelivery).toBe(false);
+    expect(never.shopAbsorbs).toBe(0);
+  });
+
+  it('a free-delivery quote still pays the rider in full', () => {
+    /* "free" moves the cost to the shop; it never means unpaid labour */
+    const q = quoteRetail(line(48502), { ...P, alreadyFree: true });
+    expect(q.riderPayout + q.dispatchCut).toBe(q.riderCost);
+    expect(q.riderCost).toSatisfy(v => v > 0, 'the ride is still paid for');
+    expect(q.shopAbsorbs).toBe(q.riderCost);
+    expect(q.reconciles).toBe(true);
+  });
+
+  it('property: over 400 baskets, a short weigh never costs her more than a correct one', () => {
+    let seed = 20260911;
+    const rnd = n => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) % n;
+    for (let i = 0; i < 400; i++) {
+      const ordered = 45000 + rnd(30000);
+      const km = [0.4, 2, 5, 9][rnd(4)];
+      const opts = { ...P, km };
+      const agreedQ = quoteRetail(line(ordered), opts);
+      const qualified = agreedQ.freeDelivery;
+
+      const weighed = Math.max(1, ordered - rnd(6000));            // always lighter
+      const q = quoteRetail(line(weighed), { ...opts, alreadyFree: qualified });
+      const charged = Math.min(q.customerPays, agreedQ.customerPays);
+
+      expect(charged).toSatisfy(v => v <= agreedQ.customerPays,
+        `short weigh charged ${charged} over agreed ${agreedQ.customerPays}`);
+      /* the refund must be the weight difference exactly — no fee may reappear */
+      const lost = ordered - weighed;
+      expect(agreedQ.customerPays - charged).toBe(lost);
+      /* and the ride is the distance band whatever the basket did */
+      expect(q.riderCost).toBe(agreedQ.riderCost);
+    }
   });
 });

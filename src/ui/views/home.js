@@ -13,11 +13,13 @@
    refund rule read from CANCEL_RULES. */
 
 import { mount, esc, sheet, closeSheet, toast, ratingStars, delegate } from '../dom.js';
+import { subKey } from '../../domain/catalog.services.js';
 import { ctx, getState, me, myArea, isGuest, myOrders, saveSession, dispatch } from '../../core/ctx.js';
 import * as persist from '../../core/persist.js';
 import { live, get } from '../../core/registry.js';
 import { AREA_NAMES, AREA_GEO, kmBetween, etaMins } from '../../domain/match.js';
-import { trustScore, markupFor } from '../../domain/trust.js';
+import { trustScore, markupFor, ratingOf, ratingLabel } from '../../domain/trust.js';
+import * as ADDR from '../address.js';
 import * as gmap from '../map.js';
 import { GROUPS } from '../../domain/catalog.services.js';
 import { mark } from '../logo.js';
@@ -25,9 +27,10 @@ import { icon, hasIcon } from '../icons.js';
 import * as flow from '../../domain/flow.js';
 import * as M from '../../core/money.js';
 import { tier } from '../../domain/trust.js';
+import { t, catName, subName } from '../i18n.js';
 import * as flags from '../../core/flags.js';
 import { trackerFor, trackerIndex, stage, isTerminal } from '../../domain/orders.js';
-import { CANCEL_RULES, quoteService } from '../../domain/pricing.js';
+import { CANCEL_RULES, quoteService, RIDER_DISPATCH_CUT } from '../../domain/pricing.js';
 import { getPricing } from '../../domain/settings.js';
 import * as gateway from '../../core/gateway.js';
 import * as A from '../../domain/auction.js';
@@ -48,14 +51,14 @@ let pendingBooking = null;
 const recent = [];
 export const setSearch = v => {
   search = v;
-  const t = String(v || '').trim();
-  if (t.length < 3) return;
-  const k = t.toLowerCase();
+  const txt = String(v || '').trim();
+  if (txt.length < 3) return;
+  const k = txt.toLowerCase();
   for (let i = recent.length - 1; i >= 0; i--) {
     const r = recent[i].toLowerCase();
     if (r.startsWith(k) || k.startsWith(r)) recent.splice(i, 1);
   }
-  recent.unshift(t);
+  recent.unshift(txt);
   if (recent.length > 5) recent.length = 5;
 };
 
@@ -309,14 +312,16 @@ function supplyLine(c) {
      by a customer standing in front of a broken fan — on the tile and again in
      the booking sheet's Available capsule. Say the fact; the invitation to
      list has its own section further down the page. */
-  return online ? `${online} nearby` : pool.length ? `${pool.length} nearby, none online` : 'Nobody listed yet';
+  return online ? t('home.nearby', { n: online })
+       : pool.length ? `${t('home.nearby', { n: pool.length })}, ${t('home.noneOnline')}`
+       : t('home.nobodyYet');
 }
 
 /* a category tile: the mockup's bordered box — icon, name, supply line */
 function tileHtml(c, wide = false) {
-  return `<button class="tile${wide ? ' tile--wide' : ''}" data-act="cat.open" data-id="${c.id}" aria-label="${esc(c.name)}">
+  return `<button class="tile${wide ? ' tile--wide' : ''}" data-act="cat.open" data-id="${c.id}" aria-label="${esc(catName(c))}">
     <span class="ic" aria-hidden="true">${hasIcon(c.id) ? icon(c.id, { size: 20 }) : esc(c.name[0])}</span>
-    <span class="lbl">${esc(c.name)}</span>
+    <span class="lbl">${esc(catName(c))}</span>
     <span class="meta">${esc(supplyLine(c))}</span>
   </button>`;
 }
@@ -373,7 +378,7 @@ function orderRow(o, lead = true) {
   return `<button class="m-row" data-act="order.open" data-id="${esc(o.id)}">
     <span class="m-lead${lead ? '' : ' m-lead--dim'}" aria-hidden="true"></span>
     <div class="grow" style="min-width:0">
-      <div class="m-row__t">${esc(o.kind === 'service' ? `${cat.name}${o.sub ? ' · ' + o.sub : ''}` : `${o.lines.length} item${o.lines.length === 1 ? '' : 's'} from ${o.shopName}`)}</div>
+      <div class="m-row__t">${esc(o.kind === 'service' ? `${catName(cat)}${o.sub ? ' · ' + subName(o.sub, subKey(o.sub)) : ''}` : `${o.lines.length} item${o.lines.length === 1 ? '' : 's'} from ${o.shopName}`)}</div>
       <div class="m-row__m" style="margin-bottom:0">${esc(who)} · ${esc(st.label.toLowerCase())} · step ${idx + 1} of ${track.length}${o.eta && !isTerminal(o.stage) ? ` · ~${o.eta} min` : ''}</div>
     </div>
     <div class="m-row__r"><b class="num">${M.fmt(o.customerPays)}</b></div>
@@ -396,7 +401,7 @@ function askRow(r) {
   return `<a class="m-row" href="#/ask/${esc(r.id)}">
     <span class="m-lead" aria-hidden="true"></span>
     <div class="grow" style="min-width:0">
-      <div class="m-row__t">${esc(cat.name)}${r.sub ? ` · ${esc(r.sub)}` : ''}</div>
+      <div class="m-row__t">${esc(catName(cat))}${r.sub ? ` · ${esc(r.sub)}` : ''}</div>
       <div class="m-row__m" style="margin-bottom:0">${r.status === 'bidding' ? 'Asking workers for rates' : 'Rates are in — pick one'} · ${n} ${n === 1 ? 'reply' : 'replies'}${
         r.held ? ` · your ${M.fmt(heldPays(r.held))} stays held` : ''}</div>
     </div>
@@ -409,7 +414,7 @@ function stillOpen() {
   const asks = openAsks();
   if (!orders.length && !asks.length) return '';
   return `<div class="sec">
-    <p class="m-cap">Still open from before</p>
+    <p class="m-cap">${esc(t('home.stillOpen'))}</p>
     ${asks.map(askRow).join('')}
     ${orders.slice(0, 4).map(o => orderRow(o)).join('')}
     ${orders.length > 4 ? `<button class="more" style="margin-top:10px" data-act="nav.orders">All ${orders.length} live orders →</button>` : ''}
@@ -432,21 +437,20 @@ function faceThumb(photoId, catId, name, size = 22, cls = '') {
 }
 
 /* ── who is open now: named pros and shops, nearest first ──── */
-export function avgOf(p) {
-  const r = p.ratings || [];
-  if (!r.length) return 4.5;
-  return r.reduce((a, x) => a + x.stars, 0) / r.length;
-}
+/* null when nobody has rated them — see domain/trust.js `ratingOf`. This used
+   to return 4.5, so an unrated pro was advertised at four and a half stars in
+   this list and as unrated on his own profile. */
+export function avgOf(p) { return ratingOf(p).avg; }
 function proRow(p, km) {
   const cat = get('category', p.cat) || { name: '' };
-  const t = tier(p.tier);
+  const tr = tier(p.tier);
   return `<button class="m-row" data-act="pro.open" data-id="${esc(p.id)}">
     ${faceThumb(p.photo, p.cat, p.name)}
     <div class="grow" style="min-width:0">
       <div class="m-row__t">${esc(p.name)}</div>
-      <div class="m-row__m">${esc(cat.name)} · ${km} km · ~${etaMins(km)} min</div>
-      <div class="m-row__tags"><span class="tag tag-accent">${avgOf(p).toFixed(1)} ★</span>
-        <span class="tag tag-neutral">${t.badge ? esc(t.badge) : `${p.completed | 0} jobs`}</span></div>
+      <div class="m-row__m">${esc(catName(cat))} · ${km} km · ~${etaMins(km)} min</div>
+      <div class="m-row__tags"><span class="tag tag-accent">${ratingLabel(p)}</span>
+        <span class="tag tag-neutral">${tr.badge ? esc(tr.badge) : `${p.completed | 0} jobs`}</span></div>
     </div>
   </button>`;
 }
@@ -460,9 +464,9 @@ function shopRow(s, km) {
     ${faceThumb(s.photo, s.catId, s.name)}
     <div class="grow" style="min-width:0">
       <div class="m-row__t">${esc(s.name)}</div>
-      <div class="m-row__m">${esc(cat.name)} · ${n} items in stock · ${km} km</div>
+      <div class="m-row__m">${esc(catName(cat))} · ${esc(t('home.inStock', { n }))} · ${km} km</div>
       <div class="m-row__tags"><span class="tag tag-accent">${esc(s.ratingAvg)} ★</span>
-        <span class="tag tag-neutral">Delivers · ~${etaMins(km) + (s.prepMins || 20)} min</span></div>
+        <span class="tag tag-neutral">${esc(t('home.delivers'))} · ~${etaMins(km) + (s.prepMins || 20)} min</span></div>
     </div>
   </button>`;
 }
@@ -518,8 +522,8 @@ function mostBooked() {
   const counted = [...n.values()].reduce((x, y) => x + y, 0);
   return `<div class="sec">
     <div class="between" style="margin-bottom:8px">
-      <p class="m-cap" style="margin:0">${counted ? 'Most booked near you' : 'Start here'}</p>
-      <button class="more" data-act="scroll.all">All ${cats().length} categories →</button>
+      <p class="m-cap" style="margin:0">${counted ? 'Most booked near you' : esc(t('home.startHere'))}</p>
+      <button class="more" data-act="scroll.all">${esc(t('home.allCats', { n: cats().length }))} →</button>
     </div>
     <div class="rail">${ranked.map(c => tileHtml(c)).join('')}</div>
   </div>`;
@@ -556,10 +560,10 @@ function openNow() {
   if (!pros.length && !shops.length) return '';
   return `<div class="sec" id="freeNow">
     <div class="between" style="margin-bottom:8px">
-      <p class="m-cap" style="margin:0">Free near you right now</p>
+      <p class="m-cap" style="margin:0">${esc(t('home.freeNear'))}</p>
       <div class="row" style="gap:14px">
-        <button class="more" data-act="nav.nearby">Map view →</button>
-        <button class="more" data-act="scroll.all">All ${cats().length} categories →</button>
+        <button class="more" data-act="nav.nearby">${esc(t('home.mapView'))} →</button>
+        <button class="more" data-act="scroll.all">${esc(t('home.allCats', { n: cats().length }))} →</button>
       </div>
     </div>
     ${pros.map(x => proRow(x.p, x.km)).join('')}
@@ -614,7 +618,7 @@ function searchResults(q) {
   ${r.subHits.length ? sec('Exactly what you need', r.subHits.length,
     `<div class="chiprow" style="flex-wrap:wrap;gap:8px">${r.subHits.map(({ c, s }) =>
       `<button class="chip" data-act="book.sub" data-id="${c.id}" data-sub="${esc(s)}">
-        <span class="chip__ic" aria-hidden="true">${catGlyph(c)}</span>${esc(s)}</button>`).join('')}</div>`) : ''}
+        <span class="chip__ic" aria-hidden="true">${catGlyph(c)}</span>${esc(subName(s, subKey(s)))}</button>`).join('')}</div>`) : ''}
 
   ${r.prodHits.length ? sec('On shop shelves', r.prodHits.length,
     r.prodHits.map(p => {
@@ -632,6 +636,20 @@ function searchResults(q) {
 }
 
 /* ── the screen ────────────────────────────────────────────── */
+/* What a shop is actually charged, across the categories that exist — the same
+   shape the signup screens use. Reading the catalogue means adding a category
+   can never make this sentence untrue. */
+function shopFeeSpread() {
+  const cats = live('category').filter(c => c.kind === 'retail');
+  const pcts = cats.map(c => c.takePct).filter(v => v != null);
+  const caps = cats.map(c => c.takeCapPaise).filter(v => v != null);
+  if (!pcts.length) return { pct: getPricing().retailTakePct + '%', cap: M.fmt(getPricing().retailTakeCapPaise) };
+  const lo = Math.min(...pcts), hi = Math.max(...pcts);
+  const cl = Math.min(...caps), ch = Math.max(...caps);
+  return { pct: lo === hi ? `${lo}%` : `${lo}–${hi}%`,
+           cap: cl === ch ? M.fmt(ch) : `${M.fmt(cl)}–${M.fmt(ch)}` };
+}
+
 export function render() {
   const s = me();
   const q = search.trim();
@@ -640,8 +658,15 @@ export function render() {
   const cartCount = cart ? cart.lines.reduce((n, l) => n + l.qty, 0) : 0;
   const liveCount = liveOrders().length + openAsks().length;
   const shopsGroup = GROUPS.find(g => g.id === 'shops');
-  const prosOnline = st.partners.filter(p => !p.suspended && p.online !== false).length;
-  const shopsOpen = st.shops.filter(x => x.isOpen && x.status === 'active').length;
+  /* AND IT SOLD THE WHOLE CITY AS HER NEIGHBOURHOOD. These counted every
+     partner and shop in the dataset and the sentence then printed "in
+     Madhapur" — 111 pros and 12 shops, when 12 pros and 2 shops are actually
+     there and the rest are in Uppal, LB Nagar and Secunderabad. An audit
+     checked and called it out. A number attached to a place name is a claim
+     about that place. */
+  const here = myArea();
+  const prosOnline = st.partners.filter(p => !p.suspended && p.online !== false && p.area === here).length;
+  const shopsOpen = st.shops.filter(x => x.isOpen && x.status === 'active' && x.area === here).length;
   const P = getPricing();
 
   const recentChips = recent.map(t => ({ t, c: bestCat(t) })).filter(x => x.c);
@@ -747,15 +772,15 @@ export function render() {
                  rail directly beneath it — the same categories, two more of
                  them, plus a link to all 24. Nothing left the screen; it stopped
                  being said twice in two rows that looked identical. -->
-            <p class="m-cap">Or pick what you need</p>
+            <p class="m-cap">${esc(t('home.orPick'))}</p>
             <div class="chiprow" style="flex-wrap:wrap">
               ${againChip()}
               <button class="chip" data-act="quick.emergency">
-                <span class="chip__ic" aria-hidden="true">${icon('siren', { size: 14 })}</span>Emergency</button>
+                <span class="chip__ic" aria-hidden="true">${icon('siren', { size: 14 })}</span>${esc(t('home.emergency'))}</button>
               <button class="chip" data-act="quick.nearby">
-                <span class="chip__ic" aria-hidden="true">${icon('pin', { size: 14 })}</span>Open now</button>
+                <span class="chip__ic" aria-hidden="true">${icon('pin', { size: 14 })}</span>${esc(t('home.openNow'))}</button>
               <button class="chip" data-act="nav.nearby">
-                <span class="chip__ic" aria-hidden="true">${icon('groupShops', { size: 14 })}</span>Neighbourhood map</button>
+                <span class="chip__ic" aria-hidden="true">${icon('groupShops', { size: 14 })}</span>${esc(t('home.map'))}</button>
               ${cartCount ? `<button class="chip on" data-act="nav.cart">
                 <span class="chip__ic" aria-hidden="true">${icon('basket', { size: 14 })}</span>Cart · ${cartCount}</button>` : ''}
             </div>
@@ -768,12 +793,13 @@ export function render() {
 
         <aside class="home-lay__side">
           <div class="sec">
-            <p class="m-cap">Why this is safe</p>
+            <p class="m-cap">${esc(t('home.whySafe'))}</p>
+            <!-- FOUR SAFETY PROMISES IN ENGLISH under a Telugu heading. These are
+                 the sentences that answer "why should I trust this with my money",
+                 on the first screen a Telugu-first woman ever sees. -->
             <ul class="m-steps" style="gap:8px">
-              <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">Every pro is verified in stages — you always see which</span></li>
-              <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">Price locked before you book</span></li>
-              <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">SAAHAA holds the money until you confirm — and tells you the deadline if you do not</span></li>
-              <li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">The pro keeps the whole of their price</span></li>
+              ${['safe.verified', 'safe.priceLocked', 'safe.held', 'safe.keepsWhole']
+                .map(k => `<li class="m-step"><span class="m-step__dot"></span><span class="m-step__t">${esc(t(k))}</span></li>`).join('')}
             </ul>
           </div>
         </aside>
@@ -801,7 +827,7 @@ export function render() {
         <div class="between" style="margin-bottom:8px">
           <p class="m-cap" style="margin:0;display:flex;align-items:center;gap:6px">${icon('groupShops', { size: 14 })} ${
             esc(shopsGroup ? shopsGroup.label : 'Shops Near You')}</p>
-          <button class="more" data-act="nav.shops">Browse all →</button></div>
+          <button class="more" data-act="nav.shops">${esc(t('home.browseAll'))} →</button></div>
         <p class="tiny muted" style="margin:0 0 10px">
           Kirana, veg, meat, dairy, chemist, water &amp; gas — real shops listing their own products.</p>
         <div class="grid3">${retails().map(c => tileHtml(c)).join('')}</div>
@@ -810,9 +836,15 @@ export function render() {
       <div class="sec">
         <p class="card-kicker">Work with SAAHAA</p>
         <h2 class="h-sec" style="margin-top:4px">Run a shop or work a trade?</h2>
+        <!-- "A SHOP PAYS 3%, NEVER MORE THAN ₹25" — and the shop on that very order
+             was charged ₹30: ₹25 of fee plus the ₹5 dispatch cut, which its own
+             screen names. Five of the eight categories are 5%, three cap at ₹50,
+             and the first thirty orders are free. The recruiting screens were
+             corrected for this; the page every customer lands on was not. -->
         <p class="tiny muted" style="margin:6px 0 12px;max-width:60ch">List your services or your products. A pro keeps 100% of their quote —
-          SAAHAA's ${esc(P.serviceMarkupPct)}% sits on top and is paid by the customer. A shop pays
-          ${esc(P.retailTakePct)}% of the basket, never more than ${M.fmt(P.retailTakeCapPaise)} an order.</p>
+          SAAHAA's ${esc(P.serviceMarkupPct)}% sits on top and is paid by the customer. A shop's first
+          ${flow.FREE_FIRST_ORDERS} orders are free; after that ${esc(shopFeeSpread().pct)} of the basket, capped at
+          ${esc(shopFeeSpread().cap)}, plus ${M.fmt(RIDER_DISPATCH_CUT)} on an order somebody delivers.</p>
         <div class="row" style="gap:10px;flex-wrap:wrap">
           <button class="btn btn--primary" data-act="partner.join">List my shop or service →</button>
           <button class="btn btn--secondary" data-act="shop.start">Open a shop →</button>
@@ -950,8 +982,8 @@ function geoOf(loc) {
 function nearRow(it) {
   const act = it.kind === 'shop' ? 'shop.open' : 'pro.open';
   const line = it.kind === 'shop'
-    ? `${getState().products.filter(p => p.shopId === it.id && p.active && (!p.trackStock || p.stockQty > 0)).length} items in stock · ${esc(it.cat.name)} · ${it.km} km`
-    : `${esc(it.cat.name)} · ${it.km} km · ~${etaMins(it.km)} min`;
+    ? `${t('home.inStock', { n: getState().products.filter(p => p.shopId === it.id && p.active && (!p.trackStock || p.stockQty > 0)).length })} · ${esc(catName(it.cat))} · ${it.km} km`
+    : `${esc(catName(it.cat))} · ${it.km} km · ~${etaMins(it.km)} min`;
   const rating = it.kind === 'shop' ? Number(it.raw.ratingAvg) : avgOf(it.raw);
   return `<button class="m-row" data-act="${act}" data-id="${esc(it.id)}">
     ${faceThumb(it.raw && it.raw.photo, it.catId, it.name, 18, 'nb-thumb')}
@@ -959,7 +991,7 @@ function nearRow(it) {
       <div class="m-row__t">${esc(it.name)}</div>
       <div class="m-row__m">${line}</div>
       <div class="m-row__tags">
-        <span class="tag tag-accent">${(rating || 0).toFixed(1)} ★</span>
+        <span class="tag tag-accent">${rating ? rating.toFixed(1) + ' ★' : it.kind === 'shop' ? 'New shop' : ratingLabel(it.raw)}</span>
         <span class="tag tag-neutral">${it.kind === 'shop'
           ? (it.open ? 'Open now' : 'Closed')
           : (it.open ? 'Free now' : 'Offline')}</span>
@@ -1151,7 +1183,15 @@ delegate('click', '[data-near]', async (e, el) => {
    NEED → SERVICE → DETAILS → MATCH → PRICE → CONFIRM. The customer never
    wonders how many more screens there are, because the whole path is on the
    first one and it is only ever one sheet deep. */
-const BOOK_STEPS = ['Need', 'Service', 'Details', 'Match', 'Price', 'Confirm'];
+/* AND THE COUNTER WAS FICTION. Tapping Plumbing from home opened on
+   "Step 3 of 6 · Details" — she had taken ONE step — and picking a job type
+   jumped it to "Step 5 of 6". Six names were invented for what is actually
+   three screens: the category sheet, the pro sheet, and the bill. A progress
+   counter that runs ahead of the person is worse than none, because it is the
+   one thing on the screen that claims to know where she is.
+
+   Three screens, three steps, and the numbers move one at a time. */
+const BOOK_STEPS = ['Service', 'The job', 'Confirm'];
 function stepbar(cur) {
   return `<div class="stepbar" role="list" aria-label="Booking steps">${BOOK_STEPS.map((s, i) =>
     `<span class="stepbar__step ${i < cur ? 'done' : i === cur ? 'cur' : ''}" role="listitem" title="${esc(s)}"></span>`
@@ -1175,22 +1215,25 @@ export function openCategory(catId, sub = null, pinnedId = null) {
     const ranked = (m.alternates || []).concat(m.hero ? [m.hero] : []).find(x => x.id === p.id);
     if (ranked) return ranked;                       // already ranked this round
     const km = kmBetween(myPlace(), p.loc || p.area);
-    const t = trustScore(p);
-    return { ...p, km, eta: etaMins(km), trust: t.score, band: t.band };
+    const ts = trustScore(p);
+    return { ...p, km, eta: etaMins(km), trust: ts.score, band: ts.band };
   };
   const hero = enrich(raw) || m.hero;
   const pinned = raw ? hero : null;      // the sub chips carry it, so choosing a sub keeps this pro
   // The chosen sub-service is threaded all the way into the booking.
   const subs = (c.subs || []).map(s =>
     `<button class="chip${s === sub ? ' on' : ''}" data-act="book.sub" data-id="${catId}"
-       data-sub="${esc(s)}"${pinned ? ` data-pid="${esc(pinned.id)}"` : ''} aria-pressed="${s === sub}">${esc(s)}</button>`).join('');
+       data-sub="${esc(s)}"${pinned ? ` data-pid="${esc(pinned.id)}"` : ''} aria-pressed="${s === sub}">${esc(subName(s, subKey(s)))}</button>`).join('');
 
   sheet(c.name, `
-    ${/* The bar must not claim ground the customer has not covered. With nobody
-          free there is no match to progress to, so the journey is still at
-          Service; with a pro and a sub-service chosen this sheet IS the price,
-          and Confirm is the sheet after it. */ ''}
-    ${stepbar(hero ? (sub ? 4 : 2) : 1)}
+    ${/* AND THEN THE SAME SHEET DREW BOTH ENDS OF THE BAR. `stepbar(0)` here and
+          `stepbar(2)` inside `heroCard`, which this sheet also renders: she read
+          "Step 1 of 3 · Service" and, further down the SAME sheet, "Step 3 of 3
+          · Confirm", with no step 2 existing anywhere in the product.
+
+          A sheet is one step. The bar is drawn once, at the top, and the hero
+          card below it no longer draws its own. */ ''}
+    ${stepbar(sub ? 1 : 0)}
     <div class="capsules" style="margin:0 0 14px">
       <span class="capsule"><span class="capsule__k">Priced</span>
         <span class="capsule__v" style="font-size:16px">${esc(c.unit)}</span></span>
@@ -1200,7 +1243,7 @@ export function openCategory(catId, sub = null, pinnedId = null) {
         <span class="capsule__v" style="font-size:16px">${c.warrantyDays} days</span></span>` : ''}
     </div>
     <p class="tiny muted" style="margin-bottom:12px">${esc(c.blurb || '')}</p>
-    <p class="m-cap">What exactly do you need?</p>
+    <p class="m-cap">${esc(t('home.whatNeed'))}</p>
     <div class="chiprow" style="flex-wrap:wrap;gap:8px;margin-bottom:18px">${subs}</div>
     ${hero ? heroCard(catId, hero, sub) : noMatchBlock(c)}
     ${m.alternates.length ? `
@@ -1226,14 +1269,14 @@ function noMatchBlock(c) {
   return `<div class="empty empty--smart">
     <h3 style="font-size:17px">${pool ? 'Nobody is free for this right now' : 'Nobody has listed this trade here yet'}</h3>
     <p style="margin-top:6px">${pool
-      ? `${pool} ${pool === 1 ? 'pro is' : 'pros are'} listed for ${esc(c.name)} around ${esc(myArea())}, and none of them is online this minute. Nothing has been charged.`
-      : `Nobody around ${esc(myArea())} is offering ${esc(c.name)} yet.`}</p>
+      ? `${pool} ${pool === 1 ? 'pro is' : 'pros are'} listed for ${esc(catName(c))} around ${esc(myArea())}, and none of them is online this minute. Nothing has been charged.`
+      : `Nobody around ${esc(myArea())} is offering ${esc(catName(c))} yet.`}</p>
     <div class="row" style="gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px">
       <button class="btn btn--secondary" data-act="area.pick">Change area</button>
       <button class="btn btn--secondary" data-act="nav.nearby">See who is on the map</button>
       ${pool ? '' : `<button class="btn btn--ghost" data-act="partner.join">I do this work</button>`}
     </div>
-    ${free.length ? `<p class="m-cap" style="margin-top:18px">Free in ${esc(myArea())} right now</p>
+    ${free.length ? `<p class="m-cap" style="margin-top:18px">${esc(t('home.freeIn', { area: myArea() }))}</p>
       <div class="chiprow" style="justify-content:center;flex-wrap:wrap;gap:8px">
         ${free.map(v => smartChip(v.x.name, v.x.id, catGlyph(v.x))).join('')}</div>` : ''}
   </div>`;
@@ -1242,7 +1285,7 @@ function noMatchBlock(c) {
 /* Why THIS pro — read straight off the fields the matcher already produced.
    No new scoring and no new vocabulary: distance, the trust band, and the
    pro's own ask measured against the category's typical price. */
-function whyRow(p, cat) {
+function whyRow(p, cat, sub, q) {
   const base = (cat && cat.base) || 0;
   const near = p.km <= 3;
   const trusted = (p.trust | 0) >= 70;
@@ -1252,7 +1295,12 @@ function whyRow(p, cat) {
   return `<div class="grid3" style="gap:0;border-top:1px solid color-mix(in srgb,currentColor 30%,transparent);border-bottom:1px solid color-mix(in srgb,currentColor 30%,transparent);margin:12px 0">
     ${cell(near ? 'Nearest' : 'Distance', `${p.km} km`, `arrives ~${p.eta} min`)}
     ${cell(trusted ? 'Most trusted' : 'Trust', `${p.trust}`, (p.band && p.band.label) || tier(p.tier).label)}
-    ${cell(fair ? 'Fair price' : 'Above typical', M.fmt(p.ask), `typical ${M.fmt(base)}`)}
+    <!-- "FAIR PRICE ₹428" sat in the largest type on the card, directly above
+         "Ramesh's price ₹385" — the category-level ask, never re-rendered
+         against the job she picked. Two different "his price" figures on one
+         screen, two lines after the app tells her there is no honest total
+         until she has said which job. It shows the price for the job. -->
+    ${cell(fair ? 'Fair price' : 'Above typical', M.fmt(sub ? q.deal : p.ask), `typical ${M.fmt(base)}`)}
   </div>`;
 }
 
@@ -1269,12 +1317,31 @@ function cancelLine() {
    This is the single most important trust element in the product. */
 export function heroCard(catId, p, sub = null) {
   const pv = flow.previewBooking(catId, p, sub);   // the sub is the job: it must reach the price
-  const t = tier(p.tier);
+  /* a trade with named job types must have one picked — "per item" is not a
+     price for anything until somebody says which item */
+  const needsSub = !sub && !!(pv.cat && (pv.cat.subs || []).length);
+  const tr = tier(p.tier);
   const q = pv.quote;
   const pct = Math.round((q.uplift / Math.max(1, q.deal)) * 100);
   const w = flow.customerWallet();
-  const fromWallet = me() ? Math.min(w.balance, q.customerPays) : 0;
-  const viaGateway = q.customerPays - fromWallet;
+  /* rounded together, so the two lines sum to the total above them */
+  /* the booking sheet's two lines, derived from the total beneath them */
+  /* AND THE SHEET STILL PUT THE DRIFT ON HIS PRICE. The order screen was fixed
+     to let SAAHAA's fee absorb the rounding; this one was not, so the same job
+     read ₹403 here and ₹402 the moment she confirmed -- under the headline
+     "Price locked before you book". Index 1 is SAAHAA's own charge. */
+  const bookRow = M.fmtParts([q.deal, q.uplift], q.customerPays, { absorb: 1 });
+  /* what she pays plus what she saves IS what an aggregator would charge */
+  /* "You pay ₹324 · a typical app ₹498 · you save ₹175", and 498 − 324 = 174.
+     The pair was rounded together against the typical price, and then the
+     screen printed `customerPays` on its own for "You pay" — so the saving was
+     reconciled against a number the reader never sees. The one rule this
+     version keeps arriving at: a figure describing the relationship between two
+     others is derived from those two AS PRINTED. */
+  const rup = v => Math.round((v | 0) / 100) * 100;
+  const saveShown = Math.max(0, rup(pv.compare.typicalApp) - rup(q.customerPays));
+  const fromWalletP = me() ? Math.min(w.balance, q.customerPays) : 0;
+  const [fromWallet, viaGateway] = M.roundParts([fromWalletP, q.customerPays - fromWalletP], q.customerPays);
   const kv = (k, v, cls = '') => `<div class="m-kv ${cls}"><span>${k}</span><span class="num">${v}</span></div>`;
   return `
   <div class="bestmatch">
@@ -1287,41 +1354,71 @@ export function heroCard(catId, p, sub = null) {
           <span class="tag tag-accent">Best match</span>
         </div>
         <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
-          ${t.badge ? `<span class="tag">${esc(t.badge)}</span>` : ''}
+          ${tr.badge ? `<span class="tag">${esc(tr.badge)}</span>` : ''}
           <span class="tag">${p.online !== false ? 'Free now' : 'Offline'}</span>
           <span class="tag">${p.completed} jobs done</span>
         </div>
         <p class="tiny" style="margin-top:7px;opacity:.8">
-          ${ratingStars(avgOf(p))} ${avgOf(p).toFixed(1)} · ${esc(p.area || myArea())}
+          ${avgOf(p) == null ? '' : ratingStars(avgOf(p)) + ' '}${ratingLabel(p)} · ${esc(p.area || myArea())}
         </p>
       </div>
     </div>
 
-    ${whyRow(p, pv.cat)}
+    ${whyRow(p, pv.cat, sub, q)}
 
-    <p class="m-cap" style="opacity:.8">The bill</p>
-    ${kv(`${esc(p.name.split(' ')[0])}'s price · ${esc(pv.cat.name)}${sub ? ` · ${esc(sub)}` : ''}`, M.fmt(q.deal))}
-    ${kv(`SAAHAA charge · ${pct}% on top, incl. GST`, M.fmt(q.uplift))}
-    ${kv('You pay', M.fmt(q.customerPays), 'm-kv--total')}
-    <p class="tiny" style="margin-top:8px;opacity:.85;line-height:1.5">${esc(p.name)} receives the full ${M.fmt(q.deal)}. SAAHAA's charge is on top and paid by you.
-      The whole ${M.fmt(q.customerPays)} is paid to SAAHAA now and held until you confirm the work — nothing goes to anyone directly. If you do not confirm, the job screen shows you exactly when it releases by itself.</p>
+    <!-- A FULLY PRICED BILL BEFORE SHE HAD SAID WHAT THE JOB WAS. With no
+         sub-service picked this rendered "Shabana's price · Electrical ₹399 …
+         You pay ₹431" — a real bill, from a hidden multiplier — and choosing
+         "Inverter & battery" then moved it to ₹689. A 60% jump off a number she
+         was shown as a BILL, not an estimate. The trade's own rate is worth
+         showing; a total is not a total until it is for something. -->
+    ${needsSub ? `<p class="m-cap" style="opacity:.8">What ${esc(String(p.name).split(' ')[0])} charges</p>
+    <!-- THE SCREEN WHERE SHE COMMITS HER MONEY was ~10% translated: the bill,
+         the fee line, the total, the escrow paragraph, the refund terms and the
+         button itself were all English under a Telugu heading. Both audits, for
+         several rounds, said the same thing — navigation is translated and money
+         is not, which is exactly backwards. -->
+    ${kv(t('bill.rateFor', { trade: catName(pv.cat) }), `${M.fmt(p.ask)} ${esc(pv.cat.unit || '')}`)}
+    <p class="tiny" style="margin-top:8px;opacity:.85;line-height:1.5">${esc(t('bill.pickJobFirst', {
+      name: String(p.name).split(' ')[0], pct }))}</p>`
+    : `<p class="m-cap" style="opacity:.8">${esc(t('bill.theBill'))}</p>
+    ${kv(t('bill.theirPrice', { name: p.name.split(' ')[0], trade: catName(pv.cat) })
+         + (sub ? ` · ${esc(subName(sub, subKey(sub)))}` : ''), bookRow[0])}
+    ${kv(t('bill.saahaaCharge', { pct }), bookRow[1])}
+    ${kv(t('bill.youPay'), M.fmt(q.customerPays), 'm-kv--total')}
+    <p class="tiny" style="margin-top:8px;opacity:.85;line-height:1.5">${esc(t('bill.escrowExplain', {
+      name: p.name, amount: bookRow[0], total: M.fmt(q.customerPays) }))}</p>`}
 
-    <p class="m-cap" style="margin-top:14px;opacity:.8">How you pay</p>
-    ${me() ? `${kv('From your SAAHAA wallet', M.fmt(fromWallet))}${kv(`Via ${esc(gateway.label().split(' — ')[0])}`, M.fmt(viaGateway))}`
-           : '<p class="tiny" style="opacity:.85">Sign in to pay — wallet first, the rest through UPI.</p>'}
+    ${needsSub ? '' : `<p class="m-cap" style="margin-top:14px;opacity:.8">${esc(t('bill.howYouPay'))}</p>
+    ${me() ? `${kv(t('bill.fromWallet'), M.fmt(fromWallet))}${kv(t('bill.viaGateway', { name: gateway.label().split(' — ')[0] }), M.fmt(viaGateway))}`
+           : `<p class="tiny" style="opacity:.85">${esc(t('bill.signInToPay'))}</p>`}`}
 
     ${flags.isOn('SAVINGS_STRIP') ? `
     <div style="margin-top:12px;border-top:1px solid color-mix(in srgb,currentColor 30%,transparent);padding-top:8px">
-      ${kv('A typical app would charge', M.fmt(pv.compare.typicalApp))}
-      ${kv('You save', M.fmt(pv.compare.saved))}
-      <p class="micro" style="opacity:.7;margin-top:4px">* ${esc(pv.compare.assumption)}. ${esc(p.name)} keeps
-        <b>${M.fmt(pv.compare.workerGets)}</b> — ${M.fmt(pv.compare.workerUpside)} more than an app would pay.</p>
+      <!-- "You pay ₹324 · typical app ₹498 · you save ₹175". 498 − 324 = 174.
+           Three independent roundings of one subtraction, on the strip whose
+           only job is to be believed. -->
+      ${kv(t('bill.typicalApp'), M.fmt(pv.compare.typicalApp))}
+      ${kv(t('bill.youSave'), M.fmt(saveShown))}
+      <!-- TWO INCOMPATIBLE COUNTERFACTUALS UNDER ONE ASTERISK. The assumption
+           holds the PRO take-home equal to derive what an aggregator would
+           charge her; the sentence after it silently switched to holding HER
+           price equal to derive what he would have been paid. Both cannot be
+           true at once, and a savings claim that needs two different worlds to
+           work is not a savings claim. One world, stated. -->
+      <p class="micro" style="opacity:.7;margin-top:4px">* ${esc(pv.compare.assumption)} On that basis you pay
+        <!-- "You save ₹227" in the box and "you pay ₹226 less" in the footnote
+             beneath it. The box was already derived from the two rounded figures
+             on screen; this printed the raw one. One sentence cannot disagree
+             with the line directly above it. -->
+        <b>${M.fmt(saveShown)}</b> less than a commission app would charge for the same work, and
+        ${esc(String(p.name).split(' ')[0])} is paid the same either way.</p>
     </div>` : ''}
 
     <details class="expand" style="margin:10px 0 14px">
       <summary class="tiny" style="cursor:pointer;font-weight:700">What's included ▾</summary>
       <p class="tiny" style="margin-top:8px;opacity:.85">
-        ${esc(pv.cat.name)}${sub ? ` · ${esc(sub)}` : ''} · ${esc(pv.cat.unit)} ·
+        ${esc(catName(pv.cat))}${sub ? ` · ${esc(sub)}` : ''} · ${esc(pv.cat.unit)} ·
         about ${pv.cat.workMins} min on site. Platform fee ${M.fmt(q.platformFee)} + GST ${M.fmt(q.gst)}
         is the ${M.fmt(q.uplift)} above. The price cannot change without your approval.
       </p>
@@ -1346,35 +1443,49 @@ export function heroCard(catId, p, sub = null) {
     <!-- WHERE, EXACTLY. The booking used to carry only an area name, so the pro
          was sent to a neighbourhood centroid. It is asked once and remembered:
          a returning customer sees it filled in and never types it again. -->
-    ${me() ? `<div class="field" style="margin:2px 0 8px">
-      <input id="bkAddr" autocomplete="street-address" placeholder=" " maxlength="240"
-        value="${esc((me() || {}).address || '')}">
-      <label>Flat / house and street</label></div>
-    <div class="field" style="margin:0 0 12px">
-      <input id="bkMark" autocomplete="off" placeholder=" " maxlength="120"
-        value="${esc((me() || {}).landmark || '')}">
-      <label>Landmark, so they can find you (optional)</label></div>` : ''}
-    <button class="btn btn--primary btn--lg btn--block" style="justify-content:flex-start" data-act="book.confirm"
+    ${ADDR.addressFields({ required: true })}
+    <!-- BOOKING WITHOUT A JOB TYPE PRODUCED A BILL LINE NOBODY COULD READ:
+         "Electrical · per item — Riyaz Shaikh's price ₹543". Per WHAT item? The
+         sub-service is what gives the price its meaning and what tells the pro
+         what to bring; it was optional, so a customer could reach the doorstep
+         having agreed a number attached to nothing. If the trade has job types,
+         one of them is chosen. -->
+    ${needsSub ? `<button class="btn btn--primary btn--lg btn--block" disabled
+            style="justify-content:flex-start;opacity:.5;cursor:not-allowed">Pick the job first</button>
+      <p class="micro muted" style="margin-top:6px">Choose what the job is above — it decides the price and tells
+        ${esc(String(p.name).split(' ')[0])} what to bring.</p>`
+    : `<button class="btn btn--primary btn--lg btn--block" style="justify-content:flex-start" data-act="book.confirm"
             data-id="${catId}" data-pid="${p.id}" data-sub="${esc(sub || '')}">
-      ${me() ? 'Confirm booking' : 'Sign in to book'} · ${M.fmt(q.customerPays)}
-    </button>
+      ${esc(me() ? t('bill.confirmBooking') : t('bill.signInToBook'))} · ${M.fmt(q.customerPays)}
+    </button>`}
     <p class="micro" style="margin-top:8px;opacity:.75">${cancelLine()}</p>
 
-    ${ask.entryRow(catId, p, q.deal)}
+    <!-- the job she picked has to travel with the request: without it the pros
+         bid against the CATEGORY band, so the same plumber who lists this job at
+         ₹416 bid ₹551 for it and the screen called that a saving -->
+    ${ask.entryRow(catId, p, q.deal, sub)}
 
     <button class="btn btn--ghost btn--block" style="margin-top:6px;color:inherit"
             data-act="book.others" data-id="${catId}" data-sub="${esc(sub || '')}">Someone else</button>
   </div>`;
 }
 
-export function showAlternates(catId, sub = null) {
+export function showAllPros(catId, sub) { showAlternates(catId, sub || null, true); }
+
+/* `allPros` is a parameter, not module state: as a sticky flag it stayed true
+   for the rest of the session, so every later "Someone else" opened expanded. */
+export function showAlternates(catId, sub = null, allPros = false) {
   const m = flow.findMatch(catId, { area: myPlace() });   // coordinates when we have them
-  const list = [m.hero, ...m.alternates].filter(Boolean);
+  const everyone = [m.hero, ...m.alternates].filter(Boolean);
+  const FIRST = 6;
+  const list = allPros ? everyone : everyone.slice(0, FIRST);
+  const more = everyone.length - list.length;
   const cat = get('category', catId);
   const base = (cat && cat.base) || 0;
-  sheet('Choose your pro', `${stepbar(3)}
+  sheet('Choose your pro', `${stepbar(1)}
     <p class="tiny muted" style="margin:0 0 6px">
-      Ranked on trust, distance and a fair price — never on price alone.</p>
+      Ranked on trust, distance and a fair price — never on price alone.${
+        everyone.length > FIRST ? ` ${esc(t('pick.ofN', { n: everyone.length }))}` : ''}</p>
     ${list.map((p, i) => {
       const pv = flow.previewBooking(catId, p, sub);
       /* THIS BOUGHT INSTEAD OF COMPARING. A row showing a name, a rating, a
@@ -1387,17 +1498,27 @@ export function showAlternates(catId, sub = null) {
         <span class="avatar avatar--md">${esc(p.name[0])}</span>
         <div class="grow" style="min-width:0">
           <div class="m-row__t">${esc(p.name)}</div>
-          <div class="m-row__m">${ratingStars(avgOf(p))} ${avgOf(p).toFixed(1)} · ${p.km} km · ~${p.eta} min · ${esc(tier(p.tier).label)}</div>
+          <div class="m-row__m">${avgOf(p) == null ? '' : ratingStars(avgOf(p)) + ' '}${ratingLabel(p)} · ${p.km} km · ~${p.eta} min · ${esc(tier(p.tier).label)}</div>
           <div class="m-row__tags">
-            ${i === 0 ? '<span class="tag tag-accent">Best match</span>' : ''}
+            ${i === 0 && !allPros ? '<span class="tag tag-accent">Best match</span>' : ''}
             <span class="tag tag-neutral">Trust ${p.trust}</span>
-            <span class="tag ${base && p.ask <= base ? 'tag-neutral' : ''}">Their rate ${M.fmt(p.ask)}</span>
+            <!-- "THEIR RATE ₹428 · ₹416 YOU PAY", six rows in a row, on an app whose
+                 every other sentence says SAAHAA's 8% sits ON TOP. It reads as SAAHAA
+                 discounting the pro. The two numbers were never comparable: the tag
+                 printed his CATEGORY rate while the figure beside it was this JOB's
+                 total. Both describe the same job now, so the markup reads the way
+                 the product actually works. -->
+            <span class="tag ${base && pv.deal <= Math.round(base * ((pv.size && pv.size.x) || 1)) ? 'tag-neutral' : ''}">${
+              esc(t('pick.theirPrice', { amount: M.fmt(pv.deal) }))}</span>
           </div>
         </div>
         <div class="m-row__r"><b class="num" style="font-size:17px">${M.fmt(pv.quote.customerPays)}</b>
           <p class="micro muted">you pay</p></div>
       </button>`;
-    }).join('') || '<p class="muted">No pros online.</p>'}${SYS_CSS}`);
+    }).join('') || '<p class="muted">No pros online.</p>'}
+    ${more > 0 ? `<button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px"
+      data-act="book.allpros" data-id="${esc(catId)}" data-sub="${esc(sub || '')}">${esc(t('pick.showAll', { n: more }))}</button>` : ''}
+    ${SYS_CSS}`);
 }
 
 export async function confirmBooking(catId, partnerId, sub) {
@@ -1421,15 +1542,22 @@ export async function confirmBooking(catId, partnerId, sub) {
 
      A field that is not on the screen has said nothing. Only a field that
      exists may change what is stored. */
-  const field = id => document.getElementById(id);
-  const s0 = me() || {};
-  if (field('bkAddr')) {
-    const addr = (field('bkAddr').value || '').trim();
-    const mark = ((field('bkMark') || {}).value || '').trim();
-    if (addr !== (s0.address || '') || mark !== (s0.landmark || '')) {
-      dispatch({ type: 'user/patch', payload: { key: s0.key, patch: { address: addr, landmark: mark } } });
-      saveSession({ ...s0, address: addr, landmark: mark });
-    }
+  /* one module asks and one module saves — ui/address.js. Two screens with
+     their own copy of this had already drifted: the cart never grew one at all. */
+  ADDR.saveAddress();
+  /* AND A SERVICE BOOKING WENT THROUGH WITH NO ADDRESS AT ALL. The CART blocks
+     this -- "Fill in the flat or house and street above" -- and this path, the
+     one that sends a human being to a door, did not. An audit confirmed a
+     booking with the street field blank: it charged her, dispatched Riyaz, and
+     the order screen showed no address anywhere. The pro's job card then read
+     "No door number was given for this one."
+     A grocery bag can be collected. A plumber cannot guess. */
+  if (!ADDR.looksLikeAddress((me() || {}).address)) {
+    toast(t('cart.addAddress'), 'warn');
+    const el = document.getElementById('bkAddr');
+    if (el) el.focus();
+    else ctx.go('account');       // booked from a row with no fields on screen
+    return;
   }
   const o = await flow.bookService({ catId, partner: p, sub });
   /* the need has been served: leaving the query in place meant the next visit

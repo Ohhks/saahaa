@@ -38,10 +38,29 @@ export function saveSession(s) {
      when one is already present — otherwise every re-save (changing area, for
      instance) would silently renew the clock and the expiry would never fire
      for an active user. Signing in afresh is what starts a new 30 days. */
-  ctx.session = s ? { ...s, issuedAt: s.issuedAt || Date.now() } : s;
+  /* THE CREDENTIAL NEVER RIDES ALONG, AND THIS IS THE ONLY PLACE THAT CAN
+     GUARANTEE IT. The sign-IN path stripped `pass`/`passSalt`/`passIter` by
+     hand before calling here; the sign-UP path — forty lines away in
+     ui/views/auth.js, added later — passed the whole user record, so the very
+     same account's password hash and salt sat in localStorage if they had just
+     registered and did not if they had come back. Whichever door they walked
+     through decided whether their credential was on disk.
+
+     Two callers is two chances to forget, and one of them already had. The
+     strip belongs where the write happens, so forgetting is not possible. */
+  ctx.session = s ? stripCredential({ ...s, issuedAt: s.issuedAt || Date.now() }) : s;
   if (ctx.session) persist.write(persist.KEYS.session, ctx.session);
   else persist.remove(persist.KEYS.session);
   return ctx.session;
+}
+/** Everything the session may never carry. Exported so a test can assert the
+    list rather than trust it, and so `restoreSession` uses the same one. */
+export const CREDENTIAL_FIELDS = ['pass', 'passSalt', 'passIter'];
+export function stripCredential(u) {
+  if (!u) return u;
+  const out = { ...u };
+  for (const f of CREDENTIAL_FIELDS) delete out[f];
+  return out;
 }
 export function restoreSession(users) {
   const saved = persist.read(persist.KEYS.session, null);
@@ -56,7 +75,9 @@ export function restoreSession(users) {
   }
   // trust the stored key, but re-read the record so a role or tier change lands
   const fresh = (users || []).find(u => u.key === saved.key);
-  ctx.session = fresh ? { ...fresh, area: saved.area || fresh.area, issuedAt } : null;
+  /* and re-reading the user record puts the credential straight back — the
+     strip above only guards the write, so it is applied here too */
+  ctx.session = fresh ? stripCredential({ ...fresh, area: saved.area || fresh.area, issuedAt }) : null;
   if (!ctx.session) persist.remove(persist.KEYS.session);
   return ctx.session;
 }

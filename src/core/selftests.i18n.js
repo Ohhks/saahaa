@@ -12,6 +12,8 @@
    half-translated door screen is worse than an English one. */
 
 import { describe, it, expect } from './selftest.js';
+import * as Q from '../domain/quiz.js';
+import * as V from '../domain/verification.js';
 import * as i18n from '../ui/i18n.js';
 
 /* The strings a person meets at a moment where misunderstanding costs them:
@@ -100,5 +102,66 @@ describe('i18n · the app is honest about what has not been checked', () => {
   it('reports which keys a language is still missing, so the gap is countable', () => {
     expect(i18n.missing('en')).toHaveLength(0);
     expect(Array.isArray(i18n.missing('te'))).toBeTrue();
+  });
+});
+
+/* ── the rules, in the language he reads ───────────────────────
+   The agreement a partner signs and the conduct quiz he is marked on were
+   English-only, on an onboarding that tells him two screens earlier — in
+   Telugu — that it knows he may not read English. Being marked on rules you
+   cannot read is not being taught them; it is being filtered on English, and
+   failing locks the trade for 24 hours.
+
+   Translating a marked quiz is the dangerous kind of translation, so what
+   these pin is not the wording but the SAFETY: the correct answer must land on
+   the same index in every language, or a Telugu-speaking pro fails a question
+   he answered correctly. `conductFor` maps options positionally and copies `a`
+   from the English bank, which makes that impossible by construction — and
+   this is the test that says so. */
+describe('onboarding · the rules are translated, and translating cannot move the answer', () => {
+  it('every language has one entry per conduct question, with the same options', () => {
+    for (const l of ['en', 'hi', 'te']) {
+      const bank = Q.conductFor(l);
+      expect(bank.length).toBe(Q.CONDUCT.length);
+      bank.forEach((item, i) => {
+        expect(item.o.length).toBe(Q.CONDUCT[i].o.length);
+        expect(item.a).toBe(Q.CONDUCT[i].a);        // the answer never moves
+      });
+    }
+  });
+
+  it('nothing is blank — a missing string falls back to English, never to nothing', () => {
+    for (const l of ['en', 'hi', 'te']) {
+      for (const item of Q.conductFor(l)) {
+        expect(String(item.q || '').length).toSatisfy(v => v > 0, 'a question with no words');
+        for (const o of item.o) expect(String(o || '').length).toSatisfy(v => v > 0, 'a choice with no words');
+      }
+    }
+  });
+
+  it('Hindi and Telugu are actually different words, not the English copied over', () => {
+    /* the failure this catches is a stub map that passes every test above */
+    for (const l of ['hi', 'te']) {
+      const bank = Q.conductFor(l);
+      const same = bank.filter((item, i) => item.q === Q.CONDUCT[i].q).length;
+      expect(same).toBe(0, `${l}: ${same} question(s) still in English`);
+    }
+  });
+
+  it('an unknown language is the English bank, not a crash and not a blank', () => {
+    expect(Q.conductFor('fr').length).toBe(Q.CONDUCT.length);
+    expect(Q.conductFor(undefined)[0].q).toBe(Q.CONDUCT[0].q);
+  });
+
+  it('all five terms of the agreement exist in all three languages', () => {
+    for (const l of ['en', 'hi', 'te']) {
+      const terms = V.termsFor(l);
+      expect(terms.length).toBe(V.TERMS.length);
+      for (const line of terms) expect(String(line || '').length).toSatisfy(v => v > 0, 'a blank promise');
+    }
+    for (const l of ['hi', 'te']) {
+      const same = V.termsFor(l).filter((line, i) => line === V.TERMS[i]).length;
+      expect(same).toBe(0, `${l}: ${same} term(s) still in English`);
+    }
   });
 });

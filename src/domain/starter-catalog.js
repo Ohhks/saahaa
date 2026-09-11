@@ -20,11 +20,19 @@ const RAW = {
     'Staples & Flour': [
       ['Aashirvaad Atta 5kg', 'pack', 285, 310, ''], ['Fortune Chakki Atta 10kg', 'pack', 520, 560, ''],
       ['Sona Masoori Rice (loose)', 'kg', 62, 0, 'v'], ['HMT Rice 26kg bag', 'bag', 1560, 0, ''],
-      ['Idli Rava 1kg', 'kg', 58, 0, ''], ['Maida 1kg', 'kg', 52, 0, ''],
+      ['Idli Rava (loose)', 'kg', 58, 0, 'v'], ['Maida (loose)', 'kg', 52, 0, 'v'],
+      ['Sugar (loose)', 'kg', 46, 0, 'v'],
     ],
+    /* A KIRANA THAT SOLD ONE THING BY WEIGHT. The persona this product is
+       built for sells "loose rice, dal and vegetables by weight" and the
+       starter catalogue gave a whole shop exactly ONE variable-weight line —
+       so the scale, the short-weigh refund and the reweigh cap, which are the
+       most carefully built machinery in the app, could appear on one row of a
+       thirty-seven item shop. Dal is bought by the kilo from a sack in
+       Hyderabad; it is listed that way. Packed brands stay packed. */
     'Dals & Pulses': [
-      ['Toor Dal 1kg', 'kg', 165, 0, ''], ['Moong Dal 1kg', 'kg', 128, 0, ''],
-      ['Chana Dal 1kg', 'kg', 92, 0, ''], ['Urad Dal (Gota) 1kg', 'kg', 142, 0, ''],
+      ['Toor Dal (loose)', 'kg', 165, 0, 'v'], ['Moong Dal (loose)', 'kg', 128, 0, 'v'],
+      ['Chana Dal (loose)', 'kg', 92, 0, 'v'], ['Urad Dal (Gota) 1kg', 'kg', 142, 0, ''],
     ],
     'Oils & Ghee': [
       ['Fortune Sunflower Oil 1L', 'pouch', 142, 155, ''], ['Freedom Sunflower 5L can', 'can', 690, 730, ''],

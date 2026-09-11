@@ -23,6 +23,7 @@
 
 import * as M from '../core/money.js';
 import { find } from '../core/registry.js';
+import { subSize } from './catalog.services.js';
 import { kmBetween, etaMins } from './match.js';
 import { trustScore, tierMeets } from './trust.js';
 
@@ -56,7 +57,7 @@ const BANDS = {
  * The published band. Snapshotted onto the request at post time so that
  * editing a category's base price can never retroactively void live bids.
  */
-export function priceBand(catId, { complexity = 'simple', units = 1, damagePhoto = false } = {}) {
+export function priceBand(catId, { complexity = 'simple', units = 1, damagePhoto = false, sub = null } = {}) {
   const cat = find('category', catId);
   // A retail category has no `base`, so every arithmetic result was NaN — and
   // because every NaN comparison is false, floor/ceiling/tooSmall ALL passed.
@@ -66,7 +67,16 @@ export function priceBand(catId, { complexity = 'simple', units = 1, damagePhoto
   if (shape === null) return { quoteOnly: true, cat };
 
   const cx = COMPLEXITY[complexity] ?? 1;
-  const beff = Math.round(cat.base * cx * (units > 1 ? units : 1));
+  /* AND THE BAND IGNORED WHICH JOB IT WAS FOR. Every sub-service carries a
+     multiplier -- a tap repair is 0.7 of the category base, a pipeline
+     replacement 2.2 -- and every direct booking prices with it. The auction
+     did not, so it invited bids against the bare category: a plumber who lists
+     a blocked drain at ₹416 was led to bid ₹551 for it, and the screen labelled
+     that "₹28 less than held". The customer paid a third more by using the
+     feature sold to her as the cheaper way. Same multiplier as the booking
+     sheet, or the two screens are pricing different jobs. */
+  const size = sub ? subSize(catId, sub) : null;
+  const beff = Math.round(cat.base * ((size && size.x) || 1) * cx * (units > 1 ? units : 1));
   let ceilMul = shape.ceiling;
   if (cx >= 1.25) ceilMul = Math.max(ceilMul, 1.40);
   if (damagePhoto) ceilMul = Math.max(ceilMul, 1.60);

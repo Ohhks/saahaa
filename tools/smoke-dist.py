@@ -69,3 +69,48 @@ if problems:
         print('  ·', p)
     sys.exit(1)
 print(f'smoke-dist: OK — {"live site" if LIVE else "bundle"} boots and paints ({len(dom)//1024} KB DOM, {visible.count("data-act=")} controls)')
+
+# ── EVERY ROUTE, NOT JUST THE ONE THE APP OPENS ON ───────────────────────────
+# This file checked that the HOME shell paints, and stopped there. Twice that
+# was not enough:
+#
+#   * `flags` used in ui/views/partner.js and never imported — the shop's
+#     Payouts tab, the only screen with a withdraw button, threw on every render.
+#   * `t` called 88 times in ui/views/ask.js and never imported — the entire
+#     "ask several pros for a price" journey died with "t is not defined",
+#     and a round-10 audit scored the product 4/10 largely because of it.
+#
+# Both are legal JavaScript, so the module parses. Neither is reachable from the
+# domain tests or the money journeys, which never touch the DOM. And the bundle
+# boots perfectly — on the home route. A free variable in a view is invisible
+# until somebody opens that view, so this opens them.
+ROUTES = ['#/shops', '#/cart', '#/orders', '#/account', '#/earn',
+          '#/ask/none', '#/order/none', '#/pro/none', '#/shop/none',
+          '#/legal/terms', '#/legal/refunds', '#/legal/privacy']
+ERROR_MARK = 'This screen hit an error'
+broken = []
+for route in ROUTES:
+    rcmd = [c for c in cmd]
+    rcmd[-1] = url + ('&' if '?' in url else '?') + 'demo=1' + route
+    try:
+        rdom = subprocess.run(rcmd, capture_output=True, timeout=90).stdout.decode('utf-8', 'replace')
+    except subprocess.TimeoutExpired:
+        broken.append(route + ' — browser timed out')
+        continue
+    rvis = re.sub(r'(?is)<(script|style)\b.*?</\1\s*>', '', rdom)
+    if ERROR_MARK in rvis:
+        broken.append(route + ' — rendered the error page')
+    elif len(rdom) < 20000:
+        broken.append(route + f' — DOM only {len(rdom)} bytes')
+    elif 'data-act=' not in rvis:
+        broken.append(route + ' — nothing interactive rendered')
+
+if broken:
+    print('smoke-dist: FAIL — routes that do not render:')
+    for b in broken:
+        print('  x ' + b)
+    print('    A view with a free variable parses, passes every test, and builds.')
+    print('    It throws the first time somebody opens it.')
+    sys.exit(1)
+print(f'smoke-dist: OK — {len(ROUTES)} more routes render without throwing')
+

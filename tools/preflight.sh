@@ -8,6 +8,18 @@ ok()   { echo "  ok   $1"; }
 echo "=== SAAHAA PRE-FLIGHT ==="
 
 [ -f dist/saahaa.html ] || fail "dist/saahaa.html was not produced"
+
+# EVERY GATE BELOW READS dist/, AND NOTHING HERE BUILT IT. A run that forgot
+# `python tools/build.py --site` first smoke-tested YESTERDAY'S bundle and
+# printed "PRE-FLIGHT PASSED — safe to publish" over code nobody had compiled.
+# It happened: a release ran green against a bundle three fixes out of date.
+# A gate that can pass on a stale artefact is not a gate.
+STALE=$(find src tools/build.py index.html -newer dist/saahaa.html -type f 2>/dev/null | head -5)
+if [ -n "$STALE" ]; then
+  echo "  these are newer than the bundle:"; echo "$STALE" | sed 's/^/      /'
+  fail "dist/saahaa.html is older than the source — run: python tools/build.py --site"
+fi
+ok "the bundle was built from the source that is here now"
 SIZE=$(wc -c < dist/saahaa.html)
 [ "$SIZE" -ge 10240 ]   || fail "bundle is only ${SIZE} bytes — the build truncated"
 [ "$SIZE" -le 5242880 ] || fail "bundle is ${SIZE} bytes (>5MB) — move images to Supabase Storage"
@@ -49,14 +61,25 @@ cmp -s dist/saahaa.html dist/404.html || fail "404.html must be identical to the
 ok "SPA deep links will survive a hard refresh"
 
 # THE ONE A BROWSER HAS TO SEE: the built bundle boots and paints as an app, not as text.
+node --experimental-vm-modules tools/lint-parse.mjs 2>/dev/null || fail "a module does not parse as a module"
 python tools/smoke-dist.py; SM=$?
 [ $SM -eq 1 ] && fail "the built bundle does not render as an app (tools/smoke-dist.py)"
 [ $SM -eq 2 ] && echo "  warn: no browser here - CI proves the bundle renders"
 [ $SM -eq 0 ] && ok "the built bundle boots and paints in a real browser"
 python tools/check-version.py    || fail "version / CHANGELOG mismatch"
 python tools/lint-migrations.py  || fail "migration lint failed"
+# FIRST, BECAUSE EVERYTHING BELOW ASSUMES THE CODE PARSES. `node --check` does
+# not answer that: with no "type":"module" it parses as CommonJS and passes a
+# file whose ES-module parse fails. A backtick inside a comment inside a
+# template literal shipped a blank screen past every gate we had.
 node   tools/lint-i18n.mjs       || fail "a translated string nobody renders is not a translation"
 node   tools/lint-dead.mjs       || fail "code that exists and can never run"
 node   tools/test-node.mjs       || fail "domain tests failed at the gate"
+# LAST, AND THE ONE THAT MOVES MONEY. Everything above checks shape, pure
+# functions and a bundle that paints. This drives five real journeys through
+# the real store and asks the book after every step. The reweigh bug shipped
+# five times past every other gate here; it does not get past this one.
+node   tools/render-views.mjs    || fail "a screen does not build (tools/render-views.mjs)"
+node   tools/journey.mjs         || fail "a rupee did not arrive where it was meant to"
 
 echo "=== PRE-FLIGHT PASSED — safe to publish ==="

@@ -247,6 +247,61 @@ export const GENERIC = [
     o: ['Treated with respect, nothing touched that is not part of the job', 'Yours to use during the job', 'Fine to photograph', 'Not your concern'], a: 0 },
 ];
 
+/* THE RULES QUIZ, IN THE LANGUAGE HE READS.
+   TRADE stays English and the app says so plainly (`ob.quizEnglish`, itself
+   translated) — a plumbing question is a question about plumbing, and he can
+   ask somebody to read it with him. CONDUCT is different, and the header of
+   this file already says why: it is "the moment the pro reads the rules once,
+   with attention". A man being marked on rules he cannot read is not being
+   taught them, he is being filtered on English, and failing it locks him out
+   of his own trade for 24 hours.
+
+   Same questions, same order, same correct index — only the words change, so
+   `shuffled` and `score` need to know nothing about any of this. */
+const CONDUCT_I18N = {
+  hi: [
+    { q: 'आप ग्राहक के दरवाज़े पर पहुँचे हैं। काम शुरू करने से पहले आप क्या करेंगे?',
+      o: ['उनका SAAHAA कोड माँगकर ऐप में डालूँगा', 'तुरंत काम शुरू कर दूँगा', 'ऑफ़िस को फ़ोन करूँगा', 'घर की फ़ोटो लूँगा'] },
+    { q: 'ग्राहक ऐप छोड़कर सीधे नक़द देना चाहता है। आप?',
+      o: ['मना कर दूँगा — पैसा हमेशा SAAHAA से ही', 'ले लूँगा, ज़्यादा पैसा मिलेगा', 'आधा ले लूँगा', 'अपने नंबर पर UPI माँगूँगा'] },
+    { q: 'आपका पैसा आपको कब मिलता है?',
+      o: ['काम की फ़ोटो और ग्राहक की पुष्टि के बाद', 'काम शुरू करने से पहले', 'पहुँचते ही', 'महीने के आख़िर में'] },
+    { q: '"आप 100% रखते हैं" का मतलब?',
+      o: ['आपने जो रेट बताया, उतना ही आपको मिलेगा', 'फ़ीस पूरी आप भरते हैं', 'ग्राहक कुछ नहीं देता', 'आपको बोनस मिलता है'] },
+    { q: 'जो काम आपने लिया है, उस पर आप नहीं जा सकते। आप?',
+      o: ['जितनी जल्दी हो सके ऐप में रद्द कर दूँगा', 'बिना बताए नहीं जाऊँगा', 'अपनी जगह किसी दोस्त को भेज दूँगा', 'फ़ोन बंद कर दूँगा'] },
+    { q: 'ग्राहक शिकायत करता है कि काम ठीक से नहीं हुआ। फ़ैसला किससे होता है?',
+      o: ['आपका दरवाज़े वाला कोड, आपकी फ़ोटो, और SAAHAA टीम', 'जो ज़्यादा ज़ोर से बोले', 'ग्राहक हमेशा सही होता है', 'प्रोफ़ेशनल हमेशा सही होता है'] },
+  ],
+  te: [
+    { q: 'కస్టమర్ ఇంటి దగ్గరకు వచ్చారు. పని మొదలుపెట్టే ముందు ఏం చేస్తారు?',
+      o: ['వాళ్ల సాహా కోడ్ అడిగి యాప్‌లో ఎంటర్ చేస్తాను', 'వెంటనే పని మొదలుపెడతాను', 'ఆఫీసుకు ఫోన్ చేస్తాను', 'ఇంటి ఫోటో తీస్తాను'] },
+    { q: 'కస్టమర్ యాప్ వదిలేసి నేరుగా క్యాష్ ఇస్తానంటున్నారు. మీరు?',
+      o: ['ఒప్పుకోను — డబ్బు ఎప్పుడూ సాహా ద్వారానే', 'ఒప్పుకుంటాను, ఎక్కువ డబ్బు వస్తుంది', 'సగం ఒప్పుకుంటాను', 'నా నంబర్‌కు UPI అడుగుతాను'] },
+    { q: 'మీ డబ్బు మీకు ఎప్పుడు విడుదల అవుతుంది?',
+      o: ['పని ఫోటో పెట్టి, కస్టమర్ ఒప్పుకున్న తర్వాత', 'పని మొదలుపెట్టక ముందే', 'అక్కడికి చేరుకున్నప్పుడు', 'నెల చివర్లో'] },
+    { q: '"మీరు 100% ఉంచుకుంటారు" అంటే?',
+      o: ['మీరు చెప్పిన రేటు ఎంతో, మీకు అంతే వస్తుంది', 'ఫీజు మొత్తం మీరే కడతారు', 'కస్టమర్ ఏమీ కట్టరు', 'మీకు బోనస్ వస్తుంది'] },
+    { q: 'ఒప్పుకున్న పనికి మీరు వెళ్లలేకపోతున్నారు. మీరు?',
+      o: ['వీలైనంత తొందరగా యాప్‌లో రద్దు చేస్తాను', 'ఏమీ చెప్పకుండా వెళ్లను', 'బదులుగా స్నేహితుడిని పంపుతాను', 'ఫోన్ ఆఫ్ చేస్తాను'] },
+    { q: 'పని సరిగా చేయలేదని కస్టమర్ ఫిర్యాదు చేశారు. దీన్ని ఏది తేలుస్తుంది?',
+      o: ['మీ డోర్ కోడ్, మీ ఫోటోలు, సాహా టీమ్', 'ఎవరు గట్టిగా అరిస్తే వాళ్లు', 'ఎప్పుడూ కస్టమరే గెలుస్తారు', 'ఎప్పుడూ ప్రొఫెషనలే గెలుస్తారు'] },
+  ],
+};
+/** The conduct bank in `lang`. Falls back per question AND per option, so a
+    half-finished translation can never show a blank choice or drop an answer:
+    the correct index `a` is carried through untouched from the English. */
+export function conductFor(lang) {
+  const tr = CONDUCT_I18N[lang];
+  if (!tr) return CONDUCT;
+  return CONDUCT.map((item, i) => {
+    const t = tr[i];
+    if (!t) return item;
+    return { q: t.q || item.q, a: item.a,
+             o: item.o.map((en, j) => (t.o && t.o[j]) || en) };
+  });
+}
+
 export function tradeBank(catId) { return TRADE[catId] || GENERIC; }
 
 /* A seeded, deterministic shuffle so the correct option is not always first

@@ -9,14 +9,14 @@ import * as audit from '../core/audit.js';
 import * as M from '../core/money.js';
 import { find } from '../core/registry.js';
 import { subSize } from './catalog.services.js';
-import { applyTransition, canTransition } from './orders.js';
+import { applyTransition, canTransition, isTerminal } from './orders.js';
 import { acct, holdbackFor, balanceOf, checkInvariants } from './ledger.js';
 import * as gateway from '../core/gateway.js';
 import * as W from './wallet.js';
 import * as photos from '../core/photos.js';
-import { quoteService, quoteRetail, compareWithApps, releaseService, cancelSplit } from './pricing.js';
+import { quoteService, quoteRetail, compareWithApps, releaseService, cancelSplit, GST_RATE } from './pricing.js';
 import { lockedMatch, rankShops, kmBetween, etaMins } from './match.js';
-import { escrowTier, markupFor, trustScore } from './trust.js';
+import { escrowTier, markupFor, trustScore, capOk, effectiveCap, PROVISIONAL_JOBS } from './trust.js';
 import { toast } from '../ui/dom.js';
 import { t } from '../ui/i18n.js';
 import * as flags from '../core/flags.js';
@@ -91,14 +91,43 @@ export async function shopWithdraw(shopId, paise) {
   const shop = getState().shops.find(x => x.id === shopId);
   if (!shop) return null;
   const amt = M.int(paise), w = shopWallet(shopId);
-  if (amt > w.balance) { toast(`You can withdraw up to ${M.fmt(w.balance)}`, 'warn'); return null; }
+  if (amt > w.balance) { toast(`You can withdraw up to ${M.fmtMax(w.balance)}`, 'warn'); return null; }
   if (amt < MIN_WITHDRAW) { toast(`The smallest withdrawal is ${M.fmt(MIN_WITHDRAW)}`, 'warn'); return null; }
   if (!shop.upi) { toast('Add the UPI id this shop is paid into first', 'warn'); return null; }
   const r = await gateway.payout({ paise: amt, purpose: 'shop-payout', key: shopId, upi: shop.upi });
   if (!r.ok) { toast('Could not send that right now', 'danger'); return null; }
   await ledger('WITHDRAW', amt, acct.shop(shopId), acct.world(), { via: r.via, ref: r.ref });
+  /* AND THE APP THEN TOLD HER NOTHING HAD EVER BEEN PAID. The ledger leg was
+     posted and `paidOut` was never written — a field only the ADMIN route sets
+     (`admin.markpaid`) — while the Payouts tab derives "sent to bank" and
+     "awaiting" from exactly that field. So seconds after the toast said
+     "₹196 sent to srilakshmi@ybl", her screen read SENT TO BANK ₹0, AWAITING
+     ₹0, and "No payout has cleared yet" above a list still showing the ₹196.
+     Permanently: on the shop's own exit that field could never become true.
+
+     8.6.0 gave the shop its own withdraw button and did not give it the write.
+     Oldest settled order first, up to what actually left — the same order the
+     money itself came from. */
+  {
+    const at = Date.now();
+    let left = amt;
+    const owed = getState().orders
+      .filter(o => o.shopId === shopId && o.settledAt && !o.paidOut && (o.shopPayout | 0) > 0)
+      .sort((a, b) => (a.settledAt || 0) - (b.settledAt || 0));
+    for (const o of owed) {
+      const worth = (o.shopPayout | 0) + (flags.isOn('RIDER_POOL') ? 0 : (o.riderPayout | 0));
+      if (worth > left) break;
+      left -= worth;
+      dispatch({ type: 'order/patch', payload: { id: o.id, patch: { paidOut: true, paidOutAt: at } } });
+    }
+  }
   audit.record('shop.withdraw', { shopId, amt }, me() && me().key);
-  toast(`${M.fmt(amt)} sent to ${shop.upi}`);
+  /* A CONFIRMATION FOR AN IRREVERSIBLE TRANSFER MAY NOT ROUND. A shop asked
+     for ₹150.50, the button said "Send ₹150.50", the engine moved exactly
+     15050 paise -- and the toast said "₹151 sent", fifty paise more than had
+     left. The pro's book shows paise and the shop's rounded to rupees, so the
+     two partner ledgers disagreed about precision on the same act. */
+  toast(`${M.fmt2(amt)} sent to ${shop.upi}`);
   ctx.render();
   return amt;
 }
@@ -127,8 +156,26 @@ export async function customerWithdraw(paise) {
   if (!assertBookOk('withdraw')) return null;
   const s = me(); if (!s) return null;
   const amt = M.int(paise), w = customerWallet(s.key);
-  if (amt < 1000) { toast('The smallest take-out is ₹10', 'warn'); return null; }
-  if (amt > w.balance) { toast(`You can take out up to ${M.fmt(w.balance)}`, 'warn'); return null; }
+  /* A FLOOR MUST NOT BECOME A TRAP. An item-level refund lands on odd paise, so
+     a wallet routinely ends on something like ₹5.22 — below the floor, and
+     therefore un-withdrawable — while `eraseBlockers` counted that same ₹5.22
+     as money held and refused to delete her account. The refusal sheet then
+     told her to take her money out: the app instructing her to do the one thing
+     it would not let her do.
+
+     The floor exists to stop dust-sized payout fees, and that reason does not
+     apply when she is emptying the wallet. Taking ALL of it is always allowed. */
+  /* AND THE MESSAGE ROUNDED THE ANSWER OUT OF EXISTENCE. `M.fmt` drops the
+     paise, so a balance of ₹32.86 was shown — and refused — as "₹33": she was
+     told she could take out ₹33, typed 33, and was told she could take out ₹33.
+     There was no number she could have typed that the screen had given her.
+     Every message about an exact balance uses `fmt2`; only round figures, like
+     the ₹10 floor itself, may be printed round. */
+  if (amt < 1000 && amt !== w.balance) {
+    toast(`The smallest take-out is ${M.fmt(1000)} — or take the whole ${M.fmt2(w.balance)}`, 'warn');
+    return null;
+  }
+  if (amt > w.balance) { toast(`You can take out up to ${M.fmt2(w.balance)}`, 'warn'); return null; }
   /* THE APP NEVER ASKED HER FOR A UPI ID — no screen anywhere sets one — and
      this sent the money anyway, to '', toasting "sent to your UPI". In sandbox
      that is a lie; on a live rail it is a payout into nowhere. */
@@ -138,7 +185,7 @@ export async function customerWithdraw(paise) {
   if (!r.ok) { toast('Could not send that right now', 'danger'); return null; }
   await ledger('WITHDRAW', amt, acct.customer(s.key), acct.world(), { via: r.via, ref: r.ref });
   audit.record('cwallet.withdraw', { amt }, s.key);
-  toast(`${M.fmt(amt)} sent to ${dest}`);
+  toast(`${M.fmt2(amt)} sent to ${dest}`);
   return amt;
 }
 
@@ -163,7 +210,9 @@ export function previewBooking(catId, partner, sub) {
   const base = partner ? partner.ask : (cat && cat.base) || 50000;
   const deal = Math.round(base * size.x);
   const q = quoteService(deal, { markup: markupFor(partner || {}) });
-  const cmp = compareWithApps(deal);
+  /* the same markup the bill above uses, or the comparison describes a
+     different bill from the one she is looking at */
+  const cmp = compareWithApps(deal, { markup: markupFor(partner || {}) });
   return { cat, partner, sub, deal, quote: q, compare: cmp, size };
 }
 
@@ -193,9 +242,32 @@ export async function bookService({ catId, partner, sub, deal, slot }) {
     toast('You cannot book yourself. Pick another professional.', 'warn');
     throw new Error('self-booking refused');
   }
+  /* A MAN WAS SENT TO A NEIGHBOURHOOD NAME. The booking SHEET refuses to place
+     an order without a door -- "Fill in the flat or house and street above" --
+     and the ask-and-accept path called straight through to here, so a job won
+     at auction carried `customerAddress: ""` and no screen showed one. Two ways
+     in, one of them guarded.
+
+     The guard belongs where the order is made, not on each screen that makes
+     one: any future path gets it for free. */
+  if (!String(s.address || '').trim()) {
+    toast('Add the flat or house and street first — the pro needs a door to knock on.', 'warn');
+    throw new Error('no address');
+  }
   const cat = find('category', catId);
   const size = subSize(catId, sub);
   const price = deal ?? Math.round(partner.ask * size.x);
+  /* AND I ENFORCED THE CAP ON THE WRONG PATH. `capOk` was wired into the
+     on-site re-quote and nowhere else, so a pro one clean job old was still
+     booked straight through at ₹1,760 against the ₹1,500 his recruiting page,
+     his go-live screen and her booking sheet all promise. The cap is about how
+     much a stranger may be trusted with, so it belongs where the job is
+     ACCEPTED, not only where it is later repriced. */
+  if (partner && !capOk(partner, price)) {
+    toast(`${partner.name} is new to SAAHAA and can take jobs up to `
+      + `${M.fmt(effectiveCap(partner))} for now. Pick a smaller job, or another pro.`, 'warn');
+    throw new Error('provisional cap');
+  }
   const q = quoteService(price, { markup: markupFor(partner) });
   const km = kmBetween(s.area, partner.area);
   const now = Date.now();
@@ -213,7 +285,7 @@ export async function bookService({ catId, partner, sub, deal, slot }) {
     partnerId: partner.id, partnerName: partner.name, partnerArea: partner.area,
     km, eta: etaMins(km),
     deal: q.deal, customerPays: q.customerPays, platformFee: q.platformFee, gst: q.gst,
-    saved: compareWithApps(price).saved,
+    saved: compareWithApps(price, { markup: markupFor(partner) }).saved,
     slot: slot || 'now',
     stage: 'MATCHING', stageTs: now, createdAt: now,
     history: [{ stage: 'DRAFT', at: now }, { stage: 'MATCHING', at: now }],
@@ -287,8 +359,19 @@ export async function sweepUnaccepted(now = Date.now()) {
      24-hour auto-refund stopped applying and the owner's own remedy could not
      reach it either. The one action a worried person takes must not be the one
      that strands them. */
+  /* AND THAT SAME FILTER WAS A STANDING INVITATION TO ROB THE SHOP. It matches
+     ANY disputed retail order — including one the SHOP raised — so a kirana
+     that refused a return and escalated was auto-refunded against on the very
+     same 24-hour clock. His only three moves at R_RETURN were: accept a full
+     refund, do nothing and be refunded anyway, or escalate and be refunded
+     anyway. Weighed rice and dal go out of the door and there was no point in
+     the flow where he could say no.
+
+     A dispute must STOP the clock, not run it. A contested return waits for a
+     person; only an unanswered one refunds itself. */
   const returns = getState().orders.filter(o =>
     (o.stage === 'R_RETURN' || (o.stage === 'DISPUTED' && o.kind === 'retail'))
+    && !o.returnContested
     && (now - (o.stageTs || o.createdAt || now)) > RETURN_WINDOW_MS);
   for (const o of returns) {
     await refundRetail(o.id, 'The shop did not answer the return in time');
@@ -313,7 +396,25 @@ let bookFrozen = null;
 export const bookStatus = () => bookFrozen;
 
 export function assertBookOk(where) {
-  const r = checkInvariants(getState().ledger || []);
+  /* THE GUARD HAD A CHECK IT NEVER RAN. `escrow.no-stranded` — the one that
+     asks whether a FINISHED order is still holding money — only runs when it is
+     handed the list of closed orders, and this, its only caller in the product,
+     handed it nothing. So it sat there through every audit, unable to fire,
+     while a cancellation left the platform's own share behind in escrow on
+     every single cancelled job: the books still summed to zero, because the
+     money was simply in the wrong account, and nothing was looking.
+
+     The list is cheap to build and this runs before every payout. Not fatal —
+     stranded money is wrong, not dangerous, and freezing all payouts over a
+     historical residue would be worse than the residue. It is loud instead. */
+  const closedOrderIds = (getState().orders || [])
+    .filter(o => isTerminal(o.stage)).map(o => o.id);
+  const r = checkInvariants(getState().ledger || [], { closedOrderIds });
+  const stranded = (r.checks || []).find(c => c.id === 'escrow.no-stranded');
+  if (stranded && !stranded.ok) {
+    audit.record('ledger.stranded', { where, detail: stranded.detail }, 'system');
+    console.warn('[saahaa] stranded escrow —', stranded.detail);
+  }
   const fatal = (r.checks || []).filter(c => c.fatal && !c.ok);
   if (!fatal.length) { bookFrozen = null; return true; }
   bookFrozen = { where, at: Date.now(), problems: fatal.map(c => c.detail) };
@@ -349,6 +450,14 @@ export const sameCode = (a, b) => {
 export function verifyOtp(orderId, entered) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return false;
+  /* A SURVEY JOB MUST BE PRICED BEFORE IT IS STARTED. Otherwise the code — the
+     one act that locks the stake and begins the work — would start it at the
+     figure the app invented, which is the whole thing the promise on the
+     booking sheet exists to prevent. */
+  if (o.pricedOnSite && !o.onSiteAgreedAt) {
+    toast('Quote the job first — she has to agree the price before you start', 'warn');
+    return false;
+  }
   if (!sameCode(entered, o.otp)) {
     const fails = (o.otpFails || 0) + 1;
     dispatch({ type: 'order/patch', payload: { id: orderId, patch: { otpFails: fails } } });
@@ -368,8 +477,13 @@ export function verifyOtp(orderId, entered) {
     return false;
   }
   audit.record('otp.verified', { id: orderId });
-  advance(orderId, 'IN_PROGRESS', { otpVerified: true, startedAt: Date.now() });
+  /* THE STAKE WAS LOCKED AFTER THE SCREEN HAD ALREADY PAINTED. `advance` renders,
+     then `lockStake` dispatched into a view that had finished drawing — so the
+     "₹100 committed" chip was empty on the one render where his money moved,
+     and appeared only if he navigated away and came back. A person is told
+     their money moved, or they are not told at all. */
   lockStake(orderId);
+  advance(orderId, 'IN_PROGRESS', { otpVerified: true, startedAt: Date.now() });
   toast('Verified — work started');
   return true;
 }
@@ -492,11 +606,58 @@ async function forfeitStake(o, reason) {
   if (!o.stake || o.stake.returned || o.stake.forfeited) return 0;
   if (o.stake.funded) await ledger('STAKE_FORFEIT', o.stake.funded, W.stakeAcct(o.partnerId), acct.customer(o.customerKey), { orderId: o.id, reason });
   const p = getState().partners.find(x => x.id === o.partnerId);
-  if (p && o.stake.onCredit) dispatch({ type: 'partner/patch', payload: { id: p.id, patch: { walletDebt: (p.walletDebt | 0) + o.stake.onCredit } } });
+  if (p && o.stake.onCredit) {
+    await ledger('STAKE_FORFEIT', o.stake.onCredit, acct.debt(p.id), acct.customer(o.customerKey), { orderId: o.id, reason, onCredit: true });
+    dispatch({ type: 'partner/patch', payload: { id: p.id, patch: { walletDebt: (p.walletDebt | 0) + o.stake.onCredit } } });
+  }
   dispatch({ type: 'order/patch', payload: { id: o.id, patch: { stake: { ...o.stake, forfeited: true, forfeitedAt: Date.now(), reason } } } });
   audit.record('stake.forfeited', { id: o.id, funded: o.stake.funded, onCredit: o.stake.onCredit, reason }, 'system');
   return o.stake.need;
 }
+/* The Rs.100 an early cancellation costs the pro. Published on the public
+   refunds page since 8.0 and collected by nothing until now — the fee existed
+   only as a sentence. Taken from his wallet where there is one, and carried as
+   `walletDebt` where there is not, exactly like an unfunded stake: a pro with
+   an empty wallet must still be able to cancel rather than no-show, which is
+   the whole point, so an empty wallet cannot be allowed to block it. */
+async function chargeWorkerFee(o, paise, reason) {
+  const fee = Math.max(0, paise | 0);
+  if (!fee || !o.partnerId) return 0;
+  const p = getState().partners.find(x => x.id === o.partnerId);
+  const free = Math.max(0, balanceOf(getState().ledger, acct.partner(o.partnerId)));
+  const paid = Math.min(fee, free);
+  const owed = fee - paid;
+  /* AND IT WENT IN WHOLE, WITH NO GST LEG. Every other commission path in this
+     file splits fee-ex-GST from GST; a cancellation penalty is a taxable supply
+     too, and about ₹6.10 of the ₹40 is the government's, not ours. */
+  if (paid) {
+    const ex = Math.round(paid / (1 + GST_RATE));
+    const gstPart = paid - ex;
+    if (ex) await ledger('CANCEL_FEE', ex, acct.partner(o.partnerId), acct.fee(), { orderId: o.id, reason });
+    if (gstPart) await ledger('GST', gstPart, acct.partner(o.partnerId), acct.gst(), { orderId: o.id, reason });
+  }
+  /* AND THE UNFUNDED HALF WENT NOWHERE NEAR THE LEDGER. When his wallet was
+     empty the whole ₹40 lived in `walletDebt` and in no entry at all — so the
+     one charge SAAHAA levies against a pro was the one charge his own audit
+     trail could not show him. It is posted against a DEBT account now, and the
+     field is kept only as the fast read the UI already uses. */
+  if (owed && p) {
+    /* AND THE SPLIT WAS ONLY APPLIED TO THE FUNDED HALF. The same ₹40, under
+       the same rule, was booked fee-plus-GST when he had a balance and flat
+       with no GST leg at all when it became a debt -- so where the rupee landed,
+       and whether the government got its share of it, depended on whether he
+       happened to have money that day. The comment above this block says every
+       commission path splits; this path did not. */
+    const exOwed = Math.round(owed / (1 + GST_RATE));
+    const gstOwed = owed - exOwed;
+    if (exOwed) await ledger('CANCEL_FEE', exOwed, acct.debt(p.id), acct.fee(), { orderId: o.id, reason, onCredit: true });
+    if (gstOwed) await ledger('GST', gstOwed, acct.debt(p.id), acct.gst(), { orderId: o.id, reason, onCredit: true });
+    dispatch({ type: 'partner/patch', payload: { id: p.id, patch: { walletDebt: (p.walletDebt | 0) + owed } } });
+  }
+  audit.record('partner.cancelFee', { partner: o.partnerId, orderId: o.id, fee, paid, owed }, 'system');
+  return fee;
+}
+
 /** Wallet: top up (UPI in production; simulated here) and withdraw to UPI. */
 export async function walletTopUp(partnerId, paise) {
   const amt = M.int(paise);
@@ -521,7 +682,7 @@ export async function walletWithdraw(partnerId, paise) {
   if (!assertBookOk('withdraw')) return null;
   const amt = M.int(paise);
   const w = W.walletOf(getState().ledger, partnerId, getState().partners.find(x => x.id === partnerId) || {});
-  if (amt > w.available) { toast(`You can withdraw up to ${M.fmt(w.available)}`, 'warn'); return null; }
+  if (amt > w.available) { toast(`You can withdraw up to ${M.fmtMax(w.available)}`, 'warn'); return null; }
   if (amt < MIN_WITHDRAW) { toast(`The smallest withdrawal is ${M.fmt(MIN_WITHDRAW)}`, 'warn'); return null; }
   const pUpi = ((getState().partners.find(x => x.id === partnerId) || {}).verification || {}).upi || '';
   /* The shop path refused without a destination and this one did not, so the
@@ -532,7 +693,7 @@ export async function walletWithdraw(partnerId, paise) {
   if (!r.ok) { toast('Could not send that right now', 'danger'); return null; }
   await ledger('WITHDRAW', amt, acct.partner(partnerId), acct.world(), { via: r.via, ref: r.ref });
   audit.record('wallet.withdraw', { partnerId, amt }, me() ? me().key : 'system');
-  toast(`${M.fmt(amt)} sent to your UPI`);
+  toast(`${M.fmt2(amt)} sent to your UPI`);
   return amt;
 }
 /** The 7-day holdback comes back by itself. Runs at boot and on the order screen. */
@@ -543,6 +704,9 @@ export async function sweepHoldbacks(now = Date.now()) {
 }
 
 export async function confirmAndRelease(orderId, pct = 1) {
+  /* escrow → anybody is money leaving the system too; the guard was on the
+     wallet only, so a frozen book still settled orders. */
+  if (!assertBookOk('release')) return null;
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return;
   if (o.kind !== 'service') { toast('That is a shop order — settle it from the order screen.', 'warn'); return; }
@@ -572,24 +736,44 @@ export async function confirmAndRelease(orderId, pct = 1) {
   });
   if (!moved) return;
 
-  if (r.workerPayout) await ledger('ESCROW_RELEASE', r.workerPayout, acct.escrow(o.id), acct.partner(o.partnerId), { pct });
+  if (r.workerPayout) await ledger('ESCROW_RELEASE', r.workerPayout, acct.escrow(o.id), acct.partner(o.partnerId), { pct, orderId: o.id });
   /* THE PROMISE: on a finished job the worker receives the whole locked stake
      back and the whole of their quote; on a fully upheld dispute (nothing
      released) the stake goes to the customer instead. */
   if (pct > 0) await returnStake(getState().orders.find(x => x.id === orderId));
   else await forfeitStake(getState().orders.find(x => x.id === orderId), 'dispute upheld');
+  let heldBackNow = 0;
   if (r.workerPayout) {
     const p0 = getState().partners.find(x => x.id === o.partnerId) || {};
-    // a debt from a walked-out job is recovered from the next payout, once
-    const debt = Math.min(p0.walletDebt | 0, r.workerPayout);
-    if (debt) { await ledger('DEBT_RECOVERY', debt, acct.partner(o.partnerId), acct.goodwill(), { orderId }); dispatch({ type: 'partner/patch', payload: { id: o.partnerId, patch: { walletDebt: (p0.walletDebt | 0) - debt } } }); }
+    /* a debt from a walked-out job is recovered from the next payout, once.
+       READ OFF THE BOOK, not off `walletDebt`: the wallet screen was corrected
+       to read the DEBT account and this was left on the mutable field, so the
+       two could disagree about whether anything was owed -- and when they did,
+       the recovery the screen promised simply never ran. An audit was told
+       twice that ₹40 would come out of his next payout, took a payout, and
+       watched nothing happen. One source for one fact. */
+    const owedNow = Math.max(0, -balanceOf(getState().ledger, acct.debt(o.partnerId)));
+    const debt = Math.min(owedNow, r.workerPayout);
+    /* INTO `fee`, NOT `goodwill`. The same ₹40 cancellation fee landed in
+       revenue when the pro had a wallet balance (`chargeWorkerFee`) and in
+       PLATFORM:goodwill when he did not — an account documented as "credits we
+       fund ourselves", which should only ever run negative. The book balanced
+       either way, so nothing fired: the exact shape this release has now fixed
+       three times. Where a rupee lands cannot depend on who happened to owe. */
+    if (debt) {
+      /* the recovery pays down the DEBT account the charge was posted against,
+         so the two always tell the same story */
+      await ledger('DEBT_RECOVERY', debt, acct.partner(o.partnerId), acct.debt(o.partnerId), { orderId });
+      dispatch({ type: 'partner/patch', payload: { id: o.partnerId, patch: { walletDebt: (p0.walletDebt | 0) - debt } } });
+    }
     // the ledger's holdback policy, posted for real: 10% of a payout, capped at Rs.500 cumulative, back after 7 days
     const held = W.walletOf(getState().ledger, o.partnerId, p0).pending;
     const hb = holdbackFor(r.workerPayout - debt, held);
     if (hb) await ledger('HOLDBACK', hb, acct.partner(o.partnerId), acct.holdback(o.partnerId), { orderId });
+    heldBackNow = hb | 0;
   }
   if (r.platformFee) await ledger('FEE', r.platformFee, acct.escrow(o.id), acct.fee(), {});
-  if (r.gst)         await ledger('GST', r.gst, acct.escrow(o.id), acct.gst(), {});
+  if (r.gst)         await ledger('GST', r.gst, acct.escrow(o.id), acct.gst(), { orderId: o.id });
   if (r.refund)      await ledger('REFUND', r.refund, acct.escrow(o.id), acct.customer(o.customerKey), {});
 
   const a = getState().agg;
@@ -629,7 +813,18 @@ export async function confirmAndRelease(orderId, pct = 1) {
 
   audit.record(pct >= 1 ? audit.ACTIONS.ESCROW_RELEASE : audit.ACTIONS.ESCROW_PARTIAL,
                { id: o.id, amount: r.workerPayout, refund: r.refund, pct }, me() ? me().key : 'admin');
-  toast(pct >= 1 ? `${M.fmt(r.workerPayout)} released to ${o.partnerName}` : `Partial — ${M.fmt(r.refund)} refunded`);
+  /* AND THE TOAST NAMED THE GROSS. "₹556 released to Ramesh" on a release that
+     put ₹500.76 in his wallet and held ₹55.64 for seven days -- true of the
+     total, false of the moment it describes. It says what actually moved. */
+  /* the holdback actually posted a few lines up — not a guess at it: my first
+     version read a field that does not exist, which would have made this a
+     silent no-op that still looked fixed */
+  const heldBack = heldBackNow | 0;
+  toast(pct >= 1
+    ? (heldBack
+        ? `${M.fmt2((r.workerPayout | 0) - heldBack)} released to ${o.partnerName} — ${M.fmt2(heldBack)} waits 7 days`
+        : `${M.fmt2(r.workerPayout)} released to ${o.partnerName}`)
+    : `Partial — ${M.fmt2(r.refund)} refunded`);
 }
 
 export async function cancelOrder(orderId, ruleId) {
@@ -637,7 +832,22 @@ export async function cancelOrder(orderId, ruleId) {
   if (!o) return;
   const pc = getState().partners.find(p => p.id === o.partnerId) || {};
   const split = cancelSplit(o.deal, ruleId, { markup: markupFor(pc) });
-  if (!advance(orderId, 'CANCELLED', { cancelRule: ruleId, refund: split.refund, cancelledAt: Date.now() })) return;
+  /* AND THE ORDER REMEMBERED HER REFUND BUT NOT HIS PAYMENT. `split.worker` is
+     posted to the ledger as COMPENSATION a few lines below and was written
+     nowhere on the order -- so his own job screen, which reads the order, could
+     only say "You were not paid for it" while his passbook showed
+     `Compensation +₹168.00` for that very job, and her cancel sheet had already
+     told her he keeps it. Whatever the book pays him, the order records. */
+  /* AND SAAHAA'S OWN SHARE WAS NEVER WRITTEN DOWN EITHER. On a cancellation
+     `platform` is `customerPays − refund − worker`, which on a job abandoned
+     en route came to ₹147.84 — while BOTH bills went on printing the original
+     "platform fee ₹76 · GST ₹14 · together ₹90, the 8% SAAHAA adds on top",
+     because that is what the order still carried. An audit found the ₹148 in
+     the ledger, saw ₹90 on both screens, and had no way to learn the real
+     figure from anywhere in the pro's app. What is taken is recorded. */
+  if (!advance(orderId, 'CANCELLED', { cancelRule: ruleId, refund: split.refund,
+      workerKept: split.worker | 0, platformKept: split.platform | 0,
+      cancelledAt: Date.now() })) return;
   /* THE SHEET PROMISED "it is recorded against them, so it cannot happen
      quietly twice" AND NOTHING WAS RECORDED. A genuine no-show has no stake to
      forfeit either — the stake locks when the door code is entered, which by
@@ -652,10 +862,52 @@ export async function cancelOrder(orderId, ruleId) {
       audit.record('partner.' + field, { partner: pid, orderId: o.id }, 'system');
     }
   }
-  if ((ruleId === 'WORKER_CANCEL' || ruleId === 'WORKER_NO_SHOW') && o.stake) await forfeitStake(o, ruleId);
-  else if (o.stake) await returnStake(o);          // the customer cancelled after work began — not the worker's fault
+  /* CANCELLING COST HIM EXACTLY WHAT NO-SHOWING COST HIM, AND THE SHEET SAID
+     IT DID NOT. "Cannot do this job?" promises in so many words: "you keep your
+     stake, and this is recorded as a cancellation, not a no-show" — and then
+     this line forfeited the stake to the customer and turned any on-credit part
+     into `walletDebt`. A pro who did the honest thing the agreement asks of him,
+     because the app told him it was free, lost the same money as one who simply
+     did not turn up. There was then no reason left to cancel at all, which is
+     precisely the behaviour the feature exists to buy.
+
+     So the two are no longer the same act. A no-show forfeits. An early cancel
+     returns the stake and charges the Rs.100 already published on the public
+     refunds page (`CANCEL_RULES.WORKER_CANCEL.workerFee`, printed by
+     ui/views/legal.js) — a figure the world was shown for six versions and
+     nothing ever collected. Deterrent enough to matter, cheap enough that
+     telling the truth stays the better move. */
+  if (ruleId === 'WORKER_NO_SHOW' && o.stake) await forfeitStake(o, ruleId);
+  else if (o.stake) await returnStake(o);          // he cancelled early, or she did — not a forfeit
+  if (ruleId === 'WORKER_CANCEL' && split.workerFee) await chargeWorkerFee(o, split.workerFee, ruleId);
   if (split.refund) await ledger('REFUND', split.refund, acct.escrow(o.id), acct.customer(o.customerKey), { ruleId });
-  if (split.worker) await ledger('COMPENSATION', split.worker, acct.escrow(o.id), acct.partner(o.partnerId), { ruleId });
+  /* the two biggest lines in his passbook named no job, so "which job was that
+     ₹256.50 for?" had no answer in the app — and a cancelled job never appears
+     in Recent Jobs either. A leg about an order says which order. */
+  if (split.worker) await ledger('COMPENSATION', split.worker, acct.escrow(o.id), acct.partner(o.partnerId), { ruleId, orderId: o.id });
+  /* AND SAAHAA'S OWN SHARE WAS COMPUTED, SHOWN, AND NEVER POSTED. `cancelSplit`
+     returns `platform = customerPays - refund - worker`, the cancel sheet tells
+     the customer "SAAHAA keeps ₹74" — and nothing moved it, so ₹73.92 stayed in
+     the escrow account of a CANCELLED order for ever. The book still totalled
+     zero, which is exactly why nobody found it: the money was not lost, it was
+     parked where nothing would ever look. Every cancellation quietly inflated
+     escrow and drove "what we hold" apart from "what we owe".
+
+     It is taken LAST and clamped to what is actually left, so a rounding paisa
+     can never overdraw the account the two payments above just drew down. */
+  const leftInEscrow = balanceOf(getState().ledger, acct.escrow(o.id));
+  const platformTake = Math.max(0, Math.min(split.platform | 0, leftInEscrow));
+  /* AND THE GOVERNMENT'S SHARE OF IT. Every other commission path splits the
+     take into fee-ex-GST and GST — `quoteService` does, `settleRetail` does —
+     and this posted the whole ₹75.27 to PLATFORM:fee with no GST leg at all.
+     About ₹11.48 of that is not ours. GST is money owed, not revenue, which is
+     why the invariant `gst.non-negative` exists at all. */
+  if (platformTake) {
+    const ex = Math.round(platformTake / (1 + GST_RATE));
+    const gstPart = platformTake - ex;
+    if (ex) await ledger('FEE', ex, acct.escrow(o.id), acct.fee(), { ruleId });
+    if (gstPart) await ledger('GST', gstPart, acct.escrow(o.id), acct.gst(), { ruleId, orderId: o.id });
+  }
   // The rule promised "full refund + Rs.100 credit" and the toast said so, but
   // the credit was computed and then thrown away — the customer never got it.
   if (split.credit) await ledger('GOODWILL', split.credit, acct.goodwill(), acct.customer(o.customerKey), { ruleId });
@@ -683,6 +935,107 @@ export async function workerCancel(orderId, reason) {
   return out;
 }
 
+/* ── the price only the person standing there can set ──────────
+   `pricedOnSite` was written onto every survey-priced order and read by
+   NOTHING — it was the only mention of the word in the repo — while
+   ui/views/home.js told the customer in bold: "₹X is the estimate; he confirms
+   it when they arrive and nothing starts until you approve the number."
+   `o.deal` was written once at booking, from a hidden multiplier table the pro
+   had never seen, and never patched anywhere. Twenty-one sub-services carry
+   `survey: true`: pipeline replacement at 2.2x, house shifting at 3.0x,
+   termite treatment at 2.0x — the biggest jobs on the list.
+
+   So the pro arrived at a job escrowed at a number the app invented, and his
+   only moves were to work at a loss, take cash (banned, and the conduct quiz
+   he passed says so), or cancel and pay the fee. The promise is kept here. */
+
+/* Three times the estimate, and no further without a conversation. */
+export const ON_SITE_MAX_MULTIPLE = 3;
+
+/** Pro, standing in front of the work: this is what it actually costs. */
+export function proposeOnSitePrice(orderId, dealPaise) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o) return null;
+  if (!o.pricedOnSite) { toast('This job was booked at a fixed price', 'warn'); return null; }
+  if (o.stage !== 'ARRIVED') { toast('Quote it once you have arrived and seen the job', 'warn'); return null; }
+  const deal = M.int(dealPaise);
+  if (deal <= 0) { toast('Put in what the job costs', 'warn'); return null; }
+  /* A SURVEY PRICE IS NOT A BLANK CHEQUE. She agreed to an estimate; a quote
+     that multiplies it without limit is how a doorstep becomes a hostage
+     negotiation. Above the ceiling he has to talk to her, not type at her. */
+  const ceiling = Math.round((o.deal | 0) * ON_SITE_MAX_MULTIPLE);
+  if (deal > ceiling) {
+    toast(`More than ${M.fmt(ceiling)} has to be agreed in chat first — she was quoted ${M.fmt(o.deal)}`, 'warn');
+    return null;
+  }
+  /* AND THE CAP THE PRODUCT ADVERTISES WAS COMPUTED AND NEVER CHECKED.
+     `trust.capOk` has existed unused: a pro three jobs into the platform is
+     told, on the recruiting page and again on the go-live screen, that his
+     first jobs are limited to ₹1,500 -- and an audit priced a doorstep job at
+     ₹3,000 and watched it go straight through to "₹3,240 sent for approval".
+     The ceiling above limits him relative to HER estimate; this is the separate
+     promise about how much a stranger may be trusted with at all, and it is the
+     one the customer is relying on. */
+  const pro = getState().partners.find(x => x.id === o.partnerId) || {};
+  if (!capOk(pro, deal)) {
+    toast(`Your first ${PROVISIONAL_JOBS} jobs are capped at ${M.fmt(effectiveCap(pro))}. `
+      + 'Finish them with no complaint and the cap lifts by itself.', 'warn');
+    return null;
+  }
+  const q = quoteService(deal, { markup: markupFor(pro) });
+  advance(orderId, 'AWAITING_APPROVAL', {
+    proposedDeal: deal, proposedPays: q.customerPays, proposedAt: Date.now(),
+    estimateDeal: o.estimateDeal != null ? o.estimateDeal : o.deal,
+  });
+  audit.record('order.onSiteQuote', { id: orderId, from: o.deal, to: deal }, me() && me().key);
+  toast(`${M.fmt(q.customerPays)} sent for approval. Nothing starts until she says yes.`);
+  return q;
+}
+
+/** Customer: yes. The difference is collected or returned, then the door code
+    still has to be typed — approving a price is not starting the work. */
+export async function approveOnSitePrice(orderId) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o || o.stage !== 'AWAITING_APPROVAL' || o.proposedDeal == null) return null;
+  if (!assertBookOk('reprice')) return null;
+  const held = balanceOf(getState().ledger, acct.escrow(o.id));
+  const want = o.proposedPays | 0;
+  if (want > held) {
+    /* she pays the difference the same way she paid the first time */
+    const extra = want - held;
+    const paid = await fund(o.customerKey, extra, 'reprice', { orderId: o.id });
+    await ledger('ESCROW_IN', extra, acct.customer(o.customerKey), acct.escrow(o.id), { reason: 'priced on site' });
+    dispatch({ type: 'order/patch', payload: { id: orderId, patch: {
+      paidFromWallet: (o.paidFromWallet | 0) + paid.fromWallet, collected: (o.collected | 0) + paid.collected } } });
+    bumpAgg({ escrow: getState().agg.escrow + extra });
+  } else if (want < held) {
+    const back = held - want;
+    await ledger('REFUND', back, acct.escrow(o.id), acct.customer(o.customerKey), { reason: 'priced on site, and it was less' });
+    bumpAgg({ escrow: Math.max(0, getState().agg.escrow - back) });
+  }
+  const q = quoteService(o.proposedDeal, { markup: markupFor(getState().partners.find(x => x.id === o.partnerId) || {}) });
+  advance(orderId, 'ARRIVED', {
+    deal: o.proposedDeal, customerPays: q.customerPays, workerPayout: q.workerPayout,
+    platformFee: q.platformFee, gst: q.gst, uplift: q.uplift,
+    proposedDeal: null, proposedPays: null, onSiteAgreedAt: Date.now(),
+  });
+  audit.record('order.onSiteApproved', { id: orderId, deal: o.proposedDeal }, me() && me().key);
+  toast(`Agreed at ${M.fmt(q.customerPays)}. Read out your code and the work starts.`);
+  return q;
+}
+
+/** Customer: no. She was promised she could walk away at this exact moment and
+    pay nothing, so this is a full refund and it costs the pro nothing either —
+    he quoted honestly for work she chose not to buy. */
+export async function declineOnSitePrice(orderId) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o || o.stage !== 'AWAITING_APPROVAL') return null;
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { proposedDeal: null, proposedPays: null } } });
+  const out = await cancelOrder(orderId, 'AFTER_ACCEPT_2H');   // full refund, nothing held against him
+  audit.record('order.onSiteDeclined', { id: orderId }, me() && me().key);
+  return out;
+}
+
 /* ── DISPUTE: 3 taps to raise ──────────────────────────────── */
 export const DISPUTE_REASONS = ['Not done', 'Partly done', 'Damage', 'Late / No-show',
                                 'Overcharged', 'Rude or unsafe', 'Wrong person came'];
@@ -703,8 +1056,19 @@ export const SHOP_DISPUTE_REASONS = [
   'The customer refused the delivery', 'The order came in after we closed',
   'The basket is too large for us to fulfil', 'They asked us to deal off the app',
 ];
-export const reasonsFor = role => role === 'shop' ? SHOP_DISPUTE_REASONS
-  : role === 'partner' ? PARTNER_DISPUTE_REASONS : DISPUTE_REASONS;
+/* AND A BASKET IS NOT A JOB. This keyed on ROLE alone, so a customer reporting
+   a problem with groceries was offered "Not done", "Late / No-show", "Rude or
+   unsafe" and "Wrong person came" -- seven ways to complain about a tradesman,
+   about a jar of ghee -- and no way at all to say the thing that actually went
+   wrong: an item missing, the wrong item, something spoiled or short-weighed.
+   It is the only complaint route a grocery order has. */
+export const RETAIL_DISPUTE_REASONS = [
+  'An item is missing', 'Wrong item sent', 'Stale or spoiled',
+  'Short weight', 'Damaged or leaking', 'It never arrived', 'Charged too much',
+];
+export const reasonsFor = (role, kind) => role === 'shop' ? SHOP_DISPUTE_REASONS
+  : role === 'partner' ? PARTNER_DISPUTE_REASONS
+  : kind === 'retail' ? RETAIL_DISPUTE_REASONS : DISPUTE_REASONS;
 /* Let them try the code again. Only for a job stuck by a mistyped code — never
    for a real complaint, which is somebody's money and not a typo. The fail
    count resets so the pro is not one keystroke from the same dead end. */
@@ -713,8 +1077,31 @@ export const reasonsFor = role => role === 'shop' ? SHOP_DISPUTE_REASONS
 export function checkRetailCode(orderId, entered) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return false;
-  if (!sameCode(entered, o.otp)) { toast(t('door.wrong'), 'danger'); return false; }
-  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { otpVerified: true } } });
+  /* THE GROCERY DOOR HAD NO LOCK ON IT. `verifyOtp` — the service door, forty
+     lines up — counts failures, stops at three and raises a real dispute. This
+     one just said "wrong code" and let the rider try again, and again, for
+     ever. A nine-character code is not guessable by hand, but a rider standing
+     at the door with the phone is not guessing at random: they have the shape,
+     they know the prefix is C, and nothing was counting. Worse, the two doors
+     behaved differently for no reason a customer could ever discover.
+
+     Same rule, same count, same dispute. A retail order that fails three times
+     freezes with her money still in escrow and lands in the owner's queue,
+     where `retryDoorCode` can reopen it — rather than a rider hammering a
+     field or, having given up, marking delivered with nobody's code at all. */
+  if (!sameCode(entered, o.otp)) {
+    const fails = (o.otpFails || 0) + 1;
+    dispatch({ type: 'order/patch', payload: { id: orderId, patch: { otpFails: fails } } });
+    audit.record('retail.codeFailed', { id: orderId, fails }, me() && me().key);
+    toast(fails >= 3 ? t('door.tooMany') : t('door.wrong'), 'danger');
+    if (fails >= 3 && !(getState().disputes || []).some(d => d.orderId === orderId && d.status === 'OPEN')) {
+      raiseDispute(orderId, 'Code would not verify at the door',
+        'The code was entered incorrectly three times. Nothing has been paid out; her money is still held.',
+        { silent: true });
+    }
+    return false;
+  }
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { otpVerified: true, otpFails: 0 } } });
   audit.record('retail.codeVerified', { id: orderId }, me() && me().key);
   return true;
 }
@@ -725,7 +1112,11 @@ export function retryDoorCode(orderId) {
   const open = (getState().disputes || []).find(d => d.orderId === orderId && d.status === 'OPEN');
   if (open) dispatch({ type: 'dispute/resolve', payload: { id: open.id, patch: { status: 'RESOLVED', outcome: 'retry' } } });
   dispatch({ type: 'order/patch', payload: { id: orderId, patch: { otpFails: 0, disputed: false, disputeReason: null } } });
-  advance(orderId, 'ARRIVED', {});
+  /* back to the doorstep it came from — a grocery order returns to R_OUT, a
+     job to ARRIVED. This used to send everything to ARRIVED, which is a service
+     stage, so once retail could reach DISPUTED at all the retry would have
+     thrown `illegal transition DISPUTED -> ARRIVED` and stranded the order. */
+  advance(orderId, o.kind === 'retail' ? 'R_OUT' : 'ARRIVED', {});
   audit.record('order.codeRetry', { orderId }, me() && me().key);
   toast('Try the code again — ask them to read it out slowly.');
   return true;
@@ -838,6 +1229,11 @@ export async function placeRetailOrder(mode = 'rider') {
     itemsTotal: q.itemsTotal, deliveryFee: q.deliveryFee, customerPays: q.customerPays,
     platformFee: q.platformFee, gst: q.platformFeeGst, shopPayout: q.shopPayout,
     riderPayout: q.riderPayout, mode, km: q.km, eta: q.shop.prepMins + etaMins(q.km),
+    /* SAAHAA'S ₹5 A RIDER ORDER, WRITTEN DOWN. `quoteRetail` has always
+       returned it and the order never kept it, so the shop's statement summed
+       `o.dispatchCut` across orders that had none and printed nothing — a shop
+       reading "3% of the basket" was funding 4.10% and no screen said so. */
+    dispatchCut: q.dispatchCut | 0,
     provisional: cart.lines.some(l => l.variableWeight),
     stage: 'R_PLACED', stageTs: now, createdAt: now,
     history: [{ stage: 'R_CART', at: now }, { stage: 'R_PLACED', at: now }],
@@ -890,7 +1286,29 @@ export async function setPickedQty(orderId, lineId, qty) {
   const lines = (o.lines || []).map(l => l.lineId === lineId ? { ...l, pickedQty: n } : l);
   const shop = getState().shops.find(x => x.id === o.shopId) || {};
   const first = (shop.ordersCompleted || 0) < FREE_FIRST_ORDERS;
-  const q = quoteRetail(lines, { catId: shop.catId, km: o.km, mode: o.mode, firstOrders: first });
+  /* THE FOURTH GENERATION OF THIS BUG, AND IT HID IN AN OMITTED ARGUMENT.
+     `cartQuote` passes `freeDeliveryAbove` and this re-quote did not — so a
+     basket that qualified for free delivery lost it the moment the shop weighed
+     anything, and ₹19 of her refund quietly became a delivery charge she had
+     been told was free. The order still said `shopAbsorbedDelivery: true`.
+     Escrow balanced perfectly, which is exactly why three audits missed it.
+
+     A re-quote has to be the SAME quote with a new weight. Every argument the
+     original was given, this one is given too.
+
+     AND THAT WAS STILL NOT ENOUGH — THE FIFTH GENERATION. Passing the threshold
+     re-EVALUATES it against the new basket, so weighing 7.7 kg on an 8 kg order
+     dropped Rs.503.92 to Rs.485.02, fell under the shop's Rs.499 line, and put
+     the Rs.19 delivery back on a bill that had said "free". Her Rs.18.90 refund
+     came out to Rs.0.00 — she weighed LESS and got NOTHING back, and the order
+     went on reporting `shopAbsorbedDelivery: true`. Escrow balanced, so no
+     invariant fired; only placing a real order and reading the numbers found it.
+
+     Free delivery is a promise made at checkout. `shopAbsorbedDelivery` records
+     that the promise was made; `alreadyFree` makes the re-quote honour it. */
+  const q = quoteRetail(lines, { catId: shop.catId, km: o.km, mode: o.mode, firstOrders: first,
+                                 freeDeliveryAbove: shop.freeDeliveryAbove,
+                                 alreadyFree: o.shopAbsorbedDelivery === true });
 
   /* TWO BUGS LIVED HERE AND THE SECOND ONE WAS MINE.
 
@@ -929,10 +1347,28 @@ export async function setPickedQty(orderId, lineId, qty) {
      distance and stay exactly where the quote put them, and the shop's payout
      is whatever is left after them. Over-weighing can now only ever cost the
      shop, which is the correct direction for a mistake it alone controls. */
+  /* AND THE SCALING RAN EVEN WHEN THERE WAS NOTHING TO PROTECT HER FROM.
+     `room` subtracts the rider from what she pays — which is right when she PAID
+     for the ride, and wrong when the shop absorbed it under free delivery: there
+     the ₹14 comes out of the shop's margin, not out of her basket. So an
+     ordinary short weigh scaled `itemsTotal` down by the rider's fee and the
+     shop's own screen read "Basket ₹1,362" under "Total ₹1,376" — a basket
+     nobody ever ordered, which is the exact lie the comment above forbids.
+
+     Worse, `dispatchCut` was never re-patched, so it kept the figure from
+     placement while `flatDispatch` had moved: shopPayout + fee + rider +
+     dispatch came to ₹5 MORE than was ever collected. The ledger stayed right
+     because settlement distributes the residual, so nothing caught it — the
+     order's own arithmetic was simply wrong wherever a screen read it.
+
+     The cap exists for ONE case: she weighed heavier than she agreed. In every
+     other case the re-quote is already a coherent quote and is used as it
+     stands. Scaling a correct quote is how it stopped being one. */
+  const overWeighed = q.customerPays > agreed;
   const flatRider = q.riderPayout | 0;
-  const flatDispatch = Math.max(0, q.customerPays - q.itemsTotal - flatRider) | 0;
+  const flatDispatch = q.dispatchCut | 0;
   const room = Math.max(0, capped - flatRider - flatDispatch);
-  const scale = q.itemsTotal > 0 ? Math.min(1, room / q.itemsTotal) : 1;
+  const scale = overWeighed && q.itemsTotal > 0 ? Math.min(1, room / q.itemsTotal) : 1;
   const cut = v => Math.round((v | 0) * scale);
 
   dispatch({ type: 'order/patch', payload: { id: orderId, patch: {
@@ -948,10 +1384,21 @@ export async function setPickedQty(orderId, lineId, qty) {
        nobody ever ordered is its own kind of lie */
     weighedItemsTotal: q.itemsTotal,
     itemsTotal: cut(q.itemsTotal),
+    deliveryFee: overWeighed ? (o.deliveryFee | 0) : (q.deliveryFee | 0),
     platformFee: cut(q.platformFee),
     gst: cut(q.platformFeeGst),
-    shopPayout: Math.max(0, capped - flatRider - flatDispatch - cut(q.platformFee)),
+    /* `platformFee` IS GST-INCLUSIVE — `platformFeeGst` is the tax INSIDE it, not
+       a second charge on top (see quoteRetail, and settlement's
+       `feeExGst = platformFee − gst`). An earlier pass here subtracted both and
+       so underpaid the shop by the tax, with the residual handing it to SAAHAA;
+       the assertion written alongside double-counted the same way, so the two
+       errors cancelled and the journey went green. SAAHAA's take is one number. */
+    shopPayout: overWeighed
+      ? Math.max(0, capped - flatRider - flatDispatch - cut(q.platformFee))
+      : (q.shopPayout | 0),
     riderPayout: flatRider,          // a distance band, never scaled by weight
+    dispatchCut: flatDispatch,       // and it moves with the quote, or it lies
+    shopAbsorbedDelivery: !!q.shopAbsorbs,
     overWeighAbsorbed: Math.max(0, q.customerPays - capped),
   } } });
   ctx.render();
@@ -1017,16 +1464,117 @@ export function collected(orderId) {
 }
 
 /** Customer: return an order after delivery; shop or admin accepts → refund. */
-export function requestReturn(orderId, reason) {
+/* A RETURN USED TO BE ALL OR NOTHING. One stale ₹42 packet of turmeric took a
+   ₹501 order back with it -- including a 5 kg bag of atta that was perfectly
+   good and that the shop then had to take back, restock and lose the sale on.
+   Neither side wants that, and no kirana in Hyderabad works that way.
+
+   `lineIds` names what is actually going back. Empty or missing means the whole
+   basket, which is what every existing caller passes and what the customer gets
+   if the problem is the order rather than an item in it. */
+export function requestReturn(orderId, reason, lineIds) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o || o.stage !== 'R_DELIVERED') return null;
-  const moved = advance(orderId, 'R_RETURN', { returnReason: reason || 'not as expected', returnAt: Date.now() });
+  const ids = Array.isArray(lineIds) ? lineIds.filter(Boolean) : [];
+  const all = !ids.length || ids.length === (o.lines || []).length;
+  const moved = advance(orderId, 'R_RETURN', { returnReason: reason || 'not as expected', returnAt: Date.now(),
+    returnLines: all ? null : ids });
   if (moved) { audit.record('retail.return', { id: orderId, reason }, me() ? me().key : 'system'); toast('Return requested. The shop will confirm.'); }
   return moved;
 }
+/* The value of the items going back, at the price she was actually charged for
+   them -- picked weight where it was weighed, ordered quantity where it was not. */
+export function returnedValueOf(o) { return o && (o.returnLines || []).length ? returnedValue(o) : 0; }
+
+function returnedValue(o) {
+  const ids = new Set(o.returnLines || []);
+  return (o.lines || []).filter(l => ids.has(l.lineId)).reduce((n, l) => {
+    /* WHAT SHE PAID FOR IT, WHICH IS NOT WHAT IT WEIGHED. A shop that weighs
+       2.2 kg against 2 kg ordered gives the extra away -- she is charged for the
+       2 kg she agreed to. Refunding the WEIGHED value then handed her ₹83.60 for
+       onions she had paid ₹76 for, so the shop paid for its own gift twice: once
+       in stock, once in cash. She is never billed above what she ordered, so a
+       refund is never above it either. */
+    const billed = l.pickedQty != null ? Math.min(l.pickedQty, l.qty) : l.qty;
+    return n + Math.round((l.unitPrice | 0) * billed);
+  }, 0);
+}
+
+/* Refund what came back, settle the rest. Escrow is the ceiling: a partial
+   refund can never exceed what is actually held, so a returned basket cannot
+   mint money even if the lines were repriced between delivery and the return. */
+async function partialReturn(o) {
+  const held = Math.max(0, balanceOf(getState().ledger, acct.escrow(o.id)));
+  const want = returnedValue(o);
+  const give = Math.min(want, held);
+  /* HER MONEY FIRST, THEN WHATEVER IS LEFT. Settlement already distributes what
+     escrow actually holds rather than what the order says it should -- three
+     separate bugs were fixed by making it work that way -- so refunding before
+     it runs is all this needs: the shop is paid for the shopping she kept, and
+     the dispatch cut absorbs the residual so the account still lands at zero.
+     The order stays on the settlement path; it was never fully refunded. */
+  if (give) await ledger('REFUND', give, acct.escrow(o.id), acct.customer(o.customerKey), { reason: 'partial return' });
+  const a = getState().agg;
+  bumpAgg({ refunds: a.refunds + give, escrow: Math.max(0, a.escrow - give) });
+  /* AND LOWERING ONLY THE TOTAL SILENTLY PAID SAAHAA AND THE RIDER NOTHING.
+     Settlement hands out what escrow holds in priority order and the shop is
+     FIRST in that queue, so an order whose `shopPayout` still described the
+     whole basket swallowed the smaller remainder entire: no FEE leg, no GST
+     leg, no RIDER leg. An audit found a shop screen asserting "SAAHAA dispatch
+     − ₹5" against a book that had never taken it, which is exactly the shape of
+     defect this project keeps finding — a summary and the ledger disagreeing.
+
+     A basket with an item taken out of it is a smaller basket, so it is
+     re-quoted like one. The delivery is not re-quoted: it was driven either
+     way, and whoever drove it is owed for it. */
+  const shop = getState().shops.find(x => x.id === o.shopId) || {};
+  const kept = (o.lines || []).filter(l => !(o.returnLines || []).includes(l.lineId));
+  const q = quoteRetail(kept, { catId: shop.catId, km: o.km, mode: o.mode,
+    firstOrders: freeOrdersLeft(shop) > 0, freeDeliveryAbove: shop.freeDeliveryAbove,
+    alreadyFree: o.shopAbsorbedDelivery === true });
+  const stillPays = Math.max(0, (o.customerPays | 0) - give);
+  dispatch({ type: 'order/patch', payload: { id: o.id, patch: {
+    customerPays: stillPays,
+    itemsTotal: q.itemsTotal,
+    platformFee: q.platformFee,
+    gst: q.platformFeeGst,
+    shopPayout: Math.max(0, stillPays - (q.platformFee | 0)
+      - (o.riderPayout | 0) - (o.dispatchCut | 0)),
+    returnedValue: give, partialReturn: true, refundedAt: Date.now(),
+  } } });
+  await settleRetail(o.id);
+  audit.record('retail.partialReturn', { id: o.id, amount: give }, me() ? me().key : 'admin');
+  toast(`${M.fmt(give)} refunded for what came back. The rest of the order is settled.`);
+  return getState().orders.find(x => x.id === o.id) || null;
+}
+
+/** Shop: this return is not fair, and here is why. Stops the 24-hour clock and
+    hands it to a person — the shop's half of `requestReturn`, which existed
+    from the first day the customer could ask. */
+export function refuseReturn(orderId, reason) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o || o.stage !== 'R_RETURN') return null;
+  const why = String(reason || '').trim();
+  if (why.length < 4) { toast('Say briefly why — the owner reads this', 'warn'); return null; }
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: {
+    returnContested: true, returnRefusedReason: why, returnRefusedAt: Date.now() } } });
+  raiseDispute(orderId, 'Return refused by the shop', why, { silent: true });
+  audit.record('retail.returnRefused', { id: orderId, reason: why }, me() && me().key);
+  toast('Sent to SAAHAA. Nothing is refunded until somebody has read both sides.');
+  return true;
+}
+
 export async function acceptReturn(orderId) {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o || o.stage !== 'R_RETURN') return null;
+
+  /* A NAMED RETURN IS PAID FOR ITSELF AND NOTHING ELSE. She gets back exactly
+     what the returned items cost her; the rest of the basket settles normally,
+     so the shop is paid for the food she kept. The delivery is not refunded --
+     it was driven either way, and whoever drove it is owed for it. */
+  const back = (o.returnLines || []).length ? partialReturn(o) : null;
+  if (back) return back;
+
   if (!advance(orderId, 'R_REFUNDED', { refund: o.customerPays, refundedAt: Date.now() })) return null;
   /* REFUNDED A STALE FIGURE. A reweighed order holds `agreedTotal` in escrow
      while `customerPays` has come down, so refunding the latter left the
@@ -1045,12 +1593,11 @@ export async function acceptReturn(orderId) {
      It survived four audits because each mode only ever exercised the branch
      the other one got wrong — ?demo=1 seeds shops at 60–560 orders, so the demo
      only ever showed the paid branch and a real install only ever showed the
-     free one. */
-  {
-    const sh = getState().shops.find(x => x.id === o.shopId);
-    if (sh) dispatch({ type: 'shop/patch', payload: { id: sh.id, patch: {
-      ordersCompleted: ((sh.ordersCompleted | 0) + 1) } } });
-  }
+     free one.
+
+     The increment lives in `settleRetail`, NOT here. A returned order is not a
+     completed order — counting it here both flattered the shop's record and
+     spent one of its thirty free orders on a sale that came back. */
   advance(orderId, 'R_CLOSED', { closedAt: Date.now() });
   audit.record('retail.refunded', { id: o.id, amount: o.customerPays, reason: 'return' }, me() ? me().key : 'admin');
   toast(`${M.fmt(o.customerPays)} refunded for the return`);
@@ -1058,6 +1605,9 @@ export async function acceptReturn(orderId) {
 }
 
 export async function settleRetail(orderId) {
+  /* escrow → anybody is money leaving the system too; the guard was on the
+     wallet only, so a frozen book still settled orders. */
+  if (!assertBookOk('release')) return null;
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return;
   // items the shop could not supply come back to the customer, out of the
@@ -1105,12 +1655,47 @@ export async function settleRetail(orderId) {
   const riderPart = take(o.riderPayout);
   const dispatchCut = left;                       // the residual, so escrow ends at 0
 
-  if (shopPayout)  await ledger('SHOP_PAYOUT', shopPayout, acct.escrow(o.id), acct.shop(o.shopId), {});
+  /* THESE LEGS CARRIED NO ORDER, AND A SCREEN THAT SCOPED BY ORDER READ ZERO.
+     The shop's money column was corrected to count only the orders that column
+     is about -- filtering its ledger legs through the ids on the other side --
+     and these two posted with an empty meta, so the filter matched nothing.
+     `yours` came out 0, the residual line absorbed the shop's entire earnings,
+     and its monthly statement read "Yours ₹0" beside "Free delivery you gave
+     − ₹416" for a delivery the customer had paid for. A leg that belongs to an
+     order says which one. */
+  if (shopPayout)  await ledger('SHOP_PAYOUT', shopPayout, acct.escrow(o.id), acct.shop(o.shopId), { orderId: o.id });
   if (refundNow)   dispatch({ type: 'order/patch', payload: { id: orderId, patch: { shopPayout } } });
-  if (feePart)     await ledger('FEE', feePart, acct.escrow(o.id), acct.fee(), {});
-  if (gstPart)     await ledger('GST', gstPart, acct.escrow(o.id), acct.gst(), {});
-  if (riderPart)   await ledger('RIDER', riderPart, acct.escrow(o.id), acct.rider(), {});
-  if (dispatchCut) await ledger('DISPATCH', dispatchCut, acct.escrow(o.id), acct.fee(), {});
+  if (feePart)     await ledger('FEE', feePart, acct.escrow(o.id), acct.fee(), { orderId: o.id });
+  if (gstPart)     await ledger('GST', gstPart, acct.escrow(o.id), acct.gst(), { orderId: o.id });
+  /* THE RIDER DOES NOT EXIST YET, AND WE WERE PAYING HIM ANYWAY. There is no
+     rider role, no rider signup, no rider console and no withdrawal path for
+     `RIDER:pool` — `flags.RIDER_POOL` has said so, default-false, for six
+     versions. Meanwhile the cart defaulted to "SAAHAA rider", the SHOP drove
+     R_OUT and took the code at the door, and this line moved ₹14 into an
+     account no human being can ever empty. On a free-delivery order the shop
+     absorbed that ₹14 for a delivery it performed itself, and the money left
+     the system for good.
+
+     Until the network is switched on, the delivery money goes to whoever
+     actually made the delivery. When RIDER_POOL is on, this is a rider's. */
+  const deliveredByShop = !flags.isOn('RIDER_POOL');
+  if (riderPart)   await ledger('RIDER', riderPart, acct.escrow(o.id),
+                     deliveredByShop ? acct.shop(o.shopId) : acct.rider(), { deliveredByShop, orderId: o.id });
+  if (dispatchCut) await ledger('DISPATCH', dispatchCut, acct.escrow(o.id), acct.fee(), { orderId: o.id });
+  /* the residual is what was actually taken; the quote's figure was an estimate */
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: { dispatchCut } } });
+
+  /* AND THE FIX FOR THAT WENT INTO THE WRONG FUNCTION. The counter was added
+     to `refundRetail` — the RETURN path — so it ticked when an order came back
+     and never when one was delivered. A refunded order is not a completed one,
+     and the happy path, which is nearly every order, still left a real shop on
+     zero for ever: no commission, no countdown, the free-first-30 unspendable.
+     A live order settled here and the shop stayed on 78. */
+  {
+    const sh = getState().shops.find(x => x.id === o.shopId);
+    if (sh) dispatch({ type: 'shop/patch', payload: { id: sh.id, patch: {
+      ordersCompleted: ((sh.ordersCompleted | 0) + 1) } } });
+  }
 
   const a = getState().agg;
   /* the aggregates report what MOVED, not what the order once said it would */
@@ -1132,6 +1717,50 @@ export async function settleRetail(orderId) {
    — after dispute/resolve had already marked the dispute resolved. The
    customer's money was frozen permanently. The correct remedy when a shop
    goes dark is to give it back. */
+/* ── after the money has already gone ──────────────────────────
+   A GROCERY ORDER BECAME UNCOMPLAINABLE THE MOMENT SHE CONFIRMED IT.
+   `settleRetail` closes straight through to R_CLOSED, and R_CLOSED has no
+   edges, so "Report an issue" — gated on `canTransition(stage, 'DISPUTED')` —
+   simply disappeared. Groceries are confirmed at the door and unpacked in the
+   kitchen: the leaking oil pouch, the stale dal, the missing packet are all
+   found ten minutes too late, and after that the only controls left on her
+   screen were a map and a chat window.
+
+   She can complain for a day after it closes. The stage does NOT move — the
+   money has already been distributed and clawing it back out of a shop's
+   settled wallet is a different and much worse thing to build. What opens is a
+   real dispute in the owner's queue, and the remedy is goodwill: SAAHAA's own
+   money, which needs nothing taken from anybody. */
+export const COMPLAIN_AFTER_CLOSE_MS = 24 * 3600 * 1000;
+export function complaintWindow(o) {
+  if (!o || o.kind !== 'retail') return { open: false, msLeft: 0 };
+  if (!['R_SETTLED', 'R_CLOSED'].includes(o.stage)) return { open: false, msLeft: 0 };
+  const from = o.closedAt || o.settledAt || o.stageTs || 0;
+  const msLeft = Math.max(0, from + COMPLAIN_AFTER_CLOSE_MS - Date.now());
+  return { open: msLeft > 0, msLeft, hoursLeft: Math.ceil(msLeft / 3600000) };
+}
+
+/** The owner's remedy on an order that has already paid out: SAAHAA's own
+    money, so nothing is taken back from a shop that has been paid and spent. */
+export async function goodwillRefund(orderId, paise, reason) {
+  const o = getState().orders.find(x => x.id === orderId);
+  if (!o) return null;
+  if (!assertBookOk('goodwill')) return null;
+  const amt = Math.max(0, Math.min(paise | 0, o.customerPays | 0));
+  if (!amt) { toast('Nothing to credit', 'warn'); return null; }
+  await ledger('GOODWILL', amt, acct.goodwill(), acct.customer(o.customerKey), { orderId, reason });
+  dispatch({ type: 'order/patch', payload: { id: orderId, patch: {
+    goodwillPaise: (o.goodwillPaise | 0) + amt, disputeOutcome: 'goodwill', disputeDecidedNote: reason || '' } } });
+  const open = (getState().disputes || []).find(d => d.orderId === orderId && d.status === 'OPEN');
+  if (open) dispatch({ type: 'dispute/resolve', payload: { id: open.id,
+    patch: { status: 'RESOLVED', outcome: 'goodwill', resolvedBy: 'admin', resolvedAt: Date.now() } } });
+  const a = getState().agg;
+  bumpAgg({ refunds: a.refunds + amt });
+  audit.record('retail.goodwill', { id: orderId, amount: amt, reason }, me() ? me().key : 'admin');
+  toast(`${M.fmt(amt)} credited to ${o.customerName || 'the customer'}`);
+  return amt;
+}
+
 export async function refundRetail(orderId, reason = 'shop unresponsive') {
   const o = getState().orders.find(x => x.id === orderId);
   if (!o) return null;
@@ -1151,10 +1780,18 @@ export async function refundRetail(orderId, reason = 'shop unresponsive') {
   const a = getState().agg;
   bumpAgg({ refunds: a.refunds + o.customerPays, escrow: Math.max(0, a.escrow - (o.customerPays | 0)) });
 
+  /* AND IT CLOSED HER COMPLAINT WITHOUT TELLING HER. Resolving it is right --
+     a full refund settles what she complained about -- but it happened in
+     silence: status OPEN to RESOLVED, the block gone from the order, no
+     message. She had never withdrawn it. An outcome she is not told about is
+     indistinguishable from one that was ignored. */
   const open = getState().disputes.find(d => d.orderId === o.id && !d.resolvedAt);
-  if (open) dispatch({ type: 'dispute/resolve', payload: { id: open.id, patch: { status: 'RESOLVED', outcome: 'refund' } } });
+  if (open) dispatch({ type: 'dispute/resolve', payload: { id: open.id,
+    patch: { status: 'RESOLVED', outcome: 'refund', closedBy: 'refund' } } });
   audit.record('retail.refunded', { id: o.id, amount: o.customerPays, reason }, me() ? me().key : 'admin');
-  toast(`${M.fmt(o.customerPays)} refunded to ${o.customerName}`);
+  toast(open
+    ? `${M.fmt2(o.customerPays)} refunded — and that closes the issue you reported`
+    : `${M.fmt2(o.customerPays)} refunded to ${o.customerName}`);
   return o;
 }
 
@@ -1199,11 +1836,30 @@ export function skipRating(orderId) {
    customer who simply never tapped Confirm left the pro unpaid forever. This
    runs at boot and whenever an order screen renders. HOLD-tier orders are
    deliberately excluded — those need a human. */
+/* A DELIVERED GROCERY ORDER COULD BE HELD FOR EVER. `R_DELIVERED → R_SETTLED`
+   was reachable only from the customer's "Confirm delivery" button, and this
+   sweep filters `kind === 'service'`, so a shopper who took the bag and closed
+   the app left the kirana's ₹368 held with nothing on his screen to chase and
+   no deadline anywhere. The service side has promised and delivered a timed
+   auto-release since 7.0; retail had the same promise printed on the same
+   screen and no machine behind it. */
+export const RETAIL_AUTO_SETTLE_MS = 24 * 3600 * 1000;
+export function retailSettleAt(o) {
+  if (!o || o.kind !== 'retail' || o.stage !== 'R_DELIVERED') return 0;
+  return (o.deliveredAt || o.stageTs || o.createdAt || 0) + RETAIL_AUTO_SETTLE_MS;
+}
 export async function sweepAutoRelease(now = Date.now()) {
   const due = getState().orders.filter(o => o.kind === 'service' && o.stage === 'WORK_DONE'
     && o.releaseAt && o.releaseAt <= now && o.escrowTier !== 'HOLD' && o.escrowTier !== 'FREEZE');
   for (const o of due) await confirmAndRelease(o.id, 1);
-  return due.length;
+
+  const retailDue = getState().orders.filter(o => o.kind === 'retail' && o.stage === 'R_DELIVERED'
+    && retailSettleAt(o) && retailSettleAt(o) <= now && !o.disputed);
+  for (const o of retailDue) {
+    await settleRetail(o.id);
+    audit.record('retail.autoSettled', { id: o.id }, 'system');
+  }
+  return due.length + retailDue.length;
 }
 
 /* ── shop owner: self-listing ──────────────────────────────── */

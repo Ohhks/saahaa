@@ -25,8 +25,18 @@
 
 import * as M from '../core/money.js';
 
+/* `DEBT` — THE ONE CHARGE THAT WAS NOT ON THE BOOK. A cancellation fee taken
+   from a pro with an empty wallet was written into `partner.walletDebt`, a
+   mutable field, and nowhere else. This product's whole pitch to a tradesperson
+   is a ledger that "can be verified, never edited", and the only money SAAHAA
+   ever takes FROM him was the only money that ledger could not show him.
+
+   It is a receivable: what he owes us, carried until a payout clears it. Like
+   WORLD it is legitimately negative from the account's own point of view, so
+   the non-negative invariant exempts it — a debt that cannot go negative is not
+   a debt. Everything else about it is an ordinary double-entry leg. */
 export const ACCOUNT_TYPES = ['WORLD', 'CUSTOMER', 'ESCROW', 'PARTNER', 'HOLDBACK', 'STAKE',
-                              'SHOP', 'RIDER', 'PLATFORM'];
+                              'SHOP', 'RIDER', 'PLATFORM', 'DEBT'];
 
 export const acct = {
   world:    () => 'WORLD:funding',
@@ -39,8 +49,18 @@ export const acct = {
   fee:      () => 'PLATFORM:fee',
   gst:      () => 'PLATFORM:gst',
   goodwill: () => 'PLATFORM:goodwill',
+  debt:     p => 'DEBT:' + p,
 };
 export const typeOf = a => String(a).split(':')[0];
+
+/* EVERY POCKET A WORKER'S MONEY CAN SIT IN, in one place. His passbook read a
+   list of four written into the view -- wallet, holdback, stake, debt -- which
+   is the same whitelist shape that `takenByUs` in the partner console had
+   already been rewritten to avoid: grow a fifth pocket in the engine and the
+   screen goes on showing four, silently, and a charge he was never shown
+   becomes a charge he cannot find. The journey asserts that no account in the
+   book carrying his id falls outside this list. */
+export const partnerAccounts = pid => [acct.partner(pid), acct.holdback(pid), 'STAKE:' + pid, acct.debt(pid)];
 
 /** Holdback policy (panel V-B, adopted): the worker's stake is implicit —
     they never pay to join, but a slice of each payout is held briefly. This
@@ -96,6 +116,61 @@ function legacyLegs(e) {
 
 export function balanceOf(entries, account) { return balances(entries)[account] || 0; }
 
+/* ── reading one account's history, once, correctly ────────────
+   THE VIEWS KEPT INVENTING THEIR OWN LEDGER SHAPE, AND GETTING IT WRONG.
+   `partner.js` filtered on `e.type === 'SHOP_PAYOUT'` and read `e.partyB` and
+   `e.amountPaise`. No entry has ever had any of those fields — an entry is
+   `{ kind, legs, meta }`. So the filter matched nothing, the total was always
+   zero, and the panel silently fell through to summing an order field instead,
+   under a comment claiming it "reconciles by construction". It reconciled by
+   accident, to the wrong number: a shop's own statement read ₹556 beside its
+   own wallet reading ₹570.
+
+   The same mistake, in reverse, had already cost `shopWallet` a working
+   withdraw button. Two views is two chances to guess wrong, and both guessed.
+   This is the reader; nothing outside this file walks an entry again. */
+export function creditsByKind(entries, account) {
+  const out = Object.create(null);
+  for (const e of entries) {
+    const legs = e.legs || legacyLegs(e);
+    for (const l of legs) {
+      if (l.account !== account || l.delta <= 0) continue;
+      out[e.kind] = (out[e.kind] || 0) + l.delta;
+    }
+  }
+  return out;
+}
+/** Everything that ever LEFT this account, by kind — debts recovered, payouts
+    withdrawn, a stake forfeited. The other half of the story. */
+export function debitsByKind(entries, account) {
+  const out = Object.create(null);
+  for (const e of entries) {
+    const legs = e.legs || legacyLegs(e);
+    for (const l of legs) {
+      if (l.account !== account || l.delta >= 0) continue;
+      out[e.kind] = (out[e.kind] || 0) - l.delta;
+    }
+  }
+  return out;
+}
+/** The entries that touched this account, newest first — for a statement that
+    shows a person every line rather than one derived total. */
+export function legsFor(entries, account) {
+  const rows = [];
+  /* `at` is the entry's own position in the book. An entry carries no id -- it
+     is identified by its place in the chain -- and a reader that shows several
+     of one person's accounts at once needs to know which legs came from the
+     SAME entry, so that a move between two of their own pockets can be told
+     apart from two unrelated movements. Display only; nothing is hashed. */
+  entries.forEach((e, at) => {
+    const legs = e.legs || legacyLegs(e);
+    for (const l of legs) {
+      if (l.account === account) rows.push({ kind: e.kind, delta: l.delta, ts: e.ts, meta: e.meta || {}, at });
+    }
+  });
+  return rows.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+}
+
 export function sumByType(entries, type) {
   const bal = balances(entries);
   return Object.keys(bal).filter(a => typeOf(a) === type)
@@ -125,7 +200,7 @@ export function checkInvariants(entries, opts = {}) {
       bad.length ? `${bad.length} unbalanced entries` : `${entries.length} entries all balanced`, true);
 
   /* 3. nobody's spendable balance is negative */
-  const neg = Object.entries(bal).filter(([a, v]) => v < 0 && typeOf(a) !== 'WORLD');
+  const neg = Object.entries(bal).filter(([a, v]) => v < 0 && typeOf(a) !== 'WORLD' && typeOf(a) !== 'DEBT');
   add('balances.non-negative', neg.length === 0,
       neg.length ? neg.map(([a, v]) => `${a} ${M.fmt2(v)}`).join(', ') : 'no negative balances', true);
 

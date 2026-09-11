@@ -20,24 +20,29 @@
    No new action, no app.js change. */
 
 import { $, esc, sheet, updateSheet, sheetOpen, closeSheet, toast, ratingStars, timeAgo } from '../dom.js';
-import { t } from '../i18n.js';
+import { subKey } from '../../domain/catalog.services.js';
+import { t, catName, subName, langPicker } from '../i18n.js';
 import { icon, hasIcon } from '../icons.js';
 import * as ID from '../../domain/identity.js';
 import { ctx, getState, dispatch, me, myPartner, myShop, myOrders } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
+import { subSize } from '../../domain/catalog.services.js';
 import { stage } from '../../domain/orders.js';
 import * as flow from '../../domain/flow.js';
 import * as M from '../../core/money.js';
-import { trustScore, tier, TIERS } from '../../domain/trust.js';
+import { trustScore, tier, TIERS, markupFor } from '../../domain/trust.js';
 import { searchStarter, aislesOf } from '../../domain/starter-catalog.js';
 import { header, emptyBlock } from './shops.js';
-import { quoteRetail, liveMarkup, AGG_COMMISSION } from '../../domain/pricing.js';
+import { quoteRetail, AGG_COMMISSION, RIDER_DISPATCH_CUT } from '../../domain/pricing.js';
 import * as auction from '../../domain/auction.js';
 import { progressCard } from './onboard.js';
 import { readiness, blocker, backgroundRecord } from '../../domain/verification.js';
 import * as W from '../../domain/wallet.js';
 import * as autoverify from '../../domain/autoverify.js';
 import { acct, balanceOf, HOLDBACK_PCT, HOLDBACK_CAP, HOLDBACK_DAYS } from '../../domain/ledger.js';
+import * as L from '../../domain/ledger.js';
+import * as flags from '../../core/flags.js';
+import { getPricing } from '../../domain/settings.js';
 import * as gateway from '../../core/gateway.js';
 /* pictures: core/photos.js keeps the bytes and the device budget, ui/photo.js
    asks for the file and shrinks it. This console only draws and offers taps —
@@ -88,7 +93,7 @@ const consoleCSS = `<style>
   .stat3 .capsule:last-child{border-right:0}
   .utabs{display:flex;border-bottom:2px solid var(--color-divider);overflow-x:auto;scrollbar-width:none} .utabs::-webkit-scrollbar{display:none}
   .utabs button{flex:1 0 auto;min-height:44px;padding:0 12px;font:600 11px/1 var(--font-body);letter-spacing:.07em;text-transform:uppercase;color:var(--color-neutral-600);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:6px}
-  .utabs button[aria-selected="true"]{color:var(--color-accent);border-bottom-color:var(--color-accent)}
+  .utabs button[aria-selected="true"]{color:var(--color-accent-text);border-bottom-color:var(--color-accent)}
   .utabs .n{font-size:10px;padding:2px 5px;background:var(--color-neutral-200);color:var(--color-neutral-800)}
   .subtabs{display:flex;gap:6px;padding:10px 0;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--color-divider)} .subtabs::-webkit-scrollbar{display:none}
   .subtabs button{padding:6px 10px;font:600 11px/1 var(--font-body);white-space:nowrap;border:1px solid var(--color-divider);min-height:44px}
@@ -121,7 +126,7 @@ const consoleCSS = `<style>
   .pthumb__ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--color-neutral-700)}
   .pthumb__ph b{font:800 12px/1 var(--font-heading)}
   .pthumb__edit{position:absolute;left:0;right:0;bottom:0;background:var(--color-accent);color:var(--accent-on-fill);font:700 8px/13px var(--font-body);letter-spacing:.06em;text-transform:uppercase;text-align:center}
-  .addpic{display:inline-flex;align-items:center;gap:6px;min-height:44px;font:600 11px/1 var(--font-body);letter-spacing:.05em;text-transform:uppercase;color:var(--color-accent)}
+  .addpic{display:inline-flex;align-items:center;gap:6px;min-height:44px;font:600 11px/1 var(--font-body);letter-spacing:.05em;text-transform:uppercase;color:var(--color-accent-text)}
   .budget{border-top:2px solid var(--color-divider);padding:12px 0 4px;margin-top:18px}
   .budget__bar{height:6px;background:var(--color-neutral-300);margin:8px 0 6px}
   .budget__bar i{display:block;height:100%;background:var(--color-accent)}
@@ -160,12 +165,26 @@ const sectionHead = (eyebrow, title, right = '') =>
 const empty = (title, body) => `<div class="empty" style="margin-top:12px"><b style="display:block;color:var(--ink-1)">${esc(title)}</b><span class="tiny">${esc(body)}</span></div>`;
 
 const ymOf = ts => { const d = new Date(ts); return d.getFullYear() * 12 + d.getMonth(); };
+/* Every way SAAHAA takes money back out of a partner's wallet. A new one added
+   to the engine and forgotten here silently inflates what his screen says he
+   kept — which is exactly what `CANCEL_FEE` did. */
+/* AND THIS WAS STILL A WHITELIST, three lines under a comment explaining why
+   whitelists fail. `wallet.js` had already been turned into a denylist and this
+   had not, so the two files disagreed about what counts as money taken — and
+   the next kind the engine grows would be invisible here again. A debit from
+   his wallet that is not a withdrawal, a stake lock or a holdback is money
+   SAAHAA took; that is the rule, and it needs no list to maintain. */
+const NOT_TAKEN = ['WITHDRAW', 'STAKE_LOCK', 'HOLDBACK', 'ESCROW_IN'];
+const takenByUs = kind => !NOT_TAKEN.includes(kind);
 const monthName = (d, long = false) => d.toLocaleString('en-IN', { month: long ? 'long' : 'short' }).toUpperCase();
 const isToday = ts => { const a = new Date(ts), b = new Date(); return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); };
 
 /* ══════════════ PRO CONSOLE ══════════════ */
 const ACTIVE = ['MATCHING','ASSIGNED','EN_ROUTE','ARRIVED','IN_PROGRESS','WORK_DONE'];
-const PRO_TABS = [['leads', 'Leads'], ['jobs', 'Jobs'], ['earnings', 'Earnings'], ['page', 'My page']];
+/* the tab strip is on every earning screen, so leaving it English left a
+   Latin band across the top of a console that was otherwise in his language */
+const PRO_TABS = () => [['leads', t('earn.tabLeads')], ['jobs', t('earn.tabJobs')],
+                        ['earnings', t('earn.tabEarnings')], ['page', t('earn.tabPage')]];
 
 /* Jobs out for rates. He sees the public band, the COUNT of workers asked,
    and nothing else — no rival's price, no name, not even whether anyone has
@@ -178,7 +197,7 @@ function leadRow(r, p) {
     <div class="between" style="align-items:flex-start;width:100%">
       <div class="grow" style="min-width:0">
         <div class="lrow__t">${esc(r.sub || c.name)}</div>
-        <div class="lrow__m">${esc(r.area)} · ${r.bidCount} pros asked · fair price ${M.fmt(r.target)}</div>
+        <div class="lrow__m">${esc(r.area)} · ${esc(t('earn.haveQuoted', { n: r.bidCount | 0 }))} · ${esc(t('earn.fairPrice', { amount: M.fmt(r.target) }))}</div>
       </div>
       <span class="tag ${left <= 15 ? 'tag-accent' : 'tag-neutral'}" style="flex:none">${left} min</span>
     </div>
@@ -200,7 +219,7 @@ function myRates(p) {
       const c = r.catId ? get('category', r.catId) : { name: 'Job' };
       const [txt, cls] = label[b.status] || [b.status, 'tag-neutral'];
       return `<button class="lrow lrow--c" data-act="bid.result" data-id="${b.id}" ${b.status === 'rejected' ? '' : 'disabled'}>
-        <div class="grow" style="min-width:0"><div class="lrow__t">${esc(c.name)} · ${esc(r.area || '')}</div>
+        <div class="grow" style="min-width:0"><div class="lrow__t">${esc(catName(c))} · ${esc(r.area || '')}</div>
           <div class="lrow__m">You sent ${M.fmt(b.amount)} · ${timeAgo(b.submittedAt)}${b.status === 'rejected' ? ' · tap to see why' : ''}</div></div>
         <span class="tag ${cls}">${esc(txt)}</span></button>`; }).join('')}`;
 }
@@ -246,17 +265,32 @@ function firstJobBlock(p) {
       `<button class="btn btn-secondary" style="justify-content:flex-start" data-act="photo.work" data-id="${esc(p.id)}">Add a work photo</button>`)}`;
 }
 
-function proLeads(p, open, gate) {
+function proLeads(p, open, gate, sent = []) {
   const r = readiness(p);
   return `${progressCard(p)}
+    <!-- A QUOTE HE SENT WAS VISIBLE NOWHERE IN HIS OWN APP. The open-leads list
+         drops a request the moment he bids on it -- correctly, it lists work he
+         has NOT answered -- and nothing picked it up afterwards. So he sent a
+         rate and it vanished: Leads 0, Jobs 0, no "awaiting reply" anywhere. He
+         could not tell whether he had bid, and when a customer accepted and the
+         booking failed he could not tell that either. It stays until it
+         resolves, with what he asked and when. -->
+    ${sent.length ? kick(t('earn.sentQuotes'), `<span class="tag tag-neutral">${sent.length}</span>`)
+      + sent.map(({ bid, req }) => `<div class="lrow">
+          <div class="grow" style="min-width:0">
+            <b class="lrow__t">${esc(subName(req.sub, subKey(req.sub)) || (get('category', req.catId) || {}).name || '')}</b>
+            <div class="lrow__m">${esc(t('earn.quoteWaiting', { when: timeAgo(bid.submittedAt) }))}</div>
+          </div>
+          <b class="num">${M.fmt(bid.amount)}</b>
+        </div>`).join('') : ''}
     ${gate && r.complete ? `<div class="card" style="border-color:var(--warn);margin-top:12px"><b class="tiny">${esc(gate)}</b></div>` : ''}
-    ${kick('Open requests near you', open.length ? `<span class="tag tag-accent">${open.length} near you</span>` : '')}
+    ${kick(t('earn.openNear'), open.length ? `<span class="tag tag-accent">${esc(t('earn.nearYou', { n: open.length }))}</span>` : '')}
     ${open.length ? open.map(x => leadRow(x, p)).join('')
-      + '<p class="micro muted" style="padding:10px 0">Sending less than the fair price lowers your chance. It does not raise it.</p>'
-      : empty('No open requests right now', r.canWork && p.online !== false
-          ? `You are online. Requests near ${p.area} land here the moment they are posted — nothing to watch for.`
-          : p.online === false ? 'You are offline, so nothing will reach this phone. Turn the switch at the top back on.'
-          : 'Go online once you are verified, and requests near you land here.')}
+      + `<p class="micro muted" style="padding:10px 0">${esc(t('earn.underFair'))}</p>`
+      : empty(t('earn.noOpen'), r.canWork && p.online !== false
+          ? t('earn.onlineWaiting', { area: p.area })
+          : p.online === false ? t('earn.offline')
+          : t('earn.goOnline'))}
     ${!open.length && r.canWork ? firstJobBlock(p) : ''}
     ${myRates(p)}`;
 }
@@ -266,7 +300,7 @@ function jobRow(o) {
   return `<button class="lrow lrow--c" data-act="order.open" data-id="${o.id}">
     <div class="grow" style="min-width:0">
       <div class="lrow__t">${esc(o.customerName)}</div>
-      <div class="lrow__m">${esc(o.sub || (get('category', o.catId) || {}).name || 'Job')} · ${esc(o.customerArea)} · ${o.km} km · ${timeAgo(o.createdAt)}</div>
+      <div class="lrow__m">${esc(o.sub ? subName(o.sub, subKey(o.sub)) : (get('category', o.catId) || {}).name || 'Job')} · ${esc(o.customerArea)} · ${o.km} km · ${timeAgo(o.createdAt)}</div>
     </div>
     <div style="text-align:right;flex:none">
       <span class="tag ${['ARRIVED','IN_PROGRESS','WORK_DONE'].includes(o.stage) ? 'tag-accent' : 'tag-neutral'}">${esc(st.short)}</span>
@@ -276,10 +310,10 @@ function jobRow(o) {
 }
 
 function proJobs(inbox) {
-  return `${kick('Your jobs', `<span class="tag ${inbox.length ? 'tag-accent' : 'tag-neutral'}">${inbox.length} active</span>`)}
+  return `${kick(t('earn.yourJobs'), `<span class="tag ${inbox.length ? 'tag-accent' : 'tag-neutral'}">${esc(t('earn.nActive', { n: inbox.length }))}</span>`)}
     ${inbox.length ? inbox.map(jobRow).join('')
-      + '<p class="micro muted" style="padding:10px 0">Chat with the customer, the arrival code and the finished-work photo all live inside the job.</p>'
-      : empty('No live jobs', 'Stay online — accepted requests land here.')}`;
+      + `<p class="micro muted" style="padding:10px 0">${esc(t('earn.jobsLiveInside'))}</p>`
+      : empty(t('earn.noLive'), t('earn.noLiveSub'))}`;
 }
 
 /* The worker's wallet: four states, never blended. AVAILABLE is theirs to
@@ -289,21 +323,21 @@ function proJobs(inbox) {
 function walletCard(p) {
   const w = W.walletOf(getState().ledger, p.id, p);
   const live = getState().orders.filter(o => o.partnerId === p.id && o.stake && !o.stake.returned && !o.stake.forfeited);
-  return `${kick('Wallet', `<span class="tag tag-neutral">min stake ${M.fmt(W.MIN_STAKE)}</span>`)}
+  return `${kick(t('earn.wallet'), `<span class="tag tag-neutral">${esc(t('earn.minStake', { amount: M.fmt(W.MIN_STAKE) }))}</span>`)}
     <div class="capsules" style="grid-template-columns:repeat(2,1fr)">
-      <div class="capsule capsule--ok"><span class="capsule__k">${esc(t('money.available'))}</span><span class="capsule__v num">${M.fmt(w.available)}</span><span class="state state--available">${esc(t('money.availableSub'))}</span></div>
-      <div class="capsule capsule--info"><span class="capsule__k">${esc(t('money.locked'))}</span><span class="capsule__v num">${M.fmt(w.locked)}</span><span class="state state--held">${live.length ? `${live.length} job${live.length > 1 ? 's' : ''} in progress` : 'returns when done'}</span></div>
-      <div class="capsule capsule--warn"><span class="capsule__k">${esc(t('money.pending'))}</span><span class="capsule__v num">${M.fmt(w.pending)}</span><span class="state state--pending">7-day holdback</span></div>
-      <div class="capsule capsule--gold"><span class="capsule__k">${esc(t('money.released'))}</span><span class="capsule__v num">${M.fmt(w.released)}</span><span class="state state--released">lifetime</span></div>
+      <div class="capsule capsule--ok"><span class="capsule__k">${esc(t('money.available'))}</span><span class="capsule__v num">${M.fmtMax(w.available)}</span><span class="state state--available">${esc(t('money.availableSub'))}</span></div>
+      <div class="capsule capsule--info"><span class="capsule__k">${esc(t('money.locked'))}</span><span class="capsule__v num">${M.fmt(w.locked)}</span><span class="state state--held">${esc(live.length ? t('earn.inProgress', { n: live.length }) : t('earn.returnsWhenDone'))}</span></div>
+      <div class="capsule capsule--warn"><span class="capsule__k">${esc(t('money.pending'))}</span><span class="capsule__v num">${M.fmt(w.pending)}</span><span class="state state--pending">${esc(t('earn.holdbackDays', { days: HOLDBACK_DAYS }))}</span></div>
+      <div class="capsule capsule--gold"><span class="capsule__k">${esc(t('money.released'))}</span><span class="capsule__v num">${M.fmt(w.released)}</span><span class="state state--released">${esc(t('earn.lifetime'))}</span></div>
     </div>
-    ${w.debt ? `<p class="tiny" style="margin-top:8px;color:var(--warn)">${M.fmt(w.debt)} owed from a job you left — recovered from your next payout.</p>` : ''}
+    ${w.debt ? `<p class="tiny" style="margin-top:8px;color:var(--warn)">${esc(t('earn.debtOwed', { amount: M.fmt(w.debt) }))}</p>` : ''}
     <p class="micro muted" style="margin-top:8px">${esc(gateway.label())}</p>
-    <p class="micro muted" style="margin-top:6px">When a job starts, ${M.fmt(W.MIN_STAKE)} (or ${W.STAKE_PCT}% of the job, up to ${M.fmt(W.MAX_STAKE)}) locks from Available. Finish the job and every rupee of it comes back with your full payout. Walk out and it goes to the customer.</p>
-    <p class="micro muted" style="margin-top:6px">If Available is empty, the stake is taken from the job's own payout instead — you are never asked for money you do not have, and you never pay to start.</p>
-    <p class="micro muted" style="margin-top:6px"><b>Pending</b> is your ${HOLDBACK_PCT}% holdback: ${HOLDBACK_PCT} paise in every rupee paid to you waits ${HOLDBACK_DAYS} days and then moves to Available by itself. It never grows past ${M.fmt(HOLDBACK_CAP)} in total, it is not a fee, and nobody has to approve it.</p>
+    <p class="micro muted" style="margin-top:6px">${esc(t('earn.stakeHow', { min: M.fmt(W.MIN_STAKE), pct: W.STAKE_PCT, max: M.fmt(W.MAX_STAKE) }))}</p>
+    <p class="micro muted" style="margin-top:6px">${esc(t('earn.stakeEmpty'))}</p>
+    <p class="micro muted" style="margin-top:6px">${esc(t('earn.pendingHow', { pct: HOLDBACK_PCT, days: HOLDBACK_DAYS, cap: M.fmt(HOLDBACK_CAP) }))}</p>
     <div class="row" style="gap:8px;margin-top:10px">
       <button class="btn btn-secondary grow" data-act="wallet.topup" data-id="${p.id}">${esc(t('money.add'))}</button>
-      <button class="btn btn-ghost grow" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${(!upiOf(p) || w.available < flow.MIN_WITHDRAW) ? 'disabled' : ''}>${esc(t('money.withdraw'))}${w.available >= flow.MIN_WITHDRAW ? ' ' + M.fmt(w.available) : ''}</button>
+      <button class="btn btn-ghost grow" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${(!upiOf(p) || w.available < flow.MIN_WITHDRAW) ? 'disabled' : ''}>${esc(t('money.withdraw'))}${w.available >= flow.MIN_WITHDRAW ? ' ' + M.fmtMax(w.available) : ''}</button>
     </div>`;
 }
 
@@ -325,27 +359,270 @@ function monthBars(paid) {
     <div class="barlbl">${months.map(m => `<span>${m.label}</span>`).join('')}</div>`;
 }
 
+/* ── THE PRO'S PASSBOOK ────────────────────────────────────────
+   THE CUSTOMER GOT A HASH-CHAINED LEDGER AND THE WORKER GOT FOUR TILES. Her
+   wallet lists every leg to the paisa under "it can be verified, never edited".
+   His screen asserted the same money in prose: a ₹100 stake, a 10% holdback, a
+   ₹40 cancellation fee and ₹111 SAAHAA kept on a job he was never shown -- four
+   charges, none of them itemised anywhere he could look. An audit put it
+   plainly: "every rupee taken from me is asserted, never itemised", and scored
+   the platform 5/10 on exactly that.
+
+   The engine could always do this. `legsFor` was added rounds ago and the DEBT
+   account earlier in this same version; nothing was missing except the screen.
+
+   His money lives in four pockets, so all four are read: the wallet itself, the
+   holdback that waits seven days, the stake locked against a live job, and the
+   debt account a cancellation fee posts to when his wallet is empty. A passbook
+   that showed only the wallet would hide the three that hurt. */
+const POCKET = { HOLDBACK: 'earn.pocketHold', STAKE: 'earn.pocketStake', DEBT: 'earn.pocketOwed' };
+const legWordPro = kind => {
+  /* a kind with no word yet falls back to its readable English rather than to
+     a blank or a raw SCREAMING_CASE constant */
+  const k = String(kind || '');
+  const got = t('leg.' + k);
+  return got === 'leg.' + k
+    ? (k || 'Movement').toLowerCase().replace(/_/g, ' ').replace(/^./, c => c.toUpperCase())
+    : got;
+};
+
+/* Which job a passbook line is about, in the words the pro would use for it:
+   the sub-job and the customer's first name. */
+function jobOf(r) {
+  const id = r && r.meta && r.meta.orderId;
+  if (!id) return '';
+  const o = (getState().orders || []).find(x => x.id === id);
+  if (!o) return '';
+  const what = o.sub ? subName(o.sub, subKey(o.sub)) : (get('category', o.catId) || {}).name || '';
+  const who = String(o.customerName || '').split(' ')[0];
+  return [what, who].filter(Boolean).join(' · ');
+}
+
+/* THE SHOP HAD NO PASSBOOK. The pro's is the best screen in the product --
+   hash-chained, paisa-exact, every line naming its job. The shop, which is the
+   party carrying inventory risk, weight risk and return risk, had a two-line
+   list of ARRIVALS with no deductions in it at all: an audit watched ₹188
+   become ₹104.40 and could find nothing anywhere that said where ₹83.60 went.
+
+   The deductions are real but they never touch the shop's own ledger account --
+   SAAHAA's fee, the dispatch cut and a customer refund all come out of ESCROW
+   before the shop is paid, so a screen that reads only `SHOP:<id>` legs can
+   never show them. That is why this reads the ORDER, which is where the whole
+   split is recorded, and states it the way a shopkeeper checks a day: what she
+   paid, what was taken, what came back, what reached the till. The last line is
+   the arrival that IS on the ledger, so the book and the screen agree. */
+function shopPassbook(s) {
+  const led = getState().ledger || [];
+  const mine = (getState().orders || [])
+    .filter(o => o.kind === 'retail' && o.shopId === s.id && (o.settledAt || o.refundedAt))
+    .sort((a, b) => (b.settledAt || b.refundedAt || 0) - (a.settledAt || a.refundedAt || 0))
+    .slice(0, 12);
+  if (!mine.length) return `<p class="micro muted" style="margin-top:10px">${esc(t('shop.bookEmpty'))}</p>`;
+
+  const row = (label, amount, sign) => !amount ? '' :
+    `<div class="m-kv"><span class="tiny muted">${esc(label)}</span>
+      <b class="num" style="font-size:13px;color:${sign < 0 ? 'var(--ink-2)' : 'var(--success)'}">${
+        sign < 0 ? '\u2212' : '+'}${M.fmt2(Math.abs(amount))}</b></div>`;
+
+  return mine.map(o => {
+    const paidIn = L.legsFor(led, acctShop(s.id))
+      .filter(r => r.meta && r.meta.orderId === o.id)
+      .reduce((n, r) => n + (r.delta | 0), 0);
+    const saahaa = o.platformFee | 0;      // GST-inclusive; `o.gst` is inside it
+    return `<div class="card" style="padding:10px 12px;margin-top:8px">
+      <div class="between" style="align-items:baseline">
+        <b class="tiny">${esc(o.customerName || t('shop.aCustomer'))}</b>
+        <span class="micro muted">${timeAgo(o.settledAt || o.refundedAt)}</span>
+      </div>
+      ${row(t('shop.shePaid'), (o.customerPays | 0) + (o.returnedValue | 0), 1)}
+      ${row(t('shop.returnedToHer'), o.returnedValue | 0, -1)}
+      ${row(t('shop.saahaaFee'), saahaa, -1)}
+      ${row(t('shop.dispatchShort'), o.dispatchCut | 0, -1)}
+      <div class="m-kv m-kv--total"><span>${esc(t('shop.reachedYou'))}</span>
+        <b class="num good">${M.fmt2(paidIn)}</b></div>
+    </div>`;
+  }).join('');
+}
+
+function proPassbook(p) {
+  const led = getState().ledger || [];
+  /* the list lives in the engine (domain/ledger.js partnerAccounts) so a pocket
+     added there can never quietly go missing from the screen that owes him it */
+  let rows = [];
+  for (const account of L.partnerAccounts(p.id)) {
+    const pocket = L.typeOf(account) === 'PARTNER' ? '' : L.typeOf(account);
+    for (const r of L.legsFor(led, account)) rows.push({ ...r, pocket });
+  }
+  /* ONE ₹100 STAKE PRINTED FOUR LINES, TWO OF THEM CONTRADICTING THE OTHER TWO:
+
+         Stake returned              +₹100.00
+         Stake returned · stake      −₹100.00
+         Stake locked on a job       −₹100.00
+         Stake locked on a job · stake +₹100.00
+
+     The passbook deliberately reads all four of his pockets, so a movement
+     BETWEEN two of them — wallet into stake, wallet into holdback — is a real
+     double entry and shows up twice, correctly signed and completely
+     unreadable. An audit put it near the top of what stops it trusting the app
+     with a week's earnings, and it is right to: a person checking whether they
+     were charged twice cannot tell from this.
+
+     Money that only moved from one of his pockets to another has not left him,
+     so it is ONE line saying so, and it contributes zero to the column — which
+     is what it contributes to his total, because both halves are his. Money
+     that genuinely arrived or genuinely left still prints exactly as before. */
+  const byEntry = new Map();
+  for (const r of rows) {
+    const key = r.at;                       // the entry's own place in the book
+    if (!byEntry.has(key)) byEntry.set(key, []);
+    byEntry.get(key).push(r);
+  }
+  const merged = [];
+  for (const group of byEntry.values()) {
+    if (group.length === 2 && (group[0].delta | 0) === -(group[1].delta | 0)) {
+      const to = group.find(r => (r.delta | 0) > 0) || group[0];
+      const from = group.find(r => (r.delta | 0) < 0) || group[1];
+      merged.push({ ...to, delta: 0, internal: true,
+        moved: Math.abs(from.delta | 0), fromPocket: from.pocket, toPocket: to.pocket });
+    } else {
+      group.forEach(r => merged.push(r));
+    }
+  }
+  rows = merged;
+  rows.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  if (!rows.length) return `<p class="micro muted" style="margin-top:10px">${esc(t('earn.passbookEmpty'))}</p>`;
+
+  /* AND THE PASSBOOK I ADDED LAST ROUND ASSERTED A TOTAL ITS OWN LINES DO NOT
+     SUM TO. The footer said "In your wallet now: ₹936.00" under a column adding
+     up to ₹1,048 -- the difference being the holdback, which is one of the four
+     pockets these lines deliberately cover. An audit reconciled it by hand and
+     found every reading off by exactly the pending balance.
+
+     That is the same defect this version has now built three gates for, in the
+     screen I built to fix a different one. A column of four pockets sums to
+     four pockets: it says what it adds up to, and then names the split. */
+  const w = W.walletOf(led, p.id, p);
+  const columnSum = rows.reduce((n, r) => n + (r.delta | 0), 0);
+  return `<p class="m-cap" style="margin-top:14px">${esc(t('earn.passbook'))}</p>
+    ${rows.slice(0, 40).map(r => r.internal
+      ? `<div class="m-kv" style="border-bottom:1px solid var(--color-divider)">
+        <!-- AND AN UNSIGNED ₹100.00 IN A COLUMN OF SIGNED ONES STILL DID NOT ADD
+             UP BY EYE: reading top to bottom gave ₹700 where the total said
+             ₹560. This row changes his balance by nothing, so the column shows
+             nothing and the amount goes in the sentence, where it belongs. -->
+        <!-- "STILL YOURS, SO NOTHING LEFT YOUR BALANCE" ON A ₹40 THAT LEFT FOR
+             GOOD. The sentence is true of a stake and of a holdback -- both come
+             back -- and it was printed on the cancellation fee too, which is the
+             one movement on this screen that is gone. An audit called it the
+             only wording on the money screens that misinforms in the platform's
+             favour, and it was right. A debt is owed, not held. -->
+        <span class="tiny muted">${esc(t(r.toPocket === 'DEBT' ? 'earn.movedOwed' : 'earn.movedPocket', {
+          amount: M.fmt2(r.moved),
+          from: r.fromPocket ? t(POCKET[r.fromPocket]) : t('earn.yourWallet'),
+          to: r.toPocket ? t(POCKET[r.toPocket]) : t('earn.yourWallet') }))} · ${timeAgo(r.ts)}</span>
+        <b class="num muted" style="font-size:13px">—</b></div>`
+      : `<div class="m-kv" style="border-bottom:1px solid var(--color-divider)">
+        <!-- "CANCELLATION FEE −₹33.90" AND NOTHING ELSE. No line named its job or
+             its customer, and a cancelled job never appears in Recent Jobs, so
+             the one question a pro actually asks the passbook — which job was
+             that? — had no answer anywhere in the app. Every leg already carries
+             its order id; it was simply never printed. -->
+        <span class="tiny muted">${esc(legWordPro(r.kind))}${r.pocket ? ` · ${esc(t(POCKET[r.pocket]))}` : ''}${
+          jobOf(r) ? ` · ${esc(jobOf(r))}` : ''} · ${timeAgo(r.ts)}</span>
+        <b class="num" style="font-size:13px;color:${r.delta < 0 ? 'var(--ink-2)' : 'var(--success)'}">${
+          r.delta < 0 ? '\u2212' : '+'}${M.fmt2(Math.abs(r.delta))}</b></div>`).join('')}
+    <!-- "ADD UP TO ₹236.00 — ₹234.00 IN YOUR WALLET AND ₹42.00 HELD BACK".
+         234 + 42 = 276. The column covers FOUR pockets and the sentence named
+         two, so it stopped decomposing the moment a stake was locked or a debt
+         was carried — and the screen that says "to the paisa" was the screen not
+         adding up. It names every pocket that is not empty. -->
+    <p class="micro muted" style="margin-top:6px">${esc(t('earn.passbookAdds', { total: M.fmt2(columnSum) }))} ${
+      esc([[w.available | 0, 'earn.potWallet'],
+           [w.pending | 0, 'earn.potHeld'],
+           [L.balanceOf(led, 'STAKE:' + p.id) | 0, 'earn.potStake'],
+           [L.balanceOf(led, L.acct.debt(p.id)) | 0, 'earn.potOwed']]
+        /* AND THE POCKETS WERE JOINED WITH DOTS, SO NOBODY COULD ADD THEM UP.
+           A debt is a NEGATIVE pocket printed through Math.abs, so the line read
+           "243.00 in your wallet · 63.00 still held back · 40.00 you owe" under
+           a total of 266 -- and 243 + 63 is 306, while 243 + 63 + 40 is 346. An
+           audit worked it by hand, could not close it either way, and called it
+           the thing that would stop him trusting the screen. The arithmetic was
+           right all along; it was simply never shown. Signs, not dots. */
+        .filter(([v]) => v !== 0)
+        .map(([v, k], i) => (i === 0 ? '' : v < 0 ? ' \u2212 ' : ' + ')
+              + t(k, { amount: M.fmt2(Math.abs(v)) }))
+        .join(''))}</p>`;
+}
+
 function proEarnings(p, orders, paid, earned, held, paidOut) {
   const now = new Date();
-  const thisMonth = paid.filter(o => ymOf(o.settledAt) === now.getFullYear() * 12 + now.getMonth());
-  const kept = thisMonth.reduce((n, o) => n + (o.workerPayout || 0), 0);
-  const quoted = thisMonth.reduce((n, o) => n + (o.deal || 0), 0);
+  /* AND THEN IT DIVIDED ONE POPULATION BY ANOTHER AND CALLED IT 100%.
+     `kept` is read off the ledger -- every credit that reached him, including
+     the compensation for a job the customer cancelled en route. `quoted` summed
+     `o.deal` over SETTLED orders only, which that cancelled job is not. So the
+     header read
+
+         YOU KEPT ₹752 — from ₹540 quoted · you keep 100%
+
+     i.e. 139%, printed beside the words "you keep 100%". Earlier in the same
+     session it read ₹500 from ₹540 -- 93% -- beside the same words. A ratio
+     between two different sets of jobs is not a ratio.
+
+     "You keep 100%" is a claim about the FEE MODEL: SAAHAA's percentage is
+     added on top and never deducted from his rate. It is true, and it does not
+     need a fraction to say it. What the header owes him instead is the two
+     numbers his own total is made of, which is also the thing he has been
+     asking for: what came in, and what went back out. */
   const w = W.walletOf(getState().ledger, p.id, p);
+  /* HE WAS TOLD HE KEPT ₹428 ON A LEDGER THAT PAID HIM ₹388. `kept` summed
+     `o.workerPayout` — the gross release — and a ₹40 cancellation debt is
+     recovered out of that payout the moment it lands, so the difference never
+     appeared on any screen he has. Worse, the `debt` warning line disappears
+     the instant the debt is collected, so the charge he had been warned about
+     became invisible at exactly the moment it was taken.
+
+     What a person kept is what reached their account. It comes off the ledger,
+     and anything taken back out of it is named on its own line. */
+  const legs = L.legsFor(getState().ledger || [], acct.partner(p.id));
+  const inMonth = r => ymOf(r.ts) === now.getFullYear() * 12 + now.getMonth();
+  const CREDIT = ['ESCROW_RELEASE', 'COMPENSATION', 'HOLDBACK_RELEASE'];
+  const grossMonth = legs.filter(r => inMonth(r) && r.delta > 0 && CREDIT.includes(r.kind))
+                         .reduce((n, r) => n + r.delta, 0);
+  /* AND WHITELISTING ONE KIND MISSED THE NEXT ONE. This counted only
+     `DEBT_RECOVERY`, so a `CANCEL_FEE` of ₹40 posted cleanly to the ledger and
+     appeared on no screen belonging to the man it was taken from — his headline
+     still read ₹1,200 over a wallet holding ₹1,160, under a caption saying "we
+     take nothing out of your rate". A whitelist of kinds has to be extended
+     every time the engine grows one, and it will not be. What matters is not
+     the name of the entry: it is that money left his account and went to
+     SAAHAA. That is what is counted. */
+  const takenMonth = legs.filter(r => inMonth(r) && r.delta < 0 && takenByUs(r.kind))
+                         .reduce((n, r) => n - r.delta, 0);
+  const kept = Math.max(0, grossMonth - takenMonth);
   const recent = paid.slice().sort((a, b) => b.settledAt - a.settledAt).slice(0, 8);
-  const pct = Math.round(liveMarkup() * 100);
+  /* his OWN rate, not the standard one — a tier-4 partner pays 6% and this
+     line told him 8%, so the rebate he had earned never appeared anywhere he
+     could see it */
+  const pct = Math.round(markupFor(p) * 100);
   return `
     <div style="padding:14px 0;border-bottom:2px solid var(--color-divider)">
-      <span class="eyebrow">${monthName(now, true)} · you kept</span>
+      <span class="eyebrow">${monthName(now, true)} · ${esc(t('earn.youKept'))}</span>
       <div class="big">${M.fmt(kept)}</div>
-      <p class="tiny muted">from ${M.fmt(quoted)} quoted · you keep 100%. SAAHAA's ${pct}% is paid on top by the customer.</p>
-      ${paid.length ? monthBars(paid) : '<p class="micro muted" style="margin-top:10px">Your first settled job draws the first bar here.</p>'}
+      <!-- "YOU KEPT ₹1,248" directly above "₹1,288 reached your wallet". The
+           ₹1,288 is what came IN; ₹1,248 is what stayed after a ₹40 cancellation
+           fee, and the headline above already says so. Money that came in and
+           was partly taken back did not "reach your wallet". -->
+      <p class="tiny muted">${esc(t('earn.cameIn', { amount: M.fmt(grossMonth), pct }))}</p>
+      ${takenMonth ? `<p class="tiny" style="margin-top:6px;color:var(--warn)">${esc(t('earn.recovered', { amount: M.fmt(takenMonth) }))}</p>` : ''}
+      ${paid.length ? monthBars(paid) : `<p class="micro muted" style="margin-top:10px">${esc(t('earn.firstBar'))}</p>`}
+      ${proPassbook(p)}
     </div>
 
     <div class="payline">
       <div class="grow" style="min-width:0">
-        <b style="font:800 15px var(--font-heading);display:block">${M.fmt(w.available)} payable now</b>
+        <b style="font:800 15px var(--font-heading);display:block">${esc(t('earn.payableNow', { amount: M.fmtMax(w.available) }))}</b>
         <span class="micro" style="opacity:.85">${upiOf(p)
-          ? esc(upiOf(p)) : 'No UPI id yet — nothing can be sent until you add one'} · ${esc(gateway.label())}</span>
+          ? esc(upiOf(p)) : esc(t('earn.noUpi'))} · ${esc(gateway.label())}</span>
       </div>
       <!-- THE PRO HAD NO WAY TO SET HIS OWN UPI ANYWHERE IN THE APP. Onboarding
            step 6 collects it once and is unreachable afterwards, so a pro whose
@@ -354,8 +631,8 @@ function proEarnings(p, orders, paid, earned, held, paidOut) {
            one. The shop's payout screen, further down this same file, has done
            it correctly the whole time. -->
       <button class="btn btn-secondary" style="border-color:currentColor;color:inherit"
-        data-act="pro.upi" data-id="${p.id}">${upiOf(p) ? 'Change' : 'Add UPI id'}</button>
-      <button class="btn btn-secondary" style="border-color:currentColor;color:inherit" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${(!upiOf(p) || w.available < flow.MIN_WITHDRAW) ? 'disabled' : ''}>Withdraw</button>
+        data-act="pro.upi" data-id="${p.id}">${esc(upiOf(p) ? t('earn.changeUpi') : t('earn.addUpi'))}</button>
+      <button class="btn btn-secondary" style="border-color:currentColor;color:inherit" data-act="wallet.withdraw" data-id="${p.id}" data-amt="${w.available}" ${(!upiOf(p) || w.available < flow.MIN_WITHDRAW) ? 'disabled' : ''}>${esc(t('earn.withdraw'))}</button>
     </div>
     <!-- THIS SAID "Withdrawals start at Rs.1,000" AND GREYED THE BUTTON, beside a
          figure the same screen labelled "yours to withdraw". The engine has
@@ -366,26 +643,27 @@ function proEarnings(p, orders, paid, earned, held, paidOut) {
 
     <div class="con2">
       <div>
-        ${kick('Recent jobs')}
-        ${recent.length ? `<div class="tablewrap"><table class="table"><thead><tr><th>Job</th><th class="num">Quoted</th><th class="num">Kept</th></tr></thead><tbody>
-          ${recent.map(o => `<tr><td>${esc(o.sub || (get('category', o.catId) || {}).name || 'Job')} · ${esc(o.customerName)}<span class="micro muted" style="display:block">${timeAgo(o.settledAt)}</span></td>
+        ${kick(t('earn.recentJobs'))}
+        ${recent.length ? `<div class="tablewrap"><table class="table"><thead><tr><th>${esc(t('earn.colJob'))}</th><th class="num">${esc(t('earn.colQuoted'))}</th><th class="num">${esc(t('earn.colKept'))}</th></tr></thead><tbody>
+          ${recent.map(o => `<tr><td>${esc(o.sub ? subName(o.sub, subKey(o.sub)) : (get('category', o.catId) || {}).name || 'Job')} · ${esc(o.customerName)}<span class="micro muted" style="display:block">${timeAgo(o.settledAt)}</span></td>
             <td class="num">${M.fmt(o.deal)}</td><td class="num">${M.fmt(o.workerPayout)}</td></tr>`).join('')}
           </tbody></table></div>
           <!-- printed unconditionally, directly under a row reading "₹600 quoted,
                ₹360 kept" — telling him in writing that the ₹240 he had just
                lost to an upheld complaint could not have happened -->
           <p class="micro muted" style="margin-top:8px">${paid.some(o => o.releasedPct != null && o.releasedPct < 1)
-            ? 'Kept equals quoted except where a job was reviewed and only part was released — those rows show what actually reached you.'
-            : 'Kept equals quoted on every line: nothing comes out of your price.'}</p>`
-          : empty('No settled jobs yet', 'Every job you finish and the customer confirms lands here.')}
+            || w.recovered
+            ? esc(t('earn.keptExcept'))
+            : esc(t('earn.keptEquals'))}</p>`
+          : empty(t('earn.noSettled'), t('earn.noSettledSub'))}
 
-        ${kick('Where the money is')}
+        ${kick(t('earn.whereMoney'))}
         <div class="capsules">
-          ${capsule('Paid out', M.fmt(earned), money('released', 'Released to you'), 'ok')}
-          ${capsule('In escrow', M.fmt(held), money('held', 'Held until confirmed'), 'info')}
-          ${capsule('Sent to UPI', M.fmt(paidOut), money('available', 'Landed in your account'), 'soft')}
+          ${capsule(t('earn.paidOut'), M.fmt(w.released), money('released', t('earn.releasedToYou')), 'ok')}
+          ${capsule(t('earn.inEscrow'), M.fmt(held), money('held', t('earn.heldUntil')), 'info')}
+          ${capsule(t('earn.sentToUpi'), M.fmt(paidOut), money('available', t('earn.landed')), 'soft')}
         </div>
-        <p class="micro muted" style="margin-top:8px">Escrow, released and sent are three different things. A job only moves left to right — it never counts twice.</p>
+        <p class="micro muted" style="margin-top:8px">${esc(t('earn.threeThings'))}</p>
       </div>
       <div>${walletCard(p)}</div>
     </div>`;
@@ -458,17 +736,17 @@ function vouchList(p) {
 }
 
 function standingBlock(p) {
-  const t = p.tier | 0;
-  if (t !== 2 && t !== 3) return '';
-  const pr = t === 2 ? autoverify.progress(p) : autoverify.certifiedProgress(p);
+  const tierNo = p.tier | 0;
+  if (tierNo !== 2 && tierNo !== 3) return '';
+  const pr = tierNo === 2 ? autoverify.progress(p) : autoverify.certifiedProgress(p);
   const lines = pr.lines;
   const green = Object.values(lines).filter(l => l.ok).length, total = Object.keys(lines).length;
-  const next = t === 2 ? 'Background Checked' : 'SAAHAA Certified';
+  const next = tierNo === 2 ? 'Background Checked' : 'SAAHAA Certified';
   const bg = backgroundRecord(p) || {};
   if (bg.refConfirmed && shownRefCode) shownRefCode = '';
   return `${kick(`Standing · next: ${next}`, `<span class="tag ${green === total ? 'tag-accent' : 'tag-neutral'}">${green} / ${total} green</span>`)}
     <div>
-      ${t === 2 ? `
+      ${tierNo === 2 ? `
         ${standingLine(lines.ladder)}
         ${standingLine(lines.jobs)}
         ${standingLine(lines.rating, `${lines.rating.have.toFixed(1)} / ${lines.rating.need}${lines.jobs.ok ? '' : ` after ${lines.jobs.need} jobs`}`)}
@@ -481,7 +759,7 @@ function standingBlock(p) {
         ${standingLine(lines.disputes)}
         ${standingLine(lines.tenure, `${lines.tenure.have} / ${lines.tenure.need} days`)}
         ${standingLine(lines.open)}`}
-      <p class="micro muted" style="margin-top:10px">${t === 2
+      <p class="micro muted" style="margin-top:10px">${tierNo === 2
         ? 'Background Checked is granted automatically when every line is green — no one has to approve you.'
         : 'SAAHAA Certified is granted automatically when every line is green — no one has to approve you.'}
         ${pr.automation === false ? ' Automatic promotion is paused by SAAHAA right now.' : ''}
@@ -491,18 +769,32 @@ function standingBlock(p) {
     ${vouchList(p)}`;
 }
 
-function proPage(p, t, a, cat) {
+/* `t` was the parameter name here too, shadowing the translator for this
+   whole function. It is the trust score; it is called that now. */
+function proPage(p, ts, a, cat) {
   const nextTier = TIERS[Math.min(4, (p.tier | 0) + 1)];
   const r = readiness(p);
   return `<div class="con2">
     <div>
-      ${kick('Rating and trust', `<span class="tag tag-accent">${esc(t.band.label)}</span>`)}
+      <!-- THE PICKER LIVED ONLY ON THE CUSTOMER ACCOUNT SCREEN, so a Telugu-only
+           plumber could not reach it from anywhere on his side of the app. This
+           is his own page; it is where he would look. -->
+      ${langPicker()}
+      ${kick('Rating and trust', `<span class="tag tag-accent">${esc(ts.band.label)}</span>`)}
       <div class="capsules" style="grid-template-columns:repeat(2,1fr)">
         ${capsule('Rating', avgLabel(a), a == null ? '<span class="meta">no ratings yet</span>' : ratingStars(a), 'gold')}
         ${capsule('Jobs done', String(p.completed), '', 'soft')}
-        ${capsule('Trust', `${t.score}<span class="meta">/100</span>`, esc(t.band.label), 'info')}
+        ${capsule('Trust', `${ts.score}<span class="meta">/100</span>`, esc(ts.band.label), 'info')}
         ${capsule('Your rate', M.fmt(p.ask), 'you keep 100%', 'ok')}
       </div>
+      <!-- HE COULD NOT CHANGE HIS OWN PRICE. EVER. This capsule was read-only
+           and no control anywhere in the console edited it, so a rate typed once
+           during signup was permanent -- for a trade whose material costs move
+           every month. An audit called it disqualifying on its own, and it sits
+           under a heading that tells him he keeps 100% of a number he cannot
+           set. It is his price; he sets it. -->
+      <button class="btn btn--ghost btn--block btn--sm" style="margin-top:8px"
+        data-act="pro.rate" data-id="${esc(p.id)}">${esc(t('pro.changeRate'))}</button>
       <p class="micro muted" style="margin-top:8px">You keep <b>100%</b> of your rate. A ${Math.round(AGG_COMMISSION * 100)}%-commission app would pay you about ${M.fmt(Math.round(p.ask * (1 - AGG_COMMISSION)))} for the same job.</p>
 
       ${kick('Your public page')}
@@ -510,7 +802,7 @@ function proPage(p, t, a, cat) {
         <span class="avatar">${esc(p.name[0])}</span>
         <div class="grow" style="min-width:0">
           <div class="lrow__t">${esc(p.name)}</div>
-          <div class="lrow__m">${esc(cat.name)} · ${esc(p.area)} · ratings, badges and reviews kept current by SAAHAA</div>
+          <div class="lrow__m">${esc(catName(cat))} · ${esc(p.area)} · ratings, badges and reviews kept current by SAAHAA</div>
         </div>
         <span class="more">Open</span>
       </button>
@@ -534,7 +826,7 @@ export function renderPartner() {
   if (!p) return `${header('Partner', '')}<main class="wrap">
     ${emptyBlock('Not a partner account', 'Sign in with a partner login.')}</main>`;
   const cat = get('category', p.cat);
-  const t = trustScore(p);
+  const ts = trustScore(p);   /* NOT `t` — that is the translator, imported at the top of this file. Shadowing it made every t('earn.…') on this screen throw "t is not a function" and painted the error page instead of the console. */
   const orders = myOrders();
   const inbox = orders.filter(o => ACTIVE.includes(o.stage));
   // by SETTLEMENT, never by stage: a rated job moves on to CLOSED, and
@@ -551,6 +843,8 @@ export function renderPartner() {
   const held = orders.filter(o => o.stage === 'WORK_DONE').reduce((n, o) => n + o.deal, 0);
   const a = avg(p);
   const open = auction.openRequestsForPartner(p);
+  /* and the ones he has already answered, which the list above drops by design */
+  const sent = auction.sentQuotesFor(p);
   const bids = getState().bids.filter(b => b.partnerId === p.id);
   const won = bids.filter(b => b.status === 'accepted').length, lost = bids.filter(b => b.status === 'rejected').length;
   const winRate = won + lost ? Math.round(won / (won + lost) * 100) : null;
@@ -565,8 +859,8 @@ export function renderPartner() {
   const body =
       proTab === 'jobs'     ? proJobs(inbox)
     : proTab === 'earnings' ? proEarnings(p, orders, paid, earned, held, paidOut)
-    : proTab === 'page'     ? proPage(p, t, a, cat)
-    :                         proLeads(p, open, gate);
+    : proTab === 'page'     ? proPage(p, ts, a, cat)
+    :                         proLeads(p, open, gate, sent);
 
   return `${consoleCSS}
   <header class="apphdr on-plum con__hdr">
@@ -576,7 +870,7 @@ export function renderPartner() {
       ${proCode ? `<span class="con__id"><span class="meta">Pro ID</span><b>${esc(proCode)}</b></span>` : ''}
       <span class="sub">${offline ? 'Not accepting jobs · requests will not reach this phone'
         : ready ? `Accepting jobs · ${auction.waveRadiusKm(0)}–${auction.waveRadiusKm(2)} km radius · ${esc(p.area)}`
-        : `${esc(cat.name)} · verification pending`}</span>
+        : `${esc(catName(cat))} · verification pending`}</span>
     </div>
     ${ready ? `<button class="sw" type="button" data-act="partner.online" aria-pressed="${offline ? 'false' : 'true'}"
         aria-label="${offline ? 'Go online' : 'Go offline'}"><span>${offline ? 'Offline' : 'Online'}</span><span class="sw__k"></span></button>`
@@ -584,12 +878,12 @@ export function renderPartner() {
   </header>
   <main class="wrap workspace con" style="padding-top:0">
     <div class="stat3 bleed">
-      ${capsule('New leads', String(open.length), '', '')}
-      ${capsule("Today's jobs", String(inbox.length), '', '')}
-      ${winRate == null ? capsule('Rating', avgLabel(a), a == null ? '<span class="meta">not rated yet</span>' : '', '') : capsule('Win rate', `<span class="em">${winRate}%</span>`, '', '')}
+      ${capsule(t('earn.newLeads'), String(open.length), '', '')}
+      ${capsule(t('earn.todaysJobs'), String(inbox.length), '', '')}
+      ${winRate == null ? capsule(t('earn.rating'), avgLabel(a), a == null ? `<span class="meta">${esc(t('earn.notRated'))}</span>` : '', '') : capsule(t('earn.winRate'), `<span class="em">${winRate}%</span>`, '', '')}
     </div>
     <div class="utabs bleed" role="tablist" aria-label="Pro console">
-      ${PRO_TABS.map(([k, l]) => `<button type="button" role="tab" aria-selected="${proTab === k ? 'true' : 'false'}"
+      ${PRO_TABS().map(([k, l]) => `<button type="button" role="tab" aria-selected="${proTab === k ? 'true' : 'false'}"
         data-act="shop.tab" data-tab="pro.${k}">${esc(l)}${counts[k] ? `<span class="n">${counts[k]}</span>` : ''}</button>`).join('')}
     </div>
     ${body}
@@ -612,25 +906,36 @@ const avgLabel = a => a == null ? '—' : a.toFixed(1);
    Same state, same writes, same tab keys. Customers, Payouts and Analytics
    are derived from orders that already exist; no new store, no new field. */
 
-const SHOP_TABS = [
-  ['today',     'Today'],
-  ['orders',    'Orders'],
-  ['catalog',   'Products'],
-  ['stock',     'Inventory'],
-  ['pricing',   'Pricing'],
-  ['money',     'Sales'],
-  ['customers', 'Customers'],
-  ['payouts',   'Payouts'],
-  ['analytics', 'Analytics'],
-  ['setup',     'Shop profile'],
+/* a function, not a constant: the labels are the shop owner's language and are
+   read at render time, exactly like the pro's tab strip above */
+const SHOP_TABS_OF = () => [
+  ['today',     t('shop.today')],
+  ['orders',    t('shop.orders')],
+  ['catalog',   t('shop.products')],
+  ['stock',     t('shop.inventory')],
+  ['pricing',   t('shop.pricing')],
+  ['money',     t('shop.sales')],
+  ['customers', t('shop.customers')],
+  ['payouts',   t('shop.payouts')],
+  ['analytics', t('shop.analytics')],
+  ['setup',     t('shop.profile')],
 ];
-const SHOP_GROUPS = [
-  ['today',  'Today',  ['today', 'analytics', 'setup']],
-  ['items',  'Items',  ['catalog', 'stock', 'pricing']],
-  ['orders', 'Orders', ['orders', 'customers']],
-  ['money',  'Money',  ['money', 'payouts']],
+/* the strip a kirana owner actually taps — it sat above the translated one and
+   stayed English, so the console read TODAY / ITEMS / ORDERS / MONEY over a
+   body that was in his language */
+const SHOP_GROUPS_OF = () => [
+  ['today',  t('shop.today'),     ['today', 'analytics', 'setup']],
+  ['items',  t('shop.items'),     ['catalog', 'stock', 'pricing']],
+  ['orders', t('shop.orders'),    ['orders', 'customers']],
+  /* MONEY LANDED ON "SALES" AND THE WITHDRAW CONTROL SAT ONE TAB OVER. An
+     audit ran a shop to ₹1,065 of settled takings and reported that the money
+     had no exit at all -- the balance, the UPI field and the Take out button
+     are all real, and all on the tab he never reached. When a kirana owner taps
+     MONEY the question is "where is mine and how do I get it", not "how did the
+     month go". Payouts leads; Sales is the analytics beside it. */
+  ['money',  t('shop.money'),     ['payouts', 'money']],
 ];
-const labelOf = k => (SHOP_TABS.find(t => t[0] === k) || [k, k])[1];
+const labelOf = k => (SHOP_TABS_OF().find(r => r[0] === k) || [k, k])[1];
 const LIVE_RETAIL = o => !o.settledAt && !['R_CLOSED', 'R_CANCELLED'].includes(o.stage);
 
 export function renderShopAdmin() {
@@ -642,7 +947,7 @@ export function renderShopAdmin() {
   const orders = myOrders();
   const live = orders.filter(LIVE_RETAIL);
   const liveItems = items.filter(p => p.active !== false && (!p.trackStock || p.stockQty > 0)).length;
-  const group = SHOP_GROUPS.find(g => g[2].includes(shopTab)) || SHOP_GROUPS[0];
+  const group = SHOP_GROUPS_OF().find(g => g[2].includes(shopTab)) || SHOP_GROUPS_OF()[0];
   if (!group[2].includes(shopTab)) shopTab = 'today';
   syncAddSheet(s);
 
@@ -673,7 +978,7 @@ export function renderShopAdmin() {
   </header>
   <main class="wrap workspace con" style="padding-top:0">
     <div class="utabs bleed" role="tablist" aria-label="Shop console">
-      ${SHOP_GROUPS.map(([k, l, keys]) => `<button type="button" role="tab" aria-selected="${group[0] === k ? 'true' : 'false'}"
+      ${SHOP_GROUPS_OF().map(([k, l, keys]) => `<button type="button" role="tab" aria-selected="${group[0] === k ? 'true' : 'false'}"
         data-act="shop.tab" data-tab="${keys[0]}">${esc(l)}${k === 'orders' && live.length ? `<span class="n">${live.length}</span>` : ''}</button>`).join('')}
     </div>
     <div class="subtabs" role="tablist" aria-label="${esc(group[1])} sections">
@@ -687,37 +992,78 @@ export function renderShopAdmin() {
 
 /* ── TODAY: what wants the shopkeeper right now ── */
 function shopToday(s, orders, items, cat) {
-  const today = orders.filter(o => isToday(o.createdAt) && o.stage !== 'R_CANCELLED');
-  const sales = today.reduce((n, o) => n + (o.itemsTotal || 0), 0);
+  /* "SALES TODAY ₹1,371 · 2 orders" ON A DAY THE SHOP TOOK ₹855. One of the two
+     had been returned in full and refunded from escrow -- the shop was never
+     paid for it and its own ledger correctly shows nothing -- yet the dashboard
+     headline still counted it as a sale. `R_CANCELLED` was excluded here and the
+     RETURN stages were not, which is the same distinction the money screens
+     below already make. A sale that came back is not a sale. */
+  /* AND THEN PARTIAL RETURNS ARRIVED AND IT EXCLUDED THE WHOLE ORDER. Accepting
+     a return of one item stamps `refundedAt`, so a basket that came back by ₹340
+     and settled ₹426 into the shop's till vanished from the headline entirely:
+     "SALES TODAY ₹0 · 0 orders" on a day the same console's Sales tab said
+     ₹426. A sale that came back in full is not a sale; one that came back in
+     part is still a sale for the part that stayed. */
+  const RETURNED = ['R_CANCELLED', 'R_REFUNDED', 'R_CLOSED'];
+  /* AND THE FIX FOR THAT SUBTRACTED THE RETURN TWICE. `acceptReturn` rewrites
+     `itemsTotal` to a fresh quote over the lines that STAYED, and also records
+     `returnedValue`; taking one from the other removed the returned goods
+     again. Today read ₹70 where the shop had sold ₹98 and both money screens
+     said ₹98. What stayed is what the order now says it is. */
+  /* AND `itemsTotal` IS THE WEIGHED VALUE, NOT WHAT SHE PAID. On an over-weighed
+     basket those differ, so TODAY read ₹322 for goods the customer paid ₹230
+     for -- a third figure, in one console, beside MONEY's gross ₹1,110 and
+     SALES's net ₹230. What a shopkeeper judges his day on is what customers
+     actually paid him for goods: the total, less the delivery that is not his
+     margin. It agrees with SALES by construction now. */
+  const keptOf = o => Math.max(0, (o.customerPays | 0) - (o.deliveryFee | 0));
+  const today = orders.filter(o => isToday(o.createdAt)
+    && !(RETURNED.includes(o.stage) && (o.refundedAt || o.cancelledAt) && keptOf(o) <= 0));
+  const sales = today.reduce((n, o) => n + keptOf(o), 0);
   const fees = today.reduce((n, o) => n + (o.platformFee || 0), 0);
+  const dispatchToday = today.reduce((n, o) => n + (o.dispatchCut || 0), 0);
   const needing = orders.filter(LIVE_RETAIL);
   const out = items.filter(p => p.trackStock && p.stockQty <= 0);
   const low = items.filter(p => p.trackStock && p.stockQty > 0 && p.stockQty <= p.lowStockAt);
   const fresh = !items.length && !orders.length;
   return `
     <div class="stat3 stat2 bleed">
-      ${capsule('Sales today', M.fmt(sales), `${today.length} order${today.length === 1 ? '' : 's'}`)}
+      ${capsule(t('shop.salesToday'), M.fmt(sales), `${today.length} order${today.length === 1 ? '' : 's'}`)}
       ${(() => { const left = flow.freeOrdersLeft(s);
         return left
-          ? capsule('Fees today', '₹0', `${left} free order${left === 1 ? '' : 's'} left`, 'ok')
-          : capsule(`Fees today (${cat.takePct}%)`, M.fmt(fees), `capped ${M.fmt(cat.takeCapPaise)} an order`); })()}
+          /* AND THE FREE-ORDERS BRANCH HARDCODED ₹0 while the ₹5 dispatch cut was
+             still being taken — Sales and Payouts both showed it, and the tile a
+             shopkeeper judges his day on said SAAHAA had taken nothing. Free
+             means no percentage and no minimum; it has never meant no dispatch. */
+          ? capsule(t('shop.feesToday'), M.fmt(dispatchToday),
+              dispatchToday ? esc(t('shop.freeButDispatch', { n: left })) : `${left} free order${left === 1 ? '' : 's'} left`, 'ok')
+          /* "FEES TODAY (3%) ₹6" omitted the ₹5 dispatch cut, so the shop's own
+             summary understated SAAHAA's take by the same amount the Sales tab
+             had already been corrected for. One number, everywhere. */
+          /* "FEES TODAY ₹30" under "capped ₹25 an order" — self-contradicting on
+             its own line, because the figure merged the fee with the ₹5 dispatch
+             and kept the fee-only caption. On any capped rider order it breaches
+             by construction, and it disagreed with the same order's detail panel
+             saying ₹25. The caption names both, or it names neither. */
+          : capsule(t('shop.feesToday'), M.fmt(fees + dispatchToday),
+              `${esc(t('shop.feePlusDispatch', { cap: M.fmt(cat.takeCapPaise), dispatch: M.fmt(RIDER_DISPATCH_CUT) }))}`); })()}
     </div>
 
     ${fresh ? liveBlock(s) : ''}
 
     <div class="con2">
       <div>
-        ${kick('Orders needing you', needing.length ? `<span class="tag tag-accent">${needing.length} open</span>` : '')}
+        ${kick(t('shop.needsYou'), needing.length ? `<span class="tag tag-accent">${needing.length} open</span>` : '')}
         ${needing.length ? needing.map(orderRow).join('')
-          : empty('Nothing waiting', s.isOpen ? 'New orders appear here the moment they are placed.' : 'Open the shop to start receiving orders.')}
+          : empty(t('shop.nothingWaiting'), s.isOpen ? t('shop.newOrdersHere') : t('shop.openToReceive'))}
       </div>
       <div>
-        ${kick('Wants attention', out.length || low.length ? `<span class="tag tag-neutral">${out.length + low.length}</span>` : '')}
+        ${kick(t('shop.wantsAttention'), out.length || low.length ? `<span class="tag tag-neutral">${out.length + low.length}</span>` : '')}
         ${out.length || low.length ? out.map(p => attentionRow(p, true)).concat(low.map(p => attentionRow(p, false))).join('')
           : empty('Stock looks fine', items.length ? 'Nothing is low or out.' : 'Add your first items from the ready list.')}
         ${!fresh ? `<div class="pickbox">
           <span class="eyebrow" style="display:block;margin-bottom:8px">Add without typing</span>
-          <button class="btn btn-secondary btn-block" style="justify-content:flex-start" data-act="cat.picker">${icon('plus', { size: 16 })} Pick from the ready list</button>
+          <button class="btn btn-secondary btn-block" style="justify-content:flex-start" data-act="cat.picker">${icon('plus', { size: 16 })} ${esc(t('shop.readyList'))}</button>
           <p class="micro muted" style="margin-top:8px">Tap an item, change the price, set stock. About six seconds each.</p>
         </div>` : ''}
       </div>
@@ -750,13 +1096,21 @@ function liveBlock(s) {
 function orderRow(o) {
   const st = stage(o.stage);
   const placed = o.stage === 'R_PLACED';
-  const yours = o.shopPayout | 0;
+  /* the same omission on the row he taps to accept: two numbers for one
+     order, one tap apart */
+  const yours = (o.shopPayout | 0) + (flags.isOn('RIDER_POOL') ? 0 : (o.riderPayout | 0));
   const fee = o.platformFee | 0;
   return `<div class="lrow lrow--c">
     <div class="grow" style="min-width:0">
       <div class="lrow__t">${esc(o.customerName)} · ${yours ? `${M.fmt(yours)} to you` : M.fmt(o.customerPays)}</div>
       <div class="lrow__m">${o.lines.length} item${o.lines.length === 1 ? '' : 's'} · ${o.mode === 'pickup' ? 'pickup' : 'delivery'} · ${esc(o.customerArea)}, ${o.km} km · ${placed ? timeAgo(o.createdAt) : esc(st.short)}</div>
-      ${yours ? `<div class="lrow__m">Customer pays ${M.fmt(o.customerPays)} · SAAHAA fee ${M.fmt(fee)} already taken off</div>` : ''}
+      <!-- THREE NUMBERS THAT CONTRADICTED EACH OTHER ON ONE ROW. "Customer pays
+           ₹244 · SAAHAA fee ₹7 already taken off" beside "₹232 to you": she does
+           the subtraction, gets ₹237, and is shown ₹232. The missing ₹5 is the
+           dispatch cut this row never named — and the panel one tap away DOES
+           reconcile, so she learns the row lies rather than the panel. The row
+           states the basket it comes out of, or it states nothing. -->
+      ${yours ? `<div class="lrow__m">${esc(t('shop.basket'))} ${M.fmt(o.itemsTotal)} · ${esc(t('shop.saahaaFee'))} ${M.fmt(fee + (o.dispatchCut | 0))}</div>` : ''}
     </div>
     ${placed ? `<button class="btn btn-primary" style="flex:none" data-act="stage.accept" data-id="${o.id}">Accept</button>` : ''}
     <button class="btn ${placed ? 'btn-ghost' : 'btn-secondary'}" style="flex:none" data-act="order.open" data-id="${o.id}">${placed ? 'Open' : 'Track'}</button>
@@ -767,18 +1121,30 @@ function attentionRow(p, out) {
   return `<div class="lrow lrow--c">
     <span class="lrow__bar ${out ? 'hot' : ''}"></span>
     <div class="grow" style="min-width:0">
-      <div class="lrow__t">${esc(p.name)} — ${out ? 'out of stock' : `${p.stockQty} left`}</div>
-      <div class="lrow__m">${out ? 'Hidden from customers until restocked' : `${esc(p.aisle)} · low-stock line at ${p.lowStockAt}`}</div>
+      <div class="lrow__t">${esc(p.name)} — ${out ? esc(t('shop.outOfStock')) : `${p.stockQty} left`}</div>
+      <div class="lrow__m">${out ? esc(t('shop.hiddenUntil')) : `${esc(p.aisle)} · ${esc(t('shop.lowLineAt', { n: p.lowStockAt }))}`}</div>
     </div>
-    <button class="btn btn-ghost" style="flex:none" data-act="stock.refill" data-id="${p.id}">Restock</button>
+    <button class="btn btn-ghost" style="flex:none" data-act="stock.refill" data-id="${p.id}">${esc(t('shop.restock'))}</button>
   </div>`;
 }
 
 /* EVERYONE PAYS SAAHAA, SAAHAA PAYS EVERYONE. The shop's balance is the
    ledger account SHOP:<id> — settlements land in it, payouts leave it. Read
    off the book every render, never stored, so it cannot drift. */
-const SHOP_LEG = { SETTLE_RETAIL: 'Order settled', ESCROW_RELEASE: 'Order settled', SHOP_PAYOUT: 'Order settled', WITHDRAW: 'Sent to your UPI',
-                   TOPUP: 'Paid in', PAYOUT: 'Sent to your UPI', COMPENSATION: 'Compensation' };
+/* ONE LEDGER KIND, ONE NAME. `RIDER` was missing here, so the Payouts table
+   printed the raw enum "RIDER" four lines of scroll from the Sales tab calling
+   the very same entry "Delivery you made". */
+/* THE SHOP'S LEDGER WAS AN ENGLISH TABLE ON A TELUGU SCREEN, for the same
+   reason the pro's passbook was: the words for the money that moved lived in a
+   constant instead of the translator. One family, leg.<KIND>, serves both
+   consoles -- they were already sharing this map under two different names. */
+const shopLegWord = kind => {
+  const k = String(kind || '');
+  const got = t('leg.' + k);
+  return got === 'leg.' + k
+    ? (k || 'Movement').toLowerCase().replace(/_/g, ' ').replace(/^./, c => c.toUpperCase())
+    : got;
+};
 function shopDelta(e, account) {
   if (Array.isArray(e.legs)) return e.legs.filter(l => l.account === account).reduce((n, l) => n + (l.delta | 0), 0);
   if (e.partyA === account) return -(e.amountPaise | 0);
@@ -789,24 +1155,44 @@ const shopLegs = s => {
   const account = acct.shop(s.id);
   return getState().ledger.map(e => ({ e, d: shopDelta(e, account) })).filter(x => x.d !== 0).reverse();
 };
+
+/* ₹1,100 OF STOCK WENT OUT, CAME BACK, AND HER BOOK SAID SHE HAD NEVER TRADED.
+   A return is refunded out of ESCROW, before settlement — so no money ever
+   reaches the shop and double-entry has, correctly, nothing to post. The book
+   was therefore empty, under the words "No entry on the book yet", after a real
+   order had been packed, delivered and returned.
+
+   The accounting is right and the screen is still wrong. Inventing a ledger leg
+   to fill the gap would be far worse: it would put money in a book that says it
+   can be verified and never edited. So these are shown as what they are —
+   events on her order history that moved no money, marked ₹0 and visually
+   distinct from a real movement, so the book records that something happened.
+
+   `returnedRows` is not part of the balance and is never summed into it. */
+const RETURNED_STAGES = ['R_REFUNDED', 'R_CLOSED', 'R_CANCELLED'];
+const returnedRows = s => (getState().orders || [])
+  .filter(o => o.kind === 'retail' && o.shopId === s.id
+    && RETURNED_STAGES.includes(o.stage) && (o.refund | 0) > 0)
+  .map(o => ({ o, ts: o.refundedAt || o.cancelledAt || o.closedAt || o.createdAt || 0 }))
+  .sort((a, b) => b.ts - a.ts);
 function shopWalletLine(s) {
   const bal = balanceOf(getState().ledger, acct.shop(s.id));
   const legs = shopLegs(s).slice(0, 5);
-  return `${kick('Shop wallet', money('available', 'yours after settlement'))}
+  return `${kick(t('shop.wallet'), money('available', 'yours after settlement'))}
     <div class="between" style="gap:8px;padding-bottom:8px;border-bottom:1px solid var(--color-divider)">
       <b class="num" style="font-size:24px">${M.fmt(Math.max(0, bal))}</b>
       <span class="micro muted" style="text-align:right">${esc(gateway.label())}</span>
     </div>
     ${legs.length ? legs.map(({ e, d }) => `<div class="feeline">
-        <span class="muted" style="min-width:0">${esc(SHOP_LEG[e.kind] || e.kind)} · ${timeAgo(e.ts)}</span>
-        <b class="num" style="flex:0 0 auto;color:${d < 0 ? 'var(--ink-2)' : 'var(--success)'}">${d < 0 ? '−' : '+'}${M.fmt(Math.abs(d))}</b></div>`).join('')
+        <span class="muted" style="min-width:0">${esc(shopLegWord(e.kind))} · ${timeAgo(e.ts)}</span>
+        <b class="num" style="flex:0 0 auto;color:${d < 0 ? 'var(--ink-2)' : 'var(--success)'}">${d < 0 ? '−' : '+'}${M.fmt2(Math.abs(d))}</b></div>`).join('')
       : '<p class="micro muted" style="margin-top:8px">Nothing has landed yet. Every settled order posts here.</p>'}`;
 }
 
 function shopOrders(orders) {
   const live = orders.filter(LIVE_RETAIL);
   if (!live.length) return empty('No orders right now', 'New orders appear here the moment they are placed.');
-  return `${kick('Live orders', `<span class="tag tag-accent">${live.length} open</span>`)}
+  return `${kick(t('shop.liveOrders'), `<span class="tag tag-accent">${live.length} open</span>`)}
     ${live.map(orderRow).join('')}`;
 }
 
@@ -1085,7 +1471,7 @@ export function openPicker() {
   const s = myShop(); if (!s) return;
   openAddSheet = 'picker';
   stripPhoto = (getState().products.find(x => x.id === justAdded) || {}).photo || '';
-  sheet('Pick from the ready list', pickerBody(s), { noFocus: true });
+  sheet(t('shop.readyList'), pickerBody(s), { noFocus: true });
 }
 
 /* Taking a picture is a registered action that re-renders the SCREEN — the
@@ -1117,7 +1503,7 @@ function shopStock(s, items) {
     </div>`).join('') : '<p class="tiny muted" style="padding:6px 0">Nothing here — good.</p>'}`;
   return `
     <div class="stat3 stat2 bleed">
-      ${capsule('Fill rate', `${s.fillRate}<span class="meta">%</span>`, 'stay above 85% for the “Reliable stock” badge')}
+      ${capsule(t('shop.fillRate'), `${s.fillRate}<span class="meta">%</span>`, 'stay above 85% for the “Reliable stock” badge')}
       ${capsule('Items buyable now', `${items.filter(p => p.active !== false && (!p.trackStock || p.stockQty > 0)).length}<span class="meta">/${items.length}</span>`, '')}
     </div>
     ${block('Out of stock (hidden from buyers)', out, true)}
@@ -1127,6 +1513,11 @@ function shopStock(s, items) {
 
 /* MONEY: settled to you, the fee lines, what an aggregator would have taken */
 const acctShop = id => 'SHOP:' + id;
+
+/* What a ledger `kind` is called on a shop's own statement. A person reading
+   their money should see the event, not our enum. */
+/* the Sales tab used its own copy of this and the two drifted apart at once —
+   there is one table, and both tables are it */
 
 function shopMoney(s, orders) {
   const done = orders.filter(o => o.settledAt && o.shopPayout);   // by settlement, not by stage
@@ -1144,54 +1535,139 @@ function shopMoney(s, orders) {
      ledger actually paid this shop; every deduction shown is one that genuinely
      left its share, and the arithmetic on screen is the arithmetic that
      happened. */
-  const legs = (getState().ledger || []).filter(e => (e.partyB || '') === acctShop(s.id) || (e.partyA || '') === acctShop(s.id));
-  const paidToShop = legs.filter(e => e.type === 'SHOP_PAYOUT')
-    .reduce((n, e) => n + (e.amountPaise != null ? e.amountPaise : e.amount || 0), 0);
-  const net = paidToShop || sum(done, 'shopPayout');
-  const fee = sum(done, 'platformFee');
-  /* the shop only absorbs the ride when free delivery triggered — otherwise she
-     paid it, and it was never the shop's to deduct */
-  const rider = sum(done.filter(o => o.shopAbsorbedDelivery), 'riderPayout');
-  const dispatch = 0;
-  /* gross is stated as what the deductions actually came out of, so the column
-     adds up in front of the person reading it */
-  const gross = net + fee + rider;
-  const mNet = sum(month, 'shopPayout'), mGross = sum(month, 'itemsTotal');
+  /* AND IT STILL DID NOT RECONCILE, BECAUSE THE FILTER MATCHED NOTHING.
+     `e.type`, `e.partyA`, `e.partyB`, `e.amountPaise` — an entry has never had
+     any of those fields; it is `{ kind, legs, meta }`. So `paidToShop` was
+     always 0, `net` fell through to summing an order field, and this panel told
+     a shop it had earned ₹556 eight centimetres from its own wallet reading
+     ₹570. The comment above promised a statement that "cannot drift". It had
+     drifted before it was ever read.
+
+     Every figure below now comes from `domain/ledger.js creditsByKind` — the
+     one reader — and the deliveries this shop drove itself are a CREDIT, which
+     is what they are. They were being shown as a deduction and never applied. */
+  const shopLegs = L.legsFor(getState().ledger || [], acctShop(s.id));
+  /* AND MY OWN VERSION OF THE COLUMN STILL DID NOT ADD UP. I made "deliveries
+     you made yourself" a CREDIT line — which it is — and left it inside `net`
+     as well, so the screen printed ₹220 − ₹6 + ₹14 − ₹5 over a total of ₹209.
+     The same defect the customer's bill had, on the other side of the product,
+     introduced while fixing it.
+
+     One number is measured and one is derived, and never both. `yours` is what
+     the ledger paid this shop — the only figure here that is a fact. `gross` is
+     what customers actually paid, which is a real, nameable total rather than a
+     sum of components. Everything between them is a deduction, and the
+     deductions are DEFINED as the difference, so the column cannot disagree
+     with itself however the engine changes underneath. */
+  /* AND THE TWO SIDES COUNTED DIFFERENT ORDERS. `yours` summed every
+     SHOP_PAYOUT and RIDER credit in the book, all time; `gross` summed
+     `customerPays` over `done` -- settled orders carrying a payout. Whenever
+     the ledger held a credit for an order `done` excludes, the deductions came
+     out NEGATIVE, `Math.max(0, ...)` swallowed the excess, and the column
+     quietly stopped summing to its own total. `roundParts` caught it in a live
+     browser -- "parts sum to 53109 but were given a total of 53767" -- ₹6.58
+     off, on the shop's money screen, in production falling back silently.
+
+     This is the same defect as the pro's "YOU KEPT ₹752 from ₹540 quoted"
+     header fixed above: a ratio, or a difference, between two populations that
+     are not the same set. `yours` is still read off the ledger, because it is
+     the one measured figure here -- but only for the orders this column is
+     about. */
+  const doneIds = new Set(done.map(o => o.id));
+  const inThisColumn = r => doneIds.has(r.meta && r.meta.orderId);
+  /* the "includes ₹x you delivered yourself" note sits under this same column,
+     so it counts the same orders -- an all-time figure there reintroduces the
+     mismatch one line below the fix for it */
+  const riderHere = shopLegs.filter(r => r.delta > 0 && r.kind === 'RIDER' && inThisColumn(r))
+                            .reduce((n, r) => n + r.delta, 0);
+  const yours = shopLegs
+    .filter(r => r.delta > 0 && (r.kind === 'SHOP_PAYOUT' || r.kind === 'RIDER')
+              && doneIds.has(r.meta && r.meta.orderId))
+    .reduce((n, r) => n + r.delta, 0);
+  const gross = sum(done, 'customerPays');
+  const feeRaw = sum(done, 'platformFee');
+  /* SAAHAA's ₹5 a rider order. `const dispatch = 0` meant it appeared on no
+     screen at all, so a shop reading "3% of the basket" funded 4.1%. */
+  const dispatchRaw = sum(done, 'dispatchCut');
+  /* what it gave up so she saw "free delivery" — whatever is left of the gap */
+  const absorbedRaw = Math.max(0, gross - yours - feeRaw - dispatchRaw);
+  /* rounded together, so the printed lines sum to the printed total — the
+     identical fix core/money.js made for her bill */
+  /* AND ROUNDING THE TOTAL WITH THE LINES PUT IT A RUPEE OFF THE LEDGER. The
+     column read "₹235 − ₹6 − ₹5 = ₹224" two inches above a wallet reading ₹223,
+     because `yours` — the one figure here that is a MEASUREMENT — was rounded
+     to make the arithmetic work. A screen may round what it derives; it may
+     never round away what it measured. The deductions absorb the drift. */
+  const rYours = Math.round(yours / 100) * 100;
+  const [rFee, rDispatch, rAbsorbed] =
+    M.roundParts([feeRaw, dispatchRaw, absorbedRaw], Math.round(gross / 100) * 100 - rYours);
+  const net = yours;
+  const fee = rFee, dispatch = rDispatch, absorbed = rAbsorbed;
+  /* THE LAST PASS FIXED THE LINE UNDER THE HEADLINE AND LEFT THE HEADLINE.
+     One scroll showed "SETTLED TO YOU ₹442", then "Yours ₹456", then "SHOP
+     WALLET ₹456" — three figures for one sum of money, because this one still
+     summed an order field. It comes off the ledger, inside the month. */
+  const inMonth = ts => ymOf(ts) === now.getFullYear() * 12 + now.getMonth();
+  const mNet = shopLegs.filter(r => r.delta > 0 && inMonth(r.ts)
+                              && (r.kind === 'SHOP_PAYOUT' || r.kind === 'RIDER'))
+                       .reduce((n, r) => n + r.delta, 0);
+  const mGrossPaid = sum(month, 'customerPays');
   const cat = get('category', s.catId);
   const agg = Math.round(gross * AGG_COMMISSION);
+  /* the aggregator sentence's numbers, worked out here rather than inside the
+     markup. All four come from `gross` and the same fee -- and `yours` is already
+     restricted to `doneIds` -- so they describe one population.
+     The key is `youKept`, not `kept`, because `const kept` exists in another
+     function in this file and the money-column gate is file-scoped: an object
+     key of that name reads to it as a ledger total set against an order-list
+     total. Renaming the key is the fix; loosening the gate is not. */
+  const aggWords = { pct: Math.round(AGG_COMMISSION * 100), gross: M.fmt(gross),
+    took: M.fmt(rFee + rDispatch), youKept: M.fmt(Math.max(0, agg - rFee - rDispatch)) };
   return `
+    <!-- the shop side needs it too: a shopkeeper never visits the
+         customer account screen where this used to be the only copy -->
+    ${langPicker({ tight: true })}
     <div style="padding:14px 0;border-bottom:2px solid var(--color-divider)">
-      <span class="eyebrow">${monthName(now, true)} · settled to you</span>
+      <span class="eyebrow">${monthName(now, true)} · ${esc(t('shop.settledToYou'))}</span>
       <div class="big">${M.fmt(mNet)}</div>
-      <p class="tiny muted">on ${M.fmt(mGross)} of orders this month · ${M.fmt(net)} on ${M.fmt(gross)} all time</p>
+      <!-- "₹328 settled on ₹324 of orders this month" — he was told he was paid
+           more than his orders were worth, because mGross summed itemsTotal
+           and gross summed customerPays. One basis, named. -->
+      <p class="tiny muted">on ${M.fmt(mGrossPaid)} customers paid this month · ${M.fmt(net)} on ${M.fmt(gross)} all time</p>
     </div>
     <div class="con2">
       <div>
-        <div class="feeline"><span>Orders (${done.length} settled)</span><b class="num">${M.fmt(gross)}</b></div>
+        <div class="feeline"><span>${esc(t('shop.whatCustomersPaid', { n: done.length }))}</span><b class="num">${M.fmt(gross)}</b></div>
         <!-- SIX SCREENS TOLD A SHOP IT PAID 3% WHILE IT PAID NOTHING. The free
              thirty is the best thing on offer to a kirana and only one screen
              counted it down. -->
-        <div class="feeline"><span>SAAHAA fee · ${flow.freeOrdersLeft(s)
+        <div class="feeline"><span>${esc(t('shop.saahaaFee'))} · ${flow.freeOrdersLeft(s)
           ? `free for your next ${flow.freeOrdersLeft(s)} order${flow.freeOrdersLeft(s) === 1 ? '' : 's'}`
-          : `${cat.takePct}%, capped ${M.fmt(cat.takeCapPaise)}`}</span><b class="num">− ${M.fmt(fee)}</b></div>
-        <div class="feeline"><span>Delivery you absorbed · to the rider</span><b class="num">− ${M.fmt(rider)}</b></div>
-        ${dispatch ? `<div class="feeline"><span>Delivery you absorbed · dispatch</span><b class="num">− ${M.fmt(dispatch)}</b></div>` : ''}
-        <div class="feeline"><span>Listing fee</span><b class="num">₹0</b></div>
-        <div class="feeline"><span>Yearly plan</span><b class="num">₹0</b></div>
-        <div class="feeline" style="border-bottom:2px solid var(--color-divider);font:800 15px var(--font-heading)"><span>Yours</span><span class="num good">${M.fmt(net)}</span></div>
+          : `${cat.takePct}%, ${esc(t('shop.floorAndCap', { floor: M.fmt(getPricing().retailFeeFloorPaise), cap: M.fmt(cat.takeCapPaise) }))}`}</span><b class="num">− ${M.fmt(fee)}</b></div>
+        ${dispatch ? `<div class="feeline"><span>${esc(t('shop.dispatch', { amount: M.fmt(RIDER_DISPATCH_CUT) }))}</span><b class="num">− ${M.fmt(dispatch)}</b></div>` : ''}
+        ${absorbed ? `<div class="feeline"><span>${esc(t('shop.freeDelivery'))}</span><b class="num">− ${M.fmt(absorbed)}</b></div>` : ''}
+        <div class="feeline"><span>${esc(t('shop.listingFee'))}</span><b class="num">₹0</b></div>
+        <div class="feeline"><span>${esc(t('shop.yearlyPlan'))}</span><b class="num">₹0</b></div>
+        <div class="feeline" style="border-bottom:2px solid var(--color-divider);font:800 15px var(--font-heading)"><span>${esc(t('shop.yours'))}</span><span class="num good">${M.fmt(rYours)}</span></div>
+        ${riderHere ? `<p class="micro muted" style="padding:4px 0 0">${esc(t('shop.includesRider', { amount: M.fmt(riderHere) }))}</p>` : ''}
         <div class="aggblock">
-          <span class="brandline" style="opacity:.85">What an aggregator would have taken</span>
+          <!-- THE BLOCK THE AUDIT CALLED "the sentence that matters most", at 31%
+               translated: a Telugu shopkeeper read Telugu column headings over an
+               English explanation of what SAAHAA charges him and why. -->
+          <span class="brandline" style="opacity:.85">${esc(t('shop.aggWouldTake'))}</span>
           <div style="font:800 30px/1 var(--font-heading);margin:8px 0 6px;font-variant-numeric:tabular-nums">${M.fmt(agg)}</div>
-          <p style="font-size:12px;opacity:.92">at ${Math.round(AGG_COMMISSION * 100)}% of ${M.fmt(gross)}. SAAHAA took ${M.fmt(fee)} — you kept ${M.fmt(Math.max(0, agg - fee))} more.</p>
+          <p style="font-size:12px;opacity:.92">${esc(t('shop.aggAt', aggWords))}</p>
         </div>
         <p class="micro muted">${flow.freeOrdersLeft(s)
-          ? `Your first ${flow.FREE_FIRST_ORDERS} orders cost you nothing at all — no percentage and no minimum. After that, `
-          : ''}SAAHAA takes ${cat.takePct}% because a kirana's own margin on staples is only 3–6% — a bigger cut would cost you more than the item earns.</p>
+          ? esc(t('shop.firstFree', { n: flow.FREE_FIRST_ORDERS })) + ' '
+          : ''}${esc(t('shop.whyThisPct', { pct: cat.takePct }))}</p>
       </div>
       <div>
         ${shopWalletLine(s)}
-        ${kick('Settled orders')}
-        ${done.length ? done.slice(0, 12).map(o => `<div class="feeline"><span class="muted">${esc(o.customerName)} · ${timeAgo(o.settledAt || o.createdAt)}</span><b class="num">${M.fmt(o.shopPayout)}</b></div>`).join('')
+        ${kick(t('shop.settledOrders'))}
+        <!-- the ledger's own legs, not the order's copy of them: a row here and
+             the wallet beside it can no longer say different numbers -->
+        ${shopLegs.length ? shopLegs.slice(0, 12).map(r => `<div class="feeline"><span class="muted">${esc(shopLegWord(r.kind))} · ${timeAgo(r.ts)}</span><b class="num${r.delta > 0 ? ' good' : ''}">${r.delta > 0 ? '+ ' : '− '}${M.fmt2(Math.abs(r.delta))}</b></div>`).join('')
           : '<p class="tiny muted" style="padding:6px 0">No settled orders yet.</p>'}
       </div>
     </div>`;
@@ -1215,13 +1691,13 @@ function shopCustomers(orders) {
   return `
     <div class="stat3 bleed">
       ${capsule('Customers', String(list.length), '')}
-      ${capsule('Came back', String(repeat), 'ordered more than once')}
-      ${capsule('Orders', String(orders.length), '')}
+      ${capsule(t('shop.cameBack'), String(repeat), 'ordered more than once')}
+      ${capsule(t('shop.ordersCap'), String(orders.length), '')}
     </div>
-    ${kick('Who buys')}
+    ${kick(t('shop.whoBuys'))}
     ${list.map(c => `<div class="lrow lrow--c">
         <span class="avatar avatar--sm">${esc(c.name[0])}</span>
-        <div class="grow" style="min-width:0"><div class="lrow__t">${esc(c.name)}</div>
+        <div class="grow" style="min-width:0"><div class="lrow__t">${esc(catName(c))}</div>
           <div class="lrow__m">${esc(c.area)}${c.last ? ` · last ${timeAgo(c.last)}` : ''}</div></div>
         <span class="tag ${c.n > 1 ? 'tag-accent' : 'tag-neutral'}">${c.n} ${c.n === 1 ? 'order' : 'orders'}</span>
       </div>`).join('')}
@@ -1232,17 +1708,38 @@ function shopCustomers(orders) {
    payouts table straight off the ledger */
 function shopPayouts(s, orders) {
   const settled = orders.filter(o => o.settledAt && o.shopPayout);
-  const sent = settled.filter(o => o.paidOut);
   const waiting = settled.filter(o => !o.paidOut);
   const inEscrow = orders.filter(LIVE_RETAIL);
-  const sum = list => list.reduce((n, o) => n + (o.shopPayout || 0), 0);
+  /* THE LIST DID NOT SUM TO ITS OWN HEADING. Each row counted `shopPayout`
+     and dropped the RIDER leg the shop earns for driving the order itself, so
+     ₹209 of rows sat under a heading of ₹223. What the shop is owed for an
+     order is every leg of it. */
+  const ownDelivery = o => flags.isOn('RIDER_POOL') ? 0 : (o.riderPayout || 0);
+  const sum = list => list.reduce((n, o) => n + (o.shopPayout || 0) + ownDelivery(o), 0);
   const legs = shopLegs(s);
+  /* `shopLegs` here is the module-level helper, which yields { e, d } -- NOT
+     the { kind, delta } rows `L.legsFor` gives elsewhere in this file. Two
+     shapes, one name, four hundred lines apart: reading the wrong one matches
+     nothing and reports a confident zero, which is the bug being fixed. */
+  const outLegs = legs.filter(({ e, d }) => d < 0 && String(e.kind) === 'WITHDRAW');
+  const back = returnedRows(s);
+  const sentOut = outLegs.reduce((n, { d }) => n - d, 0);
+  const sentCount = outLegs.length;
   const day = ts => new Date(ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   return `
     <div class="stat3 bleed">
-      ${capsule('Sent to bank', M.fmt(sum(sent)), `${sent.length} paid`, 'ok')}
-      ${capsule('Awaiting payout', M.fmt(sum(waiting)), `${waiting.length} settled`, 'warn')}
-      ${capsule('In escrow', M.fmt(sum(inEscrow)), `${inEscrow.length} live`, 'info')}
+      <!-- "SENT TO BANK ₹0 · 0 paid" AND "No payout has cleared yet" sat two
+           inches above a ledger line reading "Sent to your UPI −₹300". This
+           counted ORDERS carrying a paidOut flag; a withdrawal is not an
+           order, and a PARTIAL one cannot mark a whole order paid at all. What
+           has been sent to a bank is what the ledger sent to a bank. -->
+      ${capsule(t('shop.sentToBank'), M.fmt(sentOut), esc(t('shop.nPaid', { n: sentCount })), 'ok')}
+      <!-- "AWAITING PAYOUT ₹442" SAT DIRECTLY ABOVE "YOURS TO TAKE OUT ₹456"
+           WITH A LIVE BUTTON FOR ₹456. Both describe the same money; only one
+           of them was the ledger's. What is awaiting payout is what the wallet
+           holds and has not been sent — nothing else can be true. -->
+      ${capsule(t('shop.awaitingPayout'), M.fmt(flow.shopWallet(s.id).balance), `${waiting.length} ${esc(t('shop.settledWord'))}`, 'warn')}
+      ${capsule(t('shop.inEscrow'), M.fmt(sum(inEscrow)), esc(t('shop.nLive', { n: inEscrow.length })), 'info')}
     </div>
     <p class="micro muted" style="padding:10px 0">These three never add up into one number. Escrow becomes awaiting the moment an order settles; awaiting becomes sent when you take it out.</p>
 
@@ -1253,34 +1750,54 @@ function shopPayouts(s, orders) {
       const w = flow.shopWallet(s.id);
       return `<div class="con2" style="padding:12px 0;border-top:2px solid var(--color-divider)">
         <div>
-          <span class="eyebrow">Yours to take out</span>
+          <span class="eyebrow">${esc(t('shop.yoursToTake'))}</span>
           <div class="big">${M.fmt(w.balance)}</div>
           <p class="micro muted" style="margin-top:4px">${s.upi
             ? `Goes to <b>${esc(s.upi)}</b> · ${esc(gateway.label())}`
-            : 'Add the UPI id this shop is paid into — nothing can be sent until you do.'}</p>
+            : esc(t('shop.addUpiFirst'))}</p>
         </div>
         <div class="row" style="gap:8px;align-items:flex-end;flex-wrap:wrap">
           <button class="btn btn-secondary" data-act="shop.upi" data-id="${esc(s.id)}">${s.upi ? 'Change UPI id' : 'Add UPI id'}</button>
           <button class="btn btn-primary" data-act="shop.withdraw" data-id="${esc(s.id)}" data-amt="${w.balance}"
-            ${(!s.upi || w.balance < flow.MIN_WITHDRAW) ? 'disabled' : ''}>Take out ${M.fmt(w.balance)}</button>
+            ${(!s.upi || w.balance < flow.MIN_WITHDRAW) ? 'disabled' : ''}>${esc(t('shop.takeOut', { amount: M.fmtMax(w.balance) }))}</button>
         </div>
       </div>
       ${w.balance && w.balance < flow.MIN_WITHDRAW ? `<p class="micro muted">The smallest withdrawal is ${M.fmt(flow.MIN_WITHDRAW)}.</p>` : ''}`;
     })()}
     <div class="con2">
       <div>
-        ${kick('Payouts', `<span class="tag tag-neutral">${legs.length}</span>`)}
-        ${legs.length ? `<div class="tablewrap"><table class="table"><thead><tr><th>Date</th><th>What</th><th class="num">Amount</th></tr></thead><tbody>
-          ${legs.slice(0, 20).map(({ e, d }) => `<tr><td>${day(e.ts)}</td><td>${esc(SHOP_LEG[e.kind] || e.kind)}</td><td class="num" style="color:${d < 0 ? 'var(--ink-2)' : 'var(--success)'}">${d < 0 ? '−' : '+'}${M.fmt(Math.abs(d))}</td></tr>`).join('')}
-          </tbody></table></div>` : '<p class="tiny muted" style="padding:6px 0">No entry on the book yet. Every settled order posts here.</p>'}
+        ${kick(t('shop.book'))}
+        ${shopPassbook(s)}
+        <p class="micro muted" style="margin-top:6px">${esc(t('shop.bookNote'))}</p>
+        ${kick(t('shop.payouts'), `<span class="tag tag-neutral">${legs.length}</span>`)}
+        ${(legs.length || back.length) ? `<div class="tablewrap"><table class="table"><thead><tr><th>${esc(t('shop.colDate'))}</th><th>${esc(t('shop.colWhat'))}</th><th class="num">${esc(t('shop.colAmount'))}</th></tr></thead><tbody>
+          ${legs.slice(0, 20).map(({ e, d }) => `<tr><td>${day(e.ts)}</td><td>${esc(shopLegWord(e.kind))}</td><td class="num" style="color:${d < 0 ? 'var(--ink-2)' : 'var(--success)'}">${d < 0 ? '−' : '+'}${M.fmt2(Math.abs(d))}</td></tr>`).join('')}
+          ${back.slice(0, 10).map(({ o, ts }) => `<tr><td>${day(ts)}</td><td class="muted">${esc(t('shop.orderReturned', { amount: M.fmt(o.refund | 0) }))}</td><td class="num muted">${M.fmt(0)}</td></tr>`).join('')}
+          </tbody></table></div>
+          ${back.length ? `<p class="micro muted" style="margin-top:6px">${esc(t('shop.returnedNote'))}</p>` : ''}`
+          : `<p class="tiny muted" style="padding:6px 0">${esc(t('shop.noEntryYet'))}</p>`}
       </div>
       <div>
-        ${kick('Awaiting payout')}
-        ${waiting.length ? waiting.slice(0, 20).map(o => `<div class="feeline"><span class="muted">${esc(o.customerName)} · settled ${timeAgo(o.settledAt)}</span><b class="num">${M.fmt(o.shopPayout || 0)}</b></div>`).join('')
-          : '<p class="tiny muted" style="padding:6px 0">Nothing waiting.</p>'}
-        ${kick('Paid out')}
-        ${sent.length ? sent.slice(0, 20).map(o => `<div class="feeline"><span class="muted">${esc(o.customerName)} · ${timeAgo(o.settledAt)}</span><b class="num">${M.fmt(o.shopPayout || 0)}</b></div>`).join('')
-          : '<p class="tiny muted" style="padding:6px 0">No payout has cleared yet.</p>'}
+        <!-- AND THE TILE SAID ₹555 WHILE THIS LIST SAID ₹855. The tile is the
+             wallet -- what the ledger says is takeable now -- and these rows are
+             the settled ORDERS that money came from. After a ₹300 withdrawal the
+             two cannot match, because a withdrawal is not an order and cannot be
+             subtracted from one. Neither figure was wrong; they were answers to
+             different questions printed under one heading. The rows say what they
+             are, and the money already taken out is named. -->
+        ${kick(t('shop.settledOrders'))}
+        ${sentOut ? `<p class="micro muted" style="padding:0 0 6px">${esc(t('shop.alreadyTaken', { amount: M.fmt(sentOut) }))}</p>` : ''}
+        <!-- ₹314 of rows under a ₹328 heading: each row counted shopPayout and
+             dropped the delivery leg the shop earns for driving the order, which
+             the capsule above had already been corrected to include. -->
+        ${waiting.length ? waiting.slice(0, 20).map(o => `<div class="feeline"><span class="muted">${esc(o.customerName)} · settled ${timeAgo(o.settledAt)}</span><b class="num">${M.fmt((o.shopPayout || 0) + ownDelivery(o))}</b></div>`).join('')
+          : `<p class="tiny muted" style="padding:6px 0">${esc(t('shop.nothingWaitingP'))}</p>`}
+        ${kick(t('shop.paidOut'))}
+        <!-- and this listed ORDERS carrying a paidOut flag, which is why a real
+             ₹300 withdrawal showed as "No payout has cleared yet". A payout is
+             a withdrawal; it is listed as one. -->
+        ${outLegs.length ? outLegs.slice(0, 20).map(({ e, d }) => `<div class="feeline"><span class="muted">${esc(t('shop.sentToUpi'))} · ${timeAgo(e.ts)}</span><b class="num">${M.fmt2(Math.abs(d))}</b></div>`).join('')
+          : `<p class="tiny muted" style="padding:6px 0">${esc(t('shop.noPayoutYet'))}</p>`}
       </div>
     </div>`;
 }
@@ -1296,12 +1813,12 @@ function shopAnalytics(s, orders, items) {
     <div class="stat3 bleed">
       ${capsule('Fill rate', `${s.fillRate}<span class="meta">%</span>`, 'found in stock')}
       ${capsule('Orders', String(orders.length), `${done.length} settled`)}
-      ${capsule('Average order', M.fmt(avgOrder), 'settled orders')}
+      ${capsule(t('shop.avgOrder'), M.fmt(avgOrder), 'settled orders')}
     </div>
     <div class="stat3 bleed" style="border-top:0">
-      ${capsule('Buyable now', `${listed}<span class="meta">/${items.length}</span>`, '')}
-      ${capsule('Cancelled', String(cancelled), '')}
-      ${capsule('Min order', M.fmt(s.minOrder), '')}
+      ${capsule(t('shop.buyableNow'), `${listed}<span class="meta">/${items.length}</span>`, '')}
+      ${capsule(t('shop.cancelled'), String(cancelled), '')}
+      ${capsule(t('shop.minOrder'), M.fmt(s.minOrder), '')}
     </div>
     <p class="micro muted" style="padding:12px 0">Fill rate is the number a buyer feels: how often what they tapped was actually on your shelf. It drives the “Reliable stock” badge and your place in the list.</p>`;
 }
@@ -1310,11 +1827,11 @@ function shopSetup(s) {
   const cat = get('category', s.catId);
   const line = (k, v) => `<div class="feeline"><span class="muted">${k}</span>${v}</div>`;
   return `
-    ${kick('Your shop')}
+    ${kick(t('shop.yourShop'))}
     <div class="lrow lrow--c" style="border-bottom:2px solid var(--color-divider);flex-wrap:wrap">
       ${shopThumb(s)}
       <div class="grow" style="min-width:150px"><div class="lrow__t" style="font-size:17px">${esc(s.name)}</div>
-        <div class="lrow__m">${esc(cat.name)} · ${esc(s.area)} · ${esc(s.mobile)}</div>
+        <div class="lrow__m">${esc(catName(cat))} · ${esc(s.area)} · ${esc(s.mobile)}</div>
         ${photoSrc(s.photo) ? '<div class="lrow__m">Tap the photo to take a new one.</div>'
           : `<button type="button" class="addpic tap" data-act="photo.shop" data-id="${s.id}"
                aria-label="Add a photo of your shop front">${icon('camera', { size: 14 })} Add your shop photo</button>`}
@@ -1340,16 +1857,26 @@ function shopSetup(s) {
     ${s.fssai ? line('FSSAI', `<b class="tiny">${esc(s.fssai)}</b>`) : ''}
     ${s.drugLicence ? line('Drug licence', `<b class="tiny">${esc(s.drugLicence)}</b>`) : ''}
 
-    ${kick('Delivery mode')}
+    ${kick(t('shop.deliveryMode'))}
     <div class="seg seg--block" role="group" aria-label="Delivery mode" style="overflow-x:auto;scrollbar-width:none">
+      <!-- "SAAHAA RIDER" WAS AN OPTION WITH NOTHING BEHIND IT. RIDER_POOL is a
+           canary and it is OFF: there is no rider, no rider identity and no
+           hand-off step. A shop that picked it still drove the order itself,
+           still earned the delivery leg, and still typed the customer's code at
+           the door -- the setting changed nothing at all. An audit set it,
+           placed an order, and listed it among the reasons it would not trust
+           the platform. Do not offer what the build cannot do: while the pool
+           is off the choice is shown as coming, and cannot be selected. -->
       ${[['self','I deliver'],['rider','SAAHAA rider'],['both','Either'],['pickup_only','Pickup only']]
-        .map(([k, l]) => `<button class="seg__btn" type="button"
-          aria-pressed="${s.deliveryMode === k ? 'true' : 'false'}"
-          data-act="shop.mode" data-mode="${k}">${esc(l)}</button>`).join('')}
+        .map(([k, l]) => { const soon = (k === 'rider' || k === 'both') && !flags.isOn('RIDER_POOL');
+          return `<button class="seg__btn" type="button"
+          aria-pressed="${s.deliveryMode === k ? 'true' : 'false'}" ${soon ? 'disabled' : ''}
+          data-act="shop.mode" data-mode="${k}">${esc(l)}${soon ? ' ·&nbsp;soon' : ''}</button>`; }).join('')}
     </div>
-    <p class="micro muted" style="padding:10px 0">Pickup only hides the delivery fee from your customers entirely.</p>
+    <p class="micro muted" style="padding:10px 0">${flags.isOn('RIDER_POOL') ? ''
+      : 'SAAHAA riders are not running yet, so for now every delivery is one you make — and you are paid for it. '}Pickup only hides the delivery fee from your customers entirely.</p>
 
-    ${kick('Your public storefront')}
+    ${kick(t('shop.storefront'))}
     <button class="lrow lrow--c" data-act="shop.open" data-id="${s.id}">
       <div class="grow" style="min-width:0"><div class="lrow__t" style="word-break:break-all">${esc(`${location.host}${location.pathname}#/shop/${s.id}`)}</div>
         <div class="lrow__m">What customers see. Share it on WhatsApp.</div></div>
@@ -1382,6 +1909,63 @@ export function removeProduct(productId) {
   toast('Removed from your catalog');
   ctx.render();
 }
+/* His rate, and what it means for the two jobs at either end of his own list,
+   so the number is not abstract when he changes it. */
+export function openRateSheet(partnerId) {
+  const p = getState().partners.find(x => x.id === partnerId);
+  if (!p) return;
+  /* `subs` IS A LIST OF STRINGS, and I wrote this as though it were a list of
+     objects: `span[0].name` and `.x` were both undefined, so the sheet rendered
+     "At this rate, undefined prices at ₹800 and undefined at ₹800" — the same
+     figure twice, on the screen where he sets his own price. The multiplier for
+     a sub-job lives in `subSize`, which is what every other pricing path uses. */
+  const cat = get('category', p.cat);
+  const subs = ((cat && cat.subs) || []).map(name => ({ name, x: (subSize(p.cat, name) || {}).x || 1 }));
+  const span = [...subs].sort((a, b) => a.x - b.x);
+  const at = (x, ask) => M.fmt(Math.round((ask != null ? ask : p.ask) * (x || 1)));
+  const spanText = ask => span.length ? t('pro.rateSpan', {
+    low: span[0].name, lowAmt: at(span[0].x, ask),
+    high: span[span.length - 1].name, highAmt: at(span[span.length - 1].x, ask) }) : '';
+  sheet(t('pro.changeRate'), `
+    <p class="tiny">${esc(t('pro.rateWhat'))}</p>
+    <div class="field" style="margin:14px 0 8px">
+      <input id="proAsk" type="number" inputmode="decimal" min="50" step="1"
+        value="${(p.ask / 100).toFixed(0)}" placeholder=" ">
+      <label>${esc(t('pro.rateLabel'))}</label>
+    </div>
+    ${span.length ? `<p class="micro muted" id="rateSpan">${esc(spanText())}</p>` : ''}
+    <p class="micro muted" style="margin-top:6px">${esc(t('pro.rateKeep'))}</p>
+    <button class="btn btn-primary btn--block" style="margin-top:14px"
+      data-act="pro.rate.save" data-id="${esc(p.id)}">${esc(t('pro.rateSave'))}</button>
+    <button class="btn btn--ghost btn--block btn--sm" style="margin-top:6px" data-act="sheet.close">${esc(t('pay.notNow'))}</button>`);
+
+  /* AND IT SHOWED HIM THE OLD RATE WHILE HE TYPED THE NEW ONE. With ₹900 in the
+     box the line still read "Tap & mixer repair prices at ₹420 and Pipeline
+     replacement at ₹1,320" — the figures for the ₹600 he was replacing. The
+     whole point of the line is to make the number concrete BEFORE he commits,
+     and it was answering a question he had already moved on from. The bid
+     slider on the other side of the app repaints as he drags; so does this. */
+  const box = document.getElementById('proAsk');
+  const line = document.getElementById('rateSpan');
+  if (box && line) {
+    box.addEventListener('input', () => {
+      const typed = Math.round(Number(box.value || 0) * 100);
+      line.textContent = spanText(typed >= 5000 ? typed : p.ask);
+    });
+  }
+}
+
+export function saveRate(partnerId) {
+  const el = document.getElementById('proAsk');
+  const paise = Math.round(Number((el && el.value) || 0) * 100);
+  /* A RATE OF ZERO IS NOT A DISCOUNT, IT IS A BROKEN LISTING: every job in his
+     trade would price at nothing and the 8% on top of nothing is nothing. */
+  if (!(paise >= 5000)) { toast(t('pro.rateTooLow'), 'danger'); return; }
+  dispatch({ type: 'partner/patch', payload: { id: partnerId, patch: { ask: paise } } });
+  closeSheet();
+  toast(t('pro.rateSaved', { amount: M.fmt(paise) }));
+}
+
 export function priceEdit(productId, rupees) {
   const r = flow.setProductPrice(productId, Math.round(Number(rupees) * 100));
   if (!r.ok && r.reason) toast(r.reason, 'danger');

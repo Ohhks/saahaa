@@ -36,6 +36,9 @@ class MemStorage {
   key(i) { return [...this.#m.keys()][i] ?? null; }
   get length() { return this.#m.size; }
 }
+/* A MONEY HELPER HANDED THE WRONG TOTAL FAILS HERE INSTEAD OF BEING QUIETLY
+   REPAIRED AT RENDER TIME. See core/money.js `roundParts`. */
+globalThis.__SAAHAA_STRICT = true;
 globalThis.localStorage = new MemStorage();
 globalThis.sessionStorage = new MemStorage();
 

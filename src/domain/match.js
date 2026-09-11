@@ -82,7 +82,14 @@ export function lockedMatch(partners, opts) {
   const ranked = rankPartners(partners, opts);
   return {
     hero: ranked[0] || null,
-    alternates: ranked.slice(1, 6),
+    /* IT THREW THE REST AWAY. Six of eleven plumbers were shown and the other
+       five did not exist as far as the customer was concerned -- no count, no
+       "and 5 more", no way through. For a pro who has just joined, with no
+       ratings and no jobs to rank on, that is the difference between having a
+       livelihood on this platform and not having one; nothing in onboarding
+       hints at it. The view decides how many to draw at once; the engine hands
+       over everyone who can actually do the job. */
+    alternates: ranked.slice(1),
     ladder: ranked.slice(0, 5).map(p => p.id),   // first-accept-wins, ~45s each
     exhausted: ranked.length === 0,
   };

@@ -28,7 +28,7 @@
    own rate and cap come from the same dials. Nothing here is typed. */
 
 import { esc } from '../dom.js';
-import { liveMarkup, AGG_COMMISSION } from '../../domain/pricing.js';
+import { liveMarkup, AGG_COMMISSION, CANCEL_RULES } from '../../domain/pricing.js';
 import { getPricing } from '../../domain/settings.js';
 import { icon } from '../icons.js';
 import { me } from '../../core/ctx.js';
@@ -36,6 +36,7 @@ import { live } from '../../core/registry.js';
 import * as M from '../../core/money.js';
 import { MIN_STAKE } from '../../domain/wallet.js';
 import { HOLDBACK_PCT, HOLDBACK_DAYS } from '../../domain/ledger.js';
+import { PROVISIONAL_CAP, PROVISIONAL_JOBS } from '../../domain/trust.js';
 import { header } from './shops.js';
 import { renderPartner, renderShopAdmin } from './partner.js';
 
@@ -64,9 +65,9 @@ const earnCSS = `<style>
   .ern__num .k{font:600 10px/1.3 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
   .ern__num .v{font:800 30px/1 var(--font-heading);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:7px 0 5px;word-break:break-word}
   .ern__num .d{font-size:11.5px;color:var(--ink-3)}
-  .ern__num.on .v{color:var(--color-accent)}
+  .ern__num.on .v{color:var(--color-accent-text)}
   .ern__row{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--color-divider)}
-  .ern__row .ic{width:36px;height:36px;flex:none;display:grid;place-items:center;background:var(--color-accent-100);color:var(--color-accent)}
+  .ern__row .ic{width:36px;height:36px;flex:none;display:grid;place-items:center;background:var(--color-accent-100);color:var(--color-accent-text)}
   :root[data-theme="dark"] .ern__row .ic{background:var(--surface-3)}
   .ern__row b{font:800 14.5px/1.2 var(--font-heading);display:block}
   .ern__row p{font-size:11.5px;color:var(--ink-3);margin:3px 0 0}
@@ -186,6 +187,44 @@ function invite() {
       <p class="micro muted" style="padding:8px 0 0">Neither is a fee and neither is asked for up front — if your wallet is empty
         the running-job amount comes out of that job's own payout. They exist so a customer's money is safe with a
         stranger, which is the reason they hand it over at all.</p>
+    </div>
+
+    <!-- AND THE ONE THING THAT IS A CHARGE WAS NOT HERE AT ALL. The stake and
+         the holdback are named above with the rupees; the cancellation fee was
+         not named anywhere before the agreement, and neither was the fact that
+         an empty wallet turns it into a debt. An audit met both after signing,
+         called them "flatly incompatible" with the ₹0 it had been recruited on,
+         and said it would not run a month's income through the platform.
+         A charge disclosed late reads as a charge concealed, however small and
+         however fair — and this one is avoidable by the person paying it, which
+         is exactly why he has to be told before he signs and not after. -->
+    <div style="margin-top:var(--sp-6)">
+      <span class="eyebrow">And the one thing that IS a charge</span>
+      <div class="ern__cost" style="margin-top:6px"><span class="muted">If you cancel a job you already started</span>
+        <strong>${M.fmt(CANCEL_RULES.WORKER_CANCEL.workerFee)}</strong></div>
+      <p class="micro muted" style="padding:8px 0 0">It comes out of your wallet, or is added to what you owe if your wallet is
+        empty — and it is the only money SAAHAA takes out of your own pocket. Cancelling before you start costs nothing.
+        Not turning up at all costs more, because somebody was waiting. On a job the CUSTOMER cancels once you have set
+        out, she is refunded most of what she paid, you are paid for the journey, and SAAHAA keeps the rest of its
+        charge — that share is shown on her cancellation screen and on your job screen.</p>
+    </div>
+
+    <!-- AND THE FIRST THING A NEW PRO MEETS WAS DISCLOSED AFTER HE AGREED. The
+         ₹1,500 cap on early jobs and the manual review of the first payouts
+         appear on the "you are live" screen -- one tap PAST the agreement. An
+         audit listed both among the things it learned only after committing,
+         and it is the single most consequential fact about his first week:
+         it decides which jobs he may take at all. Both are named here, before
+         he starts, with the way out of them. -->
+    <div style="margin-top:var(--sp-6)">
+      <span class="eyebrow">Your first three jobs</span>
+      <div class="ern__cost" style="margin-top:6px"><span class="muted">Biggest job you can take at first</span>
+        <strong>${M.fmt(PROVISIONAL_CAP)}</strong></div>
+      <div class="ern__cost"><span class="muted">Until</span>
+        <strong>${PROVISIONAL_JOBS} jobs with no complaint</strong></div>
+      <p class="micro muted" style="padding:8px 0 0">Then the cap lifts by itself — nobody has to approve it. Those first
+        payouts are also checked by a person before release, usually within a day. This is not about trusting you: it is
+        how a stranger can be paid before anyone in the city knows their name.</p>
     </div>
 
     <div class="ern__two">

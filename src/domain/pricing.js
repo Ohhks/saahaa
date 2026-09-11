@@ -96,8 +96,16 @@ export function releaseService(dealPaise, pct, opts = {}) {
 export const AGG_COMMISSION = 0.25;
 export const AGG_CONV_FEE   = 9900;
 
-export function compareWithApps(dealPaise) {
-  const q = quoteService(dealPaise);
+/* AND IT RE-QUOTED THE JOB AT A RATE THE BILL BESIDE IT WAS NOT USING. The
+   booking sheet prices with the PARTNER's markup -- 6% for a tier-4 pro -- and
+   this priced with the default 8%, so the two figures printed inches apart
+   described different bills. "You pay ₹836" sat under "a typical app would
+   charge ₹1,151 · YOU SAVE ₹299", and 1,151 − 299 = 852. It reconciled only
+   for pros on the standard rate, which is why it survived: the comparison is
+   right for most of the roster and silently wrong for the best of it.
+   The caller passes the markup it is actually charging. */
+export function compareWithApps(dealPaise, opts) {
+  const q = quoteService(dealPaise, opts);
   const aggDeal = Math.round(q.workerPayout / (1 - AGG_COMMISSION));
   const typicalApp = aggDeal + AGG_CONV_FEE;
   const saved = typicalApp - q.customerPays;
@@ -155,7 +163,16 @@ export function quoteRetail(lines, opts = {}) {
      margin, which is exactly what "free delivery" costs a real shop. */
   const freeAbove = opts.freeDeliveryAbove || 0;
   const bandFee = deliveryFee(opts.km ?? 2, mode);
-  const isFree = freeAbove > 0 && itemsTotal >= freeAbove && mode !== 'pickup';
+  /* `alreadyFree` — FREE DELIVERY IS A PROMISE MADE AT CHECKOUT, NOT A RUNNING
+     CONDITION. A basket that qualified when she agreed stays qualified when the
+     shop weighs it, even if the real weight lands a few grams under the line.
+     Without this an 8 kg order at Rs.503.92 (free, over Rs.499) weighed at
+     7.7 kg fell to Rs.485.02, lost the promise, and the Rs.19 delivery ate her
+     whole Rs.18.90 refund — she weighed LESS and was refunded NOTHING, and the
+     order still read `shopAbsorbedDelivery: true` while charging her for it.
+     A re-quote may lower her bill and may never quietly withdraw a promise. */
+  const isFree = mode !== 'pickup'
+    && (opts.alreadyFree === true || (freeAbove > 0 && itemsTotal >= freeAbove));
   const customerDelivery = isFree ? 0 : bandFee;
   const riderCost = mode === 'rider' ? bandFee : 0;
 
@@ -200,7 +217,13 @@ export const CANCEL_RULES = {
   LATE_2H:         { refundPct: 0.90, workerPct: 0.05, label: 'Within 2h of the slot' },
   EN_ROUTE:        { refundPct: 0.60, workerPct: 0.30, label: 'Pro already on the way' },
   WORKER_NO_SHOW:  { refundPct: 1.00, workerPct: 0.00, label: 'Pro did not arrive — full refund + ₹100 credit', credit: 10000 },
-  WORKER_CANCEL:   { refundPct: 1.00, workerPct: 0.00, label: 'Pro cancelled — full refund', workerFee: 10000 },
+  /* Rs.40, and the figure matters. It was Rs.100 — exactly `wallet.js MIN_STAKE`
+     — so on the ordinary Rs.520 job, cancelling early cost a pro the same cash
+     as simply not turning up, and the feature that exists to make honesty the
+     cheaper move made it a wash. It has to sit under the SMALLEST stake the
+     product can lock, because that is the one every small job carries. Nothing
+     has ever collected this fee, so no pro has an expectation to break. */
+  WORKER_CANCEL:   { refundPct: 1.00, workerPct: 0.00, label: 'Pro cancelled — full refund', workerFee: 4000 },
 };
 
 export function cancelSplit(dealPaise, ruleId, opts = {}) {

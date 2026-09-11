@@ -24,7 +24,7 @@
    console to start listing. */
 
 import { esc, toast, closeSheet } from '../dom.js';
-import { t, lang } from '../i18n.js';
+import { t, lang, catName, langPicker } from '../i18n.js';
 import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, me, myShop } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
@@ -108,7 +108,10 @@ export function render() {
   if (s && s.role === 'shop') return shopLive(s);
 
   const p = V.myPartner();
-  if (!p) return `${header('Become a partner', '')}<main class="wrap">
+  if (!p) return `
+    <!-- seven steps including a trade quiz and a police-verification
+         consent, and no way to change the language on any of them -->
+    ${langPicker({ tight: true })}${header('Become a partner', '')}<main class="wrap">
     <div class="empty empty--smart"><h3>Sign in as a partner first</h3>
       <button class="btn btn--primary" data-act="earn.start">Join as a partner</button></div></main>`;
   const r = V.readiness(p);
@@ -123,7 +126,7 @@ export function render() {
   <div class="ob__bar" aria-hidden="true"><i style="width:${Math.max(4, r.pct)}%"></i></div>
   <main class="wrap ob" style="padding-bottom:40px">
     <div class="ob__step">
-      <span class="eyebrow">${esc(cat.name)} · ${esc(r.tier.label)} · about ${minsLeft} min left</span>
+      <span class="eyebrow">${esc(catName(cat))} · ${esc(r.tier.label)} · about ${minsLeft} min left</span>
       <div class="ob__title" style="margin-top:6px">${esc(cur.title)}</div>
       <div class="ob__sub">${esc(subOf(cur))}</div>
     </div>
@@ -188,7 +191,7 @@ function shopLive(user) {
             it just has nothing on the shelves yet.</p>
           <div class="row" style="gap:6px;margin-top:12px;flex-wrap:wrap">
             <span class="tag" style="border-color:${accent};color:${accent}">
-              <span aria-hidden="true">${icon(hasIcon(sh.catId) ? sh.catId : 'groupShops', { size: 13 })}</span>${esc(cat.name)}</span>
+              <span aria-hidden="true">${icon(hasIcon(sh.catId) ? sh.catId : 'groupShops', { size: 13 })}</span>${esc(catName(cat))}</span>
             <span class="tag tag-neutral">${esc(sh.area || 'Your area')}</span>
             <span class="tag tag-accent">Open</span>
           </div>
@@ -229,7 +232,7 @@ function shopLive(user) {
 
         <div style="padding-top:20px">
           <span class="eyebrow">Next · put something on the shelves</span>
-          <p class="tiny" style="margin-top:6px">Your console opens on a ready-made list for ${esc(cat.name)}${aisles ? ` — ${aisles} aisle${aisles === 1 ? '' : 's'}` : ''}.
+          <p class="tiny" style="margin-top:6px">Your console opens on a ready-made list for ${esc(catName(cat))}${aisles ? ` — ${aisles} aisle${aisles === 1 ? '' : 's'}` : ''}.
             Tap an item, set your price, and it is on your storefront. About six seconds each.</p>
         </div>
       </div>
@@ -252,7 +255,7 @@ function draftPage(p, cat) {
       <div class="row" style="gap:12px">
         <span class="avatar avatar--md">${esc(p.name[0])}</span>
         <div class="grow" style="min-width:0"><b style="font:800 15px/1.2 var(--font-heading)">${esc(p.name)}</b>
-          <p class="tiny muted">${esc(cat.name)} · ${esc(p.area)} · from ${M.fmt(p.ask)}</p></div>
+          <p class="tiny muted">${esc(catName(cat))} · ${esc(p.area)} · from ${M.fmt(p.ask)}</p></div>
         <span class="tag tag-neutral" style="flex:none">Live at step 7</span>
       </div>
       <p class="micro muted" style="margin-top:10px">Ratings, badges and reviews fill in by themselves. You never build or maintain it.</p>
@@ -282,9 +285,9 @@ function stepPanel(p, id, cat) {
 
     case 'identity': return `<div class="ob__form">
       <div class="field"><div class="ob__chips">
-        ${Object.entries(V.ID_TYPES).map(([k, t]) => `<button class="chip" type="button"
+        ${Object.entries(V.ID_TYPES).map(([k, kind]) => `<button class="chip" type="button"
           aria-pressed="${idType === k ? 'true' : 'false'}"
-          data-act="ob.idtype" data-type="${k}"><span class="chip__ic" aria-hidden="true">${icon('idcard', { size: 14 })}</span>${esc(t.label)}</button>`).join('')}
+          data-act="ob.idtype" data-type="${k}"><span class="chip__ic" aria-hidden="true">${icon('idcard', { size: 14 })}</span>${esc(kind.label)}</button>`).join('')}
         </div><label>Which ID</label></div>
       <div class="field"><input id="obId" placeholder=" " autocomplete="off"><label>${esc(V.ID_TYPES[idType].hint)}</label></div>
       <p class="micro muted">We keep only a scrambled fingerprint and the last 4 digits. The number itself is never stored.</p>
@@ -311,7 +314,7 @@ function stepPanel(p, id, cat) {
       ${foot(`<button class="btn btn-primary" data-act="ob.selfie">${shot ? 'Use this photo' : 'Take my photo'}</button>`)}`;
     }
 
-    case 'trade': return quizPanel(p, 'trade', `${esc(cat.name)} — five questions`);
+    case 'trade': return quizPanel(p, 'trade', `${esc(catName(cat))} — five questions`);
     case 'conduct': return quizPanel(p, 'conduct', 'How SAAHAA works — six questions');
 
     case 'payout': return `<div class="ob__form">
@@ -321,7 +324,7 @@ function stepPanel(p, id, cat) {
       ${foot('<button class="btn btn-primary" data-act="ob.payout">Save UPI</button>')}`;
 
     case 'agreement': return `<div class="ob__form">
-      <div>${V.TERMS.map(t => `<div class="obl" style="align-items:flex-start"><span class="obl__n" style="border-color:var(--color-neutral-400)">${icon('check', { size: 11 })}</span><span class="tiny grow">${esc(t)}</span></div>`).join('')}</div>
+      <div>${V.termsFor(lang()).map(t => `<div class="obl" style="align-items:flex-start"><span class="obl__n" style="border-color:var(--color-neutral-400)">${icon('check', { size: 11 })}</span><span class="tiny grow">${esc(t)}</span></div>`).join('')}</div>
       </div>
       ${foot('<button class="btn btn-primary btn--lg" data-act="ob.agree">I agree — make me a SAAHAA pro</button>')}`;
   }
@@ -338,7 +341,7 @@ function quizPanel(p, kind, title) {
       <p class="tiny muted" style="margin-top:6px">Nothing you have already done is lost. Your number, your ID and your photo stay done, and the ladder starts again from this step.</p></div></div>
       ${foot('')}`;
   }
-  const bank = V.quizFor(p, kind);
+  const bank = V.quizFor(p, kind, lang());   // his language for the rules; TRADE stays English and says so
   const mine = answers[kind] || [];
   const answered = bank.filter((_, i) => Number.isInteger(mine[i])).length;
   /* WHAT IT COSTS TO GUESS, SAID BEFORE THEY ANSWER (8.2). The trade quiz is a
@@ -374,12 +377,14 @@ function quizPanel(p, kind, title) {
 /* ── the moment ────────────────────────────────────────────── */
 function verified(p, r, cat) {
   const bg = V.backgroundStatus(p);
-  const t = tier(p.tier);
+  /* NOT `t` — the translator is imported at the top of this file, and this
+     screen already calls it. See tools/lint-i18n.mjs. */
+  const tr = tier(p.tier);
   const canBg = (p.tier | 0) === 2 && bg !== 'pending';
   const link = `${location.host}${location.pathname}#/pro/${p.id}`;
   const next = tier(Math.min(4, (p.tier | 0) + 1));
   return `${obCSS}
-  ${stepHeader('You are live', `${cat.name} · ${t.label}`)}
+  ${stepHeader('You are live', `${cat.name} · ${tr.label}`)}
   <main class="wrap ob" style="padding-bottom:40px">
     <div class="ob__two">
       <div>
@@ -388,7 +393,7 @@ function verified(p, r, cat) {
           <div class="ob__live">${esc(p.name)}<br>is live in ${esc(p.area)}</div>
           <p class="tiny muted" style="margin-top:10px;line-height:1.6">Jobs near ${esc(p.area)} can reach you now. Your page, your badge and your ratings are built and kept current by SAAHAA — you never maintain anything.</p>
           <div class="row" style="gap:6px;margin-top:12px;flex-wrap:wrap">
-            <span class="tag tag-accent">${esc(t.badge)}</span>
+            <span class="tag tag-accent">${esc(tr.badge)}</span>
             <span class="tag tag-neutral">Locally, professionally</span>
           </div>
         </div>
@@ -415,14 +420,14 @@ function verified(p, r, cat) {
         <div style="padding-top:20px">
           <span class="eyebrow">Go further · next: ${esc(next.label)}</span>
           <p class="tiny muted" style="margin:4px 0 10px">${esc(next.unlocks)}</p>
-          ${bg === 'pending' ? `<span class="tag tag-neutral">Background check in progress</span>
-              <p class="micro muted" style="margin-top:6px">SAAHAA is calling your reference. Usually 2 working days.</p>`
+          ${bg === 'pending' ? `<span class="tag tag-neutral">${esc(t('verify.bgRunning'))}</span>
+              <p class="micro muted" style="margin-top:6px">${esc(t('verify.bgCalling'))}</p>`
             : canBg ? `
-              <div class="field"><input id="obRefName" placeholder=" "><label>A reference (past customer or employer)</label></div>
-              <div class="field"><input id="obRefPhone" placeholder=" " inputmode="numeric" maxlength="10"><label>Their 10-digit number</label></div>
+              <div class="field"><input id="obRefName" placeholder=" "><label>${esc(t('verify.refName'))}</label></div>
+              <div class="field"><input id="obRefPhone" placeholder=" " inputmode="numeric" maxlength="10"><label>${esc(t('verify.refPhone'))}</label></div>
               <label class="tiny" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px">
-                <input type="checkbox" id="obConsent" style="margin-top:3px"> I consent to SAAHAA verifying my background, including police verification where required for in-home work.</label>
-              <button class="btn btn-secondary btn-block" data-act="ob.bg">Request background check</button>`
+                <input type="checkbox" id="obConsent" style="margin-top:3px"> ${esc(t('verify.consent'))}</label>
+              <button class="btn btn-secondary btn-block" data-act="ob.bg">${esc(t('verify.requestBg'))}</button>`
             : (p.tier | 0) >= 3 ? certifiedCard(p) : ''}
         </div>
       </div>

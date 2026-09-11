@@ -84,13 +84,13 @@ const ADMIN_CSS = `<style>
   .ad-hdr .wrap{padding-bottom:0}
   .ad-brand{display:flex;align-items:center;gap:var(--sp-5);flex-wrap:wrap}
   .ad-wm{font:800 18px/1 var(--font-heading);letter-spacing:.02em;white-space:nowrap}
-  .ad-wm .sep{color:var(--color-accent);margin:0 6px}
+  .ad-wm .sep{color:var(--color-accent-text);margin:0 6px}
   .ad-ver{font-size:11px;letter-spacing:.04em;color:color-mix(in srgb,var(--color-bg) 70%,transparent)}
   .ad-tabs{display:flex;gap:var(--sp-7);overflow-x:auto;scrollbar-width:none;border-bottom:2px solid var(--color-divider);margin:var(--sp-6) 0 0}
   .ad-tabs::-webkit-scrollbar{display:none}
   .ad-tab{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0;font:600 12px/1 var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
   .ad-tab:hover{color:var(--ink-1)}
-  .ad-tab[aria-selected="true"]{color:var(--color-accent);border-bottom-color:var(--color-accent)}
+  .ad-tab[aria-selected="true"]{color:var(--color-accent-text);border-bottom-color:var(--color-accent)}
   .ad-tab .tag{padding:2px 6px;font-size:10px}
   .ad-note{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-4) var(--sp-8);padding:var(--sp-5) 0;border-bottom:1px solid var(--color-divider)}
   .ad-g2{display:grid;grid-template-columns:minmax(0,1fr);gap:0 var(--sp-6)}
@@ -1551,7 +1551,7 @@ export function suspend(id) {
 }
 /* Money the owner moves by hand above STEPUP_THRESHOLD (₹5,000) re-asks for
    the owner password first — the promise in core/adminauth.js, kept here. */
-const orderAmount = id => { const o = getState().orders.find(x => x.id === id) || {}; return o.escrowed || o.customerPays || 0; };
+const orderAmount = id => { const o = getState().orders.find(x => x.id === id) || {}; return balanceOf(getState().ledger, acct.escrow(o.id)) || o.customerPays || 0; };
 const guardMoney = (id, why, fn) => (orderAmount(id) > adminauth.STEPUP_THRESHOLD ? stepUpThen(why, fn) : fn());
 export async function release(id, pct) {
   return guardMoney(id, `Releasing ${M.fmt(orderAmount(id))} from escrow.`, async () => { await flow.confirmAndRelease(id, Number(pct)); ctx.render(); });
@@ -1568,13 +1568,41 @@ export async function resolve(id, outcome, reason) {
   const why = String(reason == null ? '' : reason).trim();
   if (!why) { toast('Write a line saying why — both sides are told what you decided', 'warn'); return; }
   const ord = getState().orders.find(x => x.id === d.orderId);
-  dispatch({ type: 'dispute/resolve', payload: { id, patch: { decidedNote: why, outcome } } });
+  /* This used to run BEFORE the money moved, stamping `resolvedAt` — and the
+     "close it where the money actually moved" guards in flow.js both test
+     `!d.resolvedAt`, so they never fired and the record kept `status: 'OPEN'`
+     for ever. The note is recorded first because the outcome needs it; the
+     status is settled after, by whichever path actually moved the money. */
+  dispatch({ type: 'dispute/note', payload: { id, patch: { decidedNote: why, outcome } } });
   // the money moves first; the dispute is marked resolved by the release
   // itself (confirmAndRelease / refundRetail both close the linked dispute)
   // confirmAndRelease bails on a retail order AFTER the dispute has already
   // been flipped to RESOLVED, which is how a shop order ended up marked
   // settled with its money still locked.
-  if (ord && ord.kind === 'retail') await flow.refundRetail(d.orderId, 'dispute upheld');
+  /* THE RETAIL BRANCH RAN BEFORE THE OUTCOME WAS CONSULTED, so every retail
+     dispute was a full refund whatever the owner decided — the shop could never
+     win one, and the three Resolve buttons were theatre. That is a fraud lane:
+     order, receive, dispute, keep the goods and the money. */
+  if (ord && ord.kind === 'retail') {
+    /* AND ON A CLOSED ORDER BOTH BRANCHES WERE DEAD ENDS. Once she can complain
+       after settlement (`flow.complaintWindow`), the queue receives disputes on
+       orders whose escrow is already at zero: `settleRetail` has nothing left
+       to distribute and `refundRetail` refuses outright with "Already closed",
+       so the owner had three buttons and no remedy. The money is gone from
+       escrow, so the remedy is SAAHAA's own — nothing is clawed back out of a
+       shop that has been paid and has spent it. */
+    if (['R_SETTLED', 'R_CLOSED'].includes(ord.stage)) {
+      if (outcome === 'release') {
+        ctx.store.dispatch({ type: 'dispute/resolve', payload: { id,
+          patch: { status: 'RESOLVED', outcome: 'released', resolvedBy: 'admin', resolvedAt: Date.now() } } });
+      } else {
+        await flow.goodwillRefund(d.orderId,
+          outcome === 'partial' ? Math.round((ord.customerPays | 0) * 0.6) : (ord.customerPays | 0), why);
+      }
+    }
+    else if (outcome === 'release') await flow.settleRetail(d.orderId);
+    else await flow.refundRetail(d.orderId, why);
+  }
   else if (outcome === 'release') await flow.confirmAndRelease(d.orderId, 1);
   else if (outcome === 'partial') await flow.confirmAndRelease(d.orderId, 0.6);
   else await flow.confirmAndRelease(d.orderId, 0);

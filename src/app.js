@@ -29,6 +29,8 @@ import './core/migrations.js';
 import { defaultState } from './domain/state.js';
 import { buildSeed } from './domain/seed.js';
 import * as flow from './domain/flow.js';
+import * as W from './domain/wallet.js';
+import { CANCEL_RULES } from './domain/pricing.js';
 import * as auction from './domain/auction.js';
 import * as bidding from './domain/bidding.js';
 import * as fresh from './domain/fresh.js';
@@ -54,6 +56,7 @@ import { icon } from './ui/icons.js';
 import { showSplash, replaySplash } from './ui/splash.js';
 import * as home from './ui/views/home.js';
 import * as shops from './ui/views/shops.js';
+import * as addr from './ui/address.js';
 import * as ordersView from './ui/views/orders.js';
 import * as auth from './ui/views/auth.js';
 import * as partner from './ui/views/partner.js';
@@ -244,7 +247,13 @@ function topBar() {
 
 function navBar() {
   const cur = currentTab();
-  return `<nav class="nav on-plum" role="tablist">
+  /* `on-plum` re-points `--color-accent-text` to the LIGHT end of the ramp for
+     use on a dark ground — and a later rule repaints this nav near-white, so
+     the token override survived onto a light surface and the ACTIVE tab became
+     pale salmon on off-white at 1.92:1. The least readable text in the product
+     was the control telling her where she was. The customer nav is a light
+     surface; it does not claim to be a dark one. */
+  return `<nav class="nav" role="tablist">
     ${NAV.map(([id, ic, lk]) => `<button role="tab" aria-selected="${cur === id}"
       data-act="nav.tab" data-tab="${id}" aria-label="${esc(i18n.t(lk))}">
       <span class="ic">${icon(ic, { size: 22 })}</span>${esc(i18n.t(lk))}</button>`).join('')}
@@ -293,6 +302,8 @@ function wireActions() {
     else go(d.tab);
   });
   A('earn.start', () => { auth.setAuthTab('signup'); auth.setAuthRole('partner'); go('auth'); });
+  A('pro.rate',      d => partner.openRateSheet(d.id));
+  A('pro.rate.save', d => { partner.saveRate(d.id); render(); });
   A('nav.onboard', () => go('onboard'));
 
   /* ── partner verification (the chronology) ─────────────────── */
@@ -309,6 +320,9 @@ function wireActions() {
   A('sheet.close', () => closeSheet());
 
   /* theme + brand */
+  /* the sheet used to tell her to empty her wallet with no way to do it from
+     there, and the floor then refused the odd paise she had left */
+  A('cwallet.emptyout', async d => { await flow.customerWithdraw(Number(d.amt)); closeSheet(); render(); });
   A('cwallet.upi', () => sheet('Where your money goes', `
     <p class="tiny muted" style="margin-bottom:12px">Refunds and take-outs are sent here. Until it is set,
       SAAHAA has nowhere to pay you and the take-out button stays off.</p>
@@ -346,6 +360,7 @@ function wireActions() {
   A('cat.open',      d => home.openCategory(d.id, null, d.pid || null));   // d.pid: booking a NAMED pro books that pro
   A('book.sub',      d => home.openCategory(d.id, d.sub, d.pid || null));  // the chosen sub used to be dropped
   A('book.others',   d => home.showAlternates(d.id, d.sub || null));
+  A('book.allpros',  d => home.showAllPros(d.id, d.sub || null));
   A('book.confirm',  d => home.confirmBooking(d.id, d.pid, d.sub));
   /* THIS SEARCHED FOR THE WORD "repair" AND TOASTED "Showing urgent-capable
      trades". For a burst pipe at 9pm it was worse than typing "plumber": no
@@ -355,7 +370,7 @@ function wireActions() {
   A('quick.nearby',    () => go('shops'));
 
   /* ── ask rates (the P2P auction, in the customer's words) ──── */
-  A('ask.start',  d => ask.startAsk(d.id, d.pid, Number(d.held)));
+  A('ask.start',  d => ask.startAsk(d.id, d.pid, Number(d.held), d.sub || null));
   A('ask.cancel', d => { auction.cancelRequest(d.id); toast('Cancelled. Nothing was charged.'); go('home'); });
   A('ask.background', () => { toast('Rates keep arriving. Open Orders whenever you like — nothing expires.'); go('home'); });
   A('ask.counter', d => auction.sendCounter(d.id, d.bid));
@@ -413,7 +428,56 @@ function wireActions() {
     <div class="chiprow" style="flex-wrap:wrap;gap:8px">${[100, 200, 500, 1000].map(r =>
       `<button class="chip" data-act="wallet.topup.do" data-id="${d.id}" data-amt="${r * 100}">₹${r}</button>`).join('')}</div>`));
   A('wallet.topup.do',  d => flow.walletTopUp(d.id, Number(d.amt)).then(() => { closeSheet(); render(); }));
-  A('wallet.withdraw',  d => flow.walletWithdraw(d.id, Number(d.amt)).then(render));
+  /* THE PRO'S WHOLE LIVELIHOOD LEFT ON ONE TAP. The SHOP got a confirmation
+     sheet in the last pass and the pro did not — same product, same
+     irreversible act, ₹1,710 gone on a misplaced thumb. And neither side could
+     send a PART of it: a plumber who wants ₹500 for the day and ₹1,200 left in
+     the app had no way to say so. One sheet, both sides, with an amount. */
+  /* AND THE HEADLINE DID NOT FOLLOW THE AMOUNT. I added the partial-payout
+     field in this same pass and left the title formatting `balance` once, at
+     render. A pro typed 200, read "Send ₹698 to ramesh@upi?" directly above
+     "This goes out now and cannot be pulled back", pressed Send -- and ₹200
+     went. The transfer was right and the sentence he authorised was wrong, on
+     the one screen in the product that is explicitly irreversible.
+
+     A number that can change does not belong in a title rendered once. It sits
+     on the button that performs the act, and it tracks every keystroke. */
+  const payoutSheet = (id, balance, upi, act) => { sheet(
+    i18n.t('pay.takeOutTo', { upi: upi || '' }), `
+    <p class="tiny">${esc(i18n.t('pay.takeOutBody'))}</p>
+    <div class="field" style="margin:12px 0 8px">
+      <input id="poAmt" type="number" inputmode="decimal" min="10" step="0.01"
+        value="${(balance / 100).toFixed(2)}" placeholder=" ">
+      <label>${esc(i18n.t('pay.howMuch'))}</label>
+    </div>
+    <button class="btn btn--ghost btn--block btn--sm" data-act="pay.all" data-amt="${balance}">${esc(i18n.t('pay.allOfIt', { amount: M.fmtMax(balance) }))}</button>
+    <button class="btn btn-primary btn--block" style="margin-top:10px" id="poSend"
+      data-act="${act}" data-id="${esc(id)}">${esc(i18n.t('pay.sendAmount', { amount: M.fmt2(balance) }))}</button>
+    <button class="btn btn--ghost btn--block btn--sm" style="margin-top:6px" data-act="sheet.close">${esc(i18n.t('pay.notNow'))}</button>`);
+    const el = document.getElementById('poAmt');
+    const btn = document.getElementById('poSend');
+    const sync = () => { if (btn) btn.textContent = i18n.t('pay.sendAmount', { amount: M.fmt2(poAmt(balance)) }); };
+    if (el) el.addEventListener('input', sync);
+    sync();
+  };
+  const poAmt = fallback => {
+    const el = document.getElementById('poAmt');
+    const typed = el ? Math.round(Number(el.value || 0) * 100) : 0;
+    return typed > 0 ? typed : fallback;
+  };
+  A('pay.all', d => { const el = document.getElementById('poAmt');
+    /* the button reads off the field, so the field announces its own change */
+    if (el) { el.value = (Number(d.amt) / 100).toFixed(2); el.dispatchEvent(new Event('input')); } });
+  A('wallet.withdraw', d => {
+    const p0 = (ctx.store.getState().partners || []).find(x => x.id === d.id) || {};
+    const bal = W.walletOf(getState().ledger, d.id, p0).available;
+    payoutSheet(d.id, bal, (p0.verification || {}).upi, 'wallet.withdraw.do');
+  });
+  A('wallet.withdraw.do', async d => {
+    const p0 = (ctx.store.getState().partners || []).find(x => x.id === d.id) || {};
+    const bal = W.walletOf(getState().ledger, d.id, p0).available;
+    await flow.walletWithdraw(d.id, poAmt(bal)); closeSheet(); render();
+  });
 
   /* ── the right to be removed ────────────────────────────────
      The privacy page promises a person can have their data deleted, so the
@@ -475,11 +539,13 @@ function wireActions() {
       sheet('Not yet — your money is still here', `
         <p class="tiny" style="margin-bottom:12px">Your account can be removed, but not while SAAHAA is
           still holding something of yours. Removing it now would forfeit it, and that is not a deletion.</p>
-        ${money ? `<div class="m-kv"><span>In your wallet</span><span class="num">${M.fmt(money.paise)}</span></div>` : ''}
+        ${money ? `<div class="m-kv"><span>In your wallet</span><span class="num">${M.fmt2(money.paise)}</span></div>` : ''}
         ${live ? `<div class="m-kv"><span>Jobs still running</span><span class="num">${live.n}</span></div>` : ''}
         <p class="micro muted" style="margin-top:10px">${live ? 'Finish or cancel those first. ' : ''}${money
-          ? 'Then take your money out from My SAAHAA — it is yours either way.' : ''}
+          ? 'Then take your money out from My SAAHAA — you can always withdraw the whole balance, however small.' : ''}
           Come back after that and this will go through.</p>
+        ${money ? `<button class="btn btn-primary btn--block" style="margin-top:12px"
+          data-act="cwallet.emptyout" data-amt="${money.paise}">Take out ${M.fmt2(money.paise)} now</button>` : ''}
         <button class="btn btn--secondary btn--block" style="margin-top:12px" data-act="sheet.close">Got it</button>`);
       return;
     }
@@ -580,8 +646,37 @@ function wireActions() {
   A('cart.sub',   d => { flow.setLineSubPolicy(d.id, d.pol); render(); });
   A('cart.clear', () => { flow.clearCart(); toast('Cart emptied'); render(); });
   A('cart.mode',  d => { shops.setCartMode(d.mode); render(); });
+  /* THE GROCERY ORDER WENT OUT WITH NOWHERE TO TAKE IT. The cart never asked
+     for an address, so `customerAddress` was the empty string on every retail
+     order ever placed and the rider got an area centroid. The field is on the
+     cart now; this is where it is saved and where an order with no door is
+     refused. Validated on the tap rather than by grewing the button out: the
+     input sits on this same screen and a re-render on every keystroke would
+     take the focus out from under her thumb. */
+  /* priced on site — the promise the booking sheet has made since 8.0 */
+  A('onsite.quote', d => {
+    const el = document.getElementById('onSitePrice');
+    const rupees = Number((el || {}).value || 0);
+    if (!rupees) { toast('Put in what the job costs', 'warn'); if (el) el.focus(); return; }
+    if (flow.proposeOnSitePrice(d.id, Math.round(rupees * 100))) render();
+  });
+  A('onsite.approve', d => flow.approveOnSitePrice(d.id).then(render));
+  A('onsite.decline', d => flow.declineOnSitePrice(d.id).then(render));
+  A('retail.refusereturn', d => {
+    const el = document.getElementById('refuseWhy');
+    if (flow.refuseReturn(d.id, el && el.value)) { render(); }
+    else if (el) el.focus();
+  });
   A('cart.place', async () => {
-    const o = await flow.placeRetailOrder(shops.getCartMode());
+    const mode = shops.getCartMode();
+    const saved = addr.saveAddress();
+    if (addr.modeNeedsAddress(mode) && !addr.looksLikeAddress(saved && saved.address)) {
+      toast('Add the flat or house and street — the rider needs a door', 'warn');
+      const el = document.getElementById('bkAddr');
+      if (el) { el.focus(); el.scrollIntoView({ block: 'center' }); }
+      return;
+    }
+    const o = await flow.placeRetailOrder(mode);
     if (o) { toast('Order placed'); go('order', o.id); }
   });
   A('rx.info', () => sheet('Prescription needed', `<p>This medicine needs a valid prescription.
@@ -623,13 +718,75 @@ function wireActions() {
     .map(el => el.value || '').join('').trim();
   A('retail.collected', d => { if (flow.checkRetailCode(d.id, doorCode())) { flow.collected(d.id); render(); } });
   A('retail.delivered', d => { if (flow.checkRetailCode(d.id, doorCode())) { flow.advance(d.id, 'R_DELIVERED'); render(); } });
-  A('retail.return',    d => sheet('Return this order', `
-    <p class="tiny muted" style="margin-bottom:12px">Pick what went wrong. The shop or SAAHAA confirms, and your money comes back in full.</p>
+  /* ONE STALE ₹42 PACKET OF TURMERIC TOOK A ₹501 ORDER BACK WITH IT, atta and
+     all. She picks the items now; picking none means the whole basket, which is
+     the right answer when the problem is the delivery rather than an item. */
+  A('retail.return', d => {
+    const o = (getState().orders || []).find(x => x.id === d.id) || {};
+    const lines = o.lines || [];
+    /* SHE COMMITTED A RETURN WITHOUT EVER BEING SHOWN WHAT SHE WOULD GET BACK.
+       Tick a box, tap a reason, done — no total, anywhere, at any point. Two
+       audits reported committing blind, and the shop's side had the same hole.
+
+       The figure is the one the engine actually refunds: what she was BILLED for
+       that line, which on an over-weighed item is the quantity she agreed to and
+       not the heavier quantity that was packed. */
+    const billed = l => Math.round((l.unitPrice | 0)
+      * (l.pickedQty != null ? Math.min(l.pickedQty, l.qty) : l.qty));
+    const whole = lines.reduce((n, l) => n + billed(l), 0);
+    sheet(i18n.t('ret.title'), `
+    <p class="tiny muted" style="margin-bottom:12px">${esc(i18n.t('ret.whatCameBack'))}</p>
+    ${lines.map(l => `<label class="m-kv" style="gap:10px;align-items:center">
+        <input type="checkbox" class="retLine" value="${esc(l.lineId)}" data-amt="${billed(l)}" style="width:20px;height:20px;flex:none">
+        <span class="grow">${esc(l.name)} × ${l.pickedQty != null ? l.pickedQty : l.qty}</span>
+        <span class="num tiny">${M.fmt2(billed(l))}</span>
+      </label>`).join('')}
+    <div class="m-kv m-kv--total" style="margin-top:10px"><span>${esc(i18n.t('ret.comingBackToYou'))}</span>
+      <span class="num" id="retTotal">${M.fmt2(whole)}</span></div>
+    <p class="micro muted" id="retHint" style="margin:6px 0 12px">${esc(i18n.t('ret.noneMeansAll'))}</p>
     <div class="chiprow" style="flex-wrap:wrap;gap:8px">
       ${['Stale or spoiled', 'Wrong item', 'Short weight', 'Damaged / leaked', 'Not what I ordered'].map(r =>
-        `<button class="chip" data-act="retail.return.pick" data-id="${d.id}" data-reason="${esc(r)}">${esc(r)}</button>`).join('')}
-    </div>`));
-  A('retail.return.pick', d => { flow.requestReturn(d.id, d.reason); closeSheet(); render(); });
+        `<button class="chip" data-act="retail.return.pick" data-id="${esc(d.id)}" data-reason="${esc(r)}">${esc(r)}</button>`).join('')}
+    </div>`);
+
+    /* and the hint stops saying "tick nothing and it all goes back" the moment
+       she has ticked something — it was contradicting the screen it sat on */
+    const boxes = [...document.querySelectorAll('.retLine')];
+    const totalEl = document.getElementById('retTotal');
+    const hintEl = document.getElementById('retHint');
+    const paint = () => {
+      const on = boxes.filter(b => b.checked);
+      const sum = on.length ? on.reduce((n, b) => n + Number(b.dataset.amt || 0), 0) : whole;
+      if (totalEl) totalEl.textContent = M.fmt2(sum);
+      if (hintEl) hintEl.textContent = on.length
+        ? i18n.t('ret.pickedN', { n: on.length })
+        : i18n.t('ret.noneMeansAll');
+    };
+    boxes.forEach(b => b.addEventListener('change', paint));
+  });
+  A('retail.return.pick', d => {
+    const picked = [...document.querySelectorAll('.retLine')].filter(c => c.checked).map(c => c.value);
+    flow.requestReturn(d.id, d.reason, picked); closeSheet(); render();
+  });
+  /* SHE HAD ₹954 IN A BASKET AND NO WAY OUT. The engine has always allowed
+     `R_PLACED -> R_CANCELLED` and `R_ACCEPTED -> R_CANCELLED`; nothing on her
+     screen ever offered it, and four audits in a row reported being trapped
+     with an order they had already paid for. It says the figure before she
+     commits, like every other irreversible act in this app. */
+  A('retail.cancel', d => {
+    const o = (getState().orders || []).find(x => x.id === d.id) || {};
+    sheet(i18n.t('order.cancelOrderTitle'), `
+      <p class="tiny">${esc(i18n.t('order.notPackedYet', { shop: o.shopName || 'The shop' }))}</p>
+      <div class="m-kv m-kv--total" style="margin-top:14px"><span>${esc(i18n.t('ret.comingBackToYou'))}</span>
+        <span class="num">${M.fmt2(o.customerPays | 0)}</span></div>
+      <button class="btn btn--danger btn--block" style="margin-top:16px"
+        data-act="retail.cancel.do" data-id="${esc(d.id)}">${esc(i18n.t('order.cancelOrder', { amount: M.fmtMax(o.customerPays | 0) }))}</button>
+      <button class="btn btn--ghost btn--block btn--sm" style="margin-top:6px" data-act="sheet.close">${esc(i18n.t('pay.notNow'))}</button>`);
+  });
+  A('retail.cancel.do', async d => {
+    await flow.refundRetail(d.id, 'cancelled by the customer before packing');
+    closeSheet(); render();
+  });
   A('retail.acceptreturn', d => flow.acceptReturn(d.id).then(render));
   A('stage.picking', d => flow.advance(d.id, 'R_PICKING'));
   A('stage.packed',  d => flow.advance(d.id, 'R_PACKED'));
@@ -640,19 +797,42 @@ function wireActions() {
     if (el && el.value.trim()) { flow.sendChat(d.id, el.value.trim()); el.value = ''; render(); }
   });
   A('dispute.open',  d => ordersView.openDispute(d.id));
-  A('dispute.pick',  d => ordersView.submitDispute(d.id, d.reason));
+  /* ONE TAP, NO CONFIRMATION, NO UNDO — AND IT FREEZES THE WHOLE ORDER. An
+     auditor meant to tap "Charged too much", the sheet shifted, and
+     "It never arrived" was filed instantly against an order that had arrived,
+     freezing ₹658.29 on both sides with no way back. Every other irreversible
+     act in this app states what it will do and waits: the cancel sheet, the
+     withdrawal sheet, the return. This one did not.
+     Choosing a reason now shows it back and asks. */
+  A('dispute.pick', d => {
+    const o = (getState().orders || []).find(x => x.id === d.id) || {};
+    sheet(i18n.t('order.reportConfirmTitle'), `
+      <div class="m-kv m-kv--total" style="margin-top:4px"><span>${esc(d.reason)}</span></div>
+      <p class="tiny" style="margin:12px 0 0">${esc(i18n.t('order.reportConfirmBody', {
+        amount: M.fmt2((o.customerPays | 0)) }))}</p>
+      <button class="btn btn--danger btn--block" style="margin-top:16px"
+        data-act="dispute.send" data-id="${esc(d.id)}" data-reason="${esc(d.reason)}">${esc(i18n.t('order.reportConfirmGo'))}</button>
+      <button class="btn btn--ghost btn--block btn--sm" style="margin-top:6px"
+        data-act="dispute.open" data-id="${esc(d.id)}">${esc(i18n.t('order.reportPickAgain'))}</button>`);
+  });
+  A('dispute.send', d => { closeSheet(); ordersView.submitDispute(d.id, d.reason); });
   A('cancel.open',   d => ordersView.openCancel(d.id));
   /* THE ESCAPES THAT EXISTED IN THE ENGINE AND ON THE PUBLISHED REFUNDS PAGE,
      but that nothing on screen could reach: a customer whose pro never came,
      and a pro who cannot make it and is required by his own agreement to say so. */
   A('noshow.open',      d => ordersView.openNoShow(d.id));
   A('noshow.confirm',   async d => { await flow.cancelOrder(d.id, 'WORKER_NO_SHOW'); closeSheet(); render(); });
-  A('worker.cancel',    d => sheet('Cannot do this job?', `
-    <p>Say so now rather than not turning up. The customer is refunded in full and can book somebody else;
-      you keep your stake, and this is recorded as a cancellation, not a no-show.</p>
-    <p class="micro muted" style="margin-top:10px">Not turning up costs you the stake and a trust penalty. This does not.</p>
-    <button class="btn btn-primary btn--block" style="margin-top:14px" data-act="worker.cancel.do" data-id="${esc(d.id)}">Cancel this job</button>
-    <button class="btn btn--ghost btn--block btn--sm" style="margin-top:6px" data-act="sheet.close">Keep the job</button>`));
+  /* THIS SHEET WAS NOT TRUE. It promised "you keep your stake" while
+     domain/flow.js forfeited it to the customer on WORKER_CANCEL, and it never
+     mentioned the Rs.100 the public refunds page has charged him in writing
+     since 8.0. He was told the honest route was free, and it cost him the same
+     as a no-show. The engine now does what this sheet says; this sheet now
+     says what the engine does, including the part he will not like. */
+  A('worker.cancel',    d => sheet(i18n.t('sheet.cannotDo'), `
+    <p>${esc(i18n.t('sheet.cancelBody'))}</p>
+    <p class="micro muted" style="margin-top:10px">${esc(i18n.t('sheet.cancelCost', { amount: M.fmt(CANCEL_RULES.WORKER_CANCEL.workerFee) }))}</p>
+    <button class="btn btn-primary btn--block" style="margin-top:14px" data-act="worker.cancel.do" data-id="${esc(d.id)}">${esc(i18n.t('sheet.cancelDo'))}</button>
+    <button class="btn btn--ghost btn--block btn--sm" style="margin-top:6px" data-act="sheet.close">${esc(i18n.t('sheet.keepJob'))}</button>`));
   A('code.retry', d => { flow.retryDoorCode(d.id); render(); });
   A('worker.cancel.do', async d => { await flow.workerCancel(d.id); closeSheet(); render(); });
   A('cancel.confirm',d => { flow.cancelOrder(d.id, d.rule); closeSheet(); render(); });
@@ -668,29 +848,37 @@ function wireActions() {
   /* a shop's takings need an account to land in, and a control to send them */
   A('pro.upi', d => {
     const pr = (ctx.store.getState().partners || []).find(x => x.id === d.id) || {};
-    sheet('Where you are paid', `
-      <p class="tiny muted" style="margin-bottom:12px">Your settled jobs are sent here, in one tap, whenever
-        you like. It is the only destination SAAHAA will pay you into.</p>
+    sheet(i18n.t('sheet.whereePaid'), `
+      <p class="tiny muted" style="margin-bottom:12px">${esc(i18n.t('sheet.paidBody'))}</p>
       <div class="field"><input id="prUpi" autocomplete="off" spellcheck="false" placeholder=" "
-        value="${esc((pr.verification || {}).upi || '')}"><label>UPI id — name@bank</label></div>
-      <button class="btn btn-primary btn--block" data-act="pro.upi.save" data-id="${esc(d.id)}">Save</button>`);
+        value="${esc((pr.verification || {}).upi || '')}"><label>${esc(i18n.t('sheet.upiLabel'))}</label></div>
+      <button class="btn btn-primary btn--block" data-act="pro.upi.save" data-id="${esc(d.id)}">${esc(i18n.t('sheet.save'))}</button>`);
   });
   A('pro.upi.save', d => {
     const pr = (ctx.store.getState().partners || []).find(x => x.id === d.id);
     const v = (document.getElementById('prUpi') || {}).value || '';
     if (pr && verification.submitPayout(pr, v)) { closeSheet(); render(); }
   });
-  A('shop.upi', d => sheet('Where this shop is paid', `
-    <p class="tiny muted" style="margin-bottom:12px">Your settled orders are sent here. It is the only
-      destination SAAHAA will pay a shop into, and you can change it whenever you like.</p>
+  A('shop.upi', d => sheet(i18n.t('sheet.shopPaid'), `
+    <p class="tiny muted" style="margin-bottom:12px">${esc(i18n.t('sheet.shopPaidBody'))}</p>
     <div class="field"><input id="shUpi" autocomplete="off" spellcheck="false" placeholder=" "
-      value="${esc((ctx.store.getState().shops.find(x => x.id === d.id) || {}).upi || '')}"><label>UPI id — name@bank</label></div>
-    <button class="btn btn-primary btn--block" data-act="shop.upi.save" data-id="${esc(d.id)}">Save</button>`));
+      value="${esc((ctx.store.getState().shops.find(x => x.id === d.id) || {}).upi || '')}"><label>${esc(i18n.t('sheet.upiLabel'))}</label></div>
+    <button class="btn btn-primary btn--block" data-act="shop.upi.save" data-id="${esc(d.id)}">${esc(i18n.t('sheet.save'))}</button>`));
   A('shop.upi.save', d => {
     const v = (document.getElementById('shUpi') || {}).value || '';
     if (flow.setShopUpi(d.id, v)) { closeSheet(); render(); }
   });
-  A('shop.withdraw', async d => { await flow.shopWithdraw(d.id, Number(d.amt)); render(); });
+  /* THE ONE IRREVERSIBLE CONTROL ON THE SCREEN, AND IT FIRED ON ONE TAP. A ₹40
+     cancellation gets a full confirm sheet; sending a shop's entire takings to
+     UPI did not. It cannot be pulled back, and there is no part-payment yet, so
+     both facts are said before it happens rather than after. */
+  A('shop.withdraw', d => {
+    const s0 = ctx.store.getState().shops.find(x => x.id === d.id) || {};
+    payoutSheet(d.id, flow.shopWallet(d.id).balance, s0.upi, 'shop.withdraw.do');
+  });
+  A('shop.withdraw.do', async d => {
+    await flow.shopWithdraw(d.id, poAmt(flow.shopWallet(d.id).balance)); closeSheet(); render();
+  });
 
   A('shop.toggle', () => {
     const s = getState().shops.find(x => x.ownerKey === me().key);
@@ -744,9 +932,18 @@ function wireActions() {
   A('vouch.give',   d => { const r = autoverify.vouch(d.id); toast(r.ok ? 'Thank you — your vouch counts.' : r.reason, r.ok ? '' : 'warn'); render(); });
   A('ref.send',     () => { const p = myPartner(); const code = p && autoverify.sendReferenceCode(p); partner.showReferenceCode && partner.showReferenceCode(code); render(); });
   A('ref.confirm',  d => { const p = myPartner(); const ok = p && autoverify.confirmReference(p, d.code || (document.getElementById('refCode') || {}).value); toast(ok ? 'Reference confirmed.' : 'That code is not right', ok ? '' : 'danger'); render(); });
-  const cwAmt = d => Number(d.amt) || Math.round(Number((document.getElementById('cwAmt') || {}).value || 0) * 100);   // chips carry paise; the field is rupees
+  /* chips carry paise; the field is rupees, and it may now carry paise after
+     the point — `Math.round` on rupees x 100 is what keeps 18.70 as 1870 rather
+     than 1869.9999 */
+  const cwAmt = d => Number(d.amt) || Math.round(Number((document.getElementById('cwAmt') || {}).value || 0) * 100);
   A('cwallet.topup',    d => flow.customerTopUp(cwAmt(d)).then(() => { closeSheet(); render(); }));
   A('cwallet.withdraw', d => flow.customerWithdraw(cwAmt(d)).then(render));
+  /* the exact balance, to the paisa, with nothing typed and nothing rounded —
+     the one amount she could never successfully enter by hand */
+  A('cwallet.withdrawAll', () => {
+    const s0 = me(); if (!s0) return;
+    flow.customerWithdraw(flow.customerWallet(s0.key).balance).then(render);
+  });
   A('admin.export',  () => admin.exportJSON());
   A('admin.exportaudit',  () => admin.exportAudit());
   A('admin.exportledger', () => admin.exportLedger());
@@ -876,6 +1073,34 @@ async function boot() {
      also silently broke tools/shots.py. A purge that removes the demo data must
      also clear the flag that says demo data exists. */
   if (purged && !demoMode) store.dispatch({ type: 'seed/reset' });
+
+  /* AND IT WAS STILL A ONE-SHOT, ONE FIX LATER. The guard is `!seeded` -- but a
+     plain first visit seeds EMPTY and sets `seeded: true`, so every device that
+     had ever been opened without the flag was permanently immune to it. An
+     audit signed up on the empty build, then opened ?demo=1 and sat looking at
+     "0 pros · 0 shops"; SIM_MARKET is set inside this same block, so nobody
+     ever acted on the other side of a single one of their orders and every
+     order froze at "step 2 of 7". They reported the product as unable to
+     complete a transaction. It could; there was simply nobody home.
+
+     ?demo=1 means "make this device a demo device", and it has to mean that on
+     the second visit too. The simulator is switched on regardless, and a device
+     whose roster is EMPTY gets the roster -- partners, shops and products only.
+     `users` is deliberately left alone: whoever is signed in stays signed in,
+     and a populated device is never overwritten by a query string. */
+  const demoWanted = new URLSearchParams(location.search).get('demo') === '1'
+    || !!new URLSearchParams(location.search).get('shot');
+  if (demoWanted) flags.set('SIM_MARKET', true);
+  const st0 = store.getState();
+  const bareRoster = !(st0.partners || []).length && !(st0.shops || []).length;
+  if (st0.seeded && demoWanted && bareRoster) {
+    const seed = await buildSeed();
+    store.dispatch({ type: 'seed/partners', payload: seed.partners });
+    store.dispatch({ type: 'seed/shops',    payload: seed.shops });
+    store.dispatch({ type: 'seed/products', payload: seed.products });
+    persist.flush(persist.KEYS.state);
+    console.info('[saahaa] demo roster loaded onto an already-seeded device');
+  }
 
   if (!store.getState().seeded) {
     /* Production starts EMPTY. The demo seed (example customers, pros, shops,

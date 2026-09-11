@@ -167,6 +167,9 @@ register('reducer', { id:'disputes', slice:'disputes', reduce(s = [], a) {
       const done = next.filter(d => d.resolvedAt).slice(0, Math.max(0, 300 - open.length));
       return open.concat(done);
     }
+    /* a note about a decision is not the decision — stamping resolvedAt here
+       made the real close, where the money moves, a no-op */
+    case 'dispute/note': return patch(s, a.payload.id, d => ({ ...d, ...a.payload.patch }));
     case 'dispute/resolve':return patch(s, a.payload.id, d => ({ ...d, ...a.payload.patch, resolvedAt:Date.now() }));
     default: return s;
   }

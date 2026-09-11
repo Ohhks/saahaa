@@ -54,7 +54,7 @@ let leaflet = null, loading = null;
    is appended after leaflet.css, so the tie falls our way. */
 const SKIN = `
 .leaflet-container{font-family:var(--font-body),system-ui,sans-serif;font-size:13px;background:var(--surface-2,#eae9e9)}
-.leaflet-container a{color:var(--color-accent)}
+.leaflet-container a{color:var(--color-accent-text)}
 .leaflet-container .leaflet-bar,
 .leaflet-container .leaflet-bar a,
 .leaflet-container .leaflet-bar a:first-child,
@@ -66,7 +66,7 @@ const SKIN = `
 .leaflet-container .leaflet-bar a{width:34px;height:34px;line-height:34px;
   background:var(--bg,#f3f2f2);color:var(--color-text);
   border-bottom:1px solid var(--color-divider);font-weight:700}
-.leaflet-container .leaflet-bar a:hover{background:var(--surface,#eae9e9);color:var(--color-accent)}
+.leaflet-container .leaflet-bar a:hover{background:var(--surface,#eae9e9);color:var(--color-accent-text)}
 .leaflet-container .leaflet-bar a:last-child{border-bottom:0}
 .leaflet-container .leaflet-bar a.leaflet-disabled{background:var(--surface,#eae9e9);color:var(--ink-4,#9b9797)}
 .leaflet-container .leaflet-popup-content-wrapper{background:var(--bg,#f3f2f2);color:var(--color-text);
@@ -75,7 +75,7 @@ const SKIN = `
 .leaflet-container .leaflet-popup-tip{background:var(--color-text);box-shadow:none}
 .leaflet-container a.leaflet-popup-close-button{color:var(--color-text);
   width:30px;height:30px;padding:0;font:800 18px/30px var(--font-heading),system-ui,sans-serif}
-.leaflet-container a.leaflet-popup-close-button:hover{color:var(--color-accent);background:transparent}
+.leaflet-container a.leaflet-popup-close-button:hover{color:var(--color-accent-text);background:transparent}
 .leaflet-container .leaflet-control-attribution{background:var(--bg,#f3f2f2);
   color:var(--ink-3,#605d5d);font-size:10px;letter-spacing:.02em;padding:2px 6px;
   border-top:1px solid var(--color-divider);border-left:1px solid var(--color-divider)}

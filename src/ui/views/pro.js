@@ -23,12 +23,13 @@
    every box is sized in CSS — a page with no photographs at all is still a
    complete page, laid out exactly the same. */
 
+import { catName } from '../i18n.js';
 import { esc, ratingStars, timeAgo, sheet, toast } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, me } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
 import * as M from '../../core/money.js';
-import { trustScore, tier } from '../../domain/trust.js';
+import { trustScore, tier, markupFor } from '../../domain/trust.js';
 import { kmBetween, etaMins } from '../../domain/match.js';
 import { myArea, dispatch } from '../../core/ctx.js';
 import { myPlace } from './home.js';
@@ -108,7 +109,7 @@ const proCSS = `<style>
     background:var(--bg);color:var(--ink-1);border-left:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider)}
   .pro__add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:none;
     border:2px solid var(--color-divider);color:var(--ink-3);font:800 11px/1 var(--font-heading);cursor:pointer}
-  .pro__add:hover,.pro__add:focus-visible{border-color:var(--color-accent);color:var(--color-accent)}
+  .pro__add:hover,.pro__add:focus-visible{border-color:var(--color-accent);color:var(--color-accent-text)}
   /* THE PORTRAIT OFFER. Only the owner of the page ever sees it, only while
      the page has no public photo and a private selfie exists, and the word
      "public" is in the sentence and in the button — a private picture must
@@ -139,6 +140,12 @@ const proCSS = `<style>
     .prosplit{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--sp-9);align-items:start} .prosplit .pro__sec:last-child{border-bottom:2px solid var(--color-divider)} }
 </style>`;
 
+/* His permanent code, from the account the listing belongs to. */
+const proCode = p => {
+  const u = (getState().users || []).find(x => x.key === (p && p.userKey));
+  return (u && u.code) || '';
+};
+
 export function render(id) {
   const p = getState().partners.find(x => x.id === id);
   if (!p) return `${header('Pro', '')}<main class="wrap"><div class="empty empty--smart"><h3>This page is not live</h3>
@@ -157,9 +164,19 @@ export function render(id) {
   const prof = p.profile || {};
   const r = readiness(p);
   const hidden = !r.complete && !mine;
-  const q = quoteService(p.ask);
+  /* THE TIER-4 REBATE WAS INVISIBLE ON THE ONE PAGE THAT SELLS IT. A certified
+     tier-4 partner pays 6%, not 8% — `domain/trust.js markupFor` is what every
+     other screen prices with — but this page called quoteService with no markup
+     at all, so it fell back to the standard rate and quoted a tier-4 pro dearer
+     than the customer would actually be charged. The pro's own profile
+     understated the reward they had spent four tiers earning. */
+  const q = quoteService(p.ask, { markup: markupFor(p) });
   const first = p.name.split(' ')[0];
-  const years = prof.years ? `${prof.years} yr${prof.years == 1 ? '' : 's'}` : p.verifiedAt ? `since ${new Date(p.verifiedAt).getFullYear()}` : 'New';
+  /* "TRADING · since 2026" READ AS A CAREER, and it is a signup date. The only
+     thing SAAHAA knows is when he joined SAAHAA, so that is what the tile says
+     unless he has actually told us how long he has been doing the work. */
+  const years = prof.years ? `${prof.years} yr${prof.years == 1 ? '' : 's'}` : p.verifiedAt ? `${new Date(p.verifiedAt).getFullYear()}` : 'New';
+  const yearsCap = prof.years ? 'Trading' : p.verifiedAt ? 'On SAAHAA since' : 'Trading';
   const subs = (cat.subs || []).slice(0, 8);
 
   if (hidden) return `${header(p.name, '')}<main class="wrap"><div class="empty empty--smart"><h3>Not yet verified</h3>
@@ -203,7 +220,7 @@ export function render(id) {
     <div class="pro__stats">
       <div><b>~${etaMins(km)} min</b><span>Response</span></div>
       <div><b>${M.fmt(p.ask)}</b><span>From</span></div>
-      <div><b>${esc(years)}</b><span>Trading</span></div>
+      <div><b>${esc(years)}</b><span>${esc(yearsCap)}</span></div>
       <div><b>${ts.score}<span style="font-size:10px">/100</span></b><span>Trust</span></div>
     </div>
 
@@ -212,7 +229,7 @@ export function render(id) {
         ${workBlock(p, mine, first)}
         <div class="pro__sec">
           <span class="eyebrow">Rate card</span>
-          <div class="pro__rate" style="margin-top:6px"><span>${esc(cat.name)} · typical job</span><strong>${M.fmt(p.ask)}</strong></div>
+          <div class="pro__rate" style="margin-top:6px"><span>${esc(catName(cat))} · typical job</span><strong>${M.fmt(p.ask)}</strong></div>
           ${subs.map(x => `<div class="pro__rate"><span>${esc(x)}</span><span class="muted">On quote</span></div>`).join('')}
           <div class="pro__rate" style="border-top:1px solid var(--color-divider);margin-top:6px;padding-top:10px"><span>Customer pays on a ${M.fmt(q.deal)} job</span><strong>${M.fmt(q.customerPays)}</strong></div>
           <p class="micro muted" style="margin-top:6px">${esc(first)} sets these prices. SAAHAA adds ${q.markupPct}% on top for the customer — nothing comes out of ${esc(first)}'s price. Price locked before booking; money held until you confirm the work, or until the deadline the job shows you.</p>
@@ -222,9 +239,22 @@ export function render(id) {
           <div class="between" style="align-items:baseline"><span class="eyebrow">About</span>${mine ? '<button class="more" data-act="pro.edit">Edit</button>' : ''}</div>
           <div class="grid2" style="margin-top:8px">
             <div><span class="meta">Experience</span><b class="tiny" style="display:block">${prof.years ? esc(String(prof.years)) + ' years' : 'Not stated'}</b></div>
-            <div><span class="meta">Languages</span><b class="tiny" style="display:block">${esc(prof.langs || 'Telugu, Hindi')}</b></div>
+            <!-- SAAHAA WAS PUBLISHING CLAIMS IN HIS NAME. A pro who gave a name, a
+                 number, a trade, a price and an area found his public page telling
+                 customers he speaks "Telugu, Hindi" — a hardcoded default, printed
+                 as fact, next to an Experience field that correctly says "Not
+                 stated" when he has not said. If he has not told us, the page says
+                 so; it does not guess on his behalf. -->
+            <div><span class="meta">Languages</span><b class="tiny" style="display:block">${prof.langs ? esc(prof.langs) : 'Not stated'}</b></div>
             <div><span class="meta">Area</span><b class="tiny" style="display:block">${esc(p.area)}</b></div>
             <div><span class="meta">Verified</span><b class="tiny" style="display:block">${p.verifiedAt ? timeAgo(p.verifiedAt) : t.badge ? 'Yes' : 'Pending'}</b></div>
+            <!-- THE ONE ANTI-IMPERSONATION PROMISE THE APP MAKES ABOUT HIM, and it
+                 was not implemented. Onboarding step 1 says the SAAHAA ID "is
+                 printed on your public page so a customer knows they have the right
+                 person", and the You screen repeats it. It appeared nowhere on the
+                 page. A pro audit went looking for it as the customer and could not
+                 find it, which is exactly the check the sentence invites. -->
+            ${proCode(p) ? `<div><span class="meta">SAAHAA ID</span><b class="tiny num" style="display:block;user-select:text">${esc(proCode(p))}</b></div>` : ''}
           </div>
           <p class="micro muted" style="margin-top:10px">${(p.ratings || []).length} ratings · ${(p.vouches || []).length} vouch${(p.vouches || []).length === 1 ? '' : 'es'} · ${km} km from you</p>
         </div>
@@ -247,7 +277,7 @@ export function render(id) {
     <div class="pro__bar">
       ${mine ? `<button class="btn btn-primary btn--lg" data-act="pro.share" data-id="${p.id}">Share my page</button>`
              : `<button class="btn btn-secondary" style="flex:none" data-act="pro.share" data-id="${p.id}" aria-label="Share">${icon('share', { size: 18 })}</button>
-                <button class="btn btn-primary btn--lg" data-act="cat.open" data-id="${p.cat}" data-pid="${p.id}">Book ${esc(first)} · ${esc(cat.name)}</button>`}
+                <button class="btn btn-primary btn--lg" data-act="cat.open" data-id="${p.cat}" data-pid="${p.id}">Book ${esc(first)} · ${esc(catName(cat))}</button>`}
     </div>
   </main>`;
 }

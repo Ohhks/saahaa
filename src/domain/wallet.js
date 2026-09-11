@@ -27,7 +27,7 @@
    locks as soon as there is real money. */
 
 import * as M from '../core/money.js';
-import { acct, balances, HOLDBACK_DAYS } from './ledger.js';
+import { acct, balances, balanceOf, creditsByKind, debitsByKind, HOLDBACK_DAYS } from './ledger.js';
 
 /* ── the stake ─────────────────────────────────────────────── */
 export const MIN_STAKE  = 10000;    // ₹100 — the minimum locked on every job
@@ -52,13 +52,40 @@ export function walletOf(entries, partnerId, partner = {}) {
   const available = Math.max(0, b[walletAcct(partnerId)] || 0);
   const locked    = Math.max(0, b[stakeAcct(partnerId)] || 0);
   const pending   = Math.max(0, b[holdbackAcct(partnerId)] || 0);
-  const released  = entries
-    .filter(e => e.partyB === walletAcct(partnerId) && (e.kind === 'ESCROW_RELEASE' || e.kind === 'COMPENSATION' || e.kind === 'HOLDBACK_RELEASE'))
-    .reduce((n, e) => n + (e.amountPaise | 0), 0);
-  const withdrawn = entries
-    .filter(e => e.partyA === walletAcct(partnerId) && e.kind === 'WITHDRAW')
-    .reduce((n, e) => n + (e.amountPaise | 0), 0);
-  return { available, locked, pending, released, withdrawn, debt: partner.walletDebt | 0 };
+  /* THROUGH THE CANONICAL READER, NOT A HAND-WALK. These two filtered on
+     `e.partyB` / `e.partyA` directly, which is the shape the app writes today
+     and NOT the shape `entry()` in ledger.js produces — so a book holding
+     either kind of record gave a silently wrong lifetime figure, and every
+     screen that trusted it was wrong with it. `creditsByKind` reads both. */
+  const credits = creditsByKind(entries, walletAcct(partnerId));
+  const debits  = debitsByKind(entries, walletAcct(partnerId));
+  const released = (credits.ESCROW_RELEASE || 0) + (credits.COMPENSATION || 0) + (credits.HOLDBACK_RELEASE || 0);
+  const withdrawn = debits.WITHDRAW || 0;
+  /* A DEBT RECOVERED IS MONEY HE DID NOT KEEP, AND NOTHING SAID SO. His screen
+     read "you kept ₹428" over a ledger that had paid him ₹388, because the ₹40
+     cancellation fee was taken out of the payout after the figure was read —
+     and the `debt` warning line disappears the moment it is recovered, so the
+     charge he was warned about became invisible everywhere at once. */
+  /* THE IDENTICAL WHITELIST, ONE FILE OVER. `partner.js` learned that naming
+     kinds misses the next one and started counting every debit to a PLATFORM
+     account; this stayed on `DEBT_RECOVERY`, so the footnote "nothing comes out
+     of your rate" printed on the same screen that had just named a ₹40
+     cancellation fee eight lines above. */
+  const recovered = Object.keys(debits)
+    .filter(k => k !== 'WITHDRAW' && k !== 'STAKE_LOCK' && k !== 'HOLDBACK' && k !== 'ESCROW_IN')
+    .reduce((n, k) => n + debits[k], 0);
+  /* TWO SOURCES FOR ONE FACT, AND THEY DRIFTED. This read the mutable
+     `partner.walletDebt` while the passbook beside it read the DEBT ledger
+     account, so a pro saw "Cancellation fee −₹40.00" subtracted in his column
+     AND "₹40 owed from a job you left — recovered from your next payout" above
+     it, then took a payout with nothing deducted. Taken, or still coming? The
+     two screens disagreed and neither was checkable.
+     The book is the answer, here as everywhere else; the field stays only as
+     the fast read for code that has no ledger to hand. */
+  const owed = Math.max(0, -balanceOf(entries, acct.debt(partnerId)));
+  return { available, locked, pending, released, withdrawn, recovered,
+           net: Math.max(0, released - recovered),
+           debt: owed };
 }
 
 /** How a stake of `need` would be funded from `available`: real money first,

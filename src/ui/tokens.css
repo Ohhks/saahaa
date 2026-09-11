@@ -38,6 +38,19 @@
   /* the system */
   --color-bg:#f3f2f2; --color-surface:#eae9e9; --color-text:#201e1d;
   --color-accent:#ec3013; --color-accent-2:#e15b47;
+  /* THE ACCENT IS A FILL COLOUR, NOT A TEXT COLOUR. #ec3013 on white measures
+     about 4.2:1 — under WCAG AA's 4.5:1 for anything at body size — and it was
+     used for every accent link on a light ground: "All 24 categories →",
+     "Map view →", the star rows, every `.em`. A 3:1 ratio is enough behind a
+     shape and is not enough inside a letter, so text gets its own darker token
+     (5.9:1) and fills keep the brand red. */
+  --color-accent-text:#c2260f;
+  /* WHITE ON THE BRAND RED IS 4.2:1 — under AA, the other way round. The
+     darker token was introduced for text ON white; a surface FILLED with the
+     accent and carrying white text has the identical problem mirrored, and the
+     hero, the primary button and every accent chip were all at 4.2. Fills that
+     carry text use this; fills that carry none keep the brighter red. */
+  --color-accent-surface:#c2260f;
   --color-divider:color-mix(in srgb,#201e1d 40%,transparent);
   --color-neutral-100:#f8f4f4; --color-neutral-200:#eae7e7; --color-neutral-300:#d7d3d3; --color-neutral-400:#bab6b6;
   --color-neutral-500:#9b9797; --color-neutral-600:#7d7979; --color-neutral-700:#605d5d; --color-neutral-800:#444141; --color-neutral-900:#2d2b2b;
@@ -94,7 +107,12 @@
   --gutter:12px; --page-max:640px; --nav-h:62px; --sidenav-w:0px; --rail-w:0px; --topbar-h:56px; --tabs-h:44px;
   --r-xs:0; --r-sm:0; --r-md:0; --r-lg:0; --r-xl:0; --r-2xl:0; --r-3xl:0; --r-pill:0;
   --font-display:var(--font-heading); --font-ui:var(--font-body);
-  --fs-micro:10px; --lh-micro:14px; --fs-cap:11px; --lh-cap:15px; --fs-sm:13px; --lh-sm:18px; --fs-base:15px; --lh-base:22px;
+  /* 10px AND 11px WERE THE SIZES WE PUT THE SAFETY WORDS IN. "SAAHAA Certified"
+     and "Background Checked" — the two labels the product tells a customer to
+     look for before she lets somebody into her home — rendered at 11px, and 46
+     elements on Home rendered at 10px. The smallest type in the app was
+     carrying its most important claims. */
+  --fs-micro:12px; --lh-micro:16px; --fs-cap:13px; --lh-cap:17px; --fs-sm:13px; --lh-sm:18px; --fs-base:15px; --lh-base:22px;
   --fs-md:17px; --lh-md:24px; --fs-lg:20px; --lh-lg:25px; --fs-xl:25px; --lh-xl:29px; --fs-2xl:32px; --lh-2xl:35px; --fs-3xl:42px; --lh-3xl:44px; --fs-4xl:56px; --lh-4xl:56px;
   --fw-reg:400; --fw-med:500; --fw-semi:600; --fw-bold:800; --fw-black:800;
   --ls-tight:-0.015em; --ls-wide:0.04em; --ls-wider:0.08em; --ls-widest:0.12em; --ls-brand:0.18em;
@@ -105,6 +123,7 @@
 
 /* dark: the same system inverted — ink ground, light type, the accent unchanged */
 :root[data-theme="dark"]{
+  --color-accent-text:var(--color-accent-400);   /* the light end of the ramp: dark red on a dark ground reads as black */
   color-scheme:dark;
   --color-bg:#201e1d; --color-surface:#2d2b2b; --color-text:#f3f2f2;
   --color-divider:color-mix(in srgb,#f3f2f2 32%,transparent);
@@ -128,7 +147,7 @@ body{margin:0;background:var(--bg);color:var(--ink-1);font:400 15px/1.55 var(--f
   -webkit-font-smoothing:antialiased;overscroll-behavior-y:none;padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom))}
 h1,h2,h3,h4,h5,h6{font-family:var(--font-heading);font-weight:800;line-height:1.12;letter-spacing:-.015em;margin:0}
 h1{font-size:var(--fs-3xl);line-height:var(--lh-3xl)} h2{font-size:var(--fs-2xl);line-height:var(--lh-2xl)} h3{font-size:var(--fs-xl)} h4{font-size:var(--fs-lg)}
-p{margin:0} a{color:var(--color-accent);text-underline-offset:3px} a:hover{color:var(--brand-text)}
+p{margin:0} a{color:var(--color-accent-text);text-underline-offset:3px} a:hover{color:var(--brand-text)}
 img,svg{display:block;max-width:100%} button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 input,select,textarea{font:inherit;color:inherit}
 :focus{outline:none} :focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
@@ -150,17 +169,42 @@ main.wrap{padding-top:var(--sp-5)}
 .topbar{display:none}
 nav.nav{position:fixed;left:0;right:0;bottom:0;z-index:var(--z-nav);display:grid;grid-template-columns:repeat(5,1fr);
   background:var(--color-neutral-100);border-top:2px solid var(--color-divider);padding-bottom:env(safe-area-inset-bottom);
-  min-height:var(--nav-h);margin:0;color:var(--color-neutral-600)}
-:root[data-theme="dark"] nav.nav{background:var(--surface-2)}
-nav.nav button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 0 10px;font:600 9px/1 var(--font-body);letter-spacing:.07em;text-transform:uppercase;color:inherit;min-height:44px}
+  /* `--color-neutral-600` on the nav's own near-white ground measures 3.94:1 —
+     under AA at 11px, and this is the one control that tells a person where in
+     the app she is. It is not decoration. Two steps darker clears 4.5:1, and
+     the label goes up to 12px with the rest of the floor. */
+  min-height:var(--nav-h);margin:0;color:var(--color-neutral-800)}
+/* AND HARD-CODING A NEUTRAL TO CLEAR AA ON THE LIGHT NAV BROKE THE DARK ONE.
+   `--color-neutral-800` is a dark grey; the dark block repoints the nav's
+   BACKGROUND and never the ramp, so four of five labels landed at 1.39:1 —
+   a failure by a factor of three, on the only control that says where you are,
+   introduced by the fix for the same defect in light mode. A colour chosen
+   against one ground has to be re-chosen against the other. */
+:root[data-theme="dark"] nav.nav{background:var(--surface-2);color:var(--ink-2)}
+:root[data-theme="dark"] nav.nav button[aria-selected="true"]{color:var(--color-accent-400)}
+/* ── THE FLOOR IS 12px, AND IT IS A FLOOR ─────────────────────
+   Raising `--fs-micro` and `--fs-cap` fixed almost nothing, because most of
+   the small type in this app is a hard-coded px inside a rule, not a token.
+   A re-audit measured 90 of 223 text elements on Home under 12px — five at
+   9px, sixteen at 9.5px, thirty-nine at 10px — with "SAAHAA Certified" and
+   "Background Checked", the two labels the product tells a customer to check
+   before letting somebody into her home, among them.
+
+   Nine-pixel type is a design choice in a mockup and a wall on a ₹8,000 phone
+   in daylight, and Telugu is worse off than English at that size: the script's
+   conjuncts stack vertically and simply fill in. Nothing that carries meaning
+   goes below 12px. */
+nav.nav button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 0 10px;font:600 12px/1.15 var(--font-body);letter-spacing:.07em;text-transform:uppercase;color:inherit;min-height:44px}
 nav.nav button .ic svg{width:18px;height:18px}
-nav.nav button[aria-selected="true"]{color:var(--color-accent)}
+nav.nav button[aria-selected="true"]{color:var(--color-accent-text)}
 /* .tabbar / .tab — the mockup's own names for the same bar, so markup lifted
    straight from the mockup behaves identically to the shell's nav. */
 .tabbar{display:grid;grid-template-columns:repeat(5,1fr);border-top:2px solid var(--color-divider);background:var(--color-neutral-100)}
 .tab{display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 0 11px;
   font:600 8.5px/1 var(--font-body);letter-spacing:.07em;color:var(--color-neutral-600);min-height:44px}
-.tab[data-on],.tab[aria-selected="true"]{color:var(--color-accent)}
+.tab[data-on],.tab[aria-selected="true"]{color:var(--color-accent-text)}
+/* the same ramp problem, on the same kind of control */
+:root[data-theme="dark"] .tabbar,:root[data-theme="dark"] .tab{color:var(--ink-2)}
 .tab svg{width:17px;height:17px}
 .shell--bare .shell__main{grid-column:1}
 @media (min-width:768px){
@@ -189,8 +233,8 @@ nav.nav button[aria-selected="true"]{color:var(--color-accent)}
 .h-display{font:800 var(--fs-4xl)/1 var(--font-heading);letter-spacing:-.02em}
 .h-sec{font:800 var(--fs-lg)/var(--lh-lg) var(--font-heading);letter-spacing:-.01em}
 .display{font:800 var(--fs-3xl)/var(--lh-3xl) var(--font-heading);letter-spacing:-.02em}
-.eyebrow,.meta,.k,.lbl,.card-kicker{font:600 10px/1.3 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
-.card-kicker,.eyebrow.em{color:var(--color-accent)}
+.eyebrow,.meta,.k,.lbl,.card-kicker{font:600 12px/1.35 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.card-kicker,.eyebrow.em{color:var(--color-accent-text)}
 .micro{font-size:var(--fs-micro);line-height:var(--lh-micro)} .tiny{font-size:var(--fs-sm);line-height:var(--lh-sm)} .med{font-size:var(--fs-md)}
 /* The legal row in a page footer is a line of inline text links (Terms · Privacy · …).
    Block padding on an INLINE box grows the hit area without touching the line box, so
@@ -199,9 +243,9 @@ nav.nav button[aria-selected="true"]{color:var(--color-accent)}
 p.micro > a.micro{padding-block:17px}
 .muted,.text-muted{color:var(--ink-3)} .sentence{font-size:var(--fs-sm);line-height:var(--lh-sm)}
 .num{font-variant-numeric:tabular-nums;font-weight:800} .num-xl{font:800 var(--fs-3xl)/1 var(--font-heading);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-.strike{text-decoration:line-through;color:var(--ink-4)} .good{color:var(--success)} .em{color:var(--color-accent)}
+.strike{text-decoration:line-through;color:var(--ink-4)} .good{color:var(--success)} .em{color:var(--color-accent-text)}
 .wordmark,.wm{font:800 18px/1 var(--font-heading);letter-spacing:.02em;color:var(--ink-1)}
-.brandline{font:600 10px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase}
+.brandline{font:600 12px/1.2 var(--font-body);letter-spacing:.14em;text-transform:uppercase}
 .rule,.hr{height:2px;border:0;background:var(--color-divider);margin:var(--sp-6) 0}
 .hd{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-5);margin:var(--sp-8) 0 var(--sp-5)}
 /* `.more` is a real control ("Browse all →", "Map view →", "Create an
@@ -212,7 +256,7 @@ p.micro > a.micro{padding-block:17px}
    "All 4 →" — measured 42 wide. Every other .more is already wider, so the
    minimum only ever moves the short ones, and by two pixels. */
 .hd .more,.more{display:inline-flex;align-items:center;justify-content:flex-end;min-height:44px;min-width:44px;padding:2px 0;
-  font:600 12px/1 var(--font-body);color:var(--color-accent);letter-spacing:.02em}
+  font:600 12px/1 var(--font-body);color:var(--color-accent-text);letter-spacing:.02em}
 .between{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-5)}
 .row{display:flex;align-items:center;gap:var(--sp-5)} .grow{flex:1;min-width:0} .stack{display:flex;flex-direction:column;gap:var(--sp-4)}
 .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--sp-4)} .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-4)}
@@ -221,7 +265,7 @@ p.micro > a.micro{padding-block:17px}
 /* ---------- 5. SURFACES ---------- */
 .card,.glass{background:var(--surface);border:1px solid var(--color-divider);padding:var(--sp-6);color:var(--ink-1)}
 .card{display:flex;flex-direction:column;gap:var(--sp-4)}
-.card-title{font:800 17px/1.2 var(--font-heading)} .card-body{font-size:13px;opacity:.85} .card-meta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-3)}
+.card-title{font:800 17px/1.2 var(--font-heading)} .card-body{font-size:13px;opacity:.85} .card-meta{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3)}
 .card--tap{cursor:pointer} .card--tap:hover{border-color:var(--border-strong)}
 .card--gold,.glass--gold{background:var(--color-accent-100);border:1px solid var(--color-accent);color:var(--ink-1)}
 :root[data-theme="dark"] .glass--gold,:root[data-theme="dark"] .card--gold{background:#3a201c}
@@ -234,10 +278,14 @@ p.micro > a.micro{padding-block:17px}
 .sheen{position:relative} .sbody{padding:var(--sp-6)}
 
 /* the working side: the ink strip. Anything .on-plum is ink ground with light type. */
-.on-plum{background:var(--color-text);color:var(--color-bg)}
+/* A DARK GROUND NEEDS THE OTHER END OF THE RAMP. `--color-accent-text` is
+   darkened for legibility on white, which makes it nearly invisible on the
+   plum. Re-pointing the token inside the surface fixes every accent-coloured
+   thing in one line, instead of chasing each rule that uses it. */
+.on-plum{background:var(--color-text);color:var(--color-bg);--color-accent-text:var(--color-accent-400)}
 .on-plum .muted,.on-plum .meta,.on-plum .eyebrow,.on-plum .tiny.muted,.on-plum .micro.muted{color:color-mix(in srgb,var(--color-bg) 70%,transparent)}
 .on-plum .glass,.on-plum .card{background:color-mix(in srgb,var(--color-bg) 8%,transparent);border-color:color-mix(in srgb,var(--color-bg) 30%,transparent);color:inherit}
-.on-plum .btn--primary{background:var(--color-accent);color:#fff}
+.on-plum .btn--primary{background:var(--color-accent-surface);color:#fff}
 .on-plum .btn--secondary,.on-plum .btn--ghost{color:inherit;border-color:color-mix(in srgb,var(--color-bg) 40%,transparent)}
 .on-plum .pill,.on-plum .chip{border-color:color-mix(in srgb,var(--color-bg) 40%,transparent);color:inherit;background:transparent}
 .on-plum .field input,.on-plum .field select,.on-plum .field textarea{background:color-mix(in srgb,var(--color-bg) 10%,transparent);color:inherit;border-color:color-mix(in srgb,var(--color-bg) 40%,transparent)}
@@ -269,7 +317,7 @@ p.micro > a.micro{padding-block:17px}
 .hero__search{display:flex;align-items:center;gap:10px;height:52px;padding:0 14px;margin-top:var(--sp-6);background:var(--surface);
   border:2px solid var(--color-text);color:var(--ink-3);font-size:15px;width:100%;text-align:left}
 .hero__search input{flex:1;min-width:0;align-self:stretch;border:0;background:transparent;color:var(--ink-1);font-size:15px;outline:none}
-.hero .eyebrow{color:var(--color-accent)}
+.hero .eyebrow{color:var(--color-accent-text)}
 .herostrip{border-bottom:2px solid var(--color-divider)}
 .search{display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;background:var(--surface);border:1px solid var(--color-divider)}
 .search input{flex:1;min-width:0;align-self:stretch;border:0;background:transparent;outline:none;font-size:15px}
@@ -279,11 +327,11 @@ p.micro > a.micro{padding-block:17px}
   font:800 14px/1.2 var(--font-heading);color:var(--ink-1);background:transparent;border:1px solid transparent;cursor:pointer;text-decoration:none;
   transition:background var(--dur-fast) var(--ease-std),border-color var(--dur-fast) var(--ease-std)}
 .btn svg{display:block} .btn:disabled{opacity:.45;cursor:not-allowed}
-.btn--primary,.btn-primary,.btn--plum{background:var(--color-accent);color:#fff;border-color:var(--color-accent)}
+.btn--primary,.btn-primary,.btn--plum{background:var(--color-accent-surface);color:#fff;border-color:var(--color-accent)}
 .btn--primary:hover,.btn-primary:hover{background:var(--color-accent-600)} .btn--primary:active,.btn-primary:active{background:var(--color-accent-700)}
 .btn--secondary,.btn-secondary{border-color:var(--color-text);color:var(--ink-1)}
 .btn--secondary:hover,.btn-secondary:hover{background:color-mix(in srgb,var(--color-text) 7%,transparent)}
-.btn--ghost,.btn-ghost{color:var(--color-accent);padding-inline:var(--sp-4);min-width:44px}
+.btn--ghost,.btn-ghost{color:var(--color-accent-text);padding-inline:var(--sp-4);min-width:44px}
 .btn--ghost:hover,.btn-ghost:hover{background:color-mix(in srgb,var(--color-accent) 10%,transparent)}
 .btn--danger{border-color:var(--danger);color:var(--danger)} .btn--danger:hover{background:var(--danger-soft)}
 .btn--sm{min-height:44px;padding:6px 12px;font-size:13px} .btn--lg{min-height:52px;font-size:16px}
@@ -291,7 +339,7 @@ p.micro > a.micro{padding-block:17px}
 .btn-icon{width:44px;height:44px;padding:0;min-height:44px}
 .fab{position:fixed;right:var(--gutter);bottom:calc(var(--nav-h) + 14px + env(safe-area-inset-bottom));z-index:var(--z-fab);
   display:flex;align-items:center;gap:8px;min-height:48px;padding:0 16px;background:var(--color-text);color:var(--color-bg);font:800 13px/1 var(--font-heading);box-shadow:var(--shadow-md)}
-.fab__count{background:var(--color-accent);color:#fff;font-size:11px;padding:2px 6px}
+.fab__count{background:var(--color-accent-surface);color:#fff;font-size:12px;padding:2px 6px}
 @media (min-width:768px){ .fab{bottom:24px;right:24px} }
 
 /* ---------- 8. FIELDS ----------
@@ -313,42 +361,42 @@ p.micro > a.micro{padding-block:17px}
 .seg{display:inline-flex;overflow:hidden;border:1px solid var(--color-divider);max-width:100%}
 .seg__btn,.seg-opt{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;font:600 13px/1 var(--font-body);cursor:pointer;min-height:44px;white-space:nowrap}
 .seg__btn + .seg__btn,.seg-opt + .seg-opt{border-left:1px solid var(--color-divider)}
-.seg__btn[aria-pressed="true"],.seg__btn.on,.seg-opt:has(input:checked){background:var(--color-accent);color:#fff}
+.seg__btn[aria-pressed="true"],.seg__btn.on,.seg-opt:has(input:checked){background:var(--color-accent-surface);color:#fff}
 .seg--block{display:flex} .seg--block > *{flex:1}
 
 /* ---------- 9. TAGS, PILLS, CHIPS, BADGES ---------- */
-.tag,.pill,.badge{display:inline-flex;align-items:center;gap:5px;font:600 11px/1 var(--font-body);letter-spacing:.02em;padding:4px 9px;
+.tag,.pill,.badge{display:inline-flex;align-items:center;gap:5px;font:600 12px/1.2 var(--font-body);letter-spacing:.02em;padding:4px 9px;
   background:var(--color-neutral-200);color:var(--color-neutral-800);border:1px solid transparent;white-space:nowrap}
 .tag-accent,.pill--gold,.badge--gold{background:var(--color-accent-100);color:var(--color-accent-800);border-color:var(--color-accent)}
 .tag-accent-2,.pill--warn,.badge--warn{background:var(--warn-soft);color:var(--warn-on)}
 .tag-neutral,.pill--soft,.badge--soft{background:var(--color-neutral-100);color:var(--color-neutral-800);border-color:var(--color-divider)}
-.tag-outline{border-color:var(--color-accent);color:var(--color-accent);background:transparent}
+.tag-outline{border-color:var(--color-accent);color:var(--color-accent-text);background:transparent}
 .pill--ok,.badge--ok{background:var(--success-soft);color:var(--success-on)} .pill--info,.badge--info{background:var(--info-soft);color:var(--info-on)}
 .pill--bad,.badge--bad{background:var(--danger-soft);color:var(--danger-on)}
 .pill--live{background:var(--color-text);color:var(--color-bg)} .pill--live::before{content:"";width:6px;height:6px;background:var(--color-accent);display:inline-block}
 :root[data-theme="dark"] .tag,:root[data-theme="dark"] .pill,:root[data-theme="dark"] .badge{background:var(--surface-3);color:var(--ink-1)}
 .chip{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:6px 12px;font:600 13px/1 var(--font-body);border:1px solid var(--color-text);background:var(--surface);color:var(--ink-1);white-space:nowrap}
-.chip[aria-pressed="true"],.chip.on{background:var(--color-accent);color:var(--color-bg);border-color:var(--color-accent)}
+.chip[aria-pressed="true"],.chip.on{background:var(--color-accent-surface);color:var(--color-bg);border-color:var(--color-accent)}
 .chip--smart{border-color:var(--color-divider);font-weight:400;font-size:12px}
 .chip__ic svg{width:14px;height:14px} .chiprow{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none} .chiprow::-webkit-scrollbar{display:none}
 .avatar{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;background:var(--color-text);color:var(--color-bg);font:800 14px/1 var(--font-heading);flex:none}
 .avatar--sm{width:32px;height:32px;font-size:12px} .avatar--md{width:48px;height:48px;font-size:16px} .avatar--lg{width:64px;height:64px;font-size:22px} .avatar--gold{background:var(--color-accent)}
 .avatars{display:flex} .avatars .avatar{margin-left:-8px;border:2px solid var(--bg)} .avatars .avatar:first-child{margin-left:0}
-.stars{color:var(--color-accent);letter-spacing:1px;position:relative;display:inline-block;white-space:nowrap;font-size:13px}
-.stars i{position:absolute;left:0;top:0;overflow:hidden;color:var(--color-accent);width:var(--pct,0%);font-style:normal}
+.stars{color:var(--color-accent-text);letter-spacing:1px;position:relative;display:inline-block;white-space:nowrap;font-size:13px}
+.stars i{position:absolute;left:0;top:0;overflow:hidden;color:var(--color-accent-text);width:var(--pct,0%);font-style:normal}
 .stars{color:var(--color-neutral-300)}
 .dot{width:8px;height:8px;background:currentColor;display:inline-block}
 
 /* ---------- 10. TILES, CAPSULES, COMMAND CARDS (contract) ---------- */
 .tile{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:var(--sp-5);min-height:96px;background:var(--surface);border:1px solid var(--color-divider);text-align:left;color:var(--ink-1)}
 .tile:hover{border-color:var(--color-text)} .tile .lbl{text-transform:none;letter-spacing:0;font:800 13px/1.2 var(--font-heading);color:var(--ink-1)} .tile .meta{font-weight:400}
-.tile .ic{width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:var(--color-accent-100);color:var(--color-accent)}
+.tile .ic{width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:var(--color-accent-100);color:var(--color-accent-text)}
 .tile--wide{grid-column:1 / -1;flex-direction:row;align-items:center}
 .capsules{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:var(--sp-4)}
 .capsule{display:flex;flex-direction:column;gap:2px;padding:var(--sp-5);background:var(--surface);border:1px solid var(--color-divider);border-top:2px solid var(--color-text);min-width:0}
-.capsule__k{font:600 10px/1.3 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.capsule__k{font:600 12px/1.35 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
 .capsule__v{font:800 22px/1.1 var(--font-heading);font-variant-numeric:tabular-nums;letter-spacing:-.01em;word-break:break-word}
-.capsule__d{font-size:11px;color:var(--ink-3)}
+.capsule__d{font-size:12px;color:var(--ink-3)}
 .capsule--gold{border-top-color:var(--color-accent);background:var(--color-accent-100)} .capsule--ok{border-top-color:var(--success)} .capsule--warn{border-top-color:var(--warn)}
 .capsule--bad{border-top-color:var(--danger)} .capsule--info,.capsule--soft{border-top-color:var(--color-neutral-500)}
 :root[data-theme="dark"] .capsule--gold{background:#3a201c}
@@ -368,7 +416,7 @@ button.cmd{width:100%} .cmd:hover{border-color:var(--color-text);border-left-col
 }
 .bestmatch{background:var(--color-text);color:var(--color-bg);padding:var(--sp-6);display:flex;flex-direction:column;gap:var(--sp-4)}
 .bestmatch__price{font:800 var(--fs-2xl)/1 var(--font-heading);font-variant-numeric:tabular-nums} .bestmatch__why{font-size:12px;color:color-mix(in srgb,var(--color-bg) 70%,transparent)}
-.bestmatch .btn--primary{background:var(--color-accent);color:#fff}
+.bestmatch .btn--primary{background:var(--color-accent-surface);color:#fff}
 /* A FIELD INSIDE AN INVERTED PANEL. `.bestmatch` flips its own background to
    the ink colour but is not `.on-plum`, so `.field > label` kept its dark
    `--ink-2` and rendered at a contrast ratio of 1.00 against the panel — the
@@ -383,7 +431,7 @@ button.cmd{width:100%} .cmd:hover{border-color:var(--color-text);border-left-col
 .moneyflow__node{flex:1;min-width:0;padding:var(--sp-5);display:flex;flex-direction:column;gap:2px} .moneyflow__node + .moneyflow__node{border-left:1px solid var(--color-divider)}
 .moneyflow__arrow{display:flex;align-items:center;padding:0 6px;color:var(--ink-4)} .moneyflow__split{border-top:2px solid var(--color-divider)}
 .state{display:inline-flex;align-items:center;gap:6px;font:600 11px/1 var(--font-body);letter-spacing:.06em;text-transform:uppercase;padding:4px 8px;border:1px solid currentColor}
-.state--available{color:var(--success)} .state--held{color:var(--warn)} .state--pending{color:var(--ink-3)} .state--released{color:var(--color-accent)}
+.state--available{color:var(--success)} .state--held{color:var(--warn)} .state--pending{color:var(--ink-3)} .state--released{color:var(--color-accent-text)}
 .metricrow{display:flex;gap:var(--sp-4);overflow-x:auto;scrollbar-width:none;flex-wrap:wrap} .metricrow::-webkit-scrollbar{display:none}
 .metricrow > *{flex:1 1 120px;min-width:0}
 
@@ -394,7 +442,7 @@ button.cmd{width:100%} .cmd:hover{border-color:var(--color-text);border-left-col
 .timeline__node,.timeline > li,.node{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--color-divider);align-items:flex-start;position:relative}
 .timeline__dot{width:18px;height:18px;flex:none;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font:800 10px/1 var(--font-heading);background:var(--bg)}
 .timeline__node.done .timeline__dot,.done > .timeline__dot{background:var(--color-text);color:var(--color-bg)}
-.timeline__node.cur .timeline__dot,.cur > .timeline__dot{border-color:var(--color-accent);background:var(--color-accent);color:#fff}
+.timeline__node.cur .timeline__dot,.cur > .timeline__dot{border-color:var(--color-accent);background:var(--color-accent-surface);color:#fff}
 .timeline__label{font-size:14px;font-weight:600} .timeline__bar{display:none} .timeline .pend,.timeline .old{color:var(--ink-3);font-weight:400}
 .timeline--list{flex-direction:column}
 .track,.mini-track{display:flex;gap:3px;margin:8px 0} .track i,.mini-track i{flex:1;height:4px;background:var(--color-neutral-300)} .track i.on,.mini-track i.on{background:var(--color-text)} .track i.cur,.mini-track i.cur{background:var(--color-accent)}
@@ -474,7 +522,7 @@ button.cmd{width:100%} .cmd:hover{border-color:var(--color-text);border-left-col
   font:400 12.5px/1.45 var(--font-body)}
 .sysbar b{display:block;font:800 13px/1.3 var(--font-heading)}
 .sysbar span{display:block;margin-top:2px;opacity:.85}
-.sysbar--bad{background:var(--color-accent);color:#fff;border-bottom-color:var(--color-accent)}
+.sysbar--bad{background:var(--color-accent-surface);color:#fff;border-bottom-color:var(--color-accent)}
 .sysbar--warn{background:var(--color-text);color:var(--color-bg)}
 .rail > *{flex:0 0 auto;scroll-snap-align:start;min-width:132px}
 @media (min-width:900px){ .rail{margin:0;padding-inline:0} }

@@ -66,11 +66,34 @@ export function counts(st) {
  *   "what would this do" must not do it: this function used to write a real
  *   `data.demoPurged` entry and wipe every picture whenever a suite ran.
  */
+/** Has a real person signed up on this device? An account created by hand is
+    not example data, and neither is the money and history hanging off it. */
+export function hasRealAccount(st) {
+  /* USE THE MODULE'S OWN DISCRIMINATOR, NOT A SECOND ONE. My first version
+     tested `origin !== 'demo'` and so counted a seeded user whose demo-ness is
+     carried by its MOBILE RANGE as a real person -- which would have kept the
+     roster on a pure demo device for ever. `isDemo` is the one definition of
+     example data in this file and the only one that may decide this. */
+  return (st.users || []).some(u => u && !isDemo(u) && u.role !== 'admin');
+}
+
 export function purgeIfDemoResidue(st, demoMode, opts = {}) {
   const commit = opts.commit !== false;
   if (demoMode) return st;
   const r = demoResidue(st);
   if (!r.total) return st;
+  /* AND IT TOOK HER ACCOUNT WITH IT. The purge is all-or-nothing because an
+     order pointing at an example partner cannot be left dangling -- true, and
+     the comment in app.js has said for versions that this means an account
+     signed up by hand during a demo session "goes with the roster", which is
+     "baffling if nobody says so". Nobody said so. An audit reloaded the page
+     without the query string and lost her account, her orders, her ledger and
+     an open complaint, under a toast that said only "Example data removed".
+     Data loss is not a tidy-up. Where a real person has signed up on this
+     device, nothing is purged: the example roster stays too, which keeps every
+     reference intact, and the owner's own wipe (freshStart) is still one tap
+     away in Settings for anyone who actually wants an empty device. */
+  if (hasRealAccount(st)) return st;
   if (commit) {
     audit.record('data.demoPurged', { ...r, kept: 'admin, settings' }, 'system');
     photos.gc([]);               // the example roster's pictures go with it

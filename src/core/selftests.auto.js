@@ -29,10 +29,21 @@ describe('fresh · demo never leaks, the credential and the dials always survive
     const st = { users: [{ mobile: '9876543210' }], partners: [], shops: [], products: [] };
     expect(F.purgeIfDemoResidue(st, false)).toBe(st);
   });
-  it('demo mode keeps the roster; production mode drops it', () => {
+  it('demo mode keeps the roster; production mode drops it — on a device nobody signed up on', () => {
+    /* the fixture carries a hand-made account (mobile 9876543210 is outside the
+       example range), and this used to assert that a plain reload deleted it.
+       An audit reloaded without the query string and lost her account, her
+       orders, her ledger and an open complaint. Data loss is not a tidy-up, so
+       the purge now stands down where a real person has signed up — and this
+       asserts BOTH halves of that rule. */
     const st = demoState();
     expect(F.purgeIfDemoResidue(st, true)).toBe(st);
-    const out = F.purgeIfDemoResidue(st, false, { commit: false });   // judge it, do not perform it
+    expect(F.hasRealAccount(st)).toBeTrue();
+    expect(F.purgeIfDemoResidue(st, false, { commit: false })).toBe(st);
+
+    const demoOnly = { ...st, users: st.users.filter(u => u.origin === 'demo') };
+    expect(F.hasRealAccount(demoOnly)).toBeFalse();
+    const out = F.purgeIfDemoResidue(demoOnly, false, { commit: false });
     expect(out.users).toHaveLength(0); expect(out.orders).toHaveLength(0); expect(out.ledger).toHaveLength(0);
     expect(out.seeded).toBeFalse();
   });

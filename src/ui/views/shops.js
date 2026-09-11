@@ -34,6 +34,9 @@ import { getPricing } from '../../domain/settings.js';
 import * as gateway from '../../core/gateway.js';
 import * as photo from '../photo.js';
 import { mark } from '../logo.js';
+import * as ADDR from '../address.js';
+import * as flags from '../../core/flags.js';
+import { t, catName } from '../i18n.js';
 
 let shopFilter = '';
 export const setShopFilter = v => { shopFilter = v; };
@@ -45,7 +48,12 @@ delegate('click', '[data-aisle]', (e, el) => { shopFilter = el.dataset.aisle || 
 
 /* The delivery mode lives here, next to the view that renders it. Displayed
    price and charged price must be the same number, always. */
-let cartMode = 'rider';
+/* AND IT DEFAULTED TO A COURIER NOBODY HAD HIRED. "SAAHAA rider" was the first
+   and default option while `flags.RIDER_POOL` was false and no rider role
+   existed anywhere in the product — so the shop drove the delivery itself,
+   under a label naming somebody else. The default is the shop's own arrangement
+   until the network is real. */
+let cartMode = 'rider';   // "delivered to me" while RIDER_POOL is off — the label, not the courier
 export const setCartMode = m => { cartMode = m; };
 export const getCartMode = () => cartMode;
 
@@ -60,10 +68,10 @@ const BADGE_LABEL = {
 export const SYS_CSS = `<style>
   .m-row{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid var(--color-divider);align-items:flex-start;
     width:100%;text-align:left;color:inherit;background:none;border-left:0;border-right:0;border-top:0;text-decoration:none}
-  .m-row:last-child{border-bottom:0} button.m-row,a.m-row{cursor:pointer} button.m-row:hover .m-row__t,a.m-row:hover .m-row__t{color:var(--color-accent)}
-  .m-row__t{font:800 14px/1.2 var(--font-heading);color:var(--ink-1)} .m-row__m{font-size:11.5px;line-height:1.4;color:var(--ink-3);margin:3px 0 6px}
+  .m-row:last-child{border-bottom:0} button.m-row,a.m-row{cursor:pointer} button.m-row:hover .m-row__t,a.m-row:hover .m-row__t{color:var(--color-accent-text)}
+  .m-row__t{font:800 14px/1.2 var(--font-heading);color:var(--ink-1)} .m-row__m{font-size:12.5px;line-height:1.45;color:var(--ink-3);margin:3px 0 6px}
   .m-row__m:last-child{margin-bottom:0} .m-row__tags{display:flex;gap:6px;flex-wrap:wrap}
-  .m-row__go{font:800 13px/1 var(--font-heading);color:var(--color-accent);align-self:center;flex:none}
+  .m-row__go{font:800 13px/1 var(--font-heading);color:var(--color-accent-text);align-self:center;flex:none}
   .m-row__r{text-align:right;flex:none;align-self:center} .m-row__r .num{font-size:15px}
   .m-lead{width:4px;align-self:stretch;background:var(--color-accent);flex:none} .m-lead--dim{background:var(--color-neutral-400)}
   .m-thumb{display:grid;place-items:center;color:var(--ink-3);overflow:hidden}
@@ -85,7 +93,7 @@ export const SYS_CSS = `<style>
   .m-front{height:150px;background:var(--color-neutral-300);border-bottom:2px solid var(--color-divider);
     display:grid;place-items:center;color:var(--ink-3);overflow:hidden}
   @media (min-width:768px){ .m-front{height:200px} }
-  .m-cap{font:600 9.5px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:0 0 8px}
+  .m-cap{font:600 12px/1.2 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:0 0 8px}
   /* On the ink grounds (.bestmatch, .on-plum) the muted ink of these classes
      is invisible — "THE BILL", "NEAREST" and the row meta all vanished on the
      booking card. Re-derive them from the paper colour instead. */
@@ -110,13 +118,13 @@ export const SYS_CSS = `<style>
   .m-set{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:48px;padding:6px 0;
     border-bottom:1px solid var(--color-divider);text-align:left;font-weight:600;color:inherit;background:none}
   .m-set:last-child{border-bottom:0} .m-set__v{color:var(--ink-3);font-weight:400;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:13px}
-  .m-set--em,.m-set--em .m-set__v{color:var(--color-accent)}
+  .m-set--em,.m-set--em .m-set__v{color:var(--color-accent-text)}
   .m-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
   .m-step{display:flex;gap:12px;align-items:flex-start} .m-step__dot{width:12px;height:12px;flex:none;margin-top:3px;background:var(--color-accent)}
   .m-step.pend .m-step__dot{background:transparent;border:2px solid var(--color-neutral-400)}
   .m-step__t{font:800 13px/1.3 var(--font-heading)} .m-step.pend .m-step__t{color:var(--ink-3)} .m-step__m{font-size:11px;color:var(--ink-3)}
-  .m-hero{background:var(--color-accent);color:#fff;padding:20px 14px 18px}
-  .m-hero .m-hero__k{font:800 10px/1 var(--font-heading);letter-spacing:.18em;opacity:.85;text-transform:uppercase}
+  .m-hero{background:var(--color-accent-surface);color:#fff;padding:20px 14px 18px}
+  .m-hero .m-hero__k{font:800 12px/1.2 var(--font-heading);letter-spacing:.18em;opacity:.85;text-transform:uppercase}
   .m-hero h1{font:800 27px/1.08 var(--font-heading);margin:10px 0 4px;color:#fff;letter-spacing:-.01em} .m-hero p{font-size:12.5px;opacity:.9}
   .m-grid2{display:grid;grid-template-columns:1fr 1fr}
   .m-prod{padding:10px;border-bottom:1px solid var(--color-divider);display:flex;flex-direction:column}
@@ -132,11 +140,11 @@ export const SYS_CSS = `<style>
   .m-prod__was .tag{padding:2px 6px;font-size:10px}
   .m-add{border:1px solid var(--color-text);padding:0 9px;min-height:44px;min-width:44px;font:800 11px/1 var(--font-heading);color:var(--ink-1)}
   .m-add:disabled{border-color:var(--color-divider);color:var(--ink-3);opacity:1}
-  .m-qty{display:inline-flex;align-items:center;background:var(--color-accent);color:#fff;font:800 12px/1 var(--font-heading);min-height:44px}
+  .m-qty{display:inline-flex;align-items:center;background:var(--color-accent-surface);color:#fff;font:800 12px/1 var(--font-heading);min-height:44px}
   .m-qty button{color:inherit;min-width:44px;min-height:44px;font:800 15px/1 var(--font-heading)} .m-qty b{padding:0 2px}
   .m-two{display:block} @media (min-width:1024px){ .m-two{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:var(--sp-9);align-items:start} .m-two > *{min-width:0} }
   .m-stars{display:flex;gap:6px} .m-stars button{font-size:33px;line-height:1;color:var(--color-neutral-400);min-width:44px;min-height:44px}
-  .m-stars button:hover,.m-stars button:focus-visible{color:var(--color-accent)}
+  .m-stars button:hover,.m-stars button:focus-visible{color:var(--color-accent-text)}
   @media (min-width:768px){ .m-grid2{grid-template-columns:repeat(3,1fr)} .m-grid2 .m-prod:nth-child(odd){border-right:0} .m-grid2 .m-prod:not(:nth-child(3n)){border-right:1px solid var(--color-divider)} }
   @media (min-width:1200px){ .m-grid2{grid-template-columns:repeat(4,1fr)} .m-grid2 .m-prod:not(:nth-child(3n)){border-right:0} .m-grid2 .m-prod:not(:nth-child(4n)){border-right:1px solid var(--color-divider)} }
 </style>`;
@@ -201,7 +209,7 @@ function cartBar(shop) {
   const sameShop = cart.shopId === shop.id;
   return `<div class="m-bar">
     <div class="grow">
-      <div class="m-bar__t">${n} item${n === 1 ? '' : 's'} · ${M.fmt(q.customerPays)}</div>
+      <div class="m-bar__t">${n} item${n === 1 ? '' : 's'} · ${M.fmtMax(q.customerPays)}</div>
       <div class="m-bar__m">${sameShop ? deliveryLine(q) : `In your cart from ${esc(q.shop.name)}`}</div>
     </div>
     <button class="btn btn--primary" data-act="nav.cart">View cart</button>
@@ -239,7 +247,7 @@ export function renderList(catId) {
     <div class="chiprow" style="margin:10px 0;flex-wrap:wrap">
       ${retailCats.map(c => `<button class="chip ${c.id === activeId ? 'on' : ''}" aria-pressed="${c.id === activeId}"
         data-act="shops.cat" data-id="${c.id}">
-        <span class="chip__ic" aria-hidden="true">${hasIcon(c.id) ? icon(c.id, { size: 14 }) : ''}</span>${esc(c.name)}</button>`).join('')}
+        <span class="chip__ic" aria-hidden="true">${hasIcon(c.id) ? icon(c.id, { size: 14 }) : ''}</span>${esc(catName(c))}</button>`).join('')}
     </div>
 
     <div class="between" style="padding:9px 0;border-top:1px solid var(--color-divider);border-bottom:2px solid var(--color-divider);font-size:11.5px;color:var(--ink-3)">
@@ -311,7 +319,7 @@ export function renderShop(shopId) {
       <div class="row" style="gap:6px;flex-wrap:wrap">
         <span class="tag tag-accent">${esc(s.ratingAvg)} ★ (${s.ratingCount})</span>
         <span class="tag tag-neutral">${s.fillRate}% in stock</span>
-        <span class="tag tag-neutral">Free delivery over ${M.fmt(s.freeDeliveryAbove)}</span>
+        <span class="tag tag-neutral">${esc(t('shopf.freeOver', { amount: M.fmt(s.freeDeliveryAbove) }))}</span>
         ${(s.badges || []).map(b => `<span class="tag tag-neutral">${esc(BADGE_LABEL[b] || b)}</span>`).join('')}
       </div>
       ${s.fssai || s.drugLicence ? `<p class="micro muted" style="margin-top:8px">
@@ -359,18 +367,43 @@ export function renderShop(shopId) {
 function productCard(p, line) {
   const out = p.trackStock && p.stockQty <= 0;
   const low = p.trackStock && p.stockQty > 0 && p.stockQty <= p.lowStockAt;
-  const off = p.mrp && p.mrp > p.price ? Math.round((1 - p.price / p.mrp) * 100) : 0;
-  const stock = out ? 'Out of stock' : low ? `Only ${p.stockQty} left` : p.trackStock ? `In stock · ${p.stockQty} left` : 'In stock';
-  const control = out ? '<button class="m-add" disabled>ADD</button>'
+  /* "₹20  ₹20  2% off" — A STRUCK-THROUGH MRP EQUAL TO THE PRICE BESIDE IT.
+     The saving was computed on PAISE (₹19.60 against ₹20.00) and both figures
+     printed rupee-rounded, so the badge announced a discount the shelf label
+     flatly contradicted. On a screen whose own footer promises "item prices
+     never exceed MRP", that is a false claim about money, and in India it is a
+     false claim under consumer law. A discount has to survive being displayed:
+     at least a rupee off, and at least one whole percent. */
+  /* AND SUPPRESSING THE SUB-RUPEE CASE DID NOT FIX THE PERCENTAGE. The badge
+     was still computed on PAISE while the two prices beside it printed rounded,
+     so "₹99, was ₹105, 5% off" sat six rows above "₹99, was ₹105, 6% off" —
+     identical printed prices, different badges, on a page whose own footer
+     promises item prices never exceed MRP. A shopper disproves that with one
+     second of mental arithmetic, and in India a mis-stated discount is a
+     consumer-law exposure rather than a rounding nit.
+
+     The badge describes what is PRINTED, so it is computed from what is
+     printed. Same rule as every bill on the customer's path. */
+  const shownPrice = Math.round(p.price / 100);
+  const shownMrp = Math.round((p.mrp || 0) / 100);
+  const off = shownMrp > shownPrice ? Math.max(1, Math.round((1 - shownPrice / shownMrp) * 100)) : 0;
+  /* THE SCREEN A KIRANA SHOPPER LIVES ON, measured at ~2% Telugu: every aisle,
+     every stock line, the word ADD and the delivery promise were English on a
+     page whose product names are the only thing she can read. */
+  const stock = out ? t('shopf.outOfStock')
+    : low ? t('shopf.onlyLeft', { n: p.stockQty })
+    : p.trackStock ? t('shopf.inStockN', { n: p.stockQty })
+    : t('shopf.inStock');
+  const control = out ? `<button class="m-add" disabled>${esc(t('shopf.add'))}</button>`
     : p.rxRequired ? `<button class="m-add" data-act="rx.info">Rx</button>`
     : line ? `<span class="m-qty" aria-label="${line.qty} in cart">
         <button data-act="cart.dec" data-id="${line.lineId}" aria-label="One less">−</button><b>${line.qty}</b>
         <button data-act="cart.inc" data-id="${line.lineId}" aria-label="One more">+</button></span>`
-    : `<button class="m-add" data-act="cart.add" data-id="${p.id}" aria-label="Add ${esc(p.name)}">ADD</button>`;
+    : `<button class="m-add" data-act="cart.add" data-id="${p.id}" aria-label="${esc(t('shopf.addNamed', { name: p.name }))}">${esc(t('shopf.add'))}</button>`;
   return `<div class="m-prod" style="${out ? 'opacity:.55' : ''}">
     <div class="m-prod__img">${picture(p.photo, p.name) || icon(prodGlyph(p), { size: 22 })}</div>
     <div class="m-prod__t">${esc(p.name)}</div>
-    <div class="m-prod__m">${esc(stock)} · ${esc(p.unit)}${p.variableWeight ? ' · weighed at packing' : ''}${
+    <div class="m-prod__m">${esc(stock)} · ${esc(p.unit)}${p.variableWeight ? ' · ' + esc(t('shopf.weighedAtPacking')) : ''}${
       p.coldChain ? ' · cold chain' : ''}${p.rxRequired ? ' · prescription needed' : ''}${p.perishable && p.mfgDate ? ' · packed today' : ''}</div>
     <div class="m-prod__b">
       <span class="m-prod__price"><b class="m-prod__p">${M.fmt(p.price)}</b>${off
@@ -391,10 +424,64 @@ export function renderCart() {
   const q = flow.cartQuote(cartMode);
   if (!q) { flow.clearCart(); return renderCart(); }   // shop vanished under us
   const provisional = cart.lines.some(l => l.variableWeight);
+  /* nowhere to send it: a delivery mode that needs a door, and no door given */
+  const needsAddr = !!me() && ADDR.modeNeedsAddress(cartMode) && !ADDR.looksLikeAddress((me() || {}).address);
   const n = cart.lines.reduce((a, l) => a + l.qty, 0);
   const w = flow.customerWallet();
-  const fromWallet = Math.min(w.balance, q.customerPays);
-  const viaGateway = q.customerPays - fromWallet;
+  /* the two halves must add to the total printed above them — see
+     core/money.js roundParts. Printed independently they read
+     "₹10 from wallet · ₹729 by UPI" under a total of ₹740. */
+  /* AND THIS WAS THE CALL THAT INVENTED ₹9. `shopPayout` and `platformFee` do
+     NOT sum to the basket — the rider's ₹14 and SAAHAA's ₹5 dispatch sit
+     between them — so `roundParts` read a ₹19 gap as rounding drift and split
+     it across the two lines, printing SAAHAA's ₹20.31 fee as **₹29** on a
+     screen that promises "never more than ₹25". A display helper that
+     disagrees with the engine by ₹9 is worse than the misalignment it was
+     written to fix, and it made the product call itself a liar.
+
+     Every part of the basket goes in, so there is nothing left to invent. */
+  /* AND ADDING EVERY PART WAS ONLY RIGHT WHEN DELIVERY IS FREE. When SHE pays
+     the delivery, the rider and the dispatch cut come out of the fee she paid,
+     not out of the basket — so on an ordinary paid-delivery order this handed
+     the helper ₹19 that did not belong to `itemsTotal`, and the guard caught it
+     on every single cart. The parts are the parts of THIS basket. */
+  /* "SRI LAKSHMI KIRANA RECEIVES ₹1,081" while the shop's own screen said
+     ₹1,095. There is no rider network, so the shop makes the delivery and is
+     paid for it — her screen subtracted the delivery and never added back the
+     part that reaches them. Both screens describe one order, so both print one
+     number: what the shop is actually paid, SAAHAA's charge, and the dispatch
+     cut, which together are exactly what she pays. */
+  const ownDelivery = flags.isOn('RIDER_POOL') ? 0 : (q.riderPayout | 0);
+  const [shopGets, shopFee, shopDispatch] = M.roundParts(
+    [(q.shopPayout | 0) + ownDelivery, q.platformFee | 0, q.dispatchCut | 0], q.customerPays);
+  /* items + delivery must add to the total printed under them */
+  const cartRow = M.fmtParts([q.itemsTotal, q.deliveryFee], q.customerPays);
+  /* AND THE ROWS ABOVE THE BILL WERE NEVER ROUNDED WITH IT. Seven lines summing
+     ₹678 sat under "you pay ₹677", and the same basket rendered ₹283 here and
+     ₹282 on the order she was charged for — two rounding regimes for one
+     shelf. The receipt already does this; the cart now does it the same way. */
+  /* AND REDISTRIBUTING THE DRIFT PUT IT ON THE ONE LINE SHE CHECKS. A ₹677.41
+     can showed ₹677 on the shelf and ₹676 in the cart, because `roundParts`
+     dumps the correction on the LARGEST part — which on a grocery column is
+     always the item she remembers the price of.
+
+     Fee, GST and payout are parts of one whole and must be made to sum. Seven
+     grocery lines are seven independent facts; forcing them to sum to a rounded
+     basket is asking one of them to be wrong. Each line prints its own honest
+     rounding, and the basket beneath prints the paise so the column can still
+     be checked. */
+  /* AND IT STOPPED HALF WAY, exactly as the receipt did. The check below is
+     right -- it notices when the column cannot be added up in whole rupees --
+     and then moved only the SUBTOTAL to paise, so four rows reading ₹282, ₹517,
+     ₹65 and ₹1,642 summed to ₹2,506 beside a total of ₹2,505. If the column
+     descends to paise, all of it descends. */
+  const lineSum = (cart.lines || []).reduce((n, l) => n + Math.round((l.unitPrice | 0) * l.qty / 100) * 100, 0);
+  const cartPaise = lineSum !== Math.round(q.itemsTotal / 100) * 100;
+  const lineRow = (cart.lines || []).map(l =>
+    (cartPaise ? M.fmt2 : M.fmt)((l.unitPrice | 0) * l.qty));
+  const itemsShown = cartPaise ? M.fmt2(q.itemsTotal) : M.fmt(q.itemsTotal);
+  const fromWalletP = Math.min(w.balance, q.customerPays);
+  const [fromWallet, viaGateway] = M.roundParts([fromWalletP, q.customerPays - fromWalletP], q.customerPays);
 
   return `
   ${header('Checkout', `${q.shop.name} · ${q.km} km`)}
@@ -403,7 +490,7 @@ export function renderCart() {
     <div>
     <div class="m-sec">
       <p class="m-cap">${n} item${n === 1 ? '' : 's'}</p>
-      ${cart.lines.map(l => {
+      ${cart.lines.map((l, li) => {
         /* the picture the customer chose the item by, at the same 44px box
            whether the shop photographed it or not */
         const prod = getState().products.find(x => x.id === l.productId);
@@ -413,13 +500,16 @@ export function renderCart() {
           picture(prod && prod.photo, '') || icon(prodGlyph(prod || l), { size: 18 })}</span>
         <div class="grow" style="min-width:0">
           <div class="m-row__t">${esc(l.name)}</div>
-          <div class="m-row__m">${M.fmt(l.unitPrice)} ${esc(l.unit)}${l.variableWeight ? ' · est. until weighed' : ''}</div>
-          <p class="m-cap" style="margin:8px 0 6px">If it is out of stock</p>
+          <!-- "₹63 kg · 3 · ₹188" — 63 x 3 is 189. The unit price was rounded and the
+               extension was not, so the two numbers she multiplies in her head could
+               not produce the third. A price with paise in it is printed with them. -->
+          <div class="m-row__m">${(l.unitPrice | 0) % 100 ? M.fmt2(l.unitPrice) : M.fmt(l.unitPrice)} ${esc(l.unit)}${l.variableWeight ? ' · est. until weighed' : ''}</div>
+          <p class="m-cap" style="margin:8px 0 6px">${esc(t('cart.ifOutOfStock'))}</p>
           <div class="chiprow" style="flex-wrap:wrap">
             ${['similar','call','refund'].map(pol => `
               <button class="chip ${l.subPolicy === pol ? 'on' : ''}" style="min-height:44px;font-size:11.5px" aria-pressed="${l.subPolicy === pol}"
                 data-act="cart.sub" data-id="${l.lineId}" data-pol="${pol}">
-                ${pol === 'similar' ? 'Similar brand OK' : pol === 'call' ? 'Ask me' : 'Just refund'}
+                ${esc(pol === 'similar' ? t('cart.similarOk') : pol === 'call' ? t('cart.askMe') : t('cart.justRefund'))}
               </button>`).join('')}
           </div>
         </div>
@@ -428,7 +518,7 @@ export function renderCart() {
             <button data-act="cart.dec" data-id="${l.lineId}" aria-label="One less">−</button><b class="num">${l.qty}</b>
             <button data-act="cart.inc" data-id="${l.lineId}" aria-label="One more">+</button>
           </span>
-          <b class="num" style="display:block;margin-top:8px">${M.fmt(l.unitPrice * l.qty)}</b>
+          <b class="num" style="display:block;margin-top:8px">${lineRow[li]}</b>
         </div>
       </div>`;
       }).join('')}
@@ -438,9 +528,11 @@ export function renderCart() {
     </div>
 
     <div class="m-sec">
-      <p class="m-cap">How you get it</p>
+      <p class="m-cap">${esc(t('cart.howYouGet'))}</p>
       <div class="seg seg--block" role="group" aria-label="Delivery mode">
-        ${[['rider','SAAHAA rider'],['self','Shop delivers'],['pickup',"I'll pick up"]]
+        ${(flags.isOn('RIDER_POOL')
+            ? [['rider', 'SAAHAA rider'], ['self', t('cart.shopDelivers')], ['pickup', t('cart.pickUp')]]
+            : [['rider', t('cart.deliveredToMe')], ['pickup', t('cart.pickUp')]])
           .map(([m, l]) => `<button class="seg__btn ${cartMode === m ? 'on' : ''}"
             aria-pressed="${cartMode === m}" data-act="cart.mode" data-mode="${m}">${esc(l)}</button>`).join('')}
       </div>
@@ -449,38 +541,82 @@ export function renderCart() {
 
     <div>
     <div class="m-sec">
-      <p class="m-cap">Bill</p>
-      <div class="m-kv"><span>Items${provisional ? ' (est.)' : ''}</span><span class="num">${M.fmt(q.itemsTotal)}</span></div>
-      <div class="m-kv"><span>Delivery · ${q.km} km${cartMode === 'pickup' ? ' · pickup' : ''}</span><span class="num">${q.deliveryFee ? M.fmt(q.deliveryFee) : 'Free'}</span></div>
-      <div class="m-kv m-kv--total"><span>You pay${provisional ? ' (est.)' : ''}</span><span class="num">${M.fmt(q.customerPays)}</span></div>
-      <p class="m-note" style="margin-top:10px">${esc(q.shop.name)} receives ${M.fmt(q.shopPayout)}. SAAHAA's charge of
-        ${M.fmt(q.platformFee)} (${q.takePct}% of the basket) comes out of the shop's side, not your bill.
-        ${provisional ? 'Weight-based items are billed on the actual weighed weight.' : ''}</p>
+      <p class="m-cap">${esc(t('cart.bill'))}</p>
+      <div class="m-kv"><span>${esc(t('cart.items'))}${provisional ? ` (${esc(t('cart.est'))})` : ''}</span><span class="num">${itemsShown}</span></div>
+      <div class="m-kv"><span>${esc(t('cart.delivery'))} · ${q.km} km${cartMode === 'pickup' ? ' · ' + esc(t('cart.pickUp')) : ''}</span><span class="num">${q.deliveryFee ? cartRow[1] : esc(t('cart.free'))}</span></div>
+      <!-- AND THE TOTAL ROUNDED WHILE THE LINE ABOVE IT DID NOT. "సామాను ₹658.29 /
+           డెలివరీ ఉచితం / మీరు కట్టేది ₹658" — printed one line apart, on the screen
+           where she authorises the payment, and ₹658.29 is what escrow actually
+           took. The column and its total share one regime, the same rule the
+           receipt learned. -->
+      <div class="m-kv m-kv--total"><span>${esc(t('cart.youPay'))}${provisional ? ` (${esc(t('cart.est'))})` : ''}</span><span class="num">${(cartPaise ? M.fmt2 : M.fmt)(q.customerPays)}</span></div>
+      <!-- "receives ₹471" beside "items ₹485" and "SAAHAA's ₹15" — a
+           three-number sentence that does not reconcile, on the panel whose
+           whole purpose is to prove the shop keeps everything else. All three
+           come off one rounding now. -->
+      <p class="m-note" style="margin-top:10px">${esc(q.shop.name)} receives ${M.fmt(shopGets)}.
+        ${esc(t('cart.feeFromShop', { fee: M.fmt(shopFee), pct: q.takePct,
+          floor: M.fmt(getPricing().retailFeeFloorPaise), cap: M.fmt(getPricing().retailTakeCapPaise) }))}
+        <!-- "receives ₹1,182 · SAAHAA takes ₹25" on a bill of ₹1,256 left ₹49
+             unaccounted, on the one panel whose whole purpose is to say where
+             her money goes. The shop absorbed it so she saw "free delivery";
+             she was never told who paid for it. -->
+        ${q.shopAbsorbs ? esc(t('cart.shopCoversDelivery', { amount: M.fmt(q.shopAbsorbs), shop: q.shop.name })) : ''}
+        <!-- AND WHEN SHE PAYS FOR THE DELIVERY, THE SHOP IS THE ONE MAKING IT.
+             There is no rider network yet, so the delivery money goes to
+             whoever actually drove — which is the shop. Its own panel has said
+             "You made this delivery + ₹34" for versions; this sentence stopped
+             at the basket payout and so understated what the shop takes home by the
+             whole delivery, on the panel that exists to show her where her
+             money goes. Both sides now describe the same order. -->
+        ${(!flags.isOn('RIDER_POOL') && (q.riderPayout | 0) && !q.shopAbsorbs)
+          ? esc(t('cart.shopMakesDelivery', { amount: M.fmt(q.riderPayout), shop: q.shop.name })) : ''}
+        <!-- AND THE THIRD PART WAS COMPUTED AND NEVER PRINTED. shopDispatch
+             comes out of the same roundParts as the other two precisely so
+             the three sum to what she pays -- and the sentence stopped after
+             two. "You pay ₹46 · receives ₹36 · SAAHAA's charge ₹5" leaves ₹5
+             of her money unaccounted, on the panel whose whole purpose is to
+             say where it goes. The home page names this cut; her bill did not. -->
+        ${shopDispatch ? esc(t('cart.dispatchCut', { amount: M.fmt(shopDispatch) })) : ''}
+        ${provisional ? esc(t('cart.weighedNote')) : ''}</p>
     </div>
 
+    <!-- WHERE IT GOES. The cart never asked, so every grocery order shipped
+         with an empty address and the rider was sent to an area centroid — the
+         one defect the customer audit called "the product not working". The
+         service sheet has asked since 8.6.0; this is the same question, from
+         the same module, so the two cannot drift apart again. -->
+    ${me() && ADDR.modeNeedsAddress(cartMode) ? `<div class="m-sec">
+      <p class="m-cap">${esc(t('cart.whereItGoes'))}</p>
+      ${ADDR.addressFields({ required: true })}
+      <p class="micro muted" style="margin-top:-4px">${(me() || {}).address
+        ? esc(t('cart.savedAddress'))
+        : esc(t('cart.needDoor'))}</p>
+    </div>` : ''}
+
     <div class="m-sec">
-      <p class="m-cap">How you pay</p>
+      <p class="m-cap">${esc(t('cart.howYouPay'))}</p>
       <div class="m-kv"><span>From your SAAHAA wallet</span><span class="num">${M.fmt(fromWallet)}</span></div>
       <div class="m-kv"><span>${esc(gatewayLine())}</span><span class="num">${M.fmt(viaGateway)}</span></div>
-      <p class="micro muted" style="margin-top:6px">You pay SAAHAA. The money is held until you confirm the delivery — or until the wait shown on the order runs out — and only then is the shop paid.
-        An item the shop cannot supply is refunded to your wallet.</p>
+      <p class="micro muted" style="margin-top:6px">${esc(t('cart.heldUntil'))}</p>
     </div>
 
     <div class="m-bar" style="margin-top:0">
       <div class="grow">
-        <div class="m-bar__t">${n} item${n === 1 ? '' : 's'} · ${M.fmt(q.customerPays)}</div>
+        <div class="m-bar__t">${n} item${n === 1 ? '' : 's'} · ${M.fmtMax(q.customerPays)}</div>
         <div class="m-bar__m">${deliveryLine(q)}</div>
       </div>
       <!-- THE MINIMUM WAS ONLY REVEALED AFTER SHE COMMITTED. The button was fully
            enabled on a below-minimum basket and produced a transient toast that
            changed nothing on screen. Say the gap, in rupees, before the tap. -->
       <button class="btn btn--primary" data-act="cart.place"
-        ${q.itemsTotal < (q.shop.minOrder || 0) ? 'disabled' : ''}>Place order</button>
+        ${q.itemsTotal < (q.shop.minOrder || 0) ? 'disabled' : ''}>${esc(t('cart.place'))}</button>
     </div>
     ${q.itemsTotal < (q.shop.minOrder || 0)
       ? `<p class="m-note" style="margin-top:8px">${M.fmt((q.shop.minOrder || 0) - q.itemsTotal)} more to reach
-          ${esc(q.shop.name)}&rsquo;s ${M.fmt(q.shop.minOrder)} minimum.</p>` : ''}
-    <button class="btn btn--ghost btn--block" style="margin-top:8px" data-act="cart.clear">Empty cart</button>
+          ${esc(q.shop.name)}&rsquo;s ${M.fmt(q.shop.minOrder)} minimum.</p>`
+      : needsAddr ? `<p class="m-note" style="margin-top:8px">${esc(t('cart.addAddress'))}</p>` : ''}
+    <button class="btn btn--ghost btn--block" style="margin-top:8px" data-act="cart.clear">${esc(t('cart.empty'))}</button>
     </div>
     </div>
     <div style="height:24px"></div>
@@ -491,8 +627,36 @@ export function renderCart() {
 /* the gateway's own label, shortened to a bill line ("Via Sandbox UPI") */
 const gatewayLine = () => 'Via ' + gateway.label().split(' — ')[0];
 
+/* WHAT SHE TAPPED WAS THROWN AWAY. A guest tapping ADD was bounced to sign-in
+   with "Sign in to start a cart" — and after signing in the cart was empty and
+   she was on Home, not back at the shop. She had to find the shop, find the
+   item and tap ADD a second time, having already done exactly what the app
+   asked. The tap is remembered and replayed. */
+const PENDING = 'SAAHAA_PENDING_ADD';
+export function replayPendingAdd() {
+  let want = null;
+  try { want = JSON.parse(sessionStorage.getItem(PENDING) || 'null'); } catch (e) {}
+  try { sessionStorage.removeItem(PENDING); } catch (e) {}
+  if (!want || !want.productId) return null;
+  /* AN HOUR WAS FAR TOO LONG. The orphaned record fired twenty minutes later on
+     an unrelated sign-in and put somebody else's sugar in a new cart. This is a
+     tap she made seconds ago on her way to a sign-in form; anything longer than
+     the walk between those two screens is not that tap. */
+  if (Date.now() - (want.at || 0) > 10 * 60e3) return null;
+  const p = getState().products.find(x => x.id === want.productId);
+  if (!p) return null;
+  const r = flow.addToCart(p, 1);
+  if (r && r.ok) toast(`${p.name} is in your cart`);
+  return { shopId: p.shopId, ok: !!(r && r.ok) };
+}
+
 export function addToCart(productId) {
-  if (isGuest()) { toast('Sign in to start a cart'); ctx.go('auth'); return; }
+  if (isGuest()) {
+    try { sessionStorage.setItem(PENDING, JSON.stringify({ productId, at: Date.now() })); } catch (e) {}
+    toast('Sign in and we will put it straight in your cart');
+    ctx.go('auth');
+    return;
+  }
   const p = getState().products.find(x => x.id === productId);
   if (!p) return;
   const r = flow.addToCart(p, 1);

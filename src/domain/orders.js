@@ -36,9 +36,22 @@ const SERVICE_STAGES = [
   /* `needsOtp` is the old name for what is now the customer's own SAAHAA code
      read out at the door — no code is generated or sent any more. The field
      name is kept because orders in flight carry it. See domain/flow.js. */
-  { id:'ARRIVED',     label:'Pro has arrived',    short:'Arrived',    owner:'worker',   to:['IN_PROGRESS','CANCELLED','DISPUTED'], tracker:true, tone:'info', ico:'📍', needsOtp:true },
-  { id:'IN_PROGRESS', label:'Work in progress',   short:'Working',    owner:'worker',   to:['AWAITING_APPROVAL','WORK_DONE','DISPUTED'], tracker:true, tone:'info', ico:'🔨' },
-  { id:'AWAITING_APPROVAL', label:'Extra work — your approval needed', short:'Approve?', owner:'customer', to:['IN_PROGRESS','WORK_DONE','DISPUTED'], tracker:false, tone:'warn' },
+  /* ARRIVED → AWAITING_APPROVAL was the missing edge under a promise in bold.
+     21 sub-services are marked `survey: true` — pipeline replacement, house
+     shifting, termite treatment — and the booking sheet tells the customer, in
+     bold, "Ravi confirms it when they arrive and NOTHING STARTS UNTIL YOU
+     APPROVE THE NUMBER". `pricedOnSite` was written onto the order and read by
+     nothing; `o.deal` was set at booking from a hidden multiplier and never
+     patched anywhere in the repo. The pro arrived at a job escrowed at a number
+     the app invented and had no control to change it. This is the edge that
+     lets him quote what he can see. */
+  { id:'ARRIVED',     label:'Pro has arrived',    short:'Arrived',    owner:'worker',   to:['IN_PROGRESS','AWAITING_APPROVAL','CANCELLED','DISPUTED'], tracker:true, tone:'info', ico:'📍', needsOtp:true },
+  /* CANCELLED was missing here alone. EN_ROUTE and ARRIVED both carry it, so
+     the pro's "I cannot do this job" worked on the doorstep and silently did
+     nothing once he had started — `cancelOrder` advances, the advance was
+     refused, and the function returned with no error and no change. */
+  { id:'IN_PROGRESS', label:'Work in progress',   short:'Working',    owner:'worker',   to:['AWAITING_APPROVAL','WORK_DONE','CANCELLED','DISPUTED'], tracker:true, tone:'info', ico:'🔨' },
+  { id:'AWAITING_APPROVAL', label:'Price to approve',        short:'Approve?', owner:'customer', to:['ARRIVED','IN_PROGRESS','WORK_DONE','CANCELLED','DISPUTED'], tracker:false, tone:'warn' },
   { id:'WORK_DONE',   label:'Work finished',      short:'Done',       owner:'worker',   to:['SETTLED','PARTIAL','REFUNDED','DISPUTED'], tracker:true, tone:'ok', ico:'📸', needsEvidence:true },
   { id:'SETTLED',     label:'Paid & settled',     short:'Settled',    owner:'system',   to:['RATED','DISPUTED'], tracker:true, tone:'ok', ico:'💰' },
   { id:'RATED',       label:'Rated',              short:'Rated',      owner:'customer', to:['CLOSED'], tracker:false, tone:'ok' },
@@ -48,7 +61,7 @@ const SERVICE_STAGES = [
      three money buttons, none of which is "let him try again", so a pro whose
      customer read the code out correctly two seconds later still had a dead
      job and she had to rebook from scratch. */
-  { id:'DISPUTED',    label:'Under review',       short:'Disputed',   owner:'admin',    to:['SETTLED','PARTIAL','REFUNDED','CLOSED','ARRIVED','R_REFUNDED','R_CANCELLED'], tracker:false, tone:'bad', ico:'⚖️' },
+  { id:'DISPUTED',    label:'Under review',       short:'Disputed',   owner:'admin',    to:['SETTLED','PARTIAL','REFUNDED','CLOSED','ARRIVED','R_OUT','R_REFUNDED','R_CANCELLED'], tracker:false, tone:'bad', ico:'⚖️' },
   { id:'REFUNDED',    label:'Refunded',           short:'Refunded',   owner:'system',   to:['CLOSED'], tracker:false, tone:'warn' },
   { id:'CANCELLED',   label:'Cancelled',          short:'Cancelled',  owner:'either',   to:[], tracker:false, tone:'bad', terminal:true },
   { id:'EXPIRED',     label:'Expired',            short:'Expired',    owner:'system',   to:[], tracker:false, tone:'soft', terminal:true },
@@ -65,7 +78,7 @@ const RETAIL_STAGES = [
   { id:'R_PACKED',    label:'Weighed & packed',       short:'Packed',     owner:'shop',     to:['R_REAUTH','R_OUT','R_PICKUP_READY','R_CANCELLED'], tracker:true, tone:'ok', ico:'⚖️' },
   { id:'R_REAUTH',    label:'Final bill — approve',   short:'Approve',    owner:'customer', to:['R_OUT','R_CANCELLED'], tracker:false, tone:'warn' },
   { id:'R_PICKUP_READY', label:'Ready for pickup',    short:'Pickup',     owner:'customer', to:['R_DELIVERED'], tracker:false, tone:'ok' },
-  { id:'R_OUT',       label:'Out for delivery',       short:'On the way', owner:'rider',    to:['R_DELIVERED','R_FAILED'], tracker:true, tone:'info', ico:'🛵' },
+  { id:'R_OUT',       label:'Out for delivery',       short:'On the way', owner:'rider',    to:['R_DELIVERED','R_FAILED','DISPUTED'], tracker:true, tone:'info', ico:'🛵' },
   { id:'R_DELIVERED', label:'Delivered',              short:'Delivered',  owner:'rider',    to:['R_SETTLED','R_RETURN'], tracker:true, tone:'ok', ico:'✅', needsOtp:true },
   { id:'R_FAILED',    label:'Delivery failed',        short:'Failed',     owner:'system',   to:['R_RETURN','R_CANCELLED'], tracker:false, tone:'bad' },
   /* A RETURN WAS A ONE-WAY DOOR. The only edge out was R_REFUNDED, reachable
@@ -74,7 +87,12 @@ const RETAIL_STAGES = [
      control at all except the map and the chat. The admin's own escape hatch
      could not reach it either (it advances to R_CANCELLED, which was not an
      edge). She can escalate now, and the owner can end it. */
-  { id:'R_RETURN',    label:'Return requested',       short:'Return',     owner:'customer', to:['R_REFUNDED','R_CANCELLED','DISPUTED'], tracker:false, tone:'warn' },
+  /* R_SETTLED is reachable from a return because a return may be PARTIAL: one
+     bad item goes back, she is refunded for it, and the shopping she kept is
+     settled like any other delivered order. Without this edge the only way
+     out of a return was to refund the whole basket, which is exactly the
+     behaviour a kirana audit called unusable. */
+  { id:'R_RETURN',    label:'Return requested',       short:'Return',     owner:'customer', to:['R_REFUNDED','R_SETTLED','R_CANCELLED','DISPUTED'], tracker:false, tone:'warn' },
   { id:'R_REFUNDED',  label:'Refunded',               short:'Refunded',   owner:'system',   to:['R_CLOSED'], tracker:false, tone:'warn' },
   { id:'R_SETTLED',   label:'Settled',                short:'Settled',    owner:'system',   to:['R_CLOSED'], tracker:true, tone:'ok', ico:'💰' },
   { id:'R_CANCELLED', label:'Cancelled',              short:'Cancelled',  owner:'either',   to:[], tracker:false, tone:'bad', terminal:true },
@@ -103,6 +121,14 @@ export function applyTransition(order, toId, patch = {}, now = Date.now()) {
   const hist = (order.history || []).concat([{ stage: toId, at: now }]);
   return { ...order, ...patch, stage: toId, stageTs: now, history: hist };
 }
+
+/* SETTLED IS SETTLED. A paid, step-7-of-7 job carried no `terminal` flag, so
+   `!isTerminal` counted it live — it sat under "Still open" on Account and
+   "Happening now" on Orders, and the only way to clear it was to rate somebody.
+   The fix was applied to one screen and the other kept its own copy of the
+   predicate, which is how it survived a pass. There is one predicate now. */
+export const DONE_STAGES = ['SETTLED', 'R_SETTLED', 'PARTIAL', 'REFUNDED', 'R_REFUNDED'];
+export const isDone = stage => isTerminal(stage) || DONE_STAGES.includes(stage);
 
 export function isTerminal(id) { const s = get('orderStage', id); return !!(s && s.terminal); }
 

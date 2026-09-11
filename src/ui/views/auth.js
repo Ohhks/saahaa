@@ -38,10 +38,15 @@
 
 import { mount, esc, toast, sheet, delegate } from '../dom.js';
 import * as ID from '../../domain/identity.js';
-import { liveMarkup, AGG_COMMISSION } from '../../domain/pricing.js';
+import { liveMarkup, AGG_COMMISSION, RETAIL_FEE_FLOOR, RIDER_DISPATCH_CUT } from '../../domain/pricing.js';
+import { FREE_FIRST_ORDERS } from '../../domain/flow.js';
+import { MIN_STAKE, MAX_STAKE, STAKE_PCT } from '../../domain/wallet.js';
 import { getPricing } from '../../domain/settings.js';
 import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, dispatch, saveSession, me } from '../../core/ctx.js';
+import * as adminauth from '../../core/adminauth.js';
+import * as shopsView from './shops.js';
+import { t, catName, langPicker } from '../i18n.js';
 import * as photoUI from '../photo.js';
 import { sha256 } from '../../core/crypto.js';
 import { nid } from '../../core/id.js';
@@ -103,6 +108,38 @@ function shopFee() {
            cap: (c && c.takeCapPaise != null) ? c.takeCapPaise : P.retailTakeCapPaise };
 }
 
+/* AND ON THE CHOOSER NOTHING IS CHOSEN YET, so `shopFee()` fell back to the
+   dials and every recruiting screen said a flat "3% an order, capped at ₹25".
+   Five of the eight categories charge 5%, and three of those cap at ₹50 — so
+   the headline was true for kirana, veg and meat, and understated the fee for
+   dairy, pharmacy, water, stationery and pet supplies. A shop signing up for
+   any of those was quoted a rate SAAHAA does not charge it.
+
+   The same screens never mentioned the ₹5 floor, the ₹5 dispatch cut, or the
+   best term in the whole offer: the first thirty orders cost nothing at all,
+   no percentage and no minimum. Overstating the cheapest number while hiding
+   the most generous one is a strange way to recruit.
+
+   Before a category is picked this states the RANGE and the free thirty; once
+   one is picked, `shopFee()` above gives that category's own exact figures. */
+function shopFeeRange() {
+  const cats = retCats();
+  const pcts = cats.map(c => c.takePct).filter(v => v != null);
+  const caps = cats.map(c => c.takeCapPaise).filter(v => v != null);
+  if (!pcts.length) { const F = shopFee(); return { one: true, lo: F.pct, hi: F.pct, capLo: F.cap, capHi: F.cap }; }
+  const lo = Math.min(...pcts), hi = Math.max(...pcts);
+  const capLo = Math.min(...caps), capHi = Math.max(...caps);
+  return { one: lo === hi && capLo === capHi, lo, hi, capLo, capHi };
+}
+/* "3% capped ₹25" when every category agrees, "3–5% capped ₹25–₹50" when they
+   do not. It reads the catalogue, so adding a category cannot make it lie. */
+function shopFeeWords() {
+  const r = shopFeeRange();
+  const pct = r.lo === r.hi ? `${r.lo}%` : `${r.lo}–${r.hi}%`;
+  const cap = r.capLo === r.capHi ? M.fmt(r.capHi) : `${M.fmt(r.capLo)}–${M.fmt(r.capHi)}`;
+  return { pct, cap };
+}
+
 /* a registry accent is code, not user input — but it lands in a style
    attribute, so only a colour is ever let through */
 const safeAccent = v => (/^#[0-9a-fA-F]{3,8}$/.test(String(v || '')) ? String(v) : 'var(--color-accent)');
@@ -149,7 +186,7 @@ export function render() {
   <header class="apphdr au__hdr">
     <button class="btn btn-ghost tap" style="min-width:44px" data-act="nav.home" aria-label="Back">${icon('back', { size: 18 })}</button>
     <div class="grow"><span class="wordmark">SAAHAA</span></div>
-    <button class="btn btn-ghost" data-act="auth.tab" data-tab="${tab === 'login' ? 'signup' : 'login'}">${tab === 'login' ? 'Create account' : 'Sign in'}</button>
+    <button class="btn btn-ghost" data-act="auth.tab" data-tab="${tab === 'login' ? 'signup' : 'login'}">${esc(tab === 'login' ? t('auth.createAccount') : t('auth.signIn'))}</button>
   </header>
 
   ${tab === 'signup' ? `<div class="au__hero">
@@ -162,7 +199,11 @@ export function render() {
     ${tab === 'login' ? loginForm() : signupForm()}
 
     <div class="au__links">
-      <button class="btn btn-ghost btn--sm" style="padding:0" data-act="nav.admin">Owner? Admin console</button>
+      <!-- The owner knows where their own console is; a first-time customer
+           reading "Owner? Admin console" under the sign-in button learns only
+           that this app is not really for her. The route still works for anyone
+           who types it, and the password still guards it. -->
+      ${adminauth.isLoggedIn() ? `<button class="btn btn-ghost btn--sm" style="padding:0" data-act="nav.admin">Admin console</button>` : ''}
       <a href="#/legal/terms">Terms</a>
       <a href="#/legal/privacy">Privacy</a>
       <a href="#/legal/refunds">Refunds</a>
@@ -179,18 +220,27 @@ export function render() {
 
 function loginForm() {
   return `
-  <div class="au__step" style="border-top:0"><b>Sign in</b><span>Your number, or your SAAHAA ID</span></div>
+  <div class="au__step" style="border-top:0"><b>${esc(t('auth.signIn'))}</b><span>${esc(t('auth.idHint'))}</span></div>
   <div class="au__form">
-    <div class="field"><input id="lgMobile" inputmode="text" maxlength="12" placeholder=" " autocomplete="username" autocapitalize="characters"><label>Mobile number or SAAHAA ID</label></div>
-    <p class="micro muted" style="margin:-8px 0 14px">A SAAHAA ID — <b class="num">C20262001</b>, <b class="num">P20262001</b>, <b class="num">S20262001</b> —
+    <div class="field"><input id="lgMobile" inputmode="text" maxlength="12" placeholder=" " autocomplete="username" autocapitalize="characters"><label>${esc(t('auth.idOrNumber'))}</label></div>
+    <!-- THESE ARE REAL PEOPLE'S CODES. C20262001 is the first customer of 2026,
+         and under the one-permanent-code design that string is simultaneously a
+         login id and the secret typed at her door. orders.js refuses to print
+         a specimen for exactly this reason and prints the SHAPE instead; this
+         screen printed three live ones, to everybody, before sign-in. -->
+    <p class="micro muted" style="margin:-8px 0 14px">A SAAHAA ID — <b class="num">C</b>, <b class="num">P</b> or <b class="num">S</b> followed by eight digits —
       opens the account it names. Your mobile number works just as well; if it carries two accounts we ask which one.</p>
-    <div class="field"><input id="lgPass" type="password" placeholder=" " autocomplete="current-password"><label>Password</label></div>
+    <div class="field"><input id="lgPass" type="password" placeholder=" " autocomplete="current-password"><label>${esc(t('auth.password'))}</label></div>
     <!-- Sign-in is mobile + password. This field is retired, not renamed: the id
          stays so the UI contract guard can see it was not silently dropped. -->
   </div>
-  <div class="au__foot"><button class="btn btn-primary btn--lg" data-act="auth.login">Sign in</button>
-    <p class="micro muted" style="margin-top:10px">Nothing else to remember. New here? <button class="more" data-act="auth.tab" data-tab="signup">Create an account</button></p>
-    <p class="micro muted" style="margin-top:2px">Forgotten it? <button class="more" data-act="auth.forgot">Get back into your account</button></p></div>`;
+  <!-- AND THE DOOR ITSELF WAS ENGLISH-ONLY. The picker lived on the customer
+       account screen, which is behind this screen: somebody who cannot read
+       this page cannot reach the control that would fix it. -->
+  ${langPicker({ tight: true })}
+  <div class="au__foot"><button class="btn btn-primary btn--lg" data-act="auth.login">${esc(t('auth.signIn'))}</button>
+    <p class="micro muted" style="margin-top:10px">${esc(t('auth.noSms'))} <button class="more" data-act="auth.tab" data-tab="signup">${esc(t('auth.newHere'))}</button></p>
+    <p class="micro muted" style="margin-top:2px"><button class="more" data-act="auth.forgot">${esc(t('auth.forgot'))}</button></p></div>`;
 }
 
 /* ── which side are you on ────────────────────────────────────
@@ -200,16 +250,33 @@ function sideRows() {
   const pct = Math.round(liveMarkup() * 100);
   const F = shopFee();
   const rows = [
-    ['customer', 'I need something done', 'Find pros and shops near you. Always free — no markup on their prices.'],
-    ['partner',  'I offer a service',     `Quote jobs, keep 100% of your price. SAAHAA's ${pct}% is added on top and paid by the customer.`],
-    ['shop',     'I run a shop',          `A storefront with your stock, live today. ${F.pct}% an order, capped at ${M.fmt(F.cap)}. No yearly plan.`],
+    /* "ALWAYS FREE — NO MARKUP ON THEIR PRICES" WAS THE OPPOSITE OF THE TRUTH.
+       `quoteService` charges her the pro's quote times 1.08, and the very next
+       screen billed her Rs.31 on a Rs.385 job. The markup is the product: it
+       is what lets the pro keep 100%, and the booking sheet has always shown
+       it line by line. The only screen that lied about it was the one she
+       reads first, and it is the number she will remember. */
+    /* THE SCREEN THAT DECIDES WHETHER A TELUGU-ONLY SHOPKEEPER JOINS AT ALL was
+       the least translated in the product -- an audit measured it at 26%, with
+       every fee term in English. The pro's own money screen is 85% translated.
+       That asymmetry is exactly backwards: the money screen is read by somebody
+       who has already joined. */
+    ['customer', t('role.customer'), t('role.customerWhat', { pct })],
+    ['partner',  t('role.partner'),  t('role.partnerWhat', { pct })],
+    ['shop',     t('role.shop'),     t('role.shopWhat', {
+      free: FREE_FIRST_ORDERS, pct: shopFeeWords().pct, cap: shopFeeWords().cap })],
   ];
+  /* `t` WAS THE PARAMETER NAME HERE, shadowing the translator inside this very
+     map — harmless only because nothing inside it translated. The shadow lint
+     reads `const`/`let`/`var` and function parameters; a destructured arrow
+     parameter slipped through. Renamed rather than left as a trap. */
   return `<div>
-    ${rows.map(([r, t, s]) => `<button class="au__side tap" type="button" aria-pressed="${role === r ? 'true' : 'false'}" data-act="auth.role" data-role="${r}"><b>${esc(t)}</b><span>${esc(s)}</span></button>`).join('')}
+    ${rows.map(([r, label, blurb]) => `<button class="au__side tap" type="button" aria-pressed="${role === r ? 'true' : 'false'}" data-act="auth.role" data-role="${r}"><b>${esc(label)}</b><span>${esc(blurb)}</span></button>`).join('')}
     <div style="padding:10px 0 4px">
-      <div class="au__cost"><span class="muted">Cost to list</span><strong>₹0</strong></div>
-      <div class="au__cost"><span class="muted">Cost per order</span><strong id="suCostLine">${costLine()}</strong></div>
-      <div class="au__cost"><span class="muted">Typical aggregator</span><strong class="em">${Math.round(AGG_COMMISSION * 100)}%</strong></div>
+      <p class="m-cap" style="margin:6px 0 2px">${esc(t('auth.whichSide'))}</p>
+      <div class="au__cost"><span class="muted">${esc(t('auth.costToList'))}</span><strong>₹0</strong></div>
+      <div class="au__cost"><span class="muted">${esc(t('auth.costPerOrder'))}</span><strong id="suCostLine">${costLine()}</strong></div>
+      <div class="au__cost"><span class="muted">${esc(t('auth.typicalAgg'))}</span><strong class="em">${Math.round(AGG_COMMISSION * 100)}%</strong></div>
     </div>
   </div>`;
 }
@@ -224,7 +291,7 @@ function placeStep() {
     <div>
       <div class="search" style="margin-top:2px">
         ${icon('search', { size: 18 })}
-        <input id="suPlaceQ" type="search" placeholder="Search a place — area, town or city"
+        <input id="suPlaceQ" type="search" placeholder="${esc(t('auth.searchPlace'))}"
                aria-label="Search for your place">
         <button class="btn btn-secondary btn--sm" data-act="auth.geocode">Search</button>
       </div>
@@ -235,7 +302,7 @@ function placeStep() {
       <p class="micro muted" style="margin-top:6px">Drag the pin, or tap the map, to fix your exact spot. We use it to show you to people nearby — it is never shown as an address.</p>
       <div id="suResults" class="chiprow" style="flex-wrap:wrap;gap:8px;margin-top:10px">${resultChips()}</div>
       <p class="tiny" id="suPlaceLabel" style="margin-top:10px">${placeLine()}</p>
-      <span class="eyebrow" style="display:block;margin-top:12px">Or a Hyderabad area</span>
+      <span class="eyebrow" style="display:block;margin-top:12px">${esc(t('auth.orArea'))}</span>
       <div class="chiprow" style="flex-wrap:wrap;gap:6px;margin-top:6px">
         ${AREA_NAMES.map(a => quickChip(a)).join('')}
       </div>
@@ -271,6 +338,9 @@ function placeLine() {
    icon and its own accent, and choosing one immediately says what SAAHAA will
    take on an order in that category — which is the only number that matters
    to somebody deciding whether to open a shop at all. */
+let suLicence = '';
+let suUpi = '';
+
 function catStep() {
   return `
   <div class="field">
@@ -280,15 +350,58 @@ function catStep() {
       <!-- the answer, in the field every existing read already looks at -->
       <input id="suCat" type="hidden" value="${esc(suCatId)}">
     </div>
-    <label>What your shop sells</label>
-  </div>`;
+    <label>${esc(t('auth.whatShopSells'))}</label>
+  </div>
+  <div id="suLicenceSlot">${licenceBody()}</div>`;
+}
+
+/* THE CATALOGUE SAYS WHICH TRADES ARE LICENSED AND NOBODY ASKED. Every retail
+   category carries `licence: 'fssai' | 'drug' | null`, `bidding.js` already
+   refuses price competition on licence-gated work, and the shop console renders
+   `s.drugLicence` if it is there. Nothing ever collected it.
+
+   So a person could open a shop selling MEAT, FISH AND EGGS -- or the Pharmacy
+   category, whose own blurb offers "Rx with prescription" -- with a name, a
+   mobile, a password and a photograph. No ID, no licence, no terms, no quiz. A
+   pro who fixes a tap answers five trade questions and signs seven steps; a
+   person selling medicine answered nothing. An audit called this out and it is
+   the most serious thing on either report.
+
+   This does not make SAAHAA a regulator. It records the number the shopkeeper
+   is legally required to display anyway, refuses to open a licensed storefront
+   without one, and puts it where a customer and an inspector can both see it. */
+const LICENCE_WORD = { fssai: 'FSSAI licence number', drug: 'Drug licence number' };
+
+/* AND THE FIELD COULD NEVER APPEAR, so the gate I added closed the door on five
+   of the eight retail categories -- every food shop and every chemist -- with
+   an error naming a box that was not on the form. Worse than the hole it was
+   meant to close.
+
+   The cause is the rule three functions up: picking a category PAINTS, it never
+   re-renders, because a full render would wipe the shop name, mobile and
+   password already typed. This markup only existed inside `catStep()`, which
+   runs once. So the requirement appeared and the input never did.
+
+   The slot is now always in the DOM and `paintCat()` fills it, like every other
+   part of this form that reacts to the choice. */
+function licenceBody() {
+  const c = chosenCat();
+  const need = c && c.licence;
+  if (!need) return '';
+  return `
+  <div class="field">
+    <input id="suLicence" placeholder=" " autocomplete="off" maxlength="40" required aria-required="true"
+      value="${esc(suLicence)}">
+    <label>${esc(LICENCE_WORD[need])} — ${esc(catName(c))}</label>
+  </div>
+  <p class="micro muted" style="margin:-6px 0 14px">${esc(t('auth.licenceWhy'))}</p>`;
 }
 
 function catCards() {
   return retCats().map(c => `<button type="button" class="au__cat tap" data-cat="${esc(c.id)}"
       aria-pressed="${suCatId === c.id ? 'true' : 'false'}" style="--cat:${safeAccent(c.accent)}">
       <span class="ic" aria-hidden="true">${icon(hasIcon(c.id) ? c.id : 'groupShops', { size: 20 })}</span>
-      <b>${esc(c.name)}</b>
+      <b>${esc(catName(c))}</b>
       <span>${esc(c.blurb || '')}</span>
     </button>`).join('');
 }
@@ -297,7 +410,7 @@ function catLine() {
   const c = chosenCat();
   if (!c) return '<span class="muted">Pick one — it sets your aisles, the ready-made list you build your stock from, and what an order costs.</span>';
   const f = shopFee(), n = (c.aisles || []).length;
-  return `<b>${esc(c.name)}</b> <span class="muted">· ${n} aisle${n === 1 ? '' : 's'} ready
+  return `<b>${esc(catName(c))}</b> <span class="muted">· ${n} aisle${n === 1 ? '' : 's'} ready
     · SAAHAA takes ${f.pct}% of an order, never more than ${M.fmt(f.cap)}</span>`;
 }
 
@@ -314,7 +427,7 @@ function shotStep() {
       <p class="micro muted" style="margin-top:6px">Optional — your shop opens without it. A photo of the front is what somebody
         recognises from the street; you can add or change it any time from your console.</p>
     </div>
-    <label>A photo of your shop</label>
+    <label>${esc(t('auth.shopPhoto'))}</label>
   </div>`;
 }
 
@@ -344,6 +457,11 @@ function paintCat() {
   if (line) mount(line, catLine());
   const cost = document.getElementById('suCostLine');
   if (cost) mount(cost, costLine());
+  /* keep whatever has been typed before the slot is rebuilt */
+  const typed = document.getElementById('suLicence');
+  if (typed) suLicence = typed.value;
+  const slot = document.getElementById('suLicenceSlot');
+  if (slot) mount(slot, licenceBody());
 }
 
 function paintShot() {
@@ -372,8 +490,33 @@ delegate('click', '.au__shotx', () => { suPhoto = ''; paintShot(); toast('Photo 
    with whichever category is chosen */
 function costLine() {
   const pct = Math.round(liveMarkup() * 100);
-  if (role === 'shop') { const f = shopFee(); return `${f.pct}%, capped ${M.fmt(f.cap)}`; }
-  return role === 'partner' ? `₹0 — the customer pays ${pct}% on top` : '₹0';
+  if (role === 'shop') {
+    if (!chosenCat()) { const w = shopFeeWords(); return `${w.pct}, capped ${w.cap} — first ${FREE_FIRST_ORDERS} free`; }
+    const f = shopFee(); return `${f.pct}%, capped ${M.fmt(f.cap)} — first ${FREE_FIRST_ORDERS} free`;
+  }
+  /* `'₹0'` for a customer under a heading reading "Cost per order" was simply
+     false — she pays the markup, and it is the one figure she carries away
+     from this screen. */
+  /* AND "₹0" WAS NOT TRUE OF HIS CASH FLOW EITHER. No commission is taken from
+     a pro's quote -- that part is real and it is the best thing about this
+     deal -- but on day one a ₹100 stake locks out of the job's own payout, a
+     tenth of every payout waits seven days, and walking out of a started job
+     costs ₹40. All three are disclosed, honestly and with numbers... on step 7
+     of 7, after the ID, the selfie and two quizzes. Four audits in a row said
+     the number a plumber decides on is this one. It can stay true and stop
+     being the whole truth in the same breath. */
+  /* AND I BUILT IT HALF IN ENGLISH. Naming the holds was right; writing the
+     first clause as a literal and bolting a translated second clause onto it
+     produced a line that code-switches mid-sentence -- an audit quoted it back:
+     "ఒక్కో ఆర్డర్‌కు ఖర్చు — ₹0 commission — the customer pays 8% on top ·
+     ప్రతి పనికి తిరిగి వచ్చే ₹100…". A sentence is translated whole or not at all.
+
+     The stake figure was wrong as well. Signup said "₹100"; the rule is ₹100 OR
+     5% of the job, capped at ₹500 -- three times the recruiting number on a
+     ₹6,000 job. Every figure here now comes from the engine that charges it. */
+  return role === 'partner'
+    ? esc(t('auth.costPro', { pct, stake: M.fmt(MIN_STAKE), pctStake: STAKE_PCT, maxStake: M.fmt(MAX_STAKE) }))
+    : esc(t('auth.costCustomer', { pct }));
 }
 
 /* ── already inside? then this is a SECOND account, not an error ──
@@ -395,7 +538,7 @@ function signupForm() {
   const pct = Math.round(liveMarkup() * 100);
   const F = shopFee();
   const s = me();
-  const title = role === 'shop' ? 'Open your shop' : role === 'partner' ? 'Your trade' : 'Your account';
+  const title = role === 'shop' ? 'Open your shop' : role === 'partner' ? 'Your trade' : t('auth.createAccount');
   const step = role === 'shop' ? 'Name it · photograph it · then list your stock' : role === 'partner' ? 'Setup · then 7 verification steps' : 'One step';
   return `
   <div class="au__two">
@@ -404,26 +547,40 @@ function signupForm() {
       <div class="au__step"><b>${title}</b><span>${step}</span></div>
       <div class="au__form">
         ${secondAccountLine()}
-        <div class="field"><input id="suName" placeholder=" " autocomplete="name"><label>${role === 'shop' ? 'Shop name — what the board outside says' : 'Full name'}</label></div>
-        <div class="field"><input id="suMobile" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel" value="${esc(s ? String(s.mobile || '') : '')}"><label>10-digit mobile</label></div>
+        <div class="field"><input id="suName" placeholder=" " autocomplete="name"><label>${role === 'shop' ? 'Shop name — what the board outside says' : esc(t('auth.yourName'))}</label></div>
+        <div class="field"><input id="suMobile" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel" value="${esc(s ? String(s.mobile || '') : '')}"><label>${esc(t('auth.mobile'))}</label></div>
         <div class="field"><input id="suPass" type="password" placeholder=" " autocomplete="new-password"><label>${s && s.role !== role ? 'A password for this new account (8+ characters)' : 'Create a password (8+ characters)'}</label></div>
 
         ${role === 'partner' ? `
           <div class="field">
-            <select id="suCat">${svcCats().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
-            <label>What do you do?</label>
+            <select id="suCat">${svcCats().map(c => `<option value="${c.id}">${esc(catName(c))}</option>`).join('')}</select>
+            <label>${esc(t('auth.whatYouDo'))}</label>
           </div>
-          <div class="field"><input id="suAsk" inputmode="numeric" placeholder=" "><label>Your typical price (₹)</label></div>
+          <div class="field"><input id="suAsk" inputmode="numeric" placeholder=" "><label>${esc(t('auth.yourPrice'))}</label></div>
           <p class="micro muted" style="margin:-6px 0 14px">You keep <b>100%</b> of this. SAAHAA's ${pct}% is added on top of it, paid by the customer.</p>` : ''}
 
         ${role === 'shop' ? `
           ${catStep()}
+          <!-- THE SHOP WENT LIVE, TOOK AN ORDER, HELD ₹137 — AND WAS NEVER
+               ASKED WHERE TO SEND IT. A pro gives a UPI id at step 6 of seven;
+               a shop was asked nowhere at all, and found out only when the
+               Payouts tab said "nothing can be sent until you do", with money
+               already sitting in it. Asked here, once, with the shop's other
+               details. -->
+          <div class="field">
+            <input id="suUpi" placeholder=" " autocomplete="off" maxlength="60" inputmode="email" value="${esc(suUpi)}">
+            <label>${esc(t('auth.shopUpi'))}</label>
+          </div>
+          <p class="micro muted" style="margin:-6px 0 14px">${esc(t('auth.shopUpiWhy'))}</p>
           ${shotStep()}
           <p class="micro muted" style="margin:-6px 0 14px">Then you pick your stock from our ready list — about six seconds an item, with a price you set.
-            SAAHAA takes ${F.pct}% an order, capped at ${M.fmt(F.cap)}, never ${Math.round(AGG_COMMISSION * 100)}%.</p>` : ''}
+            Your first ${FREE_FIRST_ORDERS} orders cost nothing — no percentage and no minimum. After that SAAHAA takes
+            ${F.pct}% an order for ${esc(catName(chosenCat()) || 'this trade')}, at least ${M.fmt(RETAIL_FEE_FLOOR)} and capped at ${M.fmt(F.cap)} — never ${Math.round(AGG_COMMISSION * 100)}%.
+            A delivery you make yourself is paid to you, less a ${M.fmt(RIDER_DISPATCH_CUT)} dispatch cut.</p>` : ''}
 
         ${placeStep()}
       </div>
+      ${langPicker({ tight: true })}
       <div class="au__foot">
         <button class="btn btn-primary btn--lg" data-act="auth.signup">
           ${role === 'shop' ? 'Open my shop' : role === 'partner' ? 'Next — get verified' : 'Create my account'}</button>
@@ -572,11 +729,16 @@ export async function doLogin(pickedKey = null) {
   }
   if (check.upgrade) dispatch({ type: 'user/patch', payload: { key: u.key, patch: check.upgrade } });
   noteLoginOk(mobile);
-  /* the session must not carry the credential around with it */
-  const { pass, passSalt, passIter, ...safe } = u;
-  saveSession(safe);              // survives a refresh and a PWA relaunch
+  /* the session must not carry the credential around with it — core/ctx.js
+     `saveSession` now strips it for every caller, so this cannot be forgotten
+     the way the sign-up path forgot it */
+  saveSession(u);                 // survives a refresh and a PWA relaunch
   audit.record('user.login', { key: u.key, code: u.code || null, role: u.role }, u.key);
   toast(`Welcome back, ${u.name.split(' ')[0]}`);
+  /* and put back whatever she tapped before we interrupted her, on the screen
+     she tapped it from — see ui/views/shops.js `replayPendingAdd` */
+  const back = u.role === 'customer' ? shopsView.replayPendingAdd() : null;
+  if (back && back.ok) { ctx.go('shop', back.shopId); return; }
   ctx.go(u.role === 'partner' ? 'partner' : u.role === 'shop' ? 'shopadmin' : 'home');
 }
 
@@ -640,7 +802,7 @@ export function announceNewId(user) {
     <p class="micro muted" style="margin-top:12px">Write it down. Sign in with it or with your mobile number &mdash; either works.
       It is a name, not a secret: it says who you are, your password proves it.</p>
     <p class="micro muted" style="margin-top:8px">${siblingLine(user)}</p>
-    <button class="btn btn-primary btn--block" style="margin-top:16px" data-act="sheet.close">Got it</button>`);
+    <button class="btn btn-primary btn--block" style="margin-top:16px" data-act="sheet.close">${esc(t('auth.gotIt'))}</button>`);
 }
 
 export async function doSignup() {
@@ -653,6 +815,29 @@ export async function doSignup() {
     const g = document.getElementById('suCatGrid');
     if (g && g.scrollIntoView) g.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
+  }
+  if (role === 'shop') {
+    const c = chosenCat();
+    if (c && c.licence) {
+      suLicence = val('suLicence').trim();
+      if (suLicence.length < 6) {
+        toast(`${LICENCE_WORD[c.licence] || 'A licence number'} is required to sell ${catName(c)}`, 'danger');
+        const el = document.getElementById('suLicence');
+        if (el && el.focus) el.focus();
+        return;
+      }
+    } else { suLicence = ''; }
+    suUpi = val('suUpi').trim();
+    /* A shop with no UPI cannot be paid, and finding that out AFTER the first
+       order is how the last audit found it. Empty is allowed -- somebody may
+       genuinely not have one to hand -- but a WRONG one is refused here rather
+       than at the moment the money is meant to move. */
+    if (suUpi && !/^[\w.\-]{2,}@[\w.\-]{2,}$/.test(suUpi)) {
+      toast(t('auth.shopUpiBad'), 'danger');
+      const el = document.getElementById('suUpi');
+      if (el && el.focus) el.focus();
+      return;
+    }
   }
   if (!suPlace) { toast(role === 'shop' ? 'Pick where the shop is — search it, use your location, or tap an area' : 'Pick where you are — search it, use your location, or tap an area', 'danger'); return; }
 
@@ -700,7 +885,13 @@ export async function doSignup() {
       prepMins: 20, radiusKm: 3, status: 'active', isOpen: true,
       minOrder: toPaise(149), freeDeliveryAbove: toPaise(499), deliveryMode: 'both',
       selfDeliveryFee: toPaise(25), fillRate: 100, ratingAvg: 0, ratingCount: 0,
-      ordersCompleted: 0, badges: [], fssai: '', drugLicence: '', onboardedAt: Date.now() } });
+      ordersCompleted: 0, badges: [],
+      /* both fields already existed on the row and were always written empty;
+         the shop console has been rendering `drugLicence` for versions */
+      upi: suUpi,
+      fssai: (chosenCat() || {}).licence === 'fssai' ? suLicence : '',
+      drugLicence: (chosenCat() || {}).licence === 'drug' ? suLicence : '',
+      onboardedAt: Date.now() } });
   }
 
   dispatch({ type: 'user/add', payload: user });
@@ -718,7 +909,17 @@ export async function doSignup() {
      moment is the same one: they typed a name and now they have a shop. It
      shows them what they made, then sends them to the console to list. */
   else if (role === 'shop') { toast(`${name} is live — now add what you sell`); ctx.go('onboard'); }
-  else { toast(`Welcome, ${name.split(' ')[0]}`); ctx.go('home'); }
+  else {
+    /* AND I WIRED THE REPLAY INTO THE RETURNING-USER PATH ONLY. A guest taps
+       ADD, is bounced here, creates an account — the only path a first-time
+       customer takes — and lands on Home with an empty cart, exactly as before
+       the fix. Worse, the orphaned pending-add then fired twenty minutes later
+       on an unrelated sign-in and silently put sugar in somebody's cart. */
+    toast(`Welcome, ${name.split(' ')[0]}`);
+    const back = shopsView.replayPendingAdd();
+    if (back && back.ok) { ctx.go('shop', back.shopId); }
+    else ctx.go('home');
+  }
   /* AFTER the navigation, never before: go() closes any open sheet, so the
      announcement has to ride on top of the screen they landed on. */
   announceNewId(user);

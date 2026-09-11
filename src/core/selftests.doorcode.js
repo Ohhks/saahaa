@@ -17,6 +17,8 @@
 import { describe, it, expect } from './selftest.js';
 import { sameCode } from '../domain/flow.js';
 import * as ID from '../domain/identity.js';
+import { canTransition } from '../domain/orders.js';
+import '../domain/state.js';
 
 describe('door code · forgiving about how a thumb types it', () => {
   const real = 'C20262001';
@@ -73,5 +75,32 @@ describe('door code · it really is the code people already have', () => {
     const code = ID.nextCode('customer', [], Date.UTC(2026, 5, 5));
     expect(sameCode(code, code)).toBeTrue();
     expect(sameCode(code.toLowerCase(), code)).toBeTrue();
+  });
+});
+
+/* ── the two doors must behave the same ────────────────────────
+   A job's door (`verifyOtp`) counted failures, stopped at three and raised a
+   real dispute. The grocery door (`checkRetailCode`) said "wrong code" and let
+   the rider try for ever — no count, no limit, no record — so the same nine
+   characters were protected on one doorstep and not on the other, for no reason
+   a customer could discover. They count the same now, and these pin the state
+   machine that the retail limit needs: without a DISPUTED edge out of R_OUT the
+   dispute opened and the order never moved, and without the way back the retry
+   threw `illegal transition`. */
+describe('door code · a failed grocery door goes somewhere, and can come back', () => {
+  it('R_OUT can reach DISPUTED — three wrong codes must be able to freeze it', () => {
+    expect(canTransition('R_OUT', 'DISPUTED')).toBe(true);
+  });
+  it('DISPUTED can return to R_OUT — the owner can hand the rider another try', () => {
+    expect(canTransition('DISPUTED', 'R_OUT')).toBe(true);
+  });
+  it('and the service door still has its own way back', () => {
+    expect(canTransition('ARRIVED', 'DISPUTED')).toBe(true);
+    expect(canTransition('DISPUTED', 'ARRIVED')).toBe(true);
+  });
+  it('a retry never lands a grocery order on a service stage', () => {
+    /* the bug this replaced: retryDoorCode advanced everything to ARRIVED */
+    expect(canTransition('DISPUTED', 'ARRIVED') && canTransition('DISPUTED', 'R_OUT')).toBe(true);
+    expect(canTransition('R_OUT', 'ARRIVED')).toBe(false);
   });
 });

@@ -13,6 +13,7 @@ import { describe, it, expect } from './selftest.js';
 import * as S from './security.js';
 import { sha256 } from './crypto.js';
 import * as adminauth from './adminauth.js';
+import { stripCredential, CREDENTIAL_FIELDS } from './ctx.js';
 import { ADMIN_BOOTSTRAP } from './config.js';
 import * as persist from './persist.js';
 
@@ -305,5 +306,52 @@ describe('security · a password is salted and stretched, and old ones still wor
     expect(r.ok).toBeTrue();
     expect(r.upgrade).toSatisfy(u => !!u && !!u.passSalt, 'a salted credential to store');
     expect((await S.checkPassword('nope', legacy)).ok).toBeFalse();
+  });
+});
+
+/* ── the credential must not travel with the session ───────────
+   The sign-IN path stripped `pass`/`passSalt`/`passIter` by hand; the sign-UP
+   path, written later and forty lines away, passed the whole user record. So
+   the same account's password hash and salt sat in localStorage if the person
+   had just registered and did not if they had come back — which door they
+   walked through decided whether their credential was on disk, and nothing
+   anywhere said so. Two callers is two chances to forget, and one had. */
+describe('session · never carries the password with it', () => {
+  const user = { key: 'k|9000000001', name: 'A', role: 'customer', code: 'C20262001',
+                 pass: 'pbkdf2$deadbeef', passSalt: 'abc123', passIter: 210000 };
+
+  it('the strip removes every credential field and keeps everything else', () => {
+    const s = stripCredential(user);
+    for (const f of CREDENTIAL_FIELDS) expect(s[f] === undefined).toBe(true);
+    expect(s.key).toBe(user.key);
+    expect(s.code).toBe('C20262001');
+    expect(s.role).toBe('customer');
+  });
+
+  it('the list is not empty — an empty list would pass every other test here', () => {
+    expect(CREDENTIAL_FIELDS.length).toSatisfy(v => v >= 3, 'pass, passSalt, passIter at least');
+    expect(CREDENTIAL_FIELDS.includes('pass')).toBe(true);
+    expect(CREDENTIAL_FIELDS.includes('passSalt')).toBe(true);
+    expect(CREDENTIAL_FIELDS.includes('passIter')).toBe(true);
+  });
+
+  it('nothing that looks like a hash survives, whatever the field is called', () => {
+    const s = stripCredential(user);
+    const blob = JSON.stringify(s);
+    expect(blob.includes('deadbeef')).toBe(false);
+    expect(blob.includes('abc123')).toBe(false);
+    expect(blob.includes('210000')).toBe(false);
+  });
+
+  it('it is safe on the shapes a caller can actually pass', () => {
+    expect(stripCredential(null)).toBe(null);
+    expect(stripCredential(undefined)).toBe(undefined);
+    expect(JSON.stringify(stripCredential({}))).toBe('{}');
+  });
+
+  it('and it does not mutate what it was handed', () => {
+    const u = { ...user };
+    stripCredential(u);
+    expect(u.pass).toBe('pbkdf2$deadbeef');    // the store's own record is untouched
   });
 });

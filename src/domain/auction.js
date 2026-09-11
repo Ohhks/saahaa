@@ -24,8 +24,10 @@ import * as audit from '../core/audit.js';
 import { toast } from '../ui/dom.js';
 import { bookService } from './flow.js';
 import { rankPartners, kmBetween } from './match.js';
+import { subSize } from './catalog.services.js';
+import * as M from '../core/money.js';
 import { blocker, categoryAllowed } from './verification.js';
-import { capOk } from './trust.js';
+import { capOk, effectiveCap } from './trust.js';
 import {
   priceBand, validateBid, biddingAllowed, rankBids, counterOffer,
   auctionState, loserFeedback, WINDOW, MAX_BIDS, WAVE_SIZE, MAX_INVITES,
@@ -39,6 +41,23 @@ export function myRequests() {
   const s = me(); if (!s) return [];
   return getState().requests.filter(r => r.customerKey === s.key);
 }
+/* WHAT HE HAS QUOTED ON AND IS STILL WAITING TO HEAR ABOUT. The lead list
+   below deliberately drops a request the moment he bids on it -- correctly, it
+   is a list of work he has NOT answered -- and nothing anywhere picked it up.
+   So a pro sent a rate and it vanished: Leads 0, Jobs 0, no "awaiting reply"
+   on any screen. He had no way to tell whether he had bid at all, and when a
+   customer accepted and the booking failed he could not even tell it had
+   happened. A quote is a commitment; it stays visible until it resolves. */
+export function sentQuotesFor(partner) {
+  if (!partner) return [];
+  const st = getState();
+  return st.bids
+    .filter(b => b.partnerId === partner.id && b.status === 'submitted')
+    .map(b => ({ bid: b, req: st.requests.find(r => r.id === b.requestId) }))
+    .filter(x => x.req && !x.req.awardedBidId)
+    .sort((a, b) => b.bid.submittedAt - a.bid.submittedAt);
+}
+
 export function openRequestsForPartner(partner) {
   if (!partner) return [];
   const now = Date.now();
@@ -77,7 +96,7 @@ export function askOffer(catId, heldAmount, opts = {}) {
   if (!flags.isOn('ASK_RATES')) return no('off');
   const gate = canAuction(catId, opts);
   if (!gate.allowed) return no(gate.why);
-  const band = priceBand(catId, { complexity: opts.complexity || 'simple' });
+  const band = priceBand(catId, { complexity: opts.complexity || 'simple', sub: opts.sub || null });
   if (!band || band.quoteOnly) return no('This job is quoted, not rated.');
   if (poolSize(catId) < UI_MIN_POOL) return no('Not enough workers nearby right now.');
   /* Nobody waits twelve minutes at 10pm for a leaking tap — a real rule, and
@@ -117,7 +136,8 @@ export function postRequest({ catId, sub, note, complexity = 'simple', budgetBan
   const gate = canAuction(catId);
   if (!gate.allowed) { toast(gate.why, 'warn'); return null; }
 
-  const band = priceBand(catId, { complexity });
+  /* the same job the booking sheet priced, or the two disagree */
+  const band = priceBand(catId, { complexity, sub: sub || null });
   const cat = find('category', catId);
   const now = Date.now();
   const req = {
@@ -167,7 +187,10 @@ function scheduleSimulatedBids(req) {
          was unreachable in practice. */
       if (bidsFor(req.id).length >= SIM_MAX_BIDS) return;
       const spread = 0.94 + Math.random() * 0.10;          // clustered around target
-      const amount = Math.max(req.floor, Math.min(req.ceiling, Math.round(req.target * spread)));
+      /* and never above what this pro charges for the job on his own page */
+      const own = Math.round((p.ask | 0) * ((subSize(req.catId, req.sub) || {}).x || 1));
+      const amount = Math.min(own || Infinity,
+        Math.max(Math.min(req.floor, own || req.floor), Math.min(req.ceiling, Math.round(req.target * spread))));
       placeBid({ requestId: req.id, partner: p, amount, quiet: true });
     }, delay));
   });
@@ -197,12 +220,39 @@ export function placeBid({ requestId, partner, amount, note, quiet }) {
   if (why) { if (!quiet) toast(why, 'warn'); return null; }
   // the auction was a complete bypass of minTier and of the tier cap
   if (!categoryAllowed(partner, req.catId)) { if (!quiet) toast('Your tier does not cover this job yet', 'warn'); return null; }
-  if (!capOk(partner, amount)) { if (!quiet) toast('Above your tier\'s job cap', 'warn'); return null; }
+  /* AND IT SAID SO ONLY AFTER HE PRESSED SEND, with no figure and the word
+     "tier", which no plumber has ever seen. The customer's list was meanwhile
+     advertising him at a price the platform would refuse. He is told the
+     number, in rupees, in the words he was recruited in. */
+  if (!capOk(partner, amount)) {
+    if (!quiet) toast(`Your first jobs are capped at ${M.fmt(effectiveCap(partner))} for now — finish three with no complaint and it lifts by itself.`, 'warn');
+    return null;
+  }
   if (myBid(requestId, partner.id)) {
     if (!quiet) toast('You have already bid on this job — one bid each', 'warn');
     return null;
   }
-  const band = { beff: req.beff, floor: req.floor, target: req.target, ceiling: req.ceiling, quoteOnly: false };
+  /* NOBODY MAY BID ABOVE THEIR OWN SHELF PRICE. The band is built from the
+     CATEGORY base, so its floor sat at ₹430 for a job that a pro asking ₹428
+     charges ₹385 for on his own booking sheet. He could not bid his own price
+     if he wanted to -- the auction forced him above it, and the customer who
+     used "ask several pros" paid ₹74 MORE than tapping Confirm twelve minutes
+     earlier, under a sheet reading "You saved ₹89".
+
+     A marketplace may help a worker charge less. It must never quietly help him
+     charge more than he publicly advertises for the same work. His own listed
+     price is the ceiling on his own bid; the band's floor cannot push him past
+     it either. */
+  const ownPrice = Math.round((partner.ask | 0) * ((subSize(req.catId, req.sub) || {}).x || 1));
+  if (ownPrice > 0 && amount > ownPrice) {
+    if (!quiet) toast(`Your own price for this job is ${M.fmt(ownPrice)} — a rate here cannot be above it.`, 'warn');
+    return null;
+  }
+  /* the band may not price him out of his own storefront in either direction:
+     it cannot force him above his listed rate, and it cannot cap him below it */
+  const band = { beff: req.beff, floor: Math.min(req.floor, ownPrice || req.floor),
+                 target: req.target,
+                 ceiling: Math.max(req.ceiling, ownPrice || 0), quoteOnly: false };
   const v = validateBid(amount, band);
   if (!v.ok) { if (!quiet) toast(v.reason, 'danger'); return null; }
 
@@ -266,15 +316,21 @@ export async function acceptBid(requestId, bidId) {
   const partner = getState().partners.find(p => p.id === bid.partnerId);
   if (!partner) return null;
 
-  clearTimers(requestId);
-  dispatch({ type: 'bid/patch', payload: { id: bidId, patch: { status: 'accepted' } } });
-  dispatch({ type: 'bid/rejectOthers', payload: { requestId, keepId: bidId } });
-  dispatch({ type: 'request/patch', payload: { id: requestId, patch: { status: 'awarded', awardedBidId: bidId } } });
-
+  /* THE SAME ORDERING DEFECT AS `bookHeld`, one function down: this awarded the
+     bid, rejected every rival and marked the request awarded BEFORE calling a
+     booking that can refuse -- leaving a closed request, a pro told he had won,
+     and no job anywhere. The award is the LAST thing that happens, not the
+     first. */
   const order = await bookService({
     catId: req.catId, partner, sub: req.sub,
     deal: bid.countered || bid.amount, slot: req.slotType,
   });
+  if (!order) return null;
+
+  clearTimers(requestId);
+  dispatch({ type: 'bid/patch', payload: { id: bidId, patch: { status: 'accepted' } } });
+  dispatch({ type: 'bid/rejectOthers', payload: { requestId, keepId: bidId } });
+  dispatch({ type: 'request/patch', payload: { id: requestId, patch: { status: 'awarded', awardedBidId: bidId } } });
   audit.record('bid.accepted', { requestId, bidId, amount: bid.amount }, me().key);
   return order;
 }
@@ -318,11 +374,42 @@ export async function bookHeld(requestId) {
   if (req.status === 'awarded' || req.status === 'held_booked') return null;
   const partner = getState().partners.find(p => p.id === req.held.partnerId);
   if (!partner) { toast('That worker is no longer free', 'warn'); return null; }
+  /* AND THE PLATFORM BID AGAINST THE WORKER UNDER HIS OWN NAME. The held match
+     is a price SAAHAA computes from a pro's listed rate and shows beside his
+     photograph. If that same pro then answers the ask with a real quote, he was
+     on the screen twice at two prices -- and this function booked the one HE
+     did not write. An audit watched SAAHAA offer ₹583 "from Ramesh Yadav" while
+     Ramesh had quoted ₹560, and the customer could only accept SAAHAA's number.
+
+     A worker's own quote is the only price that carries his name. Where he has
+     given one, it stands -- and the customer pays the lower of the two, because
+     the held price was a ceiling promised to her, not a floor owed to us. */
+  const own = bidsFor(requestId).find(b => b.partnerId === req.held.partnerId);
+  const deal = own ? Math.min(own.amount | 0, req.held.amount | 0) : req.held.amount;
+  /* THE REQUEST WAS CLOSED BEFORE THE JOB WAS CREATED, AND THE JOB CAN FAIL.
+     `bookService` refuses without an address -- among other guards -- and this
+     had already rejected every rival bid and marked the request `held_booked`.
+     So the toast read "Add the flat or house and street first", the customer
+     was left on "This request is closed. Nothing was charged." with no way
+     back, no order existed, and the winning pro's console went on saying
+     "waiting on the customer" about a request that could never be answered.
+     He would have sat on that lead all day.
+
+     Nothing is torn down until there is something to show for it. If the
+     booking refuses, the request is exactly as it was and she can fix the
+     address and tap again. */
+  const order = await bookService({ catId: req.catId, partner, sub: req.sub, deal, slot: req.slotType });
+  if (!order) return null;
+
   clearTimers(requestId);
-  dispatch({ type: 'bid/rejectOthers', payload: { requestId, keepId: null } });
+  /* AND THEN IT TOLD HIM HE HAD LOST IT. `keepId: null` rejected every bid on
+     the request -- including the bid of the very pro who just got the job. His
+     LEADS tab showed the quote as "Lost", set his win rate to 0%, and answered
+     "tap to see why" with "This job was not awarded to anyone", while the job
+     sat in his JOBS tab in progress. The bid that won is kept. */
+  dispatch({ type: 'bid/rejectOthers', payload: { requestId, keepId: own ? own.id : null } });
   dispatch({ type: 'request/patch', payload: { id: requestId, patch: { status: 'held_booked' } } });
-  const order = await bookService({ catId: req.catId, partner, sub: req.sub, deal: req.held.amount, slot: req.slotType });
-  audit.record('request.tookHeld', { requestId, amount: req.held.amount }, me().key);
+  audit.record('request.tookHeld', { requestId, amount: deal, held: req.held.amount }, me().key);
   return order;
 }
 
