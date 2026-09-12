@@ -85,6 +85,13 @@ const auth    = await import(U('src/ui/views/auth.js'));
 
 const job = await F.bookService({ catId: pro.cat, partner: pro, sub: null });
 
+/* An empty cart renders a screen with no bill on it, so the money-column check
+   below had one single column to look at across six money screens and still
+   printed "every money column sums to its own total". Stock the cart: the
+   check is only worth the coverage it has. */
+st.products.filter(p => p.shopId === shop.id && p.active).slice(0, 3)
+  .forEach((p, i) => F.addToCart(p, i + 1));
+
 /* Every screen worth scoring, and whether money is decided on it. */
 function screens() {
   const out = [];
@@ -129,9 +136,17 @@ const pass = (id, weight, what) => checks.push({ id, weight, ok: true, what });
 const all = screens();
 
 /* ── 1 · every screen builds ─────────────────────────────── */
-all.forEach(s => s.threw
-  ? fail('builds:' + s.name, 10, `${s.name} builds`, s.threw)
-  : pass('builds:' + s.name, 10, `${s.name} builds`));
+/* A screen that returns '' never throws, so it used to pass this check — and
+   then pass every check below it for free: no raw keys to find, no Latin words,
+   so 100% Telugu. Blankness scored perfect. The smallest real screen here is
+   ~2.8KB; anything under 1.2KB rendered nothing a person could use. */
+all.forEach(s => {
+  const thin = !s.threw && s.html.length < 1200;
+  (s.threw || thin)
+    ? fail('builds:' + s.name, 10, `${s.name} builds`,
+           s.threw || `rendered ${s.html.length} bytes — blank passes everything below`)
+    : pass('builds:' + s.name, 10, `${s.name} builds`);
+});
 
 /* ── 2 · no raw translation key reaches a person ──────────── */
 all.forEach(s => {
@@ -162,23 +177,47 @@ i18n.setLang && i18n.setLang('en');
 /* ── 4 · money columns add up to the total beside them ────── */
 {
   const M = await import(U('src/core/money.js'));
+  /* This used to scan a whole page at once: it took every m-kv row on the
+     screen, added them into one number, and compared that to the LAST row
+     marked --total. Two unrelated bills on one page were merged into a single
+     sum, and the passbook's ledger legs — which are signed, and are not a bill
+     column at all — were added in beside them. It found one column, on one
+     screen, and reported on all of them.
+
+     A bill column is a run of unsigned figures that ENDS at its own total.
+     A signed figure means you are reading a ledger, not a bill: that breaks
+     the run. Tolerance is zero, because the rule in CLAUDE.md is that a column
+     which cannot sum in whole rupees goes to paise — the whole column. */
+  const ROW = /<(div|li)\s+class="m-kv([^"]*)"[^>]*>([\s\S]*?)<\/\1>/g;
+  const NUM = /class="num[^"]*"[^>]*>\s*([−+-])?\s*₹?([\d,]+(?:\.\d{2})?)/;
   const rows = [];
-  const scan = html => {
-    /* every m-kv row: label + a number; the one marked --total must equal the
-       sum of the plain ones above it in the same block */
-    const kv = [...html.matchAll(/<div class="m-kv([^"]*)"[^>]*>[\s\S]*?<span class="num[^"]*">\s*[−-]?\s*₹?([\d,]+(?:\.\d{2})?)/g)];
-    let sum = 0, total = null;
-    kv.forEach(m => {
-      const v = Math.round(parseFloat(m[2].replace(/,/g, '')) * 100);
-      if (/--total/.test(m[1])) total = v; else sum += v;
-    });
-    if (total != null && kv.length > 2) rows.push({ sum, total });
+  const scan = (html, where) => {
+    let cur = [];
+    for (const m of html.matchAll(ROW)) {
+      const n = m[3].match(NUM);
+      /* A row carrying no figure at all is a heading: it ends the run. But a
+         row whose figure reads "Free" is a real line worth zero — the cart's
+         delivery line is exactly that, and treating it as a break is why the
+         busiest bill in the product was never checked. */
+      if (!/class="num[^"]*"/.test(m[3]) || (n && n[1])) { cur = []; continue; }
+      const isTotal = /--total/.test(m[2]);
+      if (isTotal && !n) { cur = []; continue; }   /* a total must be a number */
+      cur.push({ v: n ? Math.round(parseFloat(n[2].replace(/,/g, '')) * 100) : 0, isTotal });
+      if (!isTotal) continue;
+      if (cur.length >= 3) rows.push({ where,
+        sum: cur.filter(r => !r.isTotal).reduce((t, r) => t + r.v, 0),
+        total: cur[cur.length - 1].v });
+      cur = [];
+    }
   };
-  all.filter(s => s.money).forEach(s => scan(s.html));
-  const bad = rows.filter(r => Math.abs(r.sum - r.total) > rows.length * 100);
-  bad.length
+  all.filter(s => s.money).forEach(s => scan(s.html, s.name));
+  const bad = rows.filter(r => r.sum !== r.total);
+  /* A pass that checked nothing is not a pass. The fuzzer learned this the
+     expensive way — it reported ok for 2000 runs while testing no retail at all. */
+  bad.length || rows.length < 2
     ? fail('sums', 12, 'every money column sums to its own total',
-           bad.slice(0, 2).map(b => `${M.fmt2(b.sum)} vs ${M.fmt2(b.total)}`).join('; '))
+           bad.length ? bad.slice(0, 2).map(b => `${b.where}: ${M.fmt2(b.sum)} vs ${M.fmt2(b.total)}`).join('; ')
+                      : `only ${rows.length} column(s) found — too few to claim "every"`)
     : pass('sums', 12, `every money column sums to its own total (${rows.length} checked)`);
 }
 
