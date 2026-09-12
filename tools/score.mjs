@@ -174,6 +174,39 @@ te.forEach(s => {
 });
 i18n.setLang && i18n.setLang('en');
 
+/* ── 3b · a price label agrees with the price beside it ───── */
+/* "Fair price" / "Above typical" is a claim about the figure printed directly
+   under it, and it has been wrong four times — each time because the label was
+   computed from one number while the card rendered another. The card only
+   appears inside the booking sheet with a SUB-JOB chosen, which is why the
+   first version of this check matched nothing at all and passed: none of the
+   twelve screens above ever build it. So build it here, for every pro in a
+   category, with a real sub selected. */
+{
+  const SERVICES = (await import(U('src/domain/catalog.services.js'))).default;
+  const cats = SERVICES || [];
+  const bad = []; let cards = 0;
+  for (const cat of cats.slice(0, 6)) {
+    const sub = (cat.subs || [])[0];
+    if (!sub) continue;
+    for (const pr of st.partners.filter(x => x.cat === cat.id).slice(0, 4)) {
+      let html = '';
+      try { html = String(home.heroCard(cat.id, pr, sub) || ''); } catch (e) { continue; }
+      for (const m of html.matchAll(/(Fair price|Above typical)[\s\S]{0,240}?₹([\d,]+)[\s\S]{0,200}?typical ₹([\d,]+)/g)) {
+        cards++;
+        const shown = +m[2].replace(/,/g, ''), typical = +m[3].replace(/,/g, '');
+        if ((m[1] === 'Fair price') !== (shown <= typical))
+          bad.push(`${pr.name}: "${m[1]}" on ₹${shown} vs typical ₹${typical}`);
+      }
+    }
+  }
+  /* and a check that built no card is not a check that passed */
+  bad.length || cards < 3
+    ? fail('pricelabel', 8, 'a price label agrees with the price beside it',
+           bad.length ? bad.slice(0, 2).join('; ') : `only ${cards} card(s) built — nothing was compared`)
+    : pass('pricelabel', 8, `a price label agrees with the price beside it (${cards} cards)`);
+}
+
 /* ── 4 · money columns add up to the total beside them ────── */
 {
   const M = await import(U('src/core/money.js'));

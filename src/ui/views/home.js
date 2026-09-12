@@ -1289,7 +1289,14 @@ function whyRow(p, cat, sub, q) {
   const base = (cat && cat.base) || 0;
   const near = p.km <= 3;
   const trusted = (p.trust | 0) >= 70;
-  const fair = base ? p.ask <= base : false;
+  /* A CLAIM ABOUT A NUMBER ON THE SCREEN IS DECIDED ON THE NUMBER ON THE
+     SCREEN. The cell below was fixed once to show the price for the job she
+     picked (q.deal) instead of the category ask — but this line was left
+     comparing p.ask, so the label was judging one number while the card
+     printed another. Riyaz Shaikh, ₹402 against a typical of ₹480, read
+     "ABOVE TYPICAL". Fourth version of this same mistake; hence one variable. */
+  const shown = sub ? q.deal : p.ask;
+  const fair = base ? shown <= base : false;
   const cell = (k, v, d) => `<div style="padding:8px 0"><div class="m-cap" style="margin:0 0 2px">${esc(k)}</div>
     <div style="font:800 16px/1.1 var(--font-heading)">${v}</div><div class="micro" style="opacity:.7">${esc(d)}</div></div>`;
   return `<div class="grid3" style="gap:0;border-top:1px solid color-mix(in srgb,currentColor 30%,transparent);border-bottom:1px solid color-mix(in srgb,currentColor 30%,transparent);margin:12px 0">
@@ -1300,7 +1307,7 @@ function whyRow(p, cat, sub, q) {
          against the job she picked. Two different "his price" figures on one
          screen, two lines after the app tells her there is no honest total
          until she has said which job. It shows the price for the job. -->
-    ${cell(fair ? 'Fair price' : 'Above typical', M.fmt(sub ? q.deal : p.ask), `typical ${M.fmt(base)}`)}
+    ${cell(fair ? 'Fair price' : 'Above typical', M.fmt(shown), `typical ${M.fmt(base)}`)}
   </div>`;
 }
 
