@@ -57,17 +57,28 @@ export const RIDER_DISPATCH_CUT = 500; // Rs.5 of the delivery fee is SAAHAA's
 export function quoteService(dealPaise, opts = {}) {
   const D = Math.max(0, dealPaise | 0);
   const markup = opts.markup ?? liveMarkup();
-  const uplift = M.pct(D, markup * 100);              // the whole +8%
+  /* THE TOTAL IS A WHOLE RUPEE, because she types it into her bank app. The
+     8% lands on a fraction almost every time — ₹402 + 8% is ₹434.16 — and a
+     transfer box asking for ₹434.16 beside a bill reading ₹435 is two totals
+     for one order. Round the TOTAL up once, then derive the split from it, so
+     the parts still add to the number she actually sends. The rounding is
+     SAAHAA's: the pro is paid D either way. */
+  const upliftRaw = M.pct(D, markup * 100);           // the whole +8%
+  const customerPays = M.ceilRupee(D + upliftRaw);
+  const uplift = customerPays - D;                    // at most 99p more than the 8%
   const platformFee = Math.round(uplift / (1 + GST_RATE));
   const gst = uplift - platformFee;                   // remainder: never drops a paisa
   return {
     deal: D,
     workerPayout: D,
     uplift,
+    upliftRaw,
+    roundUp: uplift - upliftRaw,
     platformFee,
     gst,
     gstRatePct: GST_RATE * 100,
-    customerPays: D + uplift,
+    customerPays,
+    customerPaysExact: D + upliftRaw,
     markupPct: markup * 100,
   };
 }
@@ -186,10 +197,20 @@ export function quoteRetail(lines, opts = {}) {
   const feeExGst = Math.round(platformFee / (1 + GST_RATE));
   const feeGst = platformFee - feeExGst;
 
+  /* Same rule as a service: the basket is full of ₹277.59 packs, so the total
+     lands on paise. She pays a whole rupee; the rounding is ours, and is a
+     line of its own rather than a silent addition to the commission — taking
+     it out of the shop's side would be charging the shop for our arithmetic. */
+  const payRaw = itemsTotal + delivery;
+  const customerPays = M.ceilRupee(payRaw);
+  const roundUp = customerPays - payRaw;
+
   return {
     itemsTotal,
     deliveryFee: delivery,
-    customerPays: itemsTotal + delivery,
+    customerPays,
+    customerPaysExact: payRaw,   /* for refunds: round once at payment, adjust in exact paise */
+    roundUp,
     platformFee,
     platformFeeExGst: feeExGst,
     platformFeeGst: feeGst,
@@ -200,12 +221,12 @@ export function quoteRetail(lines, opts = {}) {
     shopAbsorbs,
     riderCost,
     freeDelivery: isFree,
-    platformRevenue: feeExGst + dispatchCut,
+    platformRevenue: feeExGst + dispatchCut + roundUp,
     mode,
     reconciles:
       (itemsTotal - platformFee + shopDeliveryShare - shopAbsorbs)   // shop
-      + platformFee + riderPayout + dispatchCut                       // us + rider
-      === itemsTotal + customerDelivery,                              // customer
+      + platformFee + riderPayout + dispatchCut + roundUp             // us + rider
+      === customerPays,                                               // customer
   };
 }
 

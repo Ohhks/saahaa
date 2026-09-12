@@ -563,3 +563,41 @@ describe('money · what is printed must sum to what is printed', () => {
     expect(M.fmtParts([68550, 1050, 1050], 70650).join(' ')).toBe('₹685 ₹11 ₹11');
   });
 });
+
+/* ── WHAT SHE TYPES INTO HER BANK APP ──────────────────────────
+   The manual UPI rail asks her to transfer an exact amount. It asked for
+   ₹434.59 while the bill beside it read ₹435 — two totals for one order, and
+   since nobody types 59 paise, every manual order would reconcile 41 paise
+   over, for as long as the rail runs. The payable is now a whole rupee,
+   rounded UP, with the rounding falling on SAAHAA's side. */
+describe('payable · she never types paise', () => {
+  it('a service total is always a whole rupee, over the whole price range', () => {
+    for (let d = 1; d <= 500000; d += 997) {              // ₹0.01 to ₹5,000, odd step
+      const q = quoteService(d);
+      expect(q.customerPays % 100).toBe(0);
+    }
+  });
+
+  it('the rounding is never taken from the pro', () => {
+    for (const d of [40200, 30000, 1, 99, 12345, 87654]) {
+      const q = quoteService(d);
+      expect(q.workerPayout).toBe(d);                      // he keeps his quote, always
+      expect(q.roundUp).toSatisfy(v => v >= 0 && v < 100, 'at most 99 paise, never negative');
+      expect(q.customerPays).toBe(q.customerPaysExact + q.roundUp);
+    }
+  });
+
+  it('the split still adds up to the number she sends', () => {
+    for (let d = 100; d <= 200000; d += 733) {
+      const q = quoteService(d);
+      expect(q.workerPayout + q.platformFee + q.gst).toBe(q.customerPays);
+    }
+  });
+
+  it('rounds UP, never down — she is never asked for less than the parts', () => {
+    const q = quoteService(40200);                          // ₹402 + 8% = ₹434.16
+    expect(q.customerPaysExact).toBe(43416);
+    expect(q.customerPays).toBe(43500);                     // ₹435, not ₹434
+    expect(q.customerPays).toSatisfy(v => v >= q.customerPaysExact, 'never below the true cost');
+  });
+});

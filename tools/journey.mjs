@@ -189,9 +189,16 @@ async function retailShortWeigh() {
   eq(mid.agreedTotal, ord.agreedTotal, 'what she agreed never moves');
   say(mid.customerPays < ord.agreedTotal, 'she is charged less than she agreed',
       `${M.fmt(mid.customerPays)} against ${M.fmt(ord.agreedTotal)}`);
-  eq(ord.agreedTotal - mid.customerPays,
-     Math.round(prod.price * qty) - Math.round(prod.price * short),
-     'the refund is the weight difference, to the paisa');
+  /* She agreed to a whole rupee — the payable is rounded up at checkout,
+     because she types it into her bank app — so the refund is the weight
+     difference PLUS that rounding. Asserting the charge directly is the
+     stronger statement anyway: she pays exactly what the scale said, to the
+     paisa, with no fee creeping back in underneath. */
+  eq(mid.customerPays, Math.round(prod.price * short),
+     'she is charged exactly the weighed value, to the paisa');
+  say(ord.agreedTotal - mid.customerPays
+      >= Math.round(prod.price * qty) - Math.round(prod.price * short),
+      'and the refund is never less than the weight she did not get');
 
   /* THE ORDER'S OWN ARITHMETIC, NOT JUST THE LEDGER'S. After a short weigh the
      re-quote scaled `itemsTotal` down by a rider fee she had not paid and left

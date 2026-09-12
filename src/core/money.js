@@ -41,6 +41,16 @@ export const fmt2 = p => fmt(p, { decimals: true });
    up maximum is a number the validator will reject. */
 export const fmtMax = p => ((p | 0) % 100 ? fmt2(p) : fmt(p));
 
+/* A FIGURE SHE TYPES INTO HER BANK APP HAS NO PAISE. On the manual UPI rail
+   the bill printed ₹435 and the transfer box asked for ₹434.59 — two totals
+   for one order. Nobody types 59 paise; she sends ₹435, and every manual order
+   reconciles 41 paise over, forever, by design. So the payable is rounded UP
+   to the whole rupee at the point it is quoted, and the few paise land on
+   SAAHAA's side of the split — never on the pro's quote, never on the shop's
+   payout. Up, not nearest: rounding down would charge her less than the parts
+   add up to, and the column would stop summing. */
+export const ceilRupee = p => Math.ceil(int(p) / PAISE) * PAISE;
+
 /* ── ROUND ONCE, AT THE EDGE ───────────────────────────────────
    THE BILLS DID NOT ADD UP, AND THE LEDGER PAGE DID NOT EITHER.
    Every figure on a screen went through `fmt` independently, and no total was

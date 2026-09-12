@@ -337,10 +337,15 @@ describe('reweigh · free delivery is a promise, not a running condition', () =>
     expect(honest.deliveryFee).toBe(0);
     expect(honest.freeDelivery).toBe(true);
 
-    /* and the refund she is actually owed is the whole weight difference */
-    const refund = agreedQ.customerPays - Math.min(honest.customerPays, agreedQ.customerPays);
-    expect(refund).toBe(50392 - 48502);
-    expect(refund).toBe(1890);
+    /* THE REFUND IS THE WEIGHT DIFFERENCE, PLUS THE ROUNDING SHE WAS CHARGED.
+       The payable is rounded up to a whole rupee at checkout, because she types
+       it into her bank app; a reweigh is an adjustment and is settled in exact
+       paise, so the few paise of rounding come back to her rather than being
+       kept by a second rounding. Compare against customerPaysExact — the same
+       figure flow.js re-quotes against. */
+    const refund = agreedQ.customerPays - Math.min(honest.customerPaysExact, agreedQ.customerPays);
+    expect(refund).toBe((50392 - 48502) + agreedQ.roundUp);
+    expect(refund).toBe(1898);
   });
 
   it('weighing short never produces an over-estimate', () => {
@@ -348,7 +353,9 @@ describe('reweigh · free delivery is a promise, not a running condition', () =>
        Rs.18.90 LIGHT — the delivery fee had been added back underneath */
     for (const weighed of [48502, 49000, 49899, 50000, 50391]) {
       const q = quoteRetail(line(weighed), { ...P, alreadyFree: true });
-      expect(Math.max(0, q.customerPays - 50392)).toBe(0);
+      /* against the EXACT re-quote: the payable is rounded up only once, when
+         she pays, and 50392 is the raw agreed basket, not a rounded figure. */
+      expect(Math.max(0, q.customerPaysExact - 50392)).toBe(0);
     }
   });
 
@@ -383,13 +390,15 @@ describe('reweigh · free delivery is a promise, not a running condition', () =>
 
       const weighed = Math.max(1, ordered - rnd(6000));            // always lighter
       const q = quoteRetail(line(weighed), { ...opts, alreadyFree: qualified });
-      const charged = Math.min(q.customerPays, agreedQ.customerPays);
+      const charged = Math.min(q.customerPaysExact, agreedQ.customerPays);
 
       expect(charged).toSatisfy(v => v <= agreedQ.customerPays,
         `short weigh charged ${charged} over agreed ${agreedQ.customerPays}`);
-      /* the refund must be the weight difference exactly — no fee may reappear */
+      /* the refund must be the weight difference exactly, plus the rounding she
+         paid at checkout — no fee may reappear, and no paisa may be kept by
+         rounding a second time */
       const lost = ordered - weighed;
-      expect(agreedQ.customerPays - charged).toBe(lost);
+      expect(agreedQ.customerPays - charged).toBe(lost + agreedQ.roundUp);
       /* and the ride is the distance band whatever the basket did */
       expect(q.riderCost).toBe(agreedQ.riderCost);
     }

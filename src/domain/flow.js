@@ -1355,7 +1355,11 @@ export async function setPickedQty(orderId, lineId, qty) {
      capped at what she agreed — a heavier weight is shown to the shop and
      never taken from her. */
   const agreed = (o.agreedTotal != null ? o.agreedTotal : o.customerPays) | 0;
-  const capped = Math.min(q.customerPays, agreed);
+  /* The EXACT re-quote, not the rounded-up payable. She was rounded up once,
+     when she paid; a reweigh is an adjustment, and adjusting against a second
+     rounding would quietly keep her paise each time the scale moved. */
+  const requoted = q.customerPaysExact != null ? q.customerPaysExact : q.customerPays;
+  const capped = Math.min(requoted, agreed);
   const under = capped < agreed;
   /* CAPPING ONLY HER SIDE MINTED MONEY. The charge was clamped to what she
      agreed and `shopPayout` was left at the heavier figure, so a shop typing

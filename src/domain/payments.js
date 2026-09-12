@@ -61,7 +61,13 @@ export function instruction(order) {
   return {
     upi: PAYEE_UPI,
     amount: paise,
-    amountText: M.fmt2(paise),
+    /* Whole rupees when it is whole, which is now always: pricing rounds the
+       payable up before it ever reaches here. fmt2 printed "₹435.00" beside a
+       bill reading "₹435" — the same number twice, written two ways, on the
+       one screen where she is copying a figure into her bank app. The paise
+       form survives only as a fallback, because if an amount ever does carry
+       paise she must still send it exactly. */
+    amountText: M.fmtMax(paise),
     reference: refFor(order && order.id),
     /* the deep link every Indian UPI app understands; `tn` is the note the
        admin reads in the statement, `am` is in rupees with two decimals */
