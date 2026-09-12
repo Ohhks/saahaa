@@ -86,13 +86,13 @@ const ADMIN_CSS = `<style>
   .ad-brand{display:flex;align-items:center;gap:var(--sp-5);flex-wrap:wrap}
   .ad-wm{font:800 18px/1 var(--font-heading);letter-spacing:.02em;white-space:nowrap}
   .ad-wm .sep{color:var(--color-accent-text);margin:0 6px}
-  .ad-ver{font-size:11px;letter-spacing:.04em;color:color-mix(in srgb,var(--color-bg) 70%,transparent)}
+  .ad-ver{font-size:12px;letter-spacing:.04em;color:color-mix(in srgb,var(--color-bg) 70%,transparent)}
   .ad-tabs{display:flex;gap:var(--sp-7);overflow-x:auto;scrollbar-width:none;border-bottom:2px solid var(--color-divider);margin:var(--sp-6) 0 0}
   .ad-tabs::-webkit-scrollbar{display:none}
   .ad-tab{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0;font:600 12px/1 var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
   .ad-tab:hover{color:var(--ink-1)}
   .ad-tab[aria-selected="true"]{color:var(--color-accent-text);border-bottom-color:var(--color-accent)}
-  .ad-tab .tag{padding:2px 6px;font-size:10px}
+  .ad-tab .tag{padding:2px 6px;font-size:12px}
   .ad-note{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-4) var(--sp-8);padding:var(--sp-5) 0;border-bottom:1px solid var(--color-divider)}
   .ad-g2{display:grid;grid-template-columns:minmax(0,1fr);gap:0 var(--sp-6)}
   .ad-cards{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-5);align-items:start}
@@ -110,7 +110,7 @@ const ADMIN_CSS = `<style>
   .ad .table{min-width:100%}
   .ad .table td{vertical-align:middle} .ad .table td.act{white-space:nowrap;text-align:right}
   .ad .table td.nowrap,.ad .table th.nowrap{white-space:nowrap}
-  .ad .table .sub{display:block;font-size:11px;color:var(--ink-3);font-weight:400}
+  .ad .table .sub{display:block;font-size:12px;color:var(--ink-3);font-weight:400}
   .ad .table tr.on td{background:var(--color-accent-100)}
   :root[data-theme="dark"] .ad .table tr.on td{background:var(--brand-soft)}
   /* a money table's last line: the total, ruled off in ink like the mockup's
@@ -138,7 +138,7 @@ const ADMIN_CSS = `<style>
   .ad-segwrap::-webkit-scrollbar{display:none}
   /* tokens.css gives .seg__btn 40px; the console keeps the 44px touch target */
   .ad .seg__btn{min-height:44px}
-  .ad-fields .field{margin-bottom:var(--sp-4)} .ad-hint{margin:-2px 0 var(--sp-5);font-size:11px;color:var(--ink-3)}
+  .ad-fields .field{margin-bottom:var(--sp-4)} .ad-hint{margin:-2px 0 var(--sp-5);font-size:12px;color:var(--ink-3)}
   .ad-facts{display:flex;flex-wrap:wrap;gap:6px}
   .ad-login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg)}
   .ad-login .card{width:100%;max-width:400px;padding:var(--sp-8) var(--sp-7)}

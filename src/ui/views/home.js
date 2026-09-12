@@ -701,7 +701,7 @@ export function render() {
     <div class="wrap inner">
       <button class="loc tap grow" data-act="area.pick" aria-label="Change where you are served">
         <b style="font:800 17px/1 var(--font-heading)">${esc(myArea())} ▾</b>
-        <small style="font-size:11px;color:var(--ink-3);margin-top:3px">${prosOnline} pros · ${shopsOpen} shops nearby</small>
+        <small style="font-size:12px;color:var(--ink-3);margin-top:3px">${prosOnline} pros · ${shopsOpen} shops nearby</small>
       </button>
       <button class="btn btn--ghost tap" data-act="nav.orders" aria-label="Your live orders" style="padding-inline:8px">
         <span style="position:relative;display:grid;place-items:center">

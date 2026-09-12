@@ -111,10 +111,10 @@ export const SYS_CSS = `<style>
   .m-kv{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;align-items:baseline}
   .m-kv--total{font:800 17px/1.2 var(--font-heading);padding-top:9px;margin-top:4px;border-top:1px solid var(--color-divider)}
   .m-kv .muted{color:var(--ink-3)}
-  .m-note{background:var(--accent-soft);color:var(--brand-text);padding:9px 10px;font-size:11.5px;line-height:1.5}
+  .m-note{background:var(--accent-soft);color:var(--brand-text);padding:9px 10px;font-size:12px;line-height:1.5}
   .m-bar{position:sticky;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));z-index:var(--z-sticky);display:flex;align-items:center;gap:10px;
     padding:10px 0;margin-top:var(--sp-6);border-top:2px solid var(--color-text);background:var(--bg)}
-  .m-bar__t{font:800 14px/1.2 var(--font-heading)} .m-bar__m{font-size:10.5px;color:var(--ink-3)}
+  .m-bar__t{font:800 14px/1.2 var(--font-heading)} .m-bar__m{font-size:12px;color:var(--ink-3)}
   @media (min-width:768px){ .m-bar{bottom:0} }
   .m-set{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:48px;padding:6px 0;
     border-bottom:1px solid var(--color-divider);text-align:left;font-weight:600;color:inherit;background:none}
@@ -123,7 +123,7 @@ export const SYS_CSS = `<style>
   .m-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
   .m-step{display:flex;gap:12px;align-items:flex-start} .m-step__dot{width:12px;height:12px;flex:none;margin-top:3px;background:var(--color-accent)}
   .m-step.pend .m-step__dot{background:transparent;border:2px solid var(--color-neutral-400)}
-  .m-step__t{font:800 13px/1.3 var(--font-heading)} .m-step.pend .m-step__t{color:var(--ink-3)} .m-step__m{font-size:11px;color:var(--ink-3)}
+  .m-step__t{font:800 13px/1.3 var(--font-heading)} .m-step.pend .m-step__t{color:var(--ink-3)} .m-step__m{font-size:12px;color:var(--ink-3)}
   .m-hero{background:var(--color-accent-surface);color:#fff;padding:20px 14px 18px}
   .m-hero .m-hero__k{font:800 12px/1.2 var(--font-heading);letter-spacing:.18em;opacity:.85;text-transform:uppercase}
   .m-hero h1{font:800 27px/1.08 var(--font-heading);margin:10px 0 4px;color:#fff;letter-spacing:-.01em} .m-hero p{font-size:12.5px;opacity:.9}
@@ -131,14 +131,14 @@ export const SYS_CSS = `<style>
   .m-prod{padding:10px;border-bottom:1px solid var(--color-divider);display:flex;flex-direction:column}
   .m-grid2 .m-prod:nth-child(odd){border-right:1px solid var(--color-divider)}
   .m-prod__img{height:78px;background:var(--color-neutral-300);border:1px solid var(--color-divider);display:grid;place-items:center;color:var(--ink-3);overflow:hidden}
-  .m-prod__t{font:800 12.5px/1.25 var(--font-heading);margin:8px 0 3px} .m-prod__m{font-size:11px;color:var(--ink-3)}
+  .m-prod__t{font:800 12.5px/1.25 var(--font-heading);margin:8px 0 3px} .m-prod__m{font-size:12px;color:var(--ink-3)}
   .m-prod__b{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto;padding-top:7px;gap:6px}
   .m-prod__p{font:800 15px/1 var(--font-heading)}
   /* price above, the struck MRP and the saving beneath it — so the ADD control
      always keeps its own line-end and never gets pushed under the price */
   .m-prod__price{display:flex;flex-direction:column;gap:4px;min-width:0}
-  .m-prod__was{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--ink-3);flex-wrap:wrap}
-  .m-prod__was .tag{padding:2px 6px;font-size:10px}
+  .m-prod__was{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-3);flex-wrap:wrap}
+  .m-prod__was .tag{padding:2px 6px;font-size:12px}
   .m-add{border:1px solid var(--color-text);padding:0 9px;min-height:44px;min-width:44px;font:800 11px/1 var(--font-heading);color:var(--ink-1)}
   .m-add:disabled{border-color:var(--color-divider);color:var(--ink-3);opacity:1}
   .m-qty{display:inline-flex;align-items:center;background:var(--color-accent-surface);color:#fff;font:800 12px/1 var(--font-heading);min-height:44px}
@@ -159,7 +159,7 @@ export function header(title, sub, right = '') {
       <button class="btn btn--ghost tap" data-act="nav.back" aria-label="Back" style="padding-inline:6px;color:inherit">${icon('back', { size: 20 })}</button>
       <div class="grow" style="min-width:0">
         <b style="font:800 15px/1.15 var(--font-heading);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(title)}</b>
-        ${sub ? `<span style="display:block;font-size:10.5px;line-height:1.3;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sub)}</span>` : ''}
+        ${sub ? `<span style="display:block;font-size:12px;line-height:1.3;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sub)}</span>` : ''}
       </div>
       ${right}
     </div>
@@ -265,7 +265,7 @@ export function renderList(catId) {
         <span class="chip__ic" aria-hidden="true">${hasIcon(c.id) ? icon(c.id, { size: 14 }) : ''}</span>${esc(catName(c))}</button>`).join('')}
     </div>
 
-    <div class="between" style="padding:9px 0;border-top:1px solid var(--color-divider);border-bottom:2px solid var(--color-divider);font-size:11.5px;color:var(--ink-3)">
+    <div class="between" style="padding:9px 0;border-top:1px solid var(--color-divider);border-bottom:2px solid var(--color-divider);font-size:12px;color:var(--ink-3)">
       <span>${shops.length} ${esc(activeCat.name.toLowerCase())} shop${shops.length === 1 ? '' : 's'} in ${esc(myArea())} · ${openNow} open now</span>
       <span style="font-weight:600;color:var(--ink-1)">Nearest first</span>
     </div>
@@ -525,7 +525,7 @@ export function renderCart() {
           <p class="m-cap" style="margin:8px 0 6px">${esc(t('cart.ifOutOfStock'))}</p>
           <div class="chiprow" style="flex-wrap:wrap">
             ${['similar','call','refund'].map(pol => `
-              <button class="chip ${l.subPolicy === pol ? 'on' : ''}" style="min-height:44px;font-size:11.5px" aria-pressed="${l.subPolicy === pol}"
+              <button class="chip ${l.subPolicy === pol ? 'on' : ''}" style="min-height:44px;font-size:12px" aria-pressed="${l.subPolicy === pol}"
                 data-act="cart.sub" data-id="${l.lineId}" data-pol="${pol}">
                 ${esc(pol === 'similar' ? t('cart.similarOk') : pol === 'call' ? t('cart.askMe') : t('cart.justRefund'))}
               </button>`).join('')}

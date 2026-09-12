@@ -197,7 +197,7 @@ function shell(title, sub, body) {
       <div class="wrap inner">
         <button class="btn btn--ghost tap" data-act="nav.back" aria-label="Back" style="padding-inline:6px;color:inherit">${icon('back', { size: 20 })}</button>
         <div class="grow" style="min-width:0"><b style="font:800 15px/1.15 var(--font-heading);display:block">${esc(title)}</b>
-          ${sub ? `<span style="display:block;font-size:11px;color:var(--ink-3)">${esc(sub)}</span>` : ''}</div>
+          ${sub ? `<span style="display:block;font-size:12px;color:var(--ink-3)">${esc(sub)}</span>` : ''}</div>
       </div></header>
     <main class="wrap" style="padding-bottom:120px">${body}</main>${SYS_CSS}`;
 }
@@ -322,11 +322,11 @@ function replyRow(req, b) {
     <div class="between" style="align-items:flex-start;gap:10px">
       <div style="min-width:0">
         <div style="font:800 15px/1.2 var(--font-heading)">${esc(b.partnerName)}</div>
-        <div style="font-size:11px;color:var(--ink-3);margin-top:3px">${starsFor(b.partnerId)}${b.km != null ? ` · ${b.km} km` : p.area ? ` · ${esc(p.area)}` : ''}${b.eta ? ` · ~${b.eta} min` : ''}${b.held ? ' · your first match' : ''}</div>
+        <div style="font-size:12px;color:var(--ink-3);margin-top:3px">${starsFor(b.partnerId)}${b.km != null ? ` · ${b.km} km` : p.area ? ` · ${esc(p.area)}` : ''}${b.eta ? ` · ~${b.eta} min` : ''}${b.held ? ' · your first match' : ''}</div>
       </div>
       <div style="text-align:right;flex:none">
         <div style="font:800 21px/1 var(--font-heading)" class="num">${M.fmt(payP(b.amount, b.partnerId))}</div>
-        <div style="font-size:10px;color:var(--ink-3);margin-top:3px">${saving ? `${M.fmt(saving)} less than held` : `incl. SAAHAA ${pctP(b.partnerId)}%`}</div>
+        <div style="font-size:12px;color:var(--ink-3);margin-top:3px">${saving ? `${M.fmt(saving)} less than held` : `incl. SAAHAA ${pctP(b.partnerId)}%`}</div>
       </div>
     </div>
     ${b.held ? `<div class="row" style="gap:8px;margin-top:10px">
@@ -419,11 +419,11 @@ function otherReply(req, b, hero, cheapest, held) {
     <div class="between" style="align-items:flex-start;gap:10px">
       <div style="min-width:0">
         <div style="font:800 15px/1.2 var(--font-heading)">${esc(b.partnerName)}</div>
-        <div style="font-size:11px;color:var(--ink-3);margin-top:3px">${starsFor(b.partnerId)} · ${b.km} km · ~${b.eta} min${isCheapest ? ' · lowest price' : ''}</div>
+        <div style="font-size:12px;color:var(--ink-3);margin-top:3px">${starsFor(b.partnerId)} · ${b.km} km · ~${b.eta} min${isCheapest ? ' · lowest price' : ''}</div>
       </div>
       <div style="text-align:right;flex:none">
         <div class="num" style="font:800 21px/1 var(--font-heading)">${M.fmt(payP(b.amount, b.partnerId))}</div>
-        <div style="font-size:10px;color:var(--ink-3);margin-top:3px">incl. SAAHAA ${pctP(b.partnerId)}%</div>
+        <div style="font-size:12px;color:var(--ink-3);margin-top:3px">incl. SAAHAA ${pctP(b.partnerId)}%</div>
       </div>
     </div>
     ${isCheapest && gap > 0 ? `<p style="font-size:12.5px;margin:9px 0 0;line-height:1.5">

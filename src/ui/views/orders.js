@@ -473,12 +473,12 @@ export function renderDetail(orderId) {
       <span class="thumb m-thumb" style="width:40px;height:40px" aria-hidden="true">${hasIcon(cat.id) ? icon(cat.id, { size: 18 }) : icon('box', { size: 18 })}</span>
       <div class="grow" style="min-width:0">
         <div style="font:800 13.5px/1.2 var(--font-heading)">${esc(who)} · ${esc(stageLabel(st).toLowerCase())}</div>
-        <div style="font-size:11px;color:var(--ink-3);margin-top:2px">${running
+        <div style="font-size:12px;color:var(--ink-3);margin-top:2px">${running
           ? `${km} km away · ~${o.eta || etaMins(km)} min · step ${idx + 1} of ${track.length}`
           : `${esc(st.short)} · ${timeAgo(o.createdAt)}`}</div>
       </div>
       <button class="btn btn--secondary btn--sm tap" data-act="order.map" data-id="${esc(o.id)}"
-        aria-pressed="${showMap}" style="font-size:11px;letter-spacing:.04em;min-height:44px">${showMap ? 'HIDE MAP' : 'MAP'}</button>
+        aria-pressed="${showMap}" style="font-size:12px;letter-spacing:.04em;min-height:44px">${showMap ? 'HIDE MAP' : 'MAP'}</button>
     </div>
 
     ${o.otp && running && isCustomer && !o.otpVerified && o.stage !== 'ARRIVED' && o.stage !== 'R_PICKUP_READY' ? `
@@ -771,7 +771,7 @@ export function renderChat(orderId) {
 
 const CHAT_CSS = `<style>
   .ch-hdr .ch-who{font:800 14px/1.15 var(--font-heading);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ch-hdr .ch-state{font-size:10.5px;line-height:1.3;color:var(--color-accent-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ch-hdr .ch-state{font-size:12px;line-height:1.3;color:var(--color-accent-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ch-wrap{display:flex;flex-direction:column;padding-top:0}
   .ch-thread{display:flex;flex-direction:column;gap:10px;min-height:52vh;
     margin:0 calc(-1 * var(--gutter));padding:12px var(--gutter);background:var(--bg-sunken)}

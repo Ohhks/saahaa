@@ -64,13 +64,13 @@ const earnCSS = `<style>
   :root[data-theme="dark"] .ern__num + .ern__num{background:#3a201c}
   .ern__num .k{font:600 10px/1.3 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
   .ern__num .v{font:800 30px/1 var(--font-heading);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:7px 0 5px;word-break:break-word}
-  .ern__num .d{font-size:11.5px;color:var(--ink-3)}
+  .ern__num .d{font-size:12px;color:var(--ink-3)}
   .ern__num.on .v{color:var(--color-accent-text)}
   .ern__row{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--color-divider)}
   .ern__row .ic{width:36px;height:36px;flex:none;display:grid;place-items:center;background:var(--color-accent-100);color:var(--color-accent-text)}
   :root[data-theme="dark"] .ern__row .ic{background:var(--surface-3)}
   .ern__row b{font:800 14.5px/1.2 var(--font-heading);display:block}
-  .ern__row p{font-size:11.5px;color:var(--ink-3);margin:3px 0 0}
+  .ern__row p{font-size:12px;color:var(--ink-3);margin:3px 0 0}
   .ern__n{width:24px;height:24px;flex:none;display:grid;place-items:center;background:var(--color-text);color:var(--color-bg);font:800 11px/1 var(--font-heading)}
   .ern__foot{position:sticky;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));z-index:var(--z-sticky);
     background:var(--bg);border-top:2px solid var(--color-divider);padding:12px 0 14px;margin-top:var(--sp-8)}

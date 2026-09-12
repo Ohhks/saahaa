@@ -118,7 +118,7 @@ const proCSS = `<style>
     border-bottom:2px solid var(--color-divider);background:var(--color-surface)}
   .pro__use img{width:52px;height:52px;object-fit:cover;flex:none;border:2px solid var(--color-text)}
   .pro__use b{font:800 13.5px/1.2 var(--font-heading)}
-  .pro__use p{font-size:11.5px;color:var(--ink-3);margin:4px 0 0}
+  .pro__use p{font-size:12px;color:var(--ink-3);margin:4px 0 0}
   @media (min-width:768px){ .pro__use{padding-left:var(--sp-8);padding-right:var(--sp-8)} }
   @media (min-width:1024px){ .pro__use{padding-left:var(--sp-10);padding-right:var(--sp-10)} }
   .pro__id{padding:12px 0;border-bottom:2px solid var(--color-divider)}
@@ -221,7 +221,7 @@ export function render(id) {
       <div><b>~${etaMins(km)} min</b><span>Response</span></div>
       <div><b>${M.fmt(p.ask)}</b><span>From</span></div>
       <div><b>${esc(years)}</b><span>${esc(yearsCap)}</span></div>
-      <div><b>${ts.score}<span style="font-size:10px">/100</span></b><span>Trust</span></div>
+      <div><b>${ts.score}<span style="font-size:12px">/100</span></b><span>Trust</span></div>
     </div>
 
     <div class="prosplit">

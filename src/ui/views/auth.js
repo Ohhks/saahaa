@@ -171,7 +171,7 @@ const authCSS = `<style>
   .au__cat:hover{border-color:var(--color-text);border-left-color:var(--cat,var(--color-accent))}
   .au__cat .ic{display:block;color:var(--cat,var(--color-accent))}
   .au__cat b{display:block;font:800 14px/1.2 var(--font-heading);margin-top:7px;overflow-wrap:anywhere}
-  .au__cat span{display:block;font-size:11.5px;line-height:1.35;color:var(--ink-3);margin-top:3px}
+  .au__cat span{display:block;font-size:12px;line-height:1.35;color:var(--ink-3);margin-top:3px}
   .au__cat[aria-pressed="true"]{background:var(--color-accent);color:var(--accent-on-fill);border-color:var(--color-accent);border-left-color:var(--color-text)}
   .au__cat[aria-pressed="true"] .ic,.au__cat[aria-pressed="true"] span{color:inherit;opacity:.92}
   .au__shotpv img{display:block;width:100%;height:150px;object-fit:cover;border:2px solid var(--color-text);background:var(--surface-3)}

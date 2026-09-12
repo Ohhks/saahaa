@@ -385,7 +385,7 @@ export function render() {
         <span class="avatar" style="width:52px;height:52px;font-size:18px">${esc((s.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase())}</span>
         <div class="grow" style="min-width:0">
           <div style="font:800 18px/1.15 var(--font-heading)">${esc(s.name)}</div>
-          <div style="font-size:11.5px;color:var(--ink-3);margin-top:3px">${maskedMobile ? `${esc(maskedMobile)} · ` : ''}${esc(s.area || myArea())}</div>
+          <div style="font-size:12px;color:var(--ink-3);margin-top:3px">${maskedMobile ? `${esc(maskedMobile)} · ` : ''}${esc(s.area || myArea())}</div>
         </div>
         ${liveList.length ? `<span class="tag tag-accent">${liveList.length} live</span>` : ''}
       </div>
