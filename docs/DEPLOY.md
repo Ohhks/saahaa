@@ -122,3 +122,38 @@ In the Cloudflare dashboard: **Zero Trust → Access → Applications → Add** 
 self-hosted application for `your-domain/admin.html`, policy **Allow** with the
 owner's email only. It costs nothing at this size and it means an attacker
 never reaches the password box at all.
+
+
+## 8 · Where the owner console is, and what to do if you cannot get in
+
+**Local:** `python tools/serve.py 8772`, then open
+`http://localhost:8772/admin.html`. Double-clicking `dist/admin.html` after a
+build works too — it is a single self-contained file.
+
+**Deployed:** `https://<your-domain>/admin.html`.
+
+It is deliberately not linked from anywhere in the customer app: typing
+`#/admin` there leaves you on the home screen. The console is its own page.
+
+**If the page 404s after deploying**, the build that produced `dist/admin.html`
+has not been published yet — run `python tools/build.py --site` and deploy
+again. The console page only exists from that build onward.
+
+**If the sign-in refuses you**, in order of likelihood:
+
+1. *Wrong password.* Five wrong attempts lock the console for 30 minutes; the
+   screen says so. Wait it out rather than retrying.
+2. *You are already locked out.* The lock lives in this browser only — another
+   browser, or a private window, is not locked.
+3. *You have forgotten it.* There is no reset link, on purpose: a reset flow is
+   a second door into the one screen that can clear money. Set a new one:
+
+   ```
+   node tools/owner-password.mjs
+   ```
+
+   It asks for a password twice without echoing it, prints a replacement
+   `ADMIN_BOOTSTRAP` block, and you paste that over the one in
+   `src/core/config.js`, rebuild and deploy. The password never touches a file,
+   a log or a commit — the block contains only its PBKDF2 hash, and nobody can
+   work backwards from it, including you.
