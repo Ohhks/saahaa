@@ -176,7 +176,9 @@ her bank gave her
 <tr><td><strong>One UTR, one live claim</strong></td><td>otherwise: pay once, claim two jobs. Enforced by a unique index in Postgres, not a check that two requests can both pass</td></tr>
 <tr><td>A claim posts no ledger entry</td><td>a claim that could write to the ledger is a way to mint money by typing</td></tr>
 <tr><td>A short payment is not a paid order</td><td>escrow is funded with what the statement showed, and the shortfall is recorded</td></tr>
-<tr><td>Clearing twice funds once</td><td>tired humans double-click at 7am</td></tr></table>
+<tr><td>Clearing twice funds once</td><td>tired humans double-click at 7am. The escrow leg’s hash is derived from the payment and the amount, so a second attempt collides with the first instead of writing a second leg</td></tr>
+<tr><td><strong>The escrow leg is written before the payment is marked</strong></td><td>it used to be the other way round, and the leg’s result was never looked at — a refused leg left a payment saying money had arrived with nothing on the ledger to show it. Nothing may say the money is here until the ledger says so</td></tr>
+<tr><td><strong>“Nothing arrived” is a rejection, not a clearance</strong></td><td>clearing an order for ₹0 is refused outright. It is not a payment that fell short; it is a payment that never happened</td></tr></table>
 <div class="warn"><strong>The risk this accepts, stated plainly.</strong> A pro starts work on a <em>claim</em> and is settled
 next morning on a <em>fact</em>. The gap is bounded to one job and is the reason the payout batch runs after the
 statement is read. There is no automated defence against a forged UTR — only two people. That is the real cost of
@@ -244,6 +246,7 @@ confirmed before filing — one tap cannot file one by accident.</p>
       found, less than bill →  Clear with the amount actually seen
                                the shortfall is recorded; chase it
       not found             →  Reject     she can fix a typo and claim again
+      found, ₹0            →  Reject     clearing a zero is refused, not recorded as short
 3. pay each due pro from the same account
 4. record YOUR transfer's UTR against the payout
       └─ every rupee in has a UTR, every rupee out has a UTR, both on the ledger</div>
@@ -299,11 +302,30 @@ every order:  ESCROW_IN  =  release + fee + gst  ( + rider + dispatch on retail 
 <p>Money is stored as integer paise, never a float. Every partner sees his own passbook, to the paisa, with a line
 that states what the column adds up to and names each pocket it is split across.</p>
 
+<h2 id="sees">15 · Who can see what</h2>
+<p>The browser is not trusted with this. Every table in Postgres is <strong>default deny</strong>: signed out, the
+answer to every question is an empty list, not an error. What each person may read is a policy in the database,
+not a filter in a screen — a screen can be edited by whoever is looking at it.</p>
+<table><tr><th>Person</th><th>Sees</th><th>Never sees</th></tr>
+<tr><td>Customer</td><td>her own orders, her own claims, the legs on her own orders</td><td>anybody else’s order, at all</td></tr>
+<tr><td>Pro</td><td>the jobs he accepted and the claims against them</td><td>a retail order that has nothing to do with him</td></tr>
+<tr><td><strong>Shopkeeper</strong></td><td>orders placed at her own shop, and the payment claimed against each</td><td>an unrelated order</td></tr>
+<tr><td>Nobody / signed out</td><td>nothing, on every table</td><td>everything</td></tr>
+<tr><td>The Worker (service role)</td><td>everything it must, to clear money</td><td>—  its key never reaches a browser</td></tr></table>
+<p><strong>The shopkeeper row is new, and it was wrong before.</strong> The database had no <code>shops</code> table:
+an order carried a shop id pointing at nothing, so no policy could connect a shop to the person who owns it, and a
+shopkeeper asking for her own orders got an empty list. Half the product was invisible to its own owner. There is
+now a <code>shops</code> table, the shop id is a real foreign key, and ownership is one lookup.</p>
+<p>None of the above was ever executed until now. <code>tools/schema-test.sh</code> applies the schema to a real
+Postgres in docker and proves each line of that table, along with the UTR index, the append-only trigger, and the
+file’s own claim to be safe to run twice.</p>
+
 <p class="sub" style="margin-top:34px;border-top:1px solid var(--line);padding-top:14px">
 Gates protecting all of the above, every one run by <code>bash tools/preflight.sh</code>:
 301 unit tests · 30 rendered screens · 17 money journeys (186 assertions) · 34 payment-rail
-assertions · 27 Worker assertions · 18 picture-sharing assertions ·
-<strong>machine score 100/100</strong> (46 checks) · <strong>taste 100/100</strong> (44 checks:
+assertions · 32 Worker assertions · 18 picture-sharing assertions · <strong>the schema run against a real
+Postgres</strong> (14 database assertions) · 600 randomised order lives ·
+<strong>machine score 100/100</strong> (46 checks) · <strong>taste 100/100</strong> (contrast in both themes, 92 weighted points:
 contrast, tap targets, type scale, token discipline).</p>
 
 </div></body></html>
