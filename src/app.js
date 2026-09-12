@@ -136,6 +136,15 @@ function go(view, param) {
   // null !== undefined, so every re-tap of the current tab pushed a junk entry
   // and the back button needed five presses to leave Home.
   if (view === 'admin' && !ADMIN_HOST) view = 'home';   // no door in the customer app
+  /* AND THE OTHER WAY ROUND. admin.html hosts the console and nothing else, so
+     "Back to SAAHAA" must LEAVE this document — go('home') would otherwise
+     paint the customer app, tab bar and all, inside the owner page. The two
+     pages share an origin and therefore the same stored state, so stepping
+     across is a navigation, not a reload of anything that matters. */
+  if (ADMIN_HOST && view !== 'admin') {
+    location.href = './' + (location.search || '') + '#/' + view + (param ? '/' + param : '');
+    return;
+  }
   const next = param ?? null;
   if (ctx.view !== view || ctx.param !== next) history.push([ctx.view, ctx.param]);
   ctx.view = view; ctx.param = next;

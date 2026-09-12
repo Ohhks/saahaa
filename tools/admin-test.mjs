@@ -34,6 +34,12 @@ say(/ADMIN_HOST \? \{ admin:/.test(app),
 say(/view === 'admin' && !ADMIN_HOST/.test(app),
     "and go('admin') lands on home anywhere else");
 
+/* 2b · and the two pages hand off to each other cleanly */
+say(/ADMIN_HOST && view !== 'admin'/.test(app) && /location\.href = '\.\/'/.test(app),
+    'leaving the console leaves the document, rather than painting the customer app inside it');
+say(/data-act="nav\.home"/.test(read('src/ui/views/admin.js')),
+    'and the console has a way back to the app at all');
+
 /* 3 · nobody is invited */
 for (const f of ['src/ui/views/auth.js', 'src/ui/views/account.js']) {
   /* the guard is a ternary that may open a line or two above the row it wraps,
