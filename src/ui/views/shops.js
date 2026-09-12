@@ -432,9 +432,12 @@ function productCard(p, line) {
 export function renderCart() {
   const cart = flow.getCart();
   if (!cart || !cart.lines.length)
-    return `${header('Your cart', '')}<main class="wrap">
-      ${emptyBlock('Cart is empty', 'Add items from any shop near you.',
-        '<button class="btn btn--secondary" data-act="nav.shops">Browse shops</button>')}</main>`;
+    /* THE EMPTY CART WAS 0% TRANSLATED — the machine score found it on its
+       first run, and a round-18 audit had said the same thing. It is a screen a
+       new customer sees before any other, in whatever language she chose. */
+    return `${header(t('cart.title'), '')}<main class="wrap">
+      ${emptyBlock(t('cart.empty'), t('cart.emptyHow'),
+        `<button class="btn btn--secondary" data-act="nav.shops">${esc(t('cart.browseShops'))}</button>`)}</main>`;
 
   const q = flow.cartQuote(cartMode);
   if (!q) { flow.clearCart(); return renderCart(); }   // shop vanished under us
