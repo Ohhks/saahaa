@@ -18,7 +18,7 @@ Serve with `python tools/serve.py <port>` — **never** `python -m http.server`.
 python tools/build.py --site && bash tools/preflight.sh
 ```
 
-Eleven gates. If it says `PRE-FLIGHT PASSED`, it is safe to push. Do not skip it
+Thirteen gates. If it says `PRE-FLIGHT PASSED`, it is safe to push. Do not skip it
 and do not push around it.
 
 | gate | catches |
@@ -31,8 +31,9 @@ and do not push around it.
 | `render-views.mjs` | **free variables — renders 30 screens with real data** |
 | `journey.mjs` | 17 money journeys, 186 assertions |
 | `pay-journey.mjs` | the manual UPI rail, 34 assertions |
-| `worker-test.mjs` | who may clear money, 27 assertions |
+| `worker-test.mjs` | who may clear money, 32 assertions |
 | `img-test.mjs` | picture sharing actually saves what it claims |
+| `schema-test.sh` | **runs `supabase/schema.sql` on a real Postgres in docker** — RLS, the UTR index, the append-only trigger. Skips cleanly with no docker |
 | `taste.mjs` / `score.mjs` | contrast, tap targets, type ≥12px; 46-check product score |
 
 Both scores are currently **100/100**. They are ratchets — do not lower a
@@ -97,6 +98,19 @@ requests. Never store a blob in Postgres.
   byte-compared against `../saahaa02`. After changing one:
   `cp <file> ../saahaa02/<file>`
 - Changelog entries say what broke and why, not what was added.
+
+## The database
+
+`supabase/schema.sql` is executed for real by `tools/schema-test.sh` (docker,
+postgres:16-alpine) against `supabase/schema.test.sql`. It proved three things
+that had been asserted for three handovers and were false or untested: a
+shopkeeper could not see her own orders (there was no `shops` table at all —
+`orders.shop_id` was a dangling text column), a payment could be marked CLEARED
+with no ledger leg behind it, and the file's own "idempotent" claim had never
+been run twice.
+
+`auth.users` / `auth.uid()` come from Supabase; `supabase/test-auth-stub.sql`
+stands in for exactly those two so the rest can run on plain Postgres.
 
 ## Deploying
 

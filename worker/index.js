@@ -167,20 +167,34 @@ export default {
       }
       const seen = b.seen == null ? p.expected : Number(b.seen) | 0;
       const short = Math.max(0, p.expected - seen);
-      const r = await db(env, `payments?id=eq.${p.id}`, { method: 'PATCH',
-        body: JSON.stringify({ state: 'CLEARED', seen, short_by: short,
-          cleared_by: me.code, cleared_at: new Date().toISOString() }) });
-      if (!r.ok) return json({ ok: false }, 500);
+      /* Nothing arrived is not a clearance. It used to be allowed, and the
+         ledger's `check (paise > 0)` then rejected the leg — leaving a payment
+         marked CLEARED with no leg behind it, which is escrow believed funded
+         with nothing to prove it. Say so instead. */
+      if (seen <= 0) return json({ ok: false,
+        reason: 'Nothing arrived against this order. Reject it — do not clear it.' }, 400);
 
-      /* escrow is funded here and nowhere else, and the ledger row is the
-         proof. A short payment funds what the statement showed, not the bill. */
-      await db(env, 'ledger', { method: 'POST', prefer: 'return=minimal',
+      /* THE LEG IS POSTED BEFORE THE ROW IS MARKED, and that order matters.
+         The old order marked CLEARED first and then posted the leg WITHOUT
+         LOOKING AT THE RESULT: any failure there returned ok:true over a
+         payment that said money had arrived and a ledger that never heard of
+         it. The hash is derived from the payment id and the amount, so it is
+         the same on a retry — a second attempt collides on ledger.hash rather
+         than minting a second leg, which is what makes this safe to repeat. */
+      const leg = await db(env, 'ledger', { method: 'POST', prefer: 'return=minimal',
         body: JSON.stringify({
           kind: 'ESCROW_IN', paise: seen,
           from_acct: 'CUSTOMER:' + p.claimed_by, to_acct: 'ESCROW:' + p.order_id,
           order_id: p.order_id, meta: { via: 'upi-manual', utr: p.utr, short },
           prev_hash: 'CHAIN', hash: await hmacHex(env.HOOK_SECRET, p.id + seen),
         }) });
+      const alreadyPosted = leg.status === 409 || (leg.body && String(leg.body.code) === '23505');
+      if (!leg.ok && !alreadyPosted) return json({ ok: false, reason: 'could not post the escrow leg' }, 500);
+
+      const r = await db(env, `payments?id=eq.${p.id}`, { method: 'PATCH',
+        body: JSON.stringify({ state: 'CLEARED', seen, short_by: short,
+          cleared_by: me.code, cleared_at: new Date().toISOString() }) });
+      if (!r.ok) return json({ ok: false, reason: 'the leg is posted but the row did not mark' }, 500);
       return json({ ok: true, seen, short });
     }
 

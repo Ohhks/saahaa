@@ -27,13 +27,31 @@ create table if not exists profiles (
   created_at  timestamptz not null default now()
 );
 
+-- ── shops ────────────────────────────────────────────────────
+-- orders.shop_id was a dangling text column: the server carried retail orders
+-- but had no idea who owned the shop on them, so the RLS below could not let a
+-- shopkeeper see her own orders. Half the product was invisible to its own
+-- owner. The owner is held as a profile code, not a uuid, because the code is
+-- the identity this product actually uses.
+create table if not exists shops (
+  id            text primary key check (length(id) <= 32),
+  owner_code    text not null check (owner_code ~ '^S[0-9]{8}$'),
+  name          text not null check (length(name) between 1 and 80),
+  area          text check (length(area) <= 40),
+  delivery_mode text not null default 'rider'
+                check (delivery_mode in ('rider','pickup_only','both')),
+  active        boolean not null default true,
+  created_at    timestamptz not null default now()
+);
+create index if not exists shops_owner_idx on shops (owner_code);
+
 -- ── orders: the minimum the server must know to settle one ───
 create table if not exists orders (
   id            text primary key check (length(id) <= 32),
   kind          text not null check (kind in ('service','retail')),
   customer_code text not null,
   partner_code  text,
-  shop_id       text,
+  shop_id       text references shops(id),
   customer_pays bigint not null check (customer_pays > 0),   -- paise
   deal          bigint check (deal >= 0),
   stage         text not null,
@@ -56,6 +74,10 @@ create table if not exists payments (
   expected      bigint not null check (expected > 0),        -- paise
   seen          bigint check (seen >= 0),                    -- what the statement showed
   short_by      bigint not null default 0 check (short_by >= 0),
+  -- domain/payments.js carries five states; only four can be rows. AWAITING_UTR
+  -- is the screen BEFORE a claim exists: there is no UTR yet, and utr is not
+  -- null here on purpose. A row in this table always means somebody has typed a
+  -- number they are willing to be held to.
   state         text not null default 'CLAIMED'
                 check (state in ('CLAIMED','PRO_CHECKED','CLEARED','REJECTED')),
   claimed_by    text,
@@ -119,10 +141,24 @@ alter table orders   enable row level security;
 alter table payments enable row level security;
 alter table ledger   enable row level security;
 alter table payouts  enable row level security;
+alter table shops    enable row level security;
 
 create or replace function my_code() returns text as $$
   select code from profiles where id = auth.uid()
 $$ language sql stable security definer;
+
+-- A shopkeeper is identified by the code on her profile, so ownership is one
+-- lookup. Marked stable + security definer so the policies below can call it
+-- without every row re-reading a table the caller cannot itself see.
+create or replace function owns_shop(sid text) returns boolean as $$
+  select exists (select 1 from shops s where s.id = sid and s.owner_code = my_code())
+$$ language sql stable security definer;
+
+-- Shops are a public listing — a customer has to be able to browse them — but a
+-- closed shop is only visible to the person who closed it.
+drop policy if exists shops_visible on shops;
+create policy shops_visible on shops
+  for select using (active or owner_code = my_code());
 
 drop policy if exists profiles_self on profiles;
 create policy profiles_self on profiles
@@ -130,13 +166,15 @@ create policy profiles_self on profiles
 
 drop policy if exists orders_mine on orders;
 create policy orders_mine on orders
-  for select using (customer_code = my_code() or partner_code = my_code());
+  for select using (customer_code = my_code() or partner_code = my_code()
+                    or owns_shop(shop_id));
 
 drop policy if exists payments_mine on payments;
 create policy payments_mine on payments
   for select using (exists (
     select 1 from orders o where o.id = payments.order_id
-      and (o.customer_code = my_code() or o.partner_code = my_code())));
+      and (o.customer_code = my_code() or o.partner_code = my_code()
+           or owns_shop(o.shop_id))));
 
 -- A CUSTOMER MAY CLAIM, AND MAY NEVER CLEAR. Insert is allowed on her own
 -- order; every state transition after that belongs to the Worker, which holds
@@ -151,7 +189,8 @@ drop policy if exists ledger_mine on ledger;
 create policy ledger_mine on ledger
   for select using (exists (
     select 1 from orders o where o.id = ledger.order_id
-      and (o.customer_code = my_code() or o.partner_code = my_code())));
+      and (o.customer_code = my_code() or o.partner_code = my_code()
+           or owns_shop(o.shop_id))));
 
 drop policy if exists payouts_mine on payouts;
 create policy payouts_mine on payouts

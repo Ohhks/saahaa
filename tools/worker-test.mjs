@@ -51,7 +51,11 @@ globalThis.fetch = async (url, init = {}) => {
     if (method === 'PATCH') { state.payment = { ...state.payment, ...JSON.parse(init.body) }; return J([state.payment]); }
     return J(state.payment ? [state.payment] : []);
   }
-  if (u.includes('/rest/v1/ledger')) return J([]);
+  if (u.includes('/rest/v1/ledger')) {
+    if (state.ledgerFails) return { ok: false, status: 500,
+      text: async () => JSON.stringify({ code: 'XX000' }), json: async () => ({ code: 'XX000' }) };
+    return J([]);
+  }
   return J({});
 };
 
@@ -147,6 +151,28 @@ for (const bad of ['123', 'abcdefghijkl', '1234567890123', '']) {
   eq(b.short, 5000, 'a short payment records how short it was');
   const leg = JSON.parse(calls.find(c => c.u.includes('/ledger')).body);
   eq(leg.paise, 36600, 'AND FUNDS WHAT THE STATEMENT SHOWED, not what the bill said');
+}
+{
+  /* Clearing a payment where nothing arrived used to be allowed. The ledger's
+     `check (paise > 0)` then refused the leg, and because the leg's result was
+     never looked at, the API answered ok over a CLEARED payment with no leg
+     behind it: escrow believed funded, nothing to prove it. */
+  state.payment = { id: 'pay_3', order_id: 'ord_1', expected: 41600, state: 'PRO_CHECKED', claimed_by: 'C20262006', utr: '111122223333' };
+  calls = [];
+  const r = await call('/api/clear', { token: 'good-token', body: { orderId: 'ord_1', seen: 0 } });
+  say(r.status === 400, 'clearing a payment that never arrived is refused');
+  say(!calls.some(c => c.u.includes('/ledger') && c.method === 'POST'), 'and posts no escrow leg');
+  eq(state.payment.state, 'PRO_CHECKED', 'and leaves the row exactly as it was');
+}
+{
+  /* If the leg cannot be posted, nothing may say the money is here. */
+  state.payment = { id: 'pay_4', order_id: 'ord_1', expected: 41600, state: 'PRO_CHECKED', claimed_by: 'C20262006', utr: '444455556666' };
+  state.ledgerFails = true; calls = [];
+  const r = await call('/api/clear', { token: 'good-token', body: { orderId: 'ord_1' } });
+  const b = await body(r);
+  say(!b.ok, 'a failed escrow leg fails the clearance');
+  eq(state.payment.state, 'PRO_CHECKED', 'AND THE PAYMENT IS NOT MARKED CLEARED');
+  state.ledgerFails = false;
 }
 
 // ── webhooks: signed, or nothing ─────────────────────────────
