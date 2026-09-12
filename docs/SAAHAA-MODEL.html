@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="How SAAHAA's money works from every side — customer, pro, shop and rider — with the real rates, caps and bands read from the code.">
+<!-- Standalone copy of the presentation. The only thing it fetches is the two
+     Google fonts; offline it falls back to the stacks declared beside them and
+     still reads correctly. Everything else — every figure, every example — is
+     in this file. -->
+<title>The SAAHAA Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+:root{
+  --ink:#1c1a19; --ink-2:#4a4543; --ink-3:#756e6a;
+  --ground:#f4f2f0; --paper:#ffffff; --sunk:#eae6e3;
+  --line:#d8d2ce; --hair:#e6e1dd;
+  --accent:#ec3013; --accent-ink:#b8260f; --accent-soft:#fbe6e1;
+  --rider:#2c6360; --rider-soft:#dfeceb;
+  --shop:#8a5a12; --shop-soft:#f5ecdb;
+  --display:'Archivo','Helvetica Neue',Arial,sans-serif;
+  --body:'Source Serif 4',Georgia,'Times New Roman',serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#f2efec; --ink-2:#bcb4af; --ink-3:#8d8580;
+    --ground:#191716; --paper:#221f1e; --sunk:#141211;
+    --line:#3a3533; --hair:#2c2827;
+    --accent:#ff5533; --accent-ink:#ff9077; --accent-soft:#3a1c15;
+    --rider:#7cc3be; --rider-soft:#16302e;
+    --shop:#d7a54e; --shop-soft:#33270f;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#f2efec; --ink-2:#bcb4af; --ink-3:#8d8580;
+  --ground:#191716; --paper:#221f1e; --sunk:#141211;
+  --line:#3a3533; --hair:#2c2827;
+  --accent:#ff5533; --accent-ink:#ff9077; --accent-soft:#3a1c15;
+  --rider:#7cc3be; --rider-soft:#16302e;
+  --shop:#d7a54e; --shop-soft:#33270f;
+}
+
+html{color-scheme:light dark}
+*{box-sizing:border-box}
+body{margin:0}
+img{max-width:100%}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);
+  font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+.col{max-width:64ch}
+h1,h2,h3,.eyebrow,.num,th,.btn{font-family:var(--display)}
+h1{font-size:clamp(40px,7vw,78px);line-height:.98;font-weight:900;letter-spacing:-.026em;
+  margin:0 0 20px;text-wrap:balance}
+h2{font-size:clamp(26px,3.6vw,38px);line-height:1.06;font-weight:800;letter-spacing:-.02em;
+  margin:0 0 14px;text-wrap:balance}
+h3{font-size:19px;font-weight:700;letter-spacing:-.008em;margin:0 0 8px}
+p{margin:0 0 16px}
+a{color:var(--accent-ink)}
+.eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.19em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 12px}
+.lede{font-size:clamp(19px,2.2vw,23px);line-height:1.5;color:var(--ink-2)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.small{font-size:14.5px;line-height:1.55;color:var(--ink-2)}
+.tiny{font-size:12.5px;line-height:1.5;color:var(--ink-3)}
+
+/* ── the rule strip: sections are separated by a hairline, not a card ── */
+section{padding:66px 0;border-top:1px solid var(--hair)}
+section:first-of-type{border-top:0}
+
+/* ── hero ─────────────────────────────────────────────── */
+.hero{padding:72px 0 58px}
+.brandline{display:flex;align-items:center;gap:12px;margin-bottom:26px}
+.brandmark{width:26px;height:26px;flex:none}
+.brandname{font-family:var(--display);font-weight:900;letter-spacing:.3em;font-size:13px}
+.thesis{font-family:var(--display);font-weight:700;font-size:clamp(19px,2.3vw,24px);
+  line-height:1.32;letter-spacing:-.012em;max-width:22ch}
+.thesis em{font-style:normal;color:var(--accent-ink);white-space:nowrap}
+
+/* comparator */
+.compare{display:grid;gap:18px;margin:34px 0 0}
+.bar-row{display:grid;grid-template-columns:minmax(0,1fr);gap:7px}
+.bar-head{display:flex;justify-content:space-between;align-items:baseline;gap:14px}
+.bar-name{font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:-.005em}
+.bar-val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600;font-size:19px}
+.track{height:34px;background:var(--sunk);border-radius:2px;overflow:hidden;display:flex}
+.fill{display:flex;height:100%;min-width:0}
+.seg{height:100%;display:flex;align-items:center;padding:0 9px;min-width:0;
+  font-family:var(--mono);font-size:11.5px;color:#fff;white-space:nowrap;overflow:hidden;
+  transform-origin:left center;animation:grow .9s cubic-bezier(.2,.8,.2,1) both}
+.seg span{opacity:.92}
+.seg--pro{background:var(--accent)}
+.seg--fee{background:var(--ink-2)}
+.seg--cut{background:#8e2d1c}
+.seg--conv{background:var(--ink-3)}
+@keyframes grow{from{transform:scaleX(.06)}to{transform:scaleX(1)}}
+.bar-row:nth-child(2) .seg{animation-delay:.14s}
+.verdict{margin-top:22px;padding-top:18px;border-top:2px solid var(--ink);
+  display:flex;flex-wrap:wrap;gap:26px 44px}
+.vitem{display:grid;gap:2px}
+.vnum{font-family:var(--mono);font-weight:600;font-size:26px;font-variant-numeric:tabular-nums}
+.vlab{font-size:12.5px;color:var(--ink-3);max-width:26ch;line-height:1.4}
+
+/* ── generic pieces ───────────────────────────────────── */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:34px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:28px}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:22px 24px}
+.stack{display:grid;gap:26px}
+
+/* the ledger block — the product's own material */
+.ledger{background:var(--paper);border:1px solid var(--line);border-radius:3px;
+  font-family:var(--mono);font-size:13.5px;font-variant-numeric:tabular-nums;overflow:hidden}
+.ledger-h{display:flex;justify-content:space-between;padding:11px 16px;
+  border-bottom:1px solid var(--line);background:var(--sunk);
+  font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+.lrow{display:flex;justify-content:space-between;gap:16px;padding:9px 16px;border-bottom:1px solid var(--hair)}
+.lrow:last-child{border-bottom:0}
+.lrow--tot{border-top:2px solid var(--ink);font-weight:600;background:var(--sunk)}
+.lrow span:first-child{color:var(--ink-2);min-width:0}
+.lrow--tot span:first-child{color:var(--ink)}
+.lrow b{font-weight:600;white-space:nowrap}
+.who{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:baseline}
+.who--pro{background:var(--accent)} .who--saahaa{background:var(--ink-2)}
+.who--rider{background:var(--rider)} .who--shop{background:var(--shop)}
+
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+.tablewrap{overflow-x:auto;background:var(--paper);border:1px solid var(--line);border-radius:3px}
+th{text-align:left;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:700;padding:13px 16px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--sunk)}
+td{padding:12px 16px;border-bottom:1px solid var(--hair);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* rider bands */
+.bands{display:grid;gap:13px}
+.band{display:grid;grid-template-columns:86px 1fr;gap:14px;align-items:center}
+.band-km{font-family:var(--mono);font-size:13px;color:var(--ink-2);text-align:right}
+.band-bar{display:flex;height:30px;border-radius:2px;overflow:hidden;background:var(--sunk)}
+.band-seg{display:flex;align-items:center;padding:0 10px;font-family:var(--mono);font-size:11.5px;
+  color:#fff;white-space:nowrap;transform-origin:left center;
+  animation:grow .8s cubic-bezier(.2,.8,.2,1) both}
+.band:nth-child(2) .band-seg{animation-delay:.07s}
+.band:nth-child(3) .band-seg{animation-delay:.14s}
+.band:nth-child(4) .band-seg{animation-delay:.21s}
+.band-seg--rider{background:var(--rider)}
+.band-seg--cut{background:var(--ink-3)}
+
+/* the rail */
+.rail{display:grid;gap:0;counter-reset:step}
+.step{display:grid;grid-template-columns:30px 1fr;gap:16px;padding:16px 0;border-bottom:1px solid var(--hair)}
+.step:last-child{border-bottom:0}
+.step-n{font-family:var(--mono);font-size:12px;color:var(--ink-3);padding-top:3px}
+.step b{font-family:var(--display);font-size:15.5px;display:block;margin-bottom:3px}
+.step .moved{font-family:var(--mono);font-size:12px;color:var(--accent-ink);margin-top:5px;display:block}
+.step .moved--no{color:var(--ink-3)}
+
+/* tier ladder */
+.ladder{display:grid;gap:0}
+.rung{display:grid;grid-template-columns:22px 1fr auto;gap:14px;align-items:center;
+  padding:13px 0;border-bottom:1px solid var(--hair)}
+.rung:last-child{border-bottom:0}
+.pip{height:9px;border-radius:99px;background:var(--line);position:relative;overflow:hidden}
+.pip i{position:absolute;inset:0;background:var(--accent);transform-origin:left center;
+  animation:grow 1s cubic-bezier(.2,.8,.2,1) both}
+.rung:nth-child(2) .pip i{animation-delay:.08s}
+.rung:nth-child(3) .pip i{animation-delay:.16s}
+.rung:nth-child(4) .pip i{animation-delay:.24s}
+.rung:nth-child(5) .pip i{animation-delay:.32s}
+.rung-n{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.rung-l{font-family:var(--display);font-weight:600;font-size:14.5px}
+
+/* stat */
+.stat{display:grid;gap:3px}
+.stat b{font-family:var(--mono);font-weight:600;font-size:clamp(28px,4vw,40px);
+  letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+.stat span{font-size:13px;color:var(--ink-3);line-height:1.45}
+
+.callout{border-left:3px solid var(--accent);padding:2px 0 2px 20px;margin:26px 0}
+.limit{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:14px 0;border-bottom:1px solid var(--hair)}
+.limit:last-child{border-bottom:0}
+.limit-k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--accent-ink);padding-top:4px;white-space:nowrap}
+footer{padding:52px 0 70px;border-top:1px solid var(--hair);color:var(--ink-3);font-size:13.5px}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important;transition:none !important}
+  .seg,.band-seg,.pip i{transform:none !important}
+}
+@media (max-width:640px){
+  body{font-size:16px}
+  .band{grid-template-columns:70px 1fr}
+  .verdict{gap:20px 28px}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="brandline">
+    <svg class="brandmark" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="10.5" fill="none" stroke="var(--accent)" stroke-width="2"/>
+      <circle cx="12" cy="12" r="3.4" fill="var(--accent)"/>
+    </svg>
+    <div class="brandname">SAAHAA</div>
+  </div>
+
+  <h1>The pro&nbsp;names his price.<br>We add ours on&nbsp;top.</h1>
+
+  <p class="lede col">Every marketplace before this one took its cut <em>out of</em> the worker's
+  money. That single preposition is the whole product. A plumber quotes ₹300 on SAAHAA and is paid
+  ₹300 — the 8% is charged to the customer, above the quote, stated on screen before she books.</p>
+
+  <div class="compare" role="img" aria-label="A ₹300 job: on SAAHAA the customer pays ₹324 and the pro keeps ₹300. On a 25%-commission app the customer pays ₹499 for the pro to take home the same ₹300.">
+    <div class="bar-row">
+      <div class="bar-head">
+        <div class="bar-name">SAAHAA</div>
+        <div class="bar-val">₹324</div>
+      </div>
+      <div class="track">
+        <!-- both rows share one scale: ₹499 is the full track, so ₹324 draws shorter -->
+        <div class="fill" style="width:64.9%">
+          <div class="seg seg--pro" style="width:92.6%"><span>₹300 &nbsp;the pro's quote, whole</span></div>
+          <div class="seg seg--fee" style="width:7.4%"><span>₹24</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-head">
+        <div class="bar-name">A 25% commission app</div>
+        <div class="bar-val">₹499</div>
+      </div>
+      <div class="track">
+        <div class="fill" style="width:100%">
+          <div class="seg seg--pro" style="width:60.1%"><span>₹300 &nbsp;the pro</span></div>
+          <div class="seg seg--cut" style="width:20.0%"><span>₹100 cut</span></div>
+          <div class="seg seg--conv" style="width:19.9%"><span>₹99 fee</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="verdict">
+    <div class="vitem">
+      <div class="vnum">₹175</div>
+      <div class="vlab">less for the same work, same pro, same take-home</div>
+    </div>
+    <div class="vitem">
+      <div class="vnum">₹300 <span style="color:var(--ink-3);font-size:15px">vs</span> ₹169</div>
+      <div class="vlab">what the pro takes home if the customer spends ₹324 either way</div>
+    </div>
+    <div class="vitem">
+      <div class="vnum">0%</div>
+      <div class="vlab">taken out of a quote, on any job, at any tier</div>
+    </div>
+  </div>
+</header>
+
+<section>
+  <p class="eyebrow">The theory</p>
+  <h2>Three commitments, and everything else follows</h2>
+  <div class="grid3" style="margin-top:30px">
+    <div class="stack">
+      <div>
+        <h3>Money you can audit</h3>
+        <p class="small">Every rupee is an entry in a double-entry, hash-chained, append-only ledger.
+        Balances are not stored — they are derived by replaying the chain. A claim can never post a
+        leg, because that would be minting money by typing.</p>
+      </div>
+    </div>
+    <div class="stack">
+      <div>
+        <h3>One code per person</h3>
+        <p class="small">A customer is <span class="mono">C20262001</span> forever. The same code
+        signs her in <em>and</em> is the code she reads out at the door. No OTP, no SMS bill, nothing
+        to intercept — and nothing to forget on a phone with no signal.</p>
+      </div>
+    </div>
+    <div class="stack">
+      <div>
+        <h3>Prices that add up</h3>
+        <p class="small">A column of figures must sum to the total printed beside it. If it cannot in
+        whole rupees, the whole column goes to paise. The amount she types into her bank app is a
+        whole rupee, rounded up, and the rounding is ours.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">The customer</p>
+  <h2>She sees the whole bill before she agrees to it</h2>
+  <div class="grid2" style="margin-top:28px;align-items:start">
+    <div>
+      <p>The booking screen shows the pro's price, our charge, the GST on our charge, and the total —
+      four lines that add to the number she pays. Nothing is discovered later. A fan installation
+      quoted at ₹402 looks like this:</p>
+      <div class="callout">
+        <p class="small" style="margin:0">The 8% is <strong>on the quote, not in it</strong>. GST is
+        18% of our commission — not of the job — because that is what the law actually charges, and
+        an invoice that says otherwise fails an audit.</p>
+      </div>
+    </div>
+    <div class="ledger">
+      <div class="ledger-h"><span>Her bill</span><span>Fan install</span></div>
+      <div class="lrow"><span><i class="who who--pro"></i>Riyaz Shaikh's price</span><b>₹402</b></div>
+      <div class="lrow"><span><i class="who who--saahaa"></i>SAAHAA charge</span><b>₹28</b></div>
+      <div class="lrow"><span><i class="who who--saahaa"></i>GST on that charge</span><b>₹5</b></div>
+      <div class="lrow lrow--tot"><span>She pays</span><b>₹435</b></div>
+    </div>
+  </div>
+
+  <div style="margin-top:40px">
+    <h3 style="margin-bottom:14px">If it goes wrong, the split is written down in advance</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When she cancels</th><th>Back to her</th><th>To the pro</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Before a pro accepted</td><td class="n">100%</td><td class="n">—</td><td>nobody has spent anything yet</td></tr>
+          <tr><td>More than 2h before the slot</td><td class="n">100%</td><td class="n">—</td><td>he can still fill the slot</td></tr>
+          <tr><td>Within 2h of the slot</td><td class="n">90%</td><td class="n">5%</td><td>he has turned down other work</td></tr>
+          <tr><td>He is already on the way</td><td class="n">60%</td><td class="n">30%</td><td>his time and travel are already gone</td></tr>
+          <tr><td>He never arrived</td><td class="n">100%</td><td class="n">—</td><td>plus ₹100 credit, because her day was wasted</td></tr>
+          <tr><td>He cancelled</td><td class="n">100%</td><td class="n">—</td><td>and it costs him ₹40, so honesty stays cheaper than vanishing</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="tiny" style="margin-top:10px">The ₹40 is deliberately smaller than the ₹100 minimum stake:
+    cancelling early must never cost a pro as much as simply not turning up.</p>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">The pro</p>
+  <h2>He keeps his quote — and climbs a ladder he can see</h2>
+  <div class="grid2" style="margin-top:28px;align-items:start">
+    <div>
+      <p>A pro sets his own rate. SAAHAA never discounts him, never runs a sale on his labour, and
+      never takes a percentage of it. What he is quoted is what he is paid, on every job, at every
+      tier. The only money that ever leaves his side is a ₹40 fee if <em>he</em> cancels.</p>
+      <p class="small">Tier 4 is the one lever we pull on price, and it pulls in his favour: a
+      certified pro's customer is charged <strong>6% instead of 8%</strong>, which makes him cheaper
+      to hire without making him cheaper.</p>
+      <div class="ladder" style="margin-top:22px">
+        <div class="rung"><span class="rung-n">0</span><span class="rung-l">Unverified</span><span class="pip" style="width:52px"><i style="width:12%"></i></span></div>
+        <div class="rung"><span class="rung-n">1</span><span class="rung-l">Number confirmed</span><span class="pip" style="width:52px"><i style="width:34%"></i></span></div>
+        <div class="rung"><span class="rung-n">2</span><span class="rung-l">ID Verified</span><span class="pip" style="width:52px"><i style="width:56%"></i></span></div>
+        <div class="rung"><span class="rung-n">3</span><span class="rung-l">Background Checked</span><span class="pip" style="width:52px"><i style="width:78%"></i></span></div>
+        <div class="rung"><span class="rung-n">4</span><span class="rung-l">SAAHAA Certified — 6%</span><span class="pip" style="width:52px"><i style="width:100%"></i></span></div>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="panel">
+        <h3>What he puts in</h3>
+        <p class="small" style="margin:0">A <strong>stake</strong> of ₹100, or 5% of the job, capped
+        at ₹500 — locked while he holds the job and returned when it closes. It is the reason a slot
+        booked is a slot worked.</p>
+      </div>
+      <div class="panel">
+        <h3>What he waits for</h3>
+        <p class="small" style="margin:0">A <strong>10% holdback</strong>, released after 7 clean
+        days. Not a fee — his own money, held briefly, so a customer with a complaint on day three
+        still has something to be made whole from.</p>
+      </div>
+      <div class="panel">
+        <h3>What he takes out</h3>
+        <p class="small" style="margin:0">Withdrawals from <strong>₹10</strong>. Payouts are settled
+        the next morning, against the bank statement — never against a promise on a screen.</p>
+      </div>
+      <div class="panel" style="border-color:var(--accent);background:var(--accent-soft)">
+        <h3>What he shares</h3>
+        <p class="small" style="margin:0">Every earner gets a <strong>QR code</strong> of his own
+        page. On a visiting card, a shutter, a WhatsApp status, an auto's back panel — anyone who
+        scans it lands on his profile and can book him. He has no website; now he does not need one.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">The shop</p>
+  <h2>3% from the shop's side — never added to her basket</h2>
+  <div class="grid2" style="margin-top:28px;align-items:start">
+    <div>
+      <p>A kirana's gross margin on staples is 3–6%. An 8% service rate would exceed the entire
+      margin on the items people order most, so retail is priced completely differently: a small
+      commission out of the shop's margin, a delivery fee shown separately, and
+      <strong>item prices that are never marked up</strong>.</p>
+      <ul class="small" style="padding-left:20px;margin:0 0 16px">
+        <li><strong>3%</strong> of the basket (5% on higher-margin categories)</li>
+        <li>Never less than <strong>₹5</strong>, never more than <strong>₹25</strong> (₹50 on those categories)</li>
+        <li>The <strong>first 30 orders cost nothing at all</strong></li>
+        <li>No listing fee, no monthly fee, no fee to exist</li>
+      </ul>
+      <p class="small">A shopkeeper can also see her own orders and the payment claimed against each —
+      which sounds obvious, and was broken until the database learned that shops have owners.</p>
+    </div>
+    <div class="ledger">
+      <div class="ledger-h"><span>A ₹278 basket, 0.4 km</span><span>Delivered</span></div>
+      <div class="lrow"><span>Items</span><b>₹278.00</b></div>
+      <div class="lrow"><span>Delivery, shown separately</span><b>₹19.00</b></div>
+      <div class="lrow lrow--tot"><span>She pays</span><b>₹297.00</b></div>
+      <div class="lrow" style="margin-top:0"><span><i class="who who--shop"></i>Shop receives</span><b>₹269.66</b></div>
+      <div class="lrow"><span><i class="who who--rider"></i>Rider receives</span><b>₹14.00</b></div>
+      <div class="lrow"><span><i class="who who--saahaa"></i>SAAHAA keeps</span><b>₹13.34</b></div>
+      <div class="lrow lrow--tot"><span>Adds back to</span><b>₹297.00</b></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">The delivery partner</p>
+  <h2>The ride is a distance band, and it is never scaled down</h2>
+  <p class="col">A rider is paid for the distance he travelled, not for the size of the basket he
+  carried. SAAHAA takes a flat <strong>₹5 dispatch</strong> from the delivery fee and the rider takes
+  the rest. There is no surge, no rating multiplier, and no formula he cannot check in his head.</p>
+
+  <div class="bands" style="margin-top:28px" role="img" aria-label="Delivery bands: up to 2km ₹19 of which the rider keeps ₹14; up to 4km ₹29, rider ₹24; up to 6km ₹39, rider ₹34; beyond 6km ₹49, rider ₹44. SAAHAA takes ₹5 from each.">
+    <div class="band">
+      <div class="band-km">≤ 2 km</div>
+      <div class="band-bar">
+        <div class="band-seg band-seg--rider" style="width:28.6%">₹14 rider</div>
+        <div class="band-seg band-seg--cut" style="width:10.2%">₹5</div>
+      </div>
+    </div>
+    <div class="band">
+      <div class="band-km">≤ 4 km</div>
+      <div class="band-bar">
+        <div class="band-seg band-seg--rider" style="width:49.0%">₹24 rider</div>
+        <div class="band-seg band-seg--cut" style="width:10.2%">₹5</div>
+      </div>
+    </div>
+    <div class="band">
+      <div class="band-km">≤ 6 km</div>
+      <div class="band-bar">
+        <div class="band-seg band-seg--rider" style="width:69.4%">₹34 rider</div>
+        <div class="band-seg band-seg--cut" style="width:10.2%">₹5</div>
+      </div>
+    </div>
+    <div class="band">
+      <div class="band-km">beyond</div>
+      <div class="band-bar">
+        <div class="band-seg band-seg--rider" style="width:89.8%">₹44 rider</div>
+        <div class="band-seg band-seg--cut" style="width:10.2%">₹5</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:30px">
+    <p style="margin:0"><strong>“Free delivery” never means unpaid labour.</strong> When a shop
+    advertises free delivery over a threshold, the shop absorbs the ride. The rider is paid the full
+    band either way. A promise made to a customer is not allowed to be funded out of the person
+    carrying the bag.</p>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">The rail</p>
+  <h2>Two people confirm a payment before it becomes money</h2>
+  <p class="col">There is no payment gateway licence yet, and pretending otherwise would mean holding
+  customers' money on a promise. So the live rail is manual UPI, and it is deliberately slow at
+  exactly one point: the point where a claim turns into a balance.</p>
+
+  <div class="rail" style="margin-top:26px">
+    <div class="step"><div class="step-n">01</div><div>
+      <b>She transfers to one UPI id</b>
+      <span class="small">The screen names <span class="mono">saahaa@ptyes</span> and a reference, and
+      says plainly that nobody from SAAHAA will ever ask her to pay a different id.</span>
+      <span class="moved moved--no">no money has moved inside SAAHAA</span></div></div>
+    <div class="step"><div class="step-n">02</div><div>
+      <b>She types the 12-digit UTR</b>
+      <span class="small">One UTR can be live against one order only — enforced by a partial unique
+      index in Postgres, not by a check that two requests could both pass.</span>
+      <span class="moved moved--no">still nothing; a claim may never post a ledger leg</span></div></div>
+    <div class="step"><div class="step-n">03</div><div>
+      <b>The pro confirms he can see it</b>
+      <span class="small">He is standing in her doorway and she has her bank app open. His check takes
+      two seconds and lets the job start.</span>
+      <span class="moved moved--no">the job starts — still no money</span></div></div>
+    <div class="step"><div class="step-n">04</div><div>
+      <b>An admin matches it to the bank statement</b>
+      <span class="small">The only step that funds escrow, and the only one that writes to the ledger.
+      A short payment funds what the statement showed, and records how short.</span>
+      <span class="moved">escrow funded · the pro is payable next morning</span></div></div>
+  </div>
+
+  <p class="tiny col" style="margin-top:18px">The risk this accepts, stated plainly: a pro starts work
+  on a <em>claim</em> and is settled next morning on a <em>fact</em>. The gap is bounded to one job,
+  and it is the reason the payout batch runs after the statement is read.</p>
+</section>
+
+<section>
+  <p class="eyebrow">What is unusual here</p>
+  <h2>Four decisions that were not obvious</h2>
+  <div class="grid2" style="margin-top:30px">
+    <div class="stack">
+      <div>
+        <h3>One picture, forty shops</h3>
+        <p class="small">'Aashirvaad Atta 5kg' is the same product in every kirana, so it resolves to
+        one shared image however many shops stock it. Measured against the real 199-item catalogue:
+        <strong>7,960 listings collapse to 199 pictures</strong> — 7.8 MB instead of 311 MB, and the
+        saving grows with every shop that joins.</p>
+      </div>
+      <div>
+        <h3>The console is not in the app</h3>
+        <p class="small">The owner console used to be a route anyone could type. It is now a separate
+        page; in the customer app that address resolves to nothing. No customer is ever told to open
+        it, and no screen mentions it — a plumber was once shown a broken-ledger alarm and sent to
+        Finance.</p>
+      </div>
+    </div>
+    <div class="stack">
+      <div>
+        <h3>Fifteen gates before anything ships</h3>
+        <p class="small">306 unit tests, 30 rendered screens, 17 money journeys, the payment rail, the
+        Worker, picture sharing, the QR codes, the admin door, the schema against a real Postgres, 600
+        randomised order lives, and two scores that cannot be lowered to make a change pass.</p>
+      </div>
+      <div>
+        <h3>Built to cost nothing at zero</h3>
+        <p class="small">Static pages on Cloudflare, a Worker for the one thing a browser must not be
+        trusted with, Postgres on a free tier, images in the repository. The bill at zero orders is
+        zero, which is what lets the first thirty orders per shop be free.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3" style="margin-top:40px;gap:34px">
+    <div class="stat"><b>40×</b><span>less picture storage, improving as shops join</span></div>
+    <div class="stat"><b>100%</b><span>of his quote to the pro, every tier, every job</span></div>
+    <div class="stat"><b>₹0</b><span>to list, to stay listed, or for the first 30 orders</span></div>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">Everything, in one table</p>
+  <h2>The whole price list</h2>
+  <div class="tablewrap" style="margin-top:24px">
+    <table>
+      <thead><tr><th>Who</th><th>Pays or earns</th><th>How much</th><th>Out of whose money</th></tr></thead>
+      <tbody>
+        <tr><td>Customer · service</td><td>the pro's quote plus our charge</td><td class="n">+8%</td><td>hers, added on top and shown first</td></tr>
+        <tr><td>Customer · tier-4 pro</td><td>the same, at the loyalty rate</td><td class="n">+6%</td><td>hers</td></tr>
+        <tr><td>Customer · shop order</td><td>item prices, unmarked up, plus delivery</td><td class="n">₹19–₹49</td><td>hers — the commission is not in her basket</td></tr>
+        <tr><td>Pro</td><td>keeps his quote</td><td class="n">100%</td><td>—</td></tr>
+        <tr><td>Pro · stake</td><td>locked while he holds the job, returned on close</td><td class="n">₹100–₹500</td><td>his, briefly</td></tr>
+        <tr><td>Pro · holdback</td><td>released after 7 clean days</td><td class="n">10%</td><td>his, briefly</td></tr>
+        <tr><td>Pro · cancels</td><td>the only fee he can ever be charged</td><td class="n">₹40</td><td>his</td></tr>
+        <tr><td>Shop</td><td>commission on the basket</td><td class="n">3–5%</td><td>the shop's margin, capped ₹25–₹50</td></tr>
+        <tr><td>Shop · first 30 orders</td><td>nothing</td><td class="n">₹0</td><td>—</td></tr>
+        <tr><td>Rider</td><td>the distance band, less dispatch</td><td class="n">₹14–₹44</td><td>the delivery fee</td></tr>
+        <tr><td>SAAHAA · dispatch</td><td>flat, per delivered order</td><td class="n">₹5</td><td>the delivery fee</td></tr>
+        <tr><td>SAAHAA · GST</td><td>on our commission only, remitted not kept</td><td class="n">18%</td><td>our fee, never the job</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">Honestly</p>
+  <h2>What is not proven yet</h2>
+  <p class="col">Everything above is in the code and covered by a gate. These are not.</p>
+  <div style="margin-top:22px;max-width:74ch">
+    <div class="limit"><div class="limit-k">Unscanned</div><div class="small">The QR codes decode
+      correctly under a reader written to the specification, and a printed one has never been scanned
+      by a real phone. Test one before ordering cards.</div></div>
+    <div class="limit"><div class="limit-k">Unwired</div><div class="small">The database schema runs
+      against a real Postgres in the gates, but Supabase's own auth wiring is proven only when the
+      project is actually created.</div></div>
+    <div class="limit"><div class="limit-k">Unopened</div><div class="small">The owner console needs
+      Cloudflare Access in front of it. The password is a hash and the browser cannot move money —
+      but the door is still on a public street until that is done.</div></div>
+    <div class="limit"><div class="limit-k">Unused</div><div class="small">No customer, pro, shop or
+      rider has used any of this. Every number here is a rule the software enforces, not a result it
+      has produced.</div></div>
+  </div>
+</section>
+
+<footer>
+  <p style="margin:0">SAAHAA · a hyperlocal services and retail marketplace for Hyderabad.
+  Every figure on this page is read from the code that runs the product — the rates, the caps, the
+  bands, the cancellation splits and the holdback terms — and each worked example adds up exactly as
+  printed.</p>
+</footer>
+
+</div>
+
+</body>
+</html>
