@@ -277,10 +277,20 @@ i18n.setLang && i18n.setLang('en');
     ['images', 'node tools/img-test.mjs'],
     ['views', 'node tools/render-views.mjs'],
   ];
+  /* THIS STRIPPED THE LEADING SLASH UNCONDITIONALLY, which is right for a
+     Windows URL pathname (/C:/Users/… → C:/Users/…) and catastrophic on Linux:
+     /home/runner/work/… became home/runner/work/…, a RELATIVE path that does
+     not exist, so every one of these eight gates failed to spawn with a null
+     exit code. On the machine it was written on it passed; on the CI runner it
+     had never worked, and nobody found out until score.mjs was made able to
+     fail a build — at which point it took the deploy down with it. Strip the
+     slash only when a drive letter follows it. */
+  const ROOT = new URL('../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
   gates.forEach(([name, cmd]) => {
-    try { execSync(cmd, { stdio: 'pipe', cwd: new URL('../', import.meta.url).pathname.replace(/^\//, '') });
+    try { execSync(cmd, { stdio: 'pipe', cwd: ROOT });
       pass('gate:' + name, 10, `gate ${name} passes`); }
-    catch (e) { fail('gate:' + name, 10, `gate ${name} passes`, 'exit ' + e.status); }
+    catch (e) { fail('gate:' + name, 10, `gate ${name} passes`,
+                     'exit ' + (e.status == null ? (e.code || e.message || 'could not run') : e.status)); }
   });
 }
 
