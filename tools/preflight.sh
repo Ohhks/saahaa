@@ -83,5 +83,6 @@ node   tools/render-views.mjs    || fail "a screen does not build (tools/render-
 node   tools/journey.mjs         || fail "a rupee did not arrive where it was meant to"
 node   tools/pay-journey.mjs     || fail "the manual UPI rail lets money be claimed twice (tools/pay-journey.mjs)"
 node   tools/worker-test.mjs    || fail "the Worker lets somebody clear money who must not (tools/worker-test.mjs)"
+node   tools/img-test.mjs       || fail "picture sharing does not save what it claims (tools/img-test.mjs)"
 
 echo "=== PRE-FLIGHT PASSED — safe to publish ==="

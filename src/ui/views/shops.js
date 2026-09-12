@@ -25,6 +25,7 @@
 
 import { esc, sheet, closeSheet, toast, ratingStars, delegate } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
+import * as IMG from '../../core/imgstore.js';
 import { ctx, getState, me, myArea, isGuest } from '../../core/ctx.js';
 import { live, get } from '../../core/registry.js';
 import * as flow from '../../domain/flow.js';
@@ -175,9 +176,23 @@ export function emptyBlock(title, body, cta = '') {
    the box's, never the image's — that is what keeps a list from jumping as
    pictures decode. The src ALWAYS comes from photo.url(), which validates
    against the user-editable store and returns '' when there is no picture. */
-const picture = (photoId, alt) => {
-  const src = photo.url(photoId);
-  return src ? `<img class="m-img" src="${src}" alt="${esc(alt || '')}" loading="lazy" decoding="async">` : '';
+/* ONE BAG OF ATTA IS PHOTOGRAPHED ONCE FOR THE WHOLE CITY. A shop's own
+   photograph wins where it has taken one; otherwise the product resolves to the
+   catalogue's shared picture, so forty shops stocking the same 199 items need
+   199 pictures and not 7,960. See core/imgstore.js for the arithmetic.
+
+   And where there is no picture at all yet, a ~96-byte placeholder paints the
+   shape and colour of the thing with NO image request — which on a ₹6,000
+   Android on 3G is the difference between a list that appears and one that
+   crawls in grey. */
+const picture = (photoId, alt, product = null) => {
+  const own = photo.url(photoId);
+  const src = own || (product ? photo.url(IMG.keyForListing(product)) : '');
+  if (src) return `<img class="m-img" src="${src}" alt="${esc(alt || '')}" loading="lazy" decoding="async">`;
+  const blur = product && product.blur;
+  return blur
+    ? `<span class="m-img m-img--blur" aria-hidden="true" style="background-image:${IMG.blurToCss(blur)}"></span>`
+    : '';
 };
 /* a thumb that carries the shop's own photograph, or the category's icon */
 const thumb = (catId, size = 52, photoId = null) => {
@@ -401,7 +416,7 @@ function productCard(p, line) {
         <button data-act="cart.inc" data-id="${line.lineId}" aria-label="One more">+</button></span>`
     : `<button class="m-add" data-act="cart.add" data-id="${p.id}" aria-label="${esc(t('shopf.addNamed', { name: p.name }))}">${esc(t('shopf.add'))}</button>`;
   return `<div class="m-prod" style="${out ? 'opacity:.55' : ''}">
-    <div class="m-prod__img">${picture(p.photo, p.name) || icon(prodGlyph(p), { size: 22 })}</div>
+    <div class="m-prod__img">${picture(p.photo, p.name, p) || icon(prodGlyph(p), { size: 22 })}</div>
     <div class="m-prod__t">${esc(p.name)}</div>
     <div class="m-prod__m">${esc(stock)} · ${esc(p.unit)}${p.variableWeight ? ' · ' + esc(t('shopf.weighedAtPacking')) : ''}${
       p.coldChain ? ' · cold chain' : ''}${p.rxRequired ? ' · prescription needed' : ''}${p.perishable && p.mfgDate ? ' · packed today' : ''}</div>

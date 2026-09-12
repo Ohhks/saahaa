@@ -10,6 +10,7 @@
    is DOM-free and unit-tested. */
 
 import * as photos from '../core/photos.js';
+import * as IMG from '../core/imgstore.js';
 
 const DEFAULTS = { maxEdge: 640, quality: 0.72, minQuality: 0.4, minEdge: 320 };
 
@@ -76,8 +77,42 @@ export async function shrinkAndStore(file, opts = {}) {
     else break;
     data = encode(img, edge, quality);
   }
-  const r = photos.put(data);
-  return r.ok ? { ...r, w: img.naturalWidth || img.width, h: img.naturalHeight || img.height } : r;
+  /* CONTENT-ADDRESSED, SO THE SAME PHOTOGRAPH IS STORED ONCE. Two shops that
+     upload the identical picture — or one shop that uploads the same one twice
+     because the first tap looked like it failed — now collide on one key rather
+     than spending the byte budget twice. The hash is of the ENCODED bytes, so
+     it is stable for the picture as stored, not for the camera file. */
+  const key = await IMG.contentKey(bytesOfDataUrl(data));
+  if (photos.url(key)) {
+    /* already here: no second copy, and the caller cannot tell the difference */
+    return { ok: true, id: key, bytes: 0, deduped: true, blur: blurOf(img),
+             w: img.naturalWidth || img.width, h: img.naturalHeight || img.height };
+  }
+  const r = photos.put(data, key);
+  return r.ok
+    ? { ...r, id: key, blur: blurOf(img), w: img.naturalWidth || img.width, h: img.naturalHeight || img.height }
+    : r;
+}
+
+/** The ~96-byte placeholder that lets a list paint with no image request. */
+function blurOf(img) {
+  try {
+    const g = IMG.GRID * 4;
+    const c = document.createElement('canvas');
+    c.width = g; c.height = g;
+    const cx = c.getContext('2d');
+    cx.drawImage(img, 0, 0, g, g);
+    return IMG.blurFromRGBA(cx.getImageData(0, 0, g, g).data, g, g);
+  } catch (e) { return ''; }   // a placeholder is a nicety; never fail an upload for it
+}
+
+/** Raw bytes behind a data URL, for hashing. */
+function bytesOfDataUrl(url) {
+  const b64 = String(url).split(',')[1] || '';
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 /** The whole gesture: ask, shrink, store. */

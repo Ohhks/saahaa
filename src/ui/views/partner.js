@@ -27,6 +27,7 @@ import * as ID from '../../domain/identity.js';
 import { ctx, getState, dispatch, me, myPartner, myShop, myOrders } from '../../core/ctx.js';
 import { get } from '../../core/registry.js';
 import { subSize } from '../../domain/catalog.services.js';
+import * as IMG from '../../core/imgstore.js';
 import { stage } from '../../domain/orders.js';
 import * as flow from '../../domain/flow.js';
 import * as M from '../../core/money.js';
@@ -1225,9 +1226,17 @@ function pickerCall(items) {
 
 function shopCatalog(s, items) {
   const shown = shownItems(items);
+  /* WHAT HIS PICTURES COST, BEFORE HE TAKES THEM. A shopkeeper adding forty
+     photographs has no idea whether that is free or ruinous. The catalogue's
+     pictures are shared with every other shop in the city and cost him nothing;
+     only one he photographs himself is new bytes. See core/imgstore.js. */
+  const picCost = IMG.rosterCost(items);
   const aisles = [...new Set(shown.map(p => p.aisle))];
   return `
   ${items.length ? `
+    <p class="micro muted" style="margin:0 0 10px">${esc(t('shop.picCost', {
+      items: picCost.listings, pics: picCost.distinct,
+      saved: Math.max(1, Math.round(picCost.savedBytes / 1024 / 1024)) }))}</p>
     ${catalogSearch(items)}
     ${aisles.map(a => `${kick(a, `<span class="tag tag-neutral">${shown.filter(p => p.aisle === a).length}</span>`)}
       <div class="prodgrid prodgrid--2">${shown.filter(p => p.aisle === a).map(catalogRow).join('')}</div>`).join('')}
