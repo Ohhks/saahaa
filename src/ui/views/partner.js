@@ -20,6 +20,8 @@
    No new action, no app.js change. */
 
 import { $, esc, sheet, updateSheet, sheetOpen, closeSheet, toast, ratingStars, timeAgo } from '../dom.js';
+import * as qr from '../../core/qr.js';
+import * as proView from './pro.js';
 import { subKey } from '../../domain/catalog.services.js';
 import { t, catName, subName, langPicker } from '../i18n.js';
 import { icon, hasIcon } from '../icons.js';
@@ -772,11 +774,39 @@ function standingBlock(p) {
 
 /* `t` was the parameter name here too, shadowing the translator for this
    whole function. It is the trust score; it is called that now. */
+
+/* ── the QR every earner gets ───────────────────────────────────
+   A pro or a shopkeeper does not have a website, a domain or a way to be
+   found. What they do have is a shutter, a visiting card, a WhatsApp status
+   and an auto-rickshaw. A code that opens their own page turns any of those
+   into a place a customer can book from, and it costs them nothing to print.
+   Same builder as the copied link (views/pro.js · profileUrl), so the code and
+   the link can never point at different pages. */
+function qrCard(id, kind, name) {
+  const url = proView.profileUrl(id, kind);
+  let code = '';
+  try { code = qr.svgFor(url, { size: 156, label: `${name || 'SAAHAA'} on SAAHAA` }); }
+  catch (e) { code = ''; }                      /* a broken code shows nothing, never a broken box */
+  return `${kick(t('qr.title'))}
+    <div class="m-sec" style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+      ${code ? `<div style="flex:none;background:#fff;padding:8px;border-radius:12px;line-height:0">${code}</div>` : ''}
+      <div style="flex:1;min-width:190px">
+        <p class="tiny" style="margin:0 0 8px">${esc(t('qr.blurb'))}</p>
+        <p class="micro muted" style="word-break:break-all;margin:0 0 10px">${esc(url)}</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn--sm" data-act="pro.share" data-id="${esc(id)}" data-kind="${esc(kind)}">${esc(t('qr.share'))}</button>
+          <button class="btn btn--ghost btn--sm" data-act="pro.qr.save" data-id="${esc(id)}" data-kind="${esc(kind)}" data-name="${esc(name || '')}">${esc(t('qr.save'))}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 function proPage(p, ts, a, cat) {
   const nextTier = TIERS[Math.min(4, (p.tier | 0) + 1)];
   const r = readiness(p);
   return `<div class="con2">
     <div>
+      ${qrCard(p.id, 'pro', p.name)}
       <!-- THE PICKER LIVED ONLY ON THE CUSTOMER ACCOUNT SCREEN, so a Telugu-only
            plumber could not reach it from anywhere on his side of the app. This
            is his own page; it is where he would look. -->
@@ -962,7 +992,9 @@ export function renderShopAdmin() {
     : shopTab === 'payouts'   ? shopPayouts(s, orders)
     : shopTab === 'analytics' ? shopAnalytics(s, orders, items)
     : shopTab === 'setup'     ? shopSetup(s)
-    :                           shopToday(s, orders, items, cat);
+    /* A SHOPKEEPER EARNS HERE TOO, so she gets the same code. Her page is
+       #/shop/<id>; everything else about the card is identical. */
+    :                           qrCard(s.id, 'shop', s.name) + shopToday(s, orders, items, cat);
 
   const modeWord = s.deliveryMode === 'pickup_only' ? 'pickup only' : 'delivering';
   /* the shop OWNER's account code (S2026….) — the person, not the storefront */

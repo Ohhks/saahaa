@@ -105,3 +105,20 @@ out has a UTR, and the ledger holds both.
 - **Whether anyone pays the wrong UPI id.** The screen names exactly one and
   says nobody will ever ask for another; if it happens anyway, that sentence
   needs to be louder, not the policy weaker.
+
+
+## 7 · Put Cloudflare Access in front of the owner console
+
+`dist/admin.html` is the owner console. The customer app has no route to it —
+there is nothing to find and nothing to try — but it is a static file on the
+same origin, so anyone who guesses the path meets the password box.
+
+Two things already make that survivable: the credential is a PBKDF2 hash at
+250,000 iterations, and the console has no authority to move money on its own
+(the Worker holds the service-role key). Neither is a reason to leave the door
+on the street.
+
+In the Cloudflare dashboard: **Zero Trust → Access → Applications → Add** a
+self-hosted application for `your-domain/admin.html`, policy **Allow** with the
+owner's email only. It costs nothing at this size and it means an attacker
+never reaches the password box at all.

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" data-admin-host="1">
+<head>
+<meta charset="UTF-8">
+<!-- CONTENT SECURITY POLICY — see docs/SECURITY.md for what this can and cannot do.
+     script-src 'self' with NO 'unsafe-inline' and NO 'unsafe-eval' is the load-bearing
+     line: Leaflet is vendored under /vendor precisely so this can stay closed.
+     A consequence worth knowing: inline onclick= handlers DO NOT RUN under this policy.
+     style-src still needs 'unsafe-inline' because every view uses style="" attributes;
+     that is the policy's honest weak point and it is documented, not hidden.
+     frame-ancestors and Strict-Transport-Security are IGNORED in a meta tag — they must
+     be sent as real headers by Cloudflare Pages (see _headers / docs/SECURITY.md). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self' https://checkout.razorpay.com; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.razorpay.com; media-src blob:; connect-src 'self' https://nominatim.openstreetmap.org https://api.razorpay.com https://lumberjack.razorpay.com https://*.functions.supabase.co https://*.supabase.co; worker-src 'self'; manifest-src 'self'; frame-src https://api.razorpay.com https://checkout.razorpay.com; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+<!-- never leak a path, a query string or an order id to OpenStreetMap in a Referer -->
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1A0B22">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SAAHAA">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>SAAHAA — owner console</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="SAAHAA owner console.">
+
+<!-- Archivo is vendored under /vendor/fonts (tokens.css @font-face); no font CDN -->
+<link rel="stylesheet" href="src/ui/tokens.css?v=20260910h">
+<link rel="stylesheet" href="src/ui/brand.css?v=20260910h">
+</head>
+<body>
+<a class="skip" href="#app">Skip to content</a>
+
+<!-- SVG gradient + symbol defs, injected once at boot -->
+<div id="defs" aria-hidden="true"></div>
+
+<div id="app" class="app">
+  <!-- first paint before the modules land: the brand, never a blank screen -->
+  <div style="min-height:100dvh;display:grid;place-items:center">
+    <div style="text-align:center">
+      <div class="wordmark" style="font-size:30px">SAAHAA</div>
+      <p class="micro muted" style="letter-spacing:.16em;margin-top:8px">OWNER CONSOLE</p>
+    </div>
+  </div>
+</div>
+
+<noscript>
+  <div style="padding:40px 20px;text-align:center">
+    <h1>SAAHAA</h1>
+    <p>This app needs JavaScript. Please enable it and reload.</p>
+  </div>
+</noscript>
+
+<!-- The console is the same app, told by the document it is on that it may
+     show the owner console. CSP forbids an inline flag, so the flag is this
+     attribute on <html> — see src/app.js · ADMIN_HOST and docs/SECURITY.md. -->
+<script type="module" src="src/app.js?v=20260910h"></script>
+</body>
+</html>

@@ -18,7 +18,7 @@ Serve with `python tools/serve.py <port>` — **never** `python -m http.server`.
 python tools/build.py --site && bash tools/preflight.sh
 ```
 
-Thirteen gates. If it says `PRE-FLIGHT PASSED`, it is safe to push. Do not skip it
+Fifteen gates. If it says `PRE-FLIGHT PASSED`, it is safe to push. Do not skip it
 and do not push around it.
 
 | gate | catches |
@@ -33,6 +33,8 @@ and do not push around it.
 | `pay-journey.mjs` | the manual UPI rail, 34 assertions |
 | `worker-test.mjs` | who may clear money, 32 assertions |
 | `img-test.mjs` | picture sharing actually saves what it claims |
+| `qr-test.mjs` | **the QR codes are real QR codes** — RS syndromes, format bits against the published table, and that every earner is given one |
+| `admin-test.mjs` | the owner console is not reachable from the customer app, and no screen sends a customer there |
 | `schema-test.sh` | **runs `supabase/schema.sql` on a real Postgres in docker** — RLS, the UTR index, the append-only trigger. Skips cleanly with no docker |
 | `taste.mjs` / `score.mjs` | contrast, tap targets, type ≥12px; 46-check product score |
 
@@ -111,6 +113,35 @@ been run twice.
 
 `auth.users` / `auth.uid()` come from Supabase; `supabase/test-auth-stub.sql`
 stands in for exactly those two so the rest can run on plain Postgres.
+
+## The owner console
+
+It is **not a route in the customer app**. `admin.html` carries
+`data-admin-host="1"` on `<html>`; `src/app.js · ADMIN_HOST` reads that, and
+without it the `admin` view is not in the route table at all — `#/admin`
+resolves to nothing and `go('admin')` lands on home. One bundle, one repo, two
+doors; `tools/build.py --site` emits `dist/admin.html` from the same HTML.
+
+**That is not the access control.** Anyone can request `admin.html` and meet the
+password. What makes that safe: the credential is a PBKDF2 hash (the plaintext
+is nowhere in this repo), and the browser has no authority to move money — the
+Worker holds the service-role key. Put Cloudflare Access in front of
+`/admin.html` for a real boundary.
+
+Nothing in the customer app may mention it. A ledger banner once told customers
+and plumbers to "Open Admin → Finance"; they now read that payouts are on hold,
+that their money is safe, and that there is nothing for them to do.
+
+## QR codes
+
+`core/qr.js` — byte mode, level M, versions 1–10, written here because the CSP
+forbids a CDN and there is no npm. Every earner's console shows one that opens
+their own page; `views/pro.js · profileUrl` builds both the code and the copied
+link so they cannot diverge. Saved as SVG: a blurred QR does not scan.
+
+A QR encoder looks finished long before it is correct — the first draft built
+its generator polynomial in the wrong order and produced perfect-looking,
+uncorrectable symbols. Only the syndrome check in `tools/qr-test.mjs` found it.
 
 ## Deploying
 

@@ -261,6 +261,17 @@ def build():
         # what makes a hard refresh survive on Pages with zero server config.
         io.open(os.path.join(DIST, 'index.html'), 'w', encoding='utf-8').write(html)
         io.open(os.path.join(DIST, '404.html'),   'w', encoding='utf-8').write(html)
+        # THE OWNER CONSOLE IS ITS OWN PAGE. The customer bundle has no #/admin
+        # route at all (src/app.js · ADMIN_HOST); the console is reachable only
+        # from this document, which sets the flag before importing the app. Same
+        # bundle, same repo, one build — a separate DOOR, not a separate app.
+        # It is not an access boundary on its own: put Cloudflare Access in
+        # front of /admin.html (docs/DEPLOY.md). What makes it safe meanwhile is
+        # that the credential is a hash and the browser has no authority to move
+        # money — the Worker does.
+        admin_html = html.replace('<html lang="en">', '<html lang="en" data-admin-host="1">')
+        admin_html = admin_html.replace('<title>SAAHAA', '<title>SAAHAA · owner console — ')
+        io.open(os.path.join(DIST, 'admin.html'), 'w', encoding='utf-8').write(admin_html)
         io.open(os.path.join(DIST, '.nojekyll'),  'w', encoding='utf-8').write('')
         # the vendored map library (no CDN under our CSP) ships with the site
         vdir = os.path.join(ROOT, 'vendor')

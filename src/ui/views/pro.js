@@ -24,6 +24,7 @@
    complete page, laid out exactly the same. */
 
 import { catName } from '../i18n.js';
+import * as qr from '../../core/qr.js';
 import { esc, ratingStars, timeAgo, sheet, toast } from '../dom.js';
 import { icon, hasIcon } from '../icons.js';
 import { ctx, getState, me } from '../../core/ctx.js';
@@ -303,10 +304,32 @@ export function saveEdit() {
   dispatch({ type: 'partner/patch', payload: { id: p.id, patch: { profile } } });
   toast('Saved. Your page is updated.');
 }
-export function share(id) {
-  const url = `${location.origin}${location.pathname}#/pro/${id}`;
+/* A pro's page is #/pro/<id>; a shop's is #/shop/<id>. One builder, because
+   the QR and the copied link must never point at different places. */
+export const profileUrl = (id, kind = 'pro') =>
+  `${location.origin}${location.pathname}#/${kind === 'shop' ? 'shop' : 'pro'}/${id}`;
+
+export function share(id, kind) {
+  const url = profileUrl(id, kind);
   const done = () => toast('Link copied — paste it on WhatsApp');
   if (navigator.share) navigator.share({ title: 'My SAAHAA page', url }).catch(() => {});
   else if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, () => toast(url));
   else toast(url);
+}
+
+/* SAVED AS SVG, NOT A PNG, ON PURPOSE. This gets printed on a card, a banner,
+   a shutter sticker — vector prints at any size without blurring, and a blurred
+   QR is a QR that does not scan. */
+export function saveQr(id, kind, name) {
+  const url = profileUrl(id, kind);
+  try {
+    const blob = new Blob([qr.svgFor(url, { size: 1024, label: `${name || 'SAAHAA'} — ${url}` })],
+                          { type: 'image/svg+xml' });
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href; a.download = `saahaa-${id}.svg`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 4000);
+    toast('QR saved. Print it at any size — it will not blur.');
+  } catch (e) { toast('Could not save the QR', 'warn'); }
 }

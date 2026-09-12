@@ -85,6 +85,8 @@ node   tools/pay-journey.mjs     || fail "the manual UPI rail lets money be clai
 node   tools/worker-test.mjs    || fail "the Worker lets somebody clear money who must not (tools/worker-test.mjs)"
 node   tools/img-test.mjs       || fail "picture sharing does not save what it claims (tools/img-test.mjs)"
 bash   tools/schema-test.sh    || fail "supabase/schema.sql does not do what it says (tools/schema-test.sh)"
+node   tools/qr-test.mjs        || fail "the QR codes are not valid QR codes (tools/qr-test.mjs)"
+node   tools/admin-test.mjs     || fail "the owner console is reachable from the customer app (tools/admin-test.mjs)"
 node   tools/fuzz.mjs --runs 600 || fail "random orders broke a money invariant (tools/fuzz.mjs)"
 node   tools/taste.mjs          || fail "the measurable design floor is breached (tools/taste.mjs)"
 node   tools/score.mjs          || fail "the machine score could not be taken (tools/score.mjs)"

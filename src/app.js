@@ -75,6 +75,19 @@ import * as recovery from './domain/recovery.js';
 import * as security from './core/security.js';
 
 /* ══════════════ ROUTES ══════════════ */
+/* WHICH DOCUMENT AM I ON. admin.html carries data-admin-host on <html>; the
+   customer app does not, and without it the owner console is not a route that
+   exists — #/admin resolves to nothing and go('admin') lands on home. One
+   bundle, one repo, two doors.
+   This is not the access control. Anyone can request admin.html and meet the
+   password; what keeps that safe is that the credential is a PBKDF2 hash kept
+   out of the repo, and that a browser has no authority to move money — the
+   Worker holds the service-role key. Put Cloudflare Access in front of
+   /admin.html for a real boundary (docs/DEPLOY.md). */
+const ADMIN_HOST = (typeof document !== 'undefined' && document.documentElement
+  && document.documentElement.getAttribute('data-admin-host') === '1')
+  || !!globalThis.__SAAHAA_ADMIN_HOST;
+
 const ROUTES = {
   home:      () => home.render(),
   shops:     p => shops.renderList(p),
@@ -85,7 +98,12 @@ const ROUTES = {
   auth:      () => auth.render(),
   partner:   () => partner.renderPartner(),
   shopadmin: () => partner.renderShopAdmin(),
-  admin:     () => admin.render(),
+  /* ONLY ON THE OWNER'S OWN PAGE. This was a route in the customer app, so
+     anyone could type #/admin and be shown a sign-in box with the owner's
+     username already in it — an invitation to try. The console is served from
+     admin.html now (src/admin-host.js sets the flag); everywhere else the route
+     does not exist and go('admin') lands on home. */
+  ...(ADMIN_HOST ? { admin: () => admin.render() } : {}),
   earn:      () => earn.render(),
   ask:       p => ask.render(p),
   onboard:   () => onboard.render(),
@@ -117,6 +135,7 @@ function go(view, param) {
   // `param` arrives undefined from the nav bar while ctx.param is null, and
   // null !== undefined, so every re-tap of the current tab pushed a junk entry
   // and the back button needed five presses to leave Home.
+  if (view === 'admin' && !ADMIN_HOST) view = 'home';   // no door in the customer app
   const next = param ?? null;
   if (ctx.view !== view || ctx.param !== next) history.push([ctx.view, ctx.param]);
   ctx.view = view; ctx.param = next;
@@ -162,10 +181,21 @@ function storageBanner() {
      has to be told, and it must not be dismissible. */
   const book = flow.bookStatus && flow.bookStatus();
   if (book) {
+    /* WHO IS READING THIS DECIDES WHAT IT SAYS. One banner told a customer and
+       a plumber that the books do not balance, printed the ledger accounts at
+       fault, and instructed them to "Open Admin → Finance" — an invitation to
+       a door that is not theirs, and an alarm about money they cannot act on.
+       The owner needs the detail. Everybody else needs to know it is being
+       handled and that they need do nothing. */
+    if (adminauth.isLoggedIn()) {
+      return `<div class="sysbar sysbar--bad" role="alert">
+        <b>${esc(i18n.t('sys.booksBad'))}</b>
+        <span>${esc(book.problems.join(' · '))}. ${esc(i18n.t('sys.booksBadOwner'))}</span>
+      </div>`;
+    }
     return `<div class="sysbar sysbar--bad" role="alert">
-      <b>Payouts are paused — the books do not balance.</b>
-      <span>${esc(book.problems.join(' · '))}. Nothing can be sent out until this is settled.
-        Open Admin → Finance and verify the chain.</span>
+      <b>${esc(i18n.t('sys.payoutsHeld'))}</b>
+      <span>${esc(i18n.t('sys.payoutsHeldNote'))}</span>
     </div>`;
   }
   const failed = persist.saveFailed && persist.saveFailed();
@@ -317,7 +347,8 @@ function wireActions() {
   A('pro.open',  d => go('pro', d.id));
   A('pro.edit',  () => pro.openEdit());
   A('pro.save',  () => { pro.saveEdit(); closeSheet(); render(); });
-  A('pro.share', d => pro.share(d.id));
+  A('pro.share', d => pro.share(d.id, d.kind));
+  A('pro.qr.save', d => pro.saveQr(d.id, d.kind, d.name));
   A('sheet.close', () => closeSheet());
 
   /* theme + brand */
@@ -1147,7 +1178,8 @@ async function boot() {
 
   const health = checkHealth(store.getState());
   if (!health.ok) console.warn('[saahaa] health', health.checks.filter(c => !c.ok));
-  if (health.fatal) { flags.safeMode(); toast('Safe mode — see Admin → System', 'danger'); }
+  /* "see Admin → System" to whoever happened to be holding the phone. */
+  if (health.fatal) { flags.safeMode(); toast(i18n.t('sys.safeMode'), 'danger'); }
 
   gateway.useOpener(checkout.open);            // how Razorpay Checkout is shown, when the rail is live
   initActions();
@@ -1160,6 +1192,9 @@ async function boot() {
     if (ROUTES[v]) { ctx.view = v; ctx.param = p || null; }
   };
   applyHash();
+  /* admin.html is the console and nothing else — it does not carry the customer
+     app's tabs, and no hash can take it somewhere else. */
+  if (ADMIN_HOST) { ctx.view = 'admin'; ctx.param = null; }
   // A sheet must never outlive its screen. go() closes it, but hash-driven
   // navigation (browser back, a pasted deep link) bypassed go() entirely and
   // left the previous screen's sheet sitting on top of the new one.
