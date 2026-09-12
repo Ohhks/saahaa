@@ -53,7 +53,7 @@
   opacity:0;animation:fadein 200ms 1000ms forwards;padding:10px;min-height:44px}
 .splash .sp-credo{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 24px);font:800 10px/1 var(--font-body);letter-spacing:.16em;
   text-transform:uppercase;color:var(--ink-3);opacity:0;animation:fadein 200ms 1000ms forwards}
-.splash .sp-ver{position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:16px;font-size:10px;color:var(--ink-4);letter-spacing:.06em}
+.splash .sp-ver{position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:16px;font-size:12px;color:var(--ink-4);letter-spacing:.06em}
 
 /* returning-visit flash — 700ms, no CTA */
 .splash--flash .sp-wm{animation:sprise 240ms var(--ease-emph) 80ms forwards}
