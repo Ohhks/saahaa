@@ -54,6 +54,8 @@ the source, not from a plan — if the code and this page disagree, the code is 
 <a href="#cancel">10 · Cancellations, returns, disputes</a>
 <a href="#admin">11 · The admin — role and daily work</a>
 <a href="#ledger">12 · The ledger</a>
+<a href="#fewer">13 · Steps we removed</a>
+<a href="#pics">14 · Pictures, without the storage bill</a>
 </div></div>
 
 <h2 id="ids">1 · Identity — one code per person</h2>
@@ -146,7 +148,7 @@ rejected, until a job actually exists. A booking that fails leaves the ask answe
         └─ she confirms → settles. Or returns items (§10).</div>
 
 <h2 id="pay">7 · Payment — the manual UPI rail</h2>
-<p>Until volume pays for an aggregator licence, the rail is one UPI id and two humans.</p>
+<p>The live rail, until volume pays for an aggregator licence: one UPI id and two humans. Built and tested — 34 assertions in <code>tools/pay-journey.mjs</code>, 27 more on the Worker that clears it.</p>
 <div class="flow">SHE                          THE PRO / SHOP            THE ADMIN
 ────────────────────────     ──────────────────        ─────────────────────
 pays  saahaa@ptyes
@@ -253,6 +255,38 @@ confirmed before filing — one tap cannot file one by accident.</p>
 <li><strong>Anyone paying a different UPI id.</strong> The screen names exactly one and says nobody will ever ask for another.</li>
 </ul>
 
+<h2 id="fewer">13 · Steps we removed</h2>
+<p>Every step below was real and is gone. A marketplace is judged by how little
+it asks of somebody standing in a shop doorway with one bar of signal.</p>
+<table><tr><th>Was</th><th>Is</th><th>Why it could go</th></tr>
+<tr><td>OTP sent, waited for, typed</td><td>nothing</td><td>the permanent code already proves who she is — <strong>no SMS rail exists</strong></td></tr>
+<tr><td>Separate door code, texted per job</td><td>her own C-code</td><td>one number, two jobs; nothing to deliver, nothing to expire</td></tr>
+<tr><td>Type each product to list it</td><td>tap it from the ready list</td><td>a kirana does not invent its stock — ~6 seconds an item</td></tr>
+<tr><td>Photograph every product</td><td>the catalogue's picture</td><td>one bag of atta, photographed once for the whole city (§14)</td></tr>
+<tr><td>"Create account" then "now sign in"</td><td>signed in on the spot</td><td>a second form between a pro and his first job earned nothing</td></tr>
+<tr><td>Re-type the address every order</td><td>saved, shown, editable</td><td>"Saved from last time — change it if this one goes elsewhere"</td></tr>
+<tr><td>Wait for approval to go live</td><td>live at step 7</td><td>nobody approves you; the ladder is earned afterwards, in public</td></tr>
+</table>
+<div class="note"><strong>The one step deliberately NOT removed:</strong> the customer reading her code
+aloud at the door. It is the only moment that proves a stranger actually arrived, and automating
+it away would remove the proof along with the friction.</div>
+
+<h2 id="pics">14 · Pictures, without the storage bill</h2>
+<p>Files are the binding constraint on the free tier by roughly thirty to one:
+500 MB of Postgres is ~150,000 orders, but 1 GB of file storage is ~5,000 photographs.</p>
+<div class="flow">40 shops x 199 catalogue items  =  7,960 listings
+                                 ->    199 pictures
+                                 =      7.8 MB, not 311 MB   (40x)
+
+and it IMPROVES with scale — the catalogue does not grow when shops do.</div>
+<table><tr><th>Mechanism</th><th>What it saves</th></tr>
+<tr><td><strong>Canonical key</strong> — a catalogue product resolves to one shared picture</td><td>the 40× above</td></tr>
+<tr><td><strong>Content-addressed</strong> — SHA-256 of the bytes</td><td>the same photo uploaded twice is stored once</td></tr>
+<tr><td><strong>96-byte placeholder</strong> — a 6×6 colour grid as radial gradients</td><td>a list of forty renders with <em>zero</em> image requests</td></tr>
+</table>
+<p>A shop still photographs its own shelf whenever it likes — its own picture always wins — and the
+Items tab tells it what that costs before it starts.</p>
+
 <h2 id="ledger">12 · The ledger</h2>
 <p>Double-entry, hash-chained, append-only — in Postgres a trigger raises on UPDATE or DELETE, because an
 append-only table that merely <em>promises</em> to be append-only is a comment.</p>
@@ -266,7 +300,10 @@ every order:  ESCROW_IN  =  release + fee + gst  ( + rider + dispatch on retail 
 that states what the column adds up to and names each pocket it is split across.</p>
 
 <p class="sub" style="margin-top:34px;border-top:1px solid var(--line);padding-top:14px">
-Gates protecting all of the above: 301 unit tests · 30 rendered screens · 17 money journeys (186 assertions) ·
-34 payment-rail assertions · 27 Worker assertions. <code>bash tools/preflight.sh</code> runs every one.</p>
+Gates protecting all of the above, every one run by <code>bash tools/preflight.sh</code>:
+301 unit tests · 30 rendered screens · 17 money journeys (186 assertions) · 34 payment-rail
+assertions · 27 Worker assertions · 18 picture-sharing assertions ·
+<strong>machine score 100/100</strong> (46 checks) · <strong>taste 100/100</strong> (44 checks:
+contrast, tap targets, type scale, token discipline).</p>
 
 </div></body></html>
