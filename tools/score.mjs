@@ -300,4 +300,9 @@ if (process.argv.includes('--json')) {
   console.log(`\n  ${bar(score)}  ${score}/100   (${got} of ${max} weighted points)`);
   console.log(`  ${checks.filter(c => c.ok).length} of ${checks.length} checks pass\n`);
 }
-process.exit(0);
+/* THIS SAID process.exit(0) UNCONDITIONALLY. preflight.sh runs this gate with
+   `|| fail`, so a falling score could never stop a push: the headline number
+   in the whole project was advisory, and "both scores are 100/100, they are
+   ratchets" was enforced by nothing at all. It found a real cart regression
+   and still printed PRE-FLIGHT PASSED underneath itself. */
+process.exit(checks.some(c => !c.ok) ? 1 : 0);

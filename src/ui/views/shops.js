@@ -473,6 +473,10 @@ export function renderCart() {
   const [shopGets, shopFee, shopDispatch] = M.roundParts(
     [(q.shopPayout | 0) + ownDelivery, q.platformFee | 0, q.dispatchCut | 0], q.customerPays);
   /* items + delivery must add to the total printed under them */
+  /* The payable is rounded UP to a whole rupee (she types it into her bank
+     app), so the rounding is a PART like any other — leave it out and the
+     column stops summing to the total printed under it, which is the one
+     rule this bill has. */
   const cartRow = M.fmtParts([q.itemsTotal, q.deliveryFee], q.customerPays);
   /* AND THE ROWS ABOVE THE BILL WERE NEVER ROUNDED WITH IT. Seven lines summing
      ₹678 sat under "you pay ₹677", and the same basket rendered ₹283 here and
@@ -497,7 +501,12 @@ export function renderCart() {
   const cartPaise = lineSum !== Math.round(q.itemsTotal / 100) * 100;
   const lineRow = (cart.lines || []).map(l =>
     (cartPaise ? M.fmt2 : M.fmt)((l.unitPrice | 0) * l.qty));
-  const itemsShown = cartPaise ? M.fmt2(q.itemsTotal) : M.fmt(q.itemsTotal);
+  /* THE ITEMS LINE MUST COME FROM THE SAME PLACE AS THE REST OF THE COLUMN.
+     It formatted itemsTotal on its own while the delivery line came from
+     fmtParts, so the two lines were rounded by different rules and stopped
+     summing to the total under them the moment the payable was rounded up
+     to a whole rupee. fmtParts exists precisely to make a column add up. */
+  const itemsShown = cartRow[0];
   const fromWalletP = Math.min(w.balance, q.customerPays);
   const [fromWallet, viaGateway] = M.roundParts([fromWalletP, q.customerPays - fromWalletP], q.customerPays);
 

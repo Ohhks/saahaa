@@ -236,6 +236,17 @@ export async function fundClearedOrder(orderId, seenPaise = null) {
   if (!o.awaitingPayment) return null;                 // already funded, or not a manual order
   const amt = seenPaise == null ? (o.customerPays | 0) : (seenPaise | 0);
   if (amt <= 0) return null;
+  /* HER MONEY ARRIVES FROM OUTSIDE, AND THE LEDGER HAS TO SAY SO. This posted
+     the escrow leg straight out of CUSTOMER:<code> — a wallet she never funded,
+     because on this rail she transferred to the bank, not to SAAHAA. Her
+     account went ₹435 negative the moment an admin cleared the payment, the
+     non-negative invariant tripped, and the whole product put up "Payouts are
+     paused — the books do not balance" on every screen. Correct and loud, and
+     caused by us.
+     Money in from the world first, exactly as the wallet rail does it, so her
+     passbook reads "Paid in" and then "Held for order" like everybody else's. */
+  await ledger('PAYMENT_IN', amt, acct.world(), 'CUSTOMER:' + o.customerKey,
+               { via: 'upi-manual', orderId });
   await ledger('ESCROW_IN', amt, 'CUSTOMER:' + o.customerKey, 'ESCROW:' + o.id,
                { via: 'upi-manual', orderId });
   dispatch({ type: 'order/patch', payload: { id: orderId, patch: { awaitingPayment: false, collected: amt } } });

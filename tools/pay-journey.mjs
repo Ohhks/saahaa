@@ -129,6 +129,27 @@ eq(PAY.paymentFor(o1.id).state, 'CLEARED', 'and only now is it money');
 say(PAY.IS_SETTLED_FUNDS.has('CLEARED'), 'which is the only state a payout may be drawn from');
 say(!!PAY.clearedFor(o1.id), 'so the settlement batch can see it');
 
+// ── and the books still balance afterwards ───────────────────
+/* THE WHOLE PRODUCT PUT UP "Payouts are paused — the books do not balance" the
+   moment an admin cleared a manual payment. The escrow leg was posted straight
+   out of CUSTOMER:<code> — a wallet she never funded, because on this rail she
+   transfers to a bank, not to SAAHAA — so her account went negative by the
+   exact amount of the order and the non-negative invariant fired. The guard was
+   right; the leg was wrong. Money enters from WORLD first, as it does on every
+   other rail. */
+{
+  const health = L.health ? L.health(ctx.getState().ledger) : null;
+  const bal = a => L.balanceOf(ctx.getState().ledger, a);
+  const custAcct = 'CUSTOMER:' + (o1.customerKey || '');
+  say(bal(custAcct) >= 0, 'clearing a payment never leaves the customer negative',
+      `${custAcct} is ${M.fmt2(bal(custAcct))}`);
+  say(!F.bookStatus || F.bookStatus() == null,
+      'AND THE BOOKS STILL BALANCE — no payout pause after a clearance',
+      JSON.stringify(F.bookStatus && F.bookStatus()));
+  say(bal('WORLD:funding') < 0, 'the money is recorded as having come from outside');
+  if (health) say(health.ok !== false, 'the ledger health check agrees');
+}
+
 // ── a short payment is not a paid order ──────────────────────
 const o3 = await F.bookService({ catId: pro.cat, partner: pro, sub: null });
 PAY.claimUtr(o3.id, '999988887777');

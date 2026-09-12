@@ -891,7 +891,11 @@ function actionPanel(o, r) {
        it is the check that takes two seconds and lets the job start. */
     if (payClaim && payClaim.state === 'CLAIMED') return panel(t('pay.didYouSee'), `
       <div class="m-kv"><span>${esc(t('pay.utrShort'))}</span><span class="num">${esc(payClaim.utr)}</span></div>
-      <div class="m-kv m-kv--total"><span>${esc(t('pay.sheSent'))}</span><span class="num">${M.fmt2(payClaim.expected)}</span></div>
+      <!-- The amount he is checking against her bank app is the amount she was
+           told to send, and she was told a whole rupee. fmt2 printed ₹435.00
+           here while her screen said ₹435 — the same figure, written two ways,
+           on the two screens that have to agree for a job to start. -->
+      <div class="m-kv m-kv--total"><span>${esc(t('pay.sheSent'))}</span><span class="num">${M.fmtMax(payClaim.expected)}</span></div>
       <p class="micro muted" style="margin:10px 0 0">${esc(t('pay.proCheckNote'))}</p>
       ${B('pay.procheck.yes', t('pay.iSawIt'))}
       <button class="btn btn--ghost btn--block btn--sm" style="margin-top:6px"

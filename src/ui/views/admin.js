@@ -296,7 +296,9 @@ export function render() {
   const payClaimed = PAY.queue('CLAIMED');
   const payRow = (p, checked) => `<tr>
     <td class="num" style="user-select:text">${esc(p.utr || '')}</td>
-    <td class="num">${M.fmt2(p.expected)}</td>
+    <!-- the figure the admin matches against the bank statement is the one
+         she was asked to send, and that is a whole rupee -->
+    <td class="num">${M.fmtMax(p.expected)}</td>
     <td style="user-select:text">${esc(p.reference || '')}</td>
     <td class="tiny muted">${checked ? 'pro checked' : 'awaiting pro'}</td>
     <td style="white-space:nowrap">

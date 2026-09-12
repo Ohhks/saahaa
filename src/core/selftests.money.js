@@ -594,6 +594,21 @@ describe('payable · she never types paise', () => {
     }
   });
 
+  it('and the figure she is shown carries no paise either', async () => {
+    /* The rounding fixed the number; three screens still PRINTED it as
+       "₹435.00" — her transfer box, the pro's confirm panel, and the admin's
+       clearing queue — beside a bill reading "₹435". The same figure written
+       two ways on the screens that have to agree. */
+    const pay = await import('../domain/payments.js');
+    for (const total of [43500, 56200, 100, 250000]) {
+      const ins = pay.instruction({ id: 'ord_x', customerPays: total });
+      expect(ins.amountText.includes('.')).toBe(false);
+      expect(ins.amount).toBe(total);
+    }
+    /* and if one ever does carry paise, she must still be told exactly */
+    expect(pay.instruction({ id: 'ord_x', customerPays: 43459 }).amountText).toBe('₹434.59');
+  });
+
   it('rounds UP, never down — she is never asked for less than the parts', () => {
     const q = quoteService(40200);                          // ₹402 + 8% = ₹434.16
     expect(q.customerPaysExact).toBe(43416);
