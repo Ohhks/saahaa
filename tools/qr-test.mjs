@@ -88,6 +88,94 @@ for (const url of URLS) {
 say(JSON.stringify(qr.encode(URLS[0])) === JSON.stringify(qr.encode(URLS[0])),
     'encoding is deterministic');
 
+/* ── 3b · READ IT BACK THE WAY A SCANNER DOES ────────────────
+   Structure and syndromes prove the parts. They do not prove the whole thing
+   is legible: a symbol can have perfect finders, valid ECC and still carry the
+   wrong bits if the zigzag, the mask or the format strip disagree with the
+   spec. So this walks the decoder's path — read the format strip, learn the
+   mask from it, unmask, walk the interleave backwards, parse byte mode — with
+   the function-pattern map rebuilt from the spec rather than borrowed from the
+   encoder, so the two can actually disagree. If this passes, a scanner gets
+   back the URL that went in. */
+const VERSIONS = { 1:[26,10,[[1,16]]],2:[44,16,[[1,28]]],3:[70,26,[[1,44]]],4:[100,18,[[2,32]]],
+  5:[134,24,[[2,43]]],6:[172,16,[[4,27]]],7:[196,18,[[4,31]]],8:[242,22,[[2,38],[2,39]]],
+  9:[292,22,[[3,36],[2,37]]],10:[346,26,[[4,43],[1,44]]] };
+const ALIGN = {1:[],2:[6,18],3:[6,22],4:[6,26],5:[6,30],6:[6,34],7:[6,22,38],8:[6,24,42],9:[6,26,46],10:[6,28,50]};
+const MASKS = [
+  (i,j)=>(i+j)%2===0, (i,j)=>i%2===0, (i,j)=>j%3===0, (i,j)=>(i+j)%3===0,
+  (i,j)=>(Math.floor(i/2)+Math.floor(j/3))%2===0, (i,j)=>((i*j)%2)+((i*j)%3)===0,
+  (i,j)=>(((i*j)%2)+((i*j)%3))%2===0, (i,j)=>(((i+j)%2)+((i*j)%3))%2===0 ];
+
+function decode(m) {
+  const n = m.length, version = (n - 17) / 4;
+  /* format strip, top-left copy */
+  let fmt = 0;
+  const bitAt = (r,c) => m[r][c] ? 1 : 0;
+  const bits = [];
+  for (let i = 0; i <= 5; i++) bits[i] = bitAt(8, i);
+  bits[6] = bitAt(8,7); bits[7] = bitAt(8,8); bits[8] = bitAt(7,8);
+  for (let i = 0; i <= 5; i++) bits[14 - i] = bitAt(i, 8);
+  for (let i = 0; i < 15; i++) fmt |= bits[i] << i;
+  const data5 = ((fmt ^ 0x5412) >> 10) & 0x1f;
+  const ecLevel = (data5 >> 3) & 3, mask = data5 & 7;
+
+  /* which modules are function patterns — rebuilt from the spec, not borrowed */
+  const fn = Array.from({length:n},()=>new Array(n).fill(false));
+  const box = (r,c,h,w)=>{for(let i=0;i<h;i++)for(let j=0;j<w;j++) if(r+i>=0&&c+j>=0&&r+i<n&&c+j<n) fn[r+i][c+j]=true;};
+  box(0,0,9,9); box(0,n-8,9,8); box(n-8,0,8,9);
+  for (let i=0;i<n;i++){ fn[6][i]=true; fn[i][6]=true; }
+  for (const a of ALIGN[version]) for (const b of ALIGN[version]) {
+    if ((a===6&&b===6)||(a===6&&b===n-7)||(a===n-7&&b===6)) continue;
+    box(a-2,b-2,5,5);
+  }
+  if (version>=7){ box(0,n-11,6,3); box(n-11,0,3,6); }
+
+  const out = [];
+  let bit = 0, byte = 0, up = true;
+  for (let right = n-1; right > 0; right -= 2) {
+    if (right === 6) right = 5;
+    for (let v = 0; v < n; v++) {
+      const row = up ? n-1-v : v;
+      for (let c = 0; c < 2; c++) {
+        const col = right - c;
+        if (fn[row][col]) continue;
+        let d = m[row][col];
+        if (MASKS[mask](row, col)) d = !d;
+        byte = (byte << 1) | (d ? 1 : 0);
+        if (++bit === 8) { out.push(byte); bit = 0; byte = 0; }
+      }
+    }
+    up = !up;
+  }
+
+  /* de-interleave */
+  const [, ecPer, groups] = VERSIONS[version];
+  const blocks = [];
+  for (const [count,size] of groups) for (let i=0;i<count;i++) blocks.push({size, d:[]});
+  const maxD = Math.max(...blocks.map(b=>b.size));
+  let k = 0;
+  for (let i=0;i<maxD;i++) for (const b of blocks) if (i < b.size) b.d.push(out[k++]);
+  const data = blocks.flatMap(b=>b.d);
+
+  /* byte mode */
+  let p = 0;
+  const take = len => { let v=0; for(let i=0;i<len;i++){ const bitIdx=p+i; v=(v<<1)|((data[bitIdx>>3]>>(7-(bitIdx&7)))&1);} p+=len; return v; };
+  const mode = take(4);
+  const count = take(version>=10?16:8);
+  const bytes = [];
+  for (let i=0;i<count;i++) bytes.push(take(8));
+  return { version, ecLevel, mask, mode, text: new TextDecoder().decode(new Uint8Array(bytes)) };
+}
+
+
+for (const url of URLS) {
+  const r = decode(qr.encode(url));
+  say(r.text === url, `a scanner reads back exactly what went in (v${r.version}, mask ${r.mask})`,
+      r.text === url ? '' : `got ${JSON.stringify(r.text).slice(0, 60)}`);
+  say(r.mode === 4, 'in byte mode');
+  say(r.ecLevel === 0, 'at error-correction level M');
+}
+
 /* ── 4 · the SVG ────────────────────────────────────────────── */
 const svg = qr.svgFor(URLS[0], { size: 200 });
 say(svg.startsWith('<svg') && svg.includes('</svg>'), 'the SVG is well formed');
