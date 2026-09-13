@@ -157,3 +157,73 @@ again. The console page only exists from that build onward.
    `src/core/config.js`, rebuild and deploy. The password never touches a file,
    a log or a commit — the block contains only its PBKDF2 hash, and nobody can
    work backwards from it, including you.
+
+
+## 9 · The domain: buy with UPI, run on Cloudflare
+
+**Buy `saahaa.in`.** Checked against the NIXI registry: unregistered. `.in` is
+right for a product whose whole claim is that it is from this neighbourhood, it
+renews for roughly ₹900–₹1,200 a year, and it is nine characters — which matters
+more here than anywhere else, because this address goes on a shutter, a visiting
+card and an auto's back panel, and every extra character is one somebody
+mistypes.
+
+**Do not buy a hyphenated domain.** `saahaa-service.in` has to be said out loud
+as "saahaa dash service dot in" in a kirana, over a phone, across a counter. The
+hyphen costs nothing to type and everything to say, and word of mouth is the
+whole distribution plan. If the word "services" matters, register
+`saahaaservices.in` (also free) and redirect it — one canonical address, one
+spelling on every QR.
+
+`saahaa.co.in` is already taken (registered September 2023), and `saahaa.com` is
+parked with a broker at a negotiated price. Neither is worth chasing before
+there is revenue; `.in` is the better address for this product anyway.
+
+### Cloudflare does not sell .in, and does not take UPI
+
+Cloudflare Registrar takes cards only and does not carry `.in`. So: buy at an
+Indian registrar with UPI, then move the **nameservers** to Cloudflare, which is
+free. The registrar becomes nothing more than the place the renewal is billed.
+
+Registrars that take UPI for `.in`: Hostinger India, BigRock, GoDaddy India,
+ResellerClub, MilesWeb. Confirm at checkout — payment options change.
+
+### The order of operations
+
+1. **Register** `saahaa.in`. Turn on registrar lock and auto-renew in the same
+   sitting; a marketplace that goes dark because a renewal lapsed is not a
+   marketplace. Ignore every upsell — hosting, email, SSL, "SEO". Cloudflare
+   supplies all of it free.
+2. **Add the site to Cloudflare** — dashboard → *Add a site* → `saahaa.in` →
+   Free plan. Cloudflare shows two nameservers.
+3. **Point the nameservers** at those two, at the registrar. Usually live within
+   minutes, occasionally a few hours.
+4. **Attach it to Pages** — *Workers & Pages* → your project → *Custom domains* →
+   add `saahaa.in` and `www.saahaa.in`. With DNS already in the same account the
+   records are created for you.
+5. **SSL/TLS → Full (strict)**, and **Always Use HTTPS** on. Add HSTS once you
+   have seen the site work on the real domain for a week.
+6. **Zero Trust → Access** in front of `saahaa.in/admin.html`, your email only
+   (§7). Do this in the same sitting as step 4, not later.
+7. **Email, free:** Cloudflare *Email Routing* forwards `anoosh@saahaa.in` to
+   your Gmail. Worth having before you print anything.
+
+### One timing trap, and it is expensive on paper
+
+Every earner's QR is built from `location.origin` (views/pro.js · profileUrl), so
+codes **generated after** the switch point at `saahaa.in` on their own — no code
+change needed. Codes generated **before** it still point at the old
+`pages.dev` address. Printed cards cannot be edited.
+
+So: finish the domain first, then let anyone print. If cards already exist on the
+old address, keep the `pages.dev` URL working — Pages serves it alongside the
+custom domain — rather than reprinting.
+
+### What it costs
+
+| | |
+|---|---|
+| `saahaa.in`, first year | often ₹199–₹700 promotional |
+| renewal, every year | ~₹900–₹1,200 |
+| Cloudflare DNS, CDN, Pages, Access, Email Routing | ₹0 |
+| **Total running cost** | **the domain, and nothing else** |
