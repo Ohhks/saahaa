@@ -82,7 +82,7 @@ It persists per device. To go back: `?payments=sim`.
 
 ## The daily routine this creates
 
-**Morning, once:** open `/#/admin` → **Payments to clear**. Every row shows the
+**Morning, once:** open `/admin.html` → **Payments to clear**. Every row shows the
 UTR, the amount and the reference. Search your bank statement for the UTR:
 
 - found, right amount → **Clear**. Escrow is funded; the pro is payable.

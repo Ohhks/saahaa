@@ -29,10 +29,14 @@ browser keep stale modules after an update.)
 |---|---|
 | App | <http://localhost:8772> |
 | Self-tests | <http://localhost:8772/?selftest=1> |
-| Admin | <http://localhost:8772/#/admin> |
+| Owner console | <http://localhost:8772/admin.html> |
 | Neighbourhood (map) | <http://localhost:8772/#/nearby> |
 | Example roster (local only) | <http://localhost:8772/?demo=1> |
 | Single-file build | `python tools/build.py` → `dist/saahaa.html` |
+
+The console is **its own page**, not a route in the app: typing `#/admin` in the
+customer app goes nowhere on purpose, so there is no door for a customer to
+find. `tools/build.py --site` emits `dist/admin.html` beside `dist/index.html`.
 
 **A new install starts empty.** No customers, no pros, no shops, no products —
 the first accounts on a device are the ones somebody signs up. `?demo=1` loads

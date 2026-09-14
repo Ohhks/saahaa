@@ -154,7 +154,8 @@ python -m http.server 8772 --directory C:\Users\siidhu\saahaa
 - App: <http://localhost:8772> — **empty**, as production is
 - With the example roster: <http://localhost:8772/?demo=1>
 - Tests: <http://localhost:8772/?selftest=1>
-- Admin: <http://localhost:8772/#/admin> — username `siidhartha12`, the owner's
+- Owner console: <http://localhost:8772/admin.html> — its own page, never a
+  route in the customer app — username `siidhartha12`, the owner's
   own password (see `docs/SETUP.md` → *Your admin credential*)
 - Deck capture: `python tools/shots.py`, which opens `?shot=<scene>&demo=1`
 - Single-file build: `python tools/build.py` → `dist/saahaa.html` (double-clickable)

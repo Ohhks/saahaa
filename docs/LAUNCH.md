@@ -7,7 +7,7 @@ You are one person. This list is ordered so that nothing needs you twice.
 1. ✅ Repository https://github.com/Ohhks/saahaa exists (public) with every commit and tag pushed.
 2. ✅ Pages via Actions is on: **https://ohhks.github.io/saahaa/**. A rollback is re-running an older deploy.
 3. ✅ `main` requires the CI check (169 tests, preflight, migration lint).
-4. **Sign in as the owner** the first time you open `/#/admin`: username
+4. **Sign in as the owner** the first time you open `/admin.html`: username
    `siidhartha12`, your own password. It is not written down anywhere in this
    repository — `ADMIN_BOOTSTRAP` in `src/core/config.js` holds only a
    PBKDF2-SHA256 hash. To change it: Admin → System & audit → change password
