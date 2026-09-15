@@ -54,10 +54,23 @@ if not (len(sys.argv) > 1 and sys.argv[1].startswith('http')) and not os.path.ex
 
 profile = tempfile.mkdtemp(prefix='saahaa-smoke-')
 LIVE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].startswith('http') else None
+
+# A live site is not a local file: from file:// the bundle, the fonts and
+# Leaflet are already on disk, and over the network each is a request. The
+# budget is therefore larger against a URL, and overridable.
+#
+# Worth recording, because the first diagnosis was wrong: when this check
+# started failing on #/pro/none and #/ask/none, the budget looked like the
+# culprit and raising it made MORE routes fail. It was not the budget. The
+# deployed site had been replaced by the 3 KB source shell, so every screen was
+# rendering out of a bundle that was not there — the DOM-size floor was
+# reporting exactly what it should have. The fix was to redeploy ./dist; this
+# larger budget is worth keeping anyway, and it fixed nothing.
+VTB = int(os.environ.get('SMOKE_VTB') or (15000 if LIVE else 6000))
 url = LIVE or 'file:///' + BUNDLE.replace('\\', '/').lstrip('/')
 cmd = [CHROME, '--headless=new', '--disable-gpu', '--no-first-run', '--no-sandbox', '--disable-extensions',
        '--allow-file-access-from-files', f'--user-data-dir={profile}',
-       '--virtual-time-budget=6000', '--window-size=390,844', '--dump-dom', url]
+       f'--virtual-time-budget={VTB}', '--window-size=390,844', '--dump-dom', url]
 # The bundle is ~1.8 MB of inlined modules and it grows with the product, so
 # the budget is generous and overridable rather than a number chosen in 2026.
 TIMEOUT = int(os.environ.get('SMOKE_TIMEOUT') or 180)

@@ -25,16 +25,21 @@ jobs:
         run: python tools/build.py --site
       - name: every gate
         run: bash tools/preflight.sh
-      - name: deploy to cloudflare pages
+      # NOT `pages deploy`. Cloudflare Pages is now part of Workers and a Pages
+      # project cannot take a name a Worker already holds — which this account
+      # does, so that command fails outright. wrangler.site.toml serves ./dist
+      # and carries the SPA settings; deploying anything else here has already
+      # put the 3 KB source shell on the live site once.
+      - name: deploy the site
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=saahaa
+          command: deploy -c wrangler.site.toml
       - name: deploy the worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
-          command: deploy
+          command: deploy -c wrangler.toml
