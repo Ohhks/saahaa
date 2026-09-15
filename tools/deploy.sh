@@ -22,6 +22,9 @@
 #   bash tools/deploy.sh --pages    # just the site
 #   bash tools/deploy.sh --check    # verify what is live, change nothing
 #   bash tools/deploy.sh --creds    # check the credentials only, change nothing
+#   bash tools/deploy.sh --auto     # no secrets anywhere: sign both CLIs in
+#                                   # with `npx wrangler login` and
+#                                   # `npx supabase login`, then run this
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -38,11 +41,15 @@ die()  { red "  x $*"; exit 1; }
 # not wrong.
 MODE="${1:-all}"
 case "$MODE" in
-  --db|--worker|--pages|--check|--creds|all|"") ;;
-  *) die "unknown option: $MODE  (--db | --worker | --pages | --check | --creds)" ;;
+  --db|--worker|--pages|--check|--creds|--auto|all|"") ;;
+  *) die "unknown option: $MODE  (--db | --worker | --pages | --check | --creds | --auto)" ;;
 esac
 
-[ -f "$ENVF" ] || die "no .env.deploy — copy .env.deploy.example and fill it in"
+# --auto reads everything from the signed-in CLIs, so it needs no file at all.
+if [ ! -f "$ENVF" ]; then
+  [ "$MODE" = "--auto" ] || die "no .env.deploy — copy .env.deploy.example and fill it in"
+  ENVF=/dev/null
+fi
 # shellcheck disable=SC1090
 set -a; . "$ENVF"; set +a
 
@@ -50,6 +57,96 @@ need() { [ -n "${!1:-}" ] || die "$1 is not set in .env.deploy"; }
 
 WORKER_NAME="$(sed -n 's/^name *= *"\(.*\)"/\1/p' worker/wrangler.toml)"
 PAGES_PROJECT="${PAGES_PROJECT:-saahaa}"
+
+# ── the no-secrets path ───────────────────────────────────────
+# WHY THIS EXISTS. Everything else here wants six values pasted into a file,
+# and the two that matter are a master key and a database password. Both CLIs
+# can authorise themselves in a browser instead — the owner clicks Allow, the
+# credential is stored by the tool that minted it, and nothing secret is ever
+# typed, pasted, or written down. The project's own keys are then READ from
+# Supabase rather than copied by hand, which also removes the one mistake
+# `--creds` exists to catch: they cannot be swapped if nobody transcribes them.
+#
+#   npx wrangler login          (once, in a browser)
+#   npx supabase login          (once, in a browser)
+#   bash tools/deploy.sh --auto
+auto() {
+  step "signed-in CLIs"
+  # `wrangler whoami` EXITS 0 WHILE SIGNED OUT — it reports the fact on stdout
+  # and calls that a successful report. Checking its status therefore said
+  # "Cloudflare is signed in" over "You are not authenticated", so read what it
+  # actually said.
+  local who
+  who=$(npx --yes wrangler whoami 2>&1)
+  if printf '%s' "$who" | grep -qi 'not authenticated'; then
+    die "Cloudflare is not signed in — run: npx wrangler login"
+  fi
+  grn "  ok  Cloudflare is signed in$(printf '%s' "$who" | grep -oiE 'Account Name[^|]*' | head -1)"
+
+  local projects ref
+  projects=$(npx --yes supabase@latest projects list --output json 2>/dev/null)     || die "Supabase is not signed in — run: npx supabase login"
+
+  # Pick the project by name, and refuse to guess when it is ambiguous: this
+  # writes secrets and applies a schema, so choosing the wrong project is not
+  # a thing to be clever about.
+  ref=$(printf '%s' "$projects" | python -c "
+import json,sys
+try: rows = json.load(sys.stdin)
+except Exception: rows = []
+want = [r for r in rows if 'saahaa' in str(r.get('name','')).lower()]
+pool = want or rows
+if len(pool) == 1: print(pool[0]['id'])
+elif not pool: print('NONE')
+else: print('MANY:' + ','.join(f\"{r.get('name')}={r['id']}\" for r in pool))
+")
+  case "$ref" in
+    NONE) die "no Supabase project on that account — create one (Free, Mumbai) and re-run" ;;
+    MANY:*) red "  more than one project, and none obviously SAAHAA:"
+            printf '        %s
+' "${ref#MANY:}"
+            die "set SUPABASE_PROJECT_REF in $ENVF and re-run" ;;
+  esac
+  [ -n "${SUPABASE_PROJECT_REF:-}" ] && ref="$SUPABASE_PROJECT_REF"
+  grn "  ok  Supabase project $ref"
+
+  local keys anon svc
+  keys=$(npx --yes supabase@latest projects api-keys --project-ref "$ref" --reveal --output json 2>/dev/null)     || die "could not read the project's API keys"
+  anon=$(printf '%s' "$keys" | python -c "
+import json,sys
+rows=json.load(sys.stdin)
+print(next((r['api_key'] for r in rows if r.get('name')=='anon'), ''))")
+  svc=$(printf '%s' "$keys" | python -c "
+import json,sys
+rows=json.load(sys.stdin)
+print(next((r['api_key'] for r in rows if r.get('name')=='service_role'), ''))")
+  [ -n "$anon" ] && [ -n "$svc" ] || die "the project did not return both an anon and a service_role key"
+
+  export SUPABASE_URL="https://$ref.supabase.co"
+  export SUPABASE_ANON_KEY="$anon"
+  export SUPABASE_SERVICE_KEY="$svc"
+  grn "  ok  read the anon and service keys from Supabase — nothing was transcribed"
+
+  check_creds
+
+  # The schema needs the database password, which is the one thing no API will
+  # hand over. If it was not supplied, say exactly what to do instead rather
+  # than failing the whole deploy over a step that takes fifteen seconds by
+  # hand — the rest of the deployment does not depend on it having run yet.
+  if [ -n "${SUPABASE_DB_URL:-}" ]; then
+    deploy_db
+  else
+    echo "  ·   no SUPABASE_DB_URL — open the Supabase SQL editor, paste"
+    echo "      supabase/schema.sql and press Run. It is idempotent."
+  fi
+
+  # The anon key is public and belongs in the build; bake it so the shipped
+  # bundle knows its own project.
+  python tools/setup-supabase.py --url "$SUPABASE_URL" --anon "$SUPABASE_ANON_KEY"     || die "could not bake the anon key into the build"
+
+  deploy_worker
+  deploy_pages
+  check
+}
 
 # ── are the credentials the ones they are labelled as? ────────
 # CHECKED BEFORE ANYTHING IS CHANGED, because the realistic mistakes here are
@@ -243,5 +340,6 @@ case "$MODE" in
   --pages)  deploy_pages ;;
   --check)  check ;;
   --creds)  check_creds ;;
+  --auto)   auto ;;
   all|"")   check_creds; deploy_db; deploy_worker; deploy_pages; check ;;
 esac
