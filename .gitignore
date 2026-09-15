@@ -16,3 +16,9 @@ Thumbs.db
 
 # deploy credentials — service-role key, db password. never committed.
 .env.deploy
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example

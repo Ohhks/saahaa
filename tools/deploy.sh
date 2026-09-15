@@ -301,9 +301,12 @@ deploy_pages() {
     || { tail -30 /tmp/saahaa-preflight.log; die "preflight failed — not publishing"; }
   grn "  ok  preflight passed"
 
-  npx --yes wrangler pages deploy dist \
-      --project-name "$PAGES_PROJECT" --branch main --commit-dirty=true \
-    || die "pages deploy failed"
+  # NOT `wrangler pages deploy`. Cloudflare Pages is now part of Workers, and a
+  # Pages project cannot be created under a name a Worker already holds — which
+  # this account does, so that command fails outright. The site ships as a
+  # Workers static-assets deployment; wrangler.site.toml carries the two
+  # settings that matter, and says why.
+  npx --yes wrangler deploy -c wrangler.site.toml || die "site deploy failed"
   grn "  ok  site deployed"
 }
 
@@ -325,11 +328,22 @@ check() {
     echo "  ·   WORKER_URL not set — skipping the Worker check"
   fi
 
-  for path in / /admin.html; do
+  # -L, BECAUSE /admin.html LEGITIMATELY 307s TO /admin: Cloudflare's default
+  # html_handling drops the extension. Without following that redirect this
+  # reported the owner console as broken on every single run.
+  for path in / /admin.html /version.json; do
     local code
-    code=$(curl -s -o /dev/null --max-time 20 -w '%{http_code}' "$p$path")
+    code=$(curl -sL -o /dev/null --max-time 25 -w '%{http_code}' "$p$path")
     [ "$code" = "200" ] && grn "  ok  $p$path → 200" || { red "  x   $p$path → $code"; fail=1; }
   done
+
+  # THE LIVE SITE, IN A REAL BROWSER — the same question the bundle answers
+  # before it ships. A deployment that returns 200 with a blank screen is
+  # still a deployment that returns 200.
+  local sm=0
+  python tools/smoke-dist.py "$p/" || sm=$?
+  [ "$sm" = 1 ] && { red "  x   the live site does not render"; fail=1; }
+  [ "$sm" = 0 ] && grn "  ok  the live site boots and paints in a real browser"
   [ "$fail" = 0 ] || die "something live is not answering"
   grn "  everything answered"
 }
