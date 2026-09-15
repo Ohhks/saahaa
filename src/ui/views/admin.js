@@ -189,9 +189,17 @@ const empty = msg => `<div class="empty"><p class="tiny muted">${esc(msg)}</p></
    em dash rather than an empty cell the owner has to interpret. */
 const codeOf = u => (u && ID.isCode(u.code)) ? ID.normaliseCode(u.code) : '';
 const codeCell = u => { const c = codeOf(u); return c ? `<b class="num">${esc(c)}</b>` : '<span class="muted">—</span>'; };
+/* A LISTING THAT CAME FROM THE DIRECTORY HAS NO LOCAL ACCOUNT ROW, AND ITS
+   KEY IS THE CODE. Since pros and shops became global this console lists
+   people it never signed up, and every lookup below returned null for them —
+   so the ID column read "—" for exactly the pros the owner cannot otherwise
+   identify. The account itself stays behind the roster, with the mobile
+   number; this is only the name already printed on the listing. */
+const stubAccount = key => (ID.isCode(key) ? { code: ID.normaliseCode(key) } : null);
+
 /** partner row -> the user account behind it */
 const userOfPartner = (st, p) => st.users.find(u => u.key === p.userKey)
-  || st.users.find(u => u.partnerId === p.id) || null;
+  || st.users.find(u => u.partnerId === p.id) || stubAccount(p.userKey);
 
 const secHead = (title, right = '') =>
   `<div class="hd"><h2 class="h-sec">${esc(title)}</h2>${right}</div>`;
@@ -663,7 +671,7 @@ function approvals(st) {
   <div class="sec" style="border-top:0">${secHead(`Shop applications · ${shops.length}`)}
     ${table(['Shop', 'Owner ID', 'Area', 'Status'], shops.map(s => `<tr>
       <td class="nowrap"><b>${esc(s.name)}</b></td>
-      <td class="nowrap">${codeCell(st.users.find(u => u.key === s.ownerKey) || st.users.find(u => u.shopId === s.id))}</td>
+      <td class="nowrap">${codeCell(st.users.find(u => u.key === s.ownerKey) || st.users.find(u => u.shopId === s.id) || stubAccount(s.ownerKey))}</td>
       <td>${esc(s.area)}</td>
       <td>${pill(s.status, 'warn')}</td></tr>`).join(''), 'No shops waiting.')}</div>
   </div>`;
@@ -872,7 +880,13 @@ export async function loadRoster() {
     rosterData = await rail.roster(secret);
   } catch (err) {
     rosterData = null;
-    rosterErr = (err && err.message) || 'Could not read the roster.';
+    /* "admins only" is the server's answer and it is useless on its own — it
+       reads as "you are not the owner" to the person who demonstrably is. It
+       means the server has no owner password to check yours against, which is
+       a setup step, not a refusal. Say which one. */
+    rosterErr = (err && err.status === 403)
+      ? 'The server has no owner password yet, so it cannot check yours. Put your console password in .env.deploy as ADMIN_PASSWORD and run: bash tools/deploy.sh --owner'
+      : ((err && err.message) || 'Could not read the roster.');
   } finally {
     rosterBusy = false; rosterTried = true; ctx.render();
   }
@@ -945,12 +959,20 @@ function people(st) {
         </td></tr>`;
     }).join(''), 'No pros yet.')}</div>
 
-  <div class="sec">${secHead(`Customers · ${customers.length}`)}
+  <div class="sec">${secHead(`Customers on this device · ${customers.length}`)}
     ${table(['Customer', 'ID', 'Mobile', 'Area'], customers.map(u => `<tr>
       <td class="nowrap"><b>${esc(u.name)}</b></td>
       <td class="nowrap">${codeCell(u)}</td>
       <td class="nowrap muted">${esc(u.mobile)}</td>
-      <td>${esc(u.area)}</td></tr>`).join(''), 'No customers yet.')}</div>`;
+      <td>${esc(u.area)}</td></tr>`).join(''),
+      /* "No customers yet." WAS A LIE, AND IT IS THE ONE THAT STARTED ALL OF
+         THIS. A customer never publishes a listing — there is no directory of
+         buyers and there should not be — so this table only ever knew the
+         accounts opened on THIS machine. Empty means this device has met
+         nobody, which is not the same as nobody having signed up. */
+      rail.isConfigured()
+        ? 'None opened on this device. Customers are not listed publicly — everyone is in the roster above.'
+        : 'No customers yet.')}</div>`;
 }
 
 /* ── FLOW — track everyone's flow ─────────────────────────────

@@ -22,6 +22,7 @@
 #   bash tools/deploy.sh --pages    # just the site
 #   bash tools/deploy.sh --check    # verify what is live, change nothing
 #   bash tools/deploy.sh --creds    # check the credentials only, change nothing
+#   bash tools/deploy.sh --owner    # let the console read the platform roster
 #   bash tools/deploy.sh --auto     # no secrets anywhere: sign both CLIs in
 #                                   # with `npx wrangler login` and
 #                                   # `npx supabase login`, then run this
@@ -41,8 +42,8 @@ die()  { red "  x $*"; exit 1; }
 # not wrong.
 MODE="${1:-all}"
 case "$MODE" in
-  --db|--worker|--pages|--check|--creds|--auto|all|"") ;;
-  *) die "unknown option: $MODE  (--db | --worker | --pages | --check | --creds | --auto)" ;;
+  --db|--worker|--pages|--check|--creds|--auto|--owner|all|"") ;;
+  *) die "unknown option: $MODE  (--db | --worker | --pages | --check | --creds | --auto | --owner)" ;;
 esac
 
 # --auto reads everything from the signed-in CLIs, so it needs no file at all.
@@ -165,19 +166,11 @@ print(next((r['api_key'] for r in rows if r.get('name')=='service_role'), ''))")
   # bundle knows its own project.
   python tools/setup-supabase.py --url "$SUPABASE_URL" --anon "$SUPABASE_ANON_KEY"     || die "could not bake the anon key into the build"
 
-  # The owner console reads the platform roster through the Worker, and the
-  # Worker asks Postgres whether the password it was given is the owner's.
-  # That hash has to be planted once. Optional on purpose: without it the
-  # roster refuses everybody, which is the safe way to be unconfigured.
-  if [ -n "${ADMIN_PASSWORD:-}" ]; then
-    if npx --yes supabase@latest db query --linked --project-ref "$ref" "select set_owner_password('$(printf %s "$ADMIN_PASSWORD" | sed "s/'/''/g")');" >/dev/null 2>&1; then
-      grn "  ok  the owner console can read the roster"
-    else
-      red "  x   could not set the owner password — the roster will refuse the console"
-    fi
-  else
-    echo "  .   no ADMIN_PASSWORD in .env.deploy — the console roster will answer"
-    echo "      \"admins only\" until you add your console password there and re-run"
+  # Not fatal: a deployment without a roster password is a working
+  # deployment whose console lists only its own device.
+  if [ -n "${ADMIN_PASSWORD:-}" ]; then seed_owner; else
+    echo "  .   no ADMIN_PASSWORD in .env.deploy — the console roster stays closed"
+    echo "      (bash tools/deploy.sh --owner, once you have put it there)"
   fi
 
   deploy_worker
@@ -275,6 +268,37 @@ check_creds() {
 
   [ "$bad" = 0 ] || die "fix the credentials above — nothing has been changed"
   grn "  every credential is what it says it is"
+}
+
+# ── the owner's roster password ───────────────────────────────
+# The console asks the Worker for every account on the platform, and the
+# Worker will not hand that list to a browser on its say-so. The proof is the
+# owner's own console password, checked by verify_owner() against a bcrypt
+# hash. That hash has to be planted once, from a password only the owner
+# knows — which is why this cannot be done for them.
+seed_owner() {
+  step "owner console"
+  local ref="${SUPABASE_PROJECT_REF:-}"
+  if [ -z "$ref" ]; then
+    ref=$(npx --yes supabase@latest projects list --output json 2>/dev/null | python -c "
+import json,sys
+try: rows = json.load(sys.stdin)
+except Exception: rows = []
+print(rows[0]['id'] if len(rows) == 1 else '')")
+  fi
+  [ -n "$ref" ] || die "cannot tell which Supabase project — set SUPABASE_PROJECT_REF in .env.deploy"
+  if [ -z "${ADMIN_PASSWORD:-}" ]; then
+    red "  x   ADMIN_PASSWORD is not set in $ENVF"
+    echo "      Put your OWNER CONSOLE password there (the one for siidhartha12)"
+    echo "      and run this again. Until then the console can list only the"
+    echo "      accounts opened on the machine it is running on."
+    die "the roster has nothing to check a password against"
+  fi
+  if npx --yes supabase@latest db query --linked --project-ref "$ref" "select set_owner_password('$(printf %s "$ADMIN_PASSWORD" | sed "s/'/''/g")');" >/dev/null 2>&1; then
+    grn "  ok  the owner console can read the roster"
+  else
+    die "could not set the owner password"
+  fi
 }
 
 # ── the database ──────────────────────────────────────────────
@@ -425,6 +449,7 @@ case "$MODE" in
   --pages)  deploy_pages ;;
   --check)  check ;;
   --creds)  check_creds ;;
+  --owner)  seed_owner ;;
   --auto)   auto ;;
   all|"")   check_creds; deploy_db; deploy_worker; deploy_pages; check ;;
 esac
