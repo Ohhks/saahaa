@@ -115,32 +115,115 @@ create unique index if not exists profiles_role_mobile
 create or replace function create_account(
   p_role text, p_name text, p_mobile text, p_area text, p_password text
 ) returns json as $$
-declare r profiles;
+declare r profiles; t uuid;
 begin
   insert into profiles (code, role, name, mobile, area, pass_hash)
   values (alloc_code(p_role), p_role, p_name,
           nullif(p_mobile, ''), nullif(p_area, ''),
           crypt(p_password, gen_salt('bf', 10)))
   returning * into r;
+  -- The device leaves with a token, because the password is not kept and
+  -- publishing a listing later cannot ask for it again.
+  insert into sessions (code) values (r.code) returning token into t;
   -- NAMED FIELDS, NEVER `select *`. Returning the row would return pass_hash
   -- with it, straight through PostgREST and into a browser.
-  return json_build_object('code', r.code, 'role', r.role, 'name', r.name,
-                           'mobile', r.mobile, 'area', r.area, 'createdAt', r.created_at);
+  return json_build_object('account', json_build_object(
+           'code', r.code, 'role', r.role, 'name', r.name,
+           'mobile', r.mobile, 'area', r.area, 'createdAt', r.created_at),
+         'token', t);
 end $$ language plpgsql security definer;
 
 -- Every account the password opens — a number may hold a customer AND a pro,
 -- and checking only the first row would tell one of them their password is
 -- wrong. The comparison is crypt(given, stored): bcrypt reads its own salt and
--- cost out of the stored hash, so there is nothing to look up first and nothing
--- to hand out.
+-- cost out of the stored hash, so there is nothing to look up first and
+-- nothing to hand out.
 create or replace function verify_account(p_ident text, p_password text) returns json as $$
+declare rec record; t uuid; arr json[] := '{}';
+begin
+  for rec in
+    select * from profiles
+     where (code = upper(p_ident) or mobile = p_ident)
+       and pass_hash is not null
+       and pass_hash = crypt(p_password, pass_hash)
+  loop
+    insert into sessions (code) values (rec.code) returning token into t;
+    arr := array_append(arr, json_build_object(
+      'code', rec.code, 'role', rec.role, 'name', rec.name,
+      'mobile', rec.mobile, 'area', rec.area,
+      'createdAt', rec.created_at, 'token', t));
+  end loop;
+  return array_to_json(arr);
+end $$ language plpgsql security definer;
+
+-- ── a session, so a device can prove it owns an account ──────
+-- Publishing a listing cannot ask for the password again — the app has it for
+-- one moment during sign-in and deliberately never keeps it. A token minted at
+-- that moment is what the device holds afterwards.
+create table if not exists sessions (
+  token      uuid primary key default gen_random_uuid(),
+  code       text not null references profiles(code) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists sessions_code_idx on sessions (code);
+alter table sessions enable row level security;
+
+-- ── the directory every customer actually reads ──────────────
+-- WHY THIS EXISTS, AND WHAT IT COST TO LEARN. Making accounts global was not
+-- enough: `profiles` held the plumber, but every screen that LISTS a plumber
+-- reads the partner row — `st.partners` — and that was still in the
+-- localStorage of the phone he signed up on. So he existed, and no customer
+-- could see him. A marketplace whose sellers are invisible to its buyers is
+-- not a marketplace.
+--
+-- The payload is jsonb rather than thirty columns, and that is a deliberate
+-- trade. A listing is a rich, changing shape the client already models; making
+-- the database own that shape means every new field is a migration, and a
+-- mapping layer that silently drops what it has not been taught. What the
+-- database DOES own is the part that has to be true regardless: who may write
+-- a row (the session), what kind it is, and whether it is visible.
+--
+-- ONLY WHAT A CUSTOMER MAY SEE GOES IN. The client whitelists the fields it
+-- publishes; a mobile number, a credential and the verification internals are
+-- not among them.
+create table if not exists listings (
+  code       text primary key references profiles(code) on delete cascade,
+  kind       text not null check (kind in ('partner','shop')),
+  area       text check (length(area) <= 40),
+  active     boolean not null default true,
+  payload    jsonb not null,
+  updated_at timestamptz not null default now()
+);
+create index if not exists listings_kind_idx on listings (kind, active);
+alter table listings enable row level security;
+
+-- A device may only ever write its OWN listing, and only of its own kind: the
+-- code comes from the session, never from the request, so a shop cannot
+-- publish itself as a pro and nobody can publish as somebody else.
+create or replace function publish_listing(
+  p_token uuid, p_kind text, p_area text, p_payload jsonb
+) returns boolean as $$
+declare c text; r text;
+begin
+  select s.code into c from sessions s where s.token = p_token;
+  if c is null then return false; end if;
+  select p.role into r from profiles p where p.code = c;
+  if r is distinct from p_kind then return false; end if;
+
+  insert into listings (code, kind, area, payload)
+  values (c, p_kind, nullif(p_area, ''), p_payload)
+  on conflict (code) do update
+    set kind = excluded.kind, area = excluded.area,
+        payload = excluded.payload, updated_at = now();
+  return true;
+end $$ language plpgsql security definer;
+
+-- What a fresh device asks for on its first paint.
+create or replace function public_listings() returns json as $$
   select coalesce(json_agg(json_build_object(
-           'code', code, 'role', role, 'name', name,
-           'mobile', mobile, 'area', area, 'createdAt', created_at)), '[]'::json)
-    from profiles
-   where (code = upper(p_ident) or mobile = p_ident)
-     and pass_hash is not null
-     and pass_hash = crypt(p_password, pass_hash);
+           'code', code, 'kind', kind, 'area', area, 'payload', payload)
+         order by updated_at desc), '[]'::json)
+    from listings where active;
 $$ language sql security definer;
 
 -- ── the owner's own credential, for the console roster ───────

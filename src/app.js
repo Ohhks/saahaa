@@ -3,6 +3,7 @@
 
 import { VERSION, SCHEMA_VERSION, BUILD_ID } from './core/version.js';
 import { ctx, getState, dispatch, me, restoreSession, myArea, saveSession, myPartner } from './core/ctx.js';
+import * as directory from './net/directory.js';
 import { createStore, combineFromRegistry } from './core/store.js';
 import * as persist from './core/persist.js';
 import * as bus from './core/bus.js';
@@ -1291,6 +1292,19 @@ async function boot() {
   render();
   await showSplash({ onGuest: () => go('home') });
   render();
+
+  /* THE DIRECTORY, AFTER THE FIRST PAINT AND NEVER BEFORE IT. A fresh device
+     has no pros and no shops, because until now a partner row only ever
+     existed on the phone that created it — a plumber could be signed up,
+     named by the server and listed in the owner console, and still be
+     invisible to every customer in the city.
+
+     Deliberately not awaited before the app paints: the screen must not wait
+     on a network that may not be there. It arrives, and if it brought
+     anything new the page is drawn again. */
+  directory.refresh()
+    .then(taken => { if (taken) render(); })
+    .catch(err => console.warn('[directory]', err));
 }
 
 boot().catch(err => {

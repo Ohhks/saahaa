@@ -253,9 +253,10 @@ do $$
 declare made json; opened json; acct text;   -- not `code`: it shadows the column
 begin
   made := create_account('customer', 'Asha Verified', '9777700001', 'Kukatpally', 'Kukatpally-7731');
-  acct := made->>'code';
+  acct := made->'account'->>'code';
   assert acct ~ '^C[0-9]{8}$', format('FAILED: create_account named the account %s', acct);
   assert made::text not like '%pass_hash%', 'FAILED: create_account returned the credential';
+  assert made->>'token' is not null, 'FAILED: create_account did not mint a session token';
   assert made::text not like '%Kukatpally-7731%', 'FAILED: create_account echoed the password back';
 
   -- what is actually stored is a bcrypt hash, not the password
@@ -296,4 +297,47 @@ do $$ begin
   assert (select value from platform_secrets where key = 'owner_password') like '$2%',
     'FAILED: the owner password is not stored as a bcrypt hash';
   raise notice 'ok  the owner is checked the same way everybody else is';
+end $$;
+
+-- ── 14 · a listing is what a customer can actually see ───────
+-- The gap this closes: `profiles` held the plumber and every screen that LISTS
+-- one reads the partner row, which lived in the localStorage of the phone he
+-- signed up on. He existed and nobody could see him.
+do $$
+declare pro json; cust json; tok uuid; ctok uuid; got json;
+begin
+  pro  := create_account('partner',  'Ravi Listed', '9777700010', 'Kukatpally', 'Kukatpally-7731');
+  cust := create_account('customer', 'Asha Buyer',  '9777700011', 'Madhapur',   'Kukatpally-7731');
+  tok  := (pro->>'token')::uuid;
+  ctok := (cust->>'token')::uuid;
+
+  assert publish_listing(tok, 'partner', 'Kukatpally',
+    '{"name":"Ravi Listed","cat":"plumbing","ask":50000,"online":true}'::jsonb) = true,
+    'FAILED: a pro could not publish his own listing';
+
+  got := public_listings();
+  assert json_array_length(got) = 1, 'FAILED: the directory did not return the listing';
+  assert got->0->>'code' = pro->'account'->>'code', 'FAILED: the listing came back under the wrong code';
+  assert got->0->'payload'->>'cat' = 'plumbing', 'FAILED: the payload did not survive';
+  raise notice 'ok  a pro publishes once and every device can read him';
+
+  -- THE CODE COMES FROM THE SESSION, NEVER FROM THE REQUEST.
+  assert publish_listing(ctok, 'partner', 'Madhapur', '{"name":"not a pro"}'::jsonb) = false,
+    'FAILED: a customer published himself as a pro';
+  assert publish_listing(gen_random_uuid(), 'partner', 'X', '{}'::jsonb) = false,
+    'FAILED: an invented token published a listing';
+  assert json_array_length(public_listings()) = 1,
+    'FAILED: a refused publish still wrote a row';
+  raise notice 'ok  a token names its own account — it cannot publish as another, or as another kind';
+
+  -- publishing again replaces, it does not duplicate
+  perform publish_listing(tok, 'partner', 'Kukatpally',
+    '{"name":"Ravi Listed","cat":"plumbing","ask":60000,"online":false}'::jsonb);
+  assert json_array_length(public_listings()) = 1, 'FAILED: republishing created a second listing';
+  assert (public_listings())->0->'payload'->>'ask' = '60000', 'FAILED: the update did not take';
+  raise notice 'ok  a pro who edits his price has one listing, not two';
+
+  -- nothing about the credential is ever in the directory
+  assert public_listings()::text not like '%pass_hash%', 'FAILED: the directory leaked a credential';
+  raise notice 'ok  and the directory carries no credential';
 end $$;

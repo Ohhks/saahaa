@@ -41,7 +41,7 @@ export class RailError extends Error {
   }
 }
 
-async function post(path, body, { timeoutMs = 12000 } = {}) {
+async function post(path, body, { timeoutMs = 12000, token = null } = {}) {
   /* `base` is '' on the deployed site — /api/… on this origin, through the
      service binding. `null` is the only value that means there is no rail. */
   const base = cfg.railUrl();
@@ -56,7 +56,9 @@ async function post(path, body, { timeoutMs = 12000 } = {}) {
   try {
     res = await fetch(base + path, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: token
+        ? { 'content-type': 'application/json', authorization: 'Bearer ' + token }
+        : { 'content-type': 'application/json' },
       body: JSON.stringify(body || {}),
       signal: ac.signal,
     });
@@ -80,10 +82,12 @@ async function post(path, body, { timeoutMs = 12000 } = {}) {
   return out;
 }
 
-/** Open an account. The SERVER names it — the device never guesses a code. */
+/** Open an account. The SERVER names it — the device never guesses a code.
+    Returns the account AND a session token: the password is not kept, and
+    publishing a listing later cannot ask for it again. */
 export async function signUp({ role, name, mobile, area, password }) {
   const out = await post('/api/accounts/signup', { role, name, mobile, area, password });
-  return out.account;
+  return { account: out.account, token: out.token };
 }
 
 /** Prove a password from any device. Returns every account it opens. */
@@ -96,4 +100,28 @@ export async function signIn({ ident, password }) {
 export async function roster(password) {
   const out = await post('/api/accounts/roster', { password });
   return { accounts: out.accounts || [], counts: out.counts || {} };
+}
+
+/** Put this account's own listing in the directory every device reads. */
+export async function publishListing({ token, kind, area, payload }) {
+  await post('/api/listings/publish', { kind, area, payload }, { token });
+  return true;
+}
+
+/** Every pro and shop a customer may see. Never throws — a directory that
+    cannot be read is a quieter failure than a screen that will not paint. */
+export async function listings() {
+  const base = cfg.railUrl();
+  if (base === null) return [];
+  try {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 12000);
+    const r = await fetch(base + '/api/listings', { signal: ac.signal });
+    clearTimeout(timer);
+    const b = await r.json().catch(() => null);
+    return (b && b.ok && Array.isArray(b.listings)) ? b.listings : [];
+  } catch (e) {
+    emit('rail:offline', { path: '/api/listings' });
+    return [];
+  }
 }

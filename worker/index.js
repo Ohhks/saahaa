@@ -10,6 +10,8 @@
  *   POST /api/accounts/signup — the server names the account and keeps it
  *   POST /api/accounts/signin — verify a password from any device
  *   POST /api/accounts/roster — the owner console's roster   [owner password]
+ *   GET  /api/listings         — every pro and shop a customer may see
+ *   POST /api/listings/publish — a pro or shop publishes its own   [token]
  *   POST /api/claim           — she says she has paid (validated, deduped)
  *   POST /api/pro-check       — he says he saw it
  *   POST /api/clear           — an admin matched the statement  [admin only]
@@ -264,7 +266,9 @@ export default {
           ? 'That number already has an account of this kind. Sign in instead.'
           : 'could not open the account' }, dup ? 409 : 500);
       }
-      return json({ ok: true, account: made.body });
+      /* The device leaves with a session token: the password is not kept, and
+         publishing a listing later cannot ask for it again. */
+      return json({ ok: true, account: (made.body || {}).account, token: (made.body || {}).token });
     }
 
     // ── sign in, from any device ─────────────────────────────
@@ -284,6 +288,45 @@ export default {
       const accounts = (got.ok && Array.isArray(got.body)) ? got.body : [];
       if (!accounts.length) return json({ ok: false, reason: 'That ID or number and password do not match.' }, 401);
       return json({ ok: true, accounts });
+    }
+
+    // ── the directory every customer reads ───────────────────
+    // Making accounts global was not enough. `profiles` held the plumber, and
+    // every screen that LISTS a plumber reads the partner row — which lived in
+    // the localStorage of the phone he signed up on. He existed and nobody
+    // could see him.
+    if (path === '/api/listings' && request.method === 'GET') {
+      const got = await rpc(env, 'public_listings', {});
+      if (!got.ok) return json({ ok: false, reason: 'could not read the directory' }, 500);
+      return json({ ok: true, listings: got.body || [] });
+    }
+
+    if (path === '/api/listings/publish' && request.method === 'POST') {
+      // THE CODE IS NEVER TAKEN FROM THE REQUEST. publish_listing resolves it
+      // from the session, so a device can only ever write its own listing, and
+      // only of its own kind — a customer cannot publish himself as a pro.
+      const auth = request.headers.get('authorization') || '';
+      const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+      if (!token) return json({ ok: false, reason: 'sign in first' }, 401);
+
+      const b = await request.json().catch(() => ({}));
+      const kind = String(b.kind || '');
+      if (kind !== 'partner' && kind !== 'shop') {
+        return json({ ok: false, reason: 'unknown kind of listing' }, 400);
+      }
+      const got = await rpc(env, 'publish_listing', {
+        p_token: token, p_kind: kind,
+        p_area: String(b.area || '').slice(0, 40),
+        p_payload: b.payload || {},
+      });
+      /* A malformed token makes Postgres reject the uuid cast, which arrives
+         here as a failed call rather than `false`. Both mean the same thing to
+         the caller and must not be told apart: this is not a way to find out
+         which tokens exist. */
+      if (!got.ok || got.body !== true) {
+        return json({ ok: false, reason: 'that session cannot publish this listing' }, 403);
+      }
+      return json({ ok: true });
     }
 
     // ── the roster the owner console shows ───────────────────

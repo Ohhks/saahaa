@@ -39,6 +39,7 @@
 import { mount, esc, toast, sheet, delegate } from '../dom.js';
 import * as ID from '../../domain/identity.js';
 import * as rail from '../../net/rail.js';
+import * as directory from '../../net/directory.js';
 import { liveMarkup, AGG_COMMISSION, RETAIL_FEE_FLOOR, RIDER_DISPATCH_CUT } from '../../domain/pricing.js';
 import { FREE_FIRST_ORDERS } from '../../domain/flow.js';
 import { MIN_STAKE, MAX_STAKE, STAKE_PCT } from '../../domain/wallet.js';
@@ -938,11 +939,11 @@ export async function doSignup() {
      somebody else tomorrow, and tells this person they have an account when
      only their phone thinks so. Signing up is a one-off, online moment;
      everything the pro does afterwards still works with no signal at all. */
-  let key, code;
+  let key, code, railToken = null;
   if (rail.isConfigured()) {
     try {
-      const acct = await rail.signUp({ role, name, mobile, area, password: pw });
-      key = acct.code; code = acct.code;
+      const made = await rail.signUp({ role, name, mobile, area, password: pw });
+      key = made.account.code; code = made.account.code; railToken = made.token;
     } catch (err) {
       toast(err && err.message ? err.message : 'Could not create the account', 'danger');
       return;
@@ -991,6 +992,21 @@ export async function doSignup() {
   }
 
   dispatch({ type: 'user/add', payload: user });
+
+  /* A PRO WHO IS NOT IN THE DIRECTORY IS NOT ON THE MARKET. The account is
+     global from the moment it is made, but the partner row — the thing every
+     category count, search and booking screen reads — is this device's. Until
+     it is published, he is a plumber only his own phone knows about.
+
+     Not awaited into the signup's success: the account is already made and
+     signing him in must not hang on a directory write. A failed publish is
+     retried the next time he opens his console. */
+  if (railToken && (role === 'partner' || role === 'shop')) {
+    const row = role === 'partner'
+      ? getState().partners.find(x => x.userKey === key)
+      : getState().shops.find(x => x.ownerKey === key);
+    directory.publish({ kind: role, token: railToken, row });
+  }
   audit.record('user.signup', { key, role }, key);
   /* "Account created — now sign in" was a second form standing between a new
      partner and their first step. Sign them in and put them on the ladder. */

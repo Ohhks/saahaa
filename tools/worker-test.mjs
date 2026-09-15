@@ -35,6 +35,7 @@ let state = {
   profileInsert409: false,
   nextCode: 'C20262001',
   accounts: [],
+  listings: [],
 };
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url); const method = (init.method || 'GET').toUpperCase();
@@ -55,15 +56,28 @@ globalThis.fetch = async (url, init = {}) => {
     const row = { code: state.nextCode, role: a.p_role, name: a.p_name,
                   mobile: a.p_mobile, area: a.p_area, createdAt: '2026-09-16T00:00:00Z' };
     state.accounts.push({ ...row, created_at: row.createdAt, password: a.p_password });
-    return J(row);
+    return J({ account: row, token: 'tok-' + row.code });
   }
   if (u.includes('/rest/v1/rpc/verify_account')) {
     const a = JSON.parse(init.body);
     const id = String(a.p_ident || '');
     return J(state.accounts
       .filter(x => (x.code === id.toUpperCase() || x.mobile === id) && x.password === a.p_password)
-      .map(({ password, created_at, ...rest }) => rest));
+      .map(({ password, created_at, ...rest }) => ({ ...rest, token: 'tok-' + rest.code })));
   }
+  /* publish_listing resolves the code FROM THE TOKEN and refuses a kind that
+     does not match the account's role — the stub has to enforce both, or the
+     assertions about them would pass against nothing. */
+  if (u.includes('/rest/v1/rpc/publish_listing')) {
+    const a = JSON.parse(init.body);
+    const code = String(a.p_token || '').startsWith('tok-') ? String(a.p_token).slice(4) : null;
+    const acct = state.accounts.find(x => x.code === code);
+    if (!acct || acct.role !== a.p_kind) return J(false);
+    state.listings = (state.listings || []).filter(l => l.code !== code);
+    state.listings.push({ code, kind: a.p_kind, area: a.p_area, payload: a.p_payload });
+    return J(true);
+  }
+  if (u.includes('/rest/v1/rpc/public_listings')) return J(state.listings || []);
   if (u.includes('/rest/v1/rpc/verify_owner')) {
     return J(JSON.parse(init.body).p_password === OWNER_PW);
   }
@@ -315,6 +329,46 @@ for (const bad of ['123', 'abcdefghijkl', '1234567890123', '']) {
   say(!hasCredential(rosb), 'and still without a single credential field');
 }
 
+
+// ── the directory: a pro one device publishes, every device reads ──
+{
+  console.log('\n  the directory\n');
+  state.accounts = []; state.listings = []; state.nextCode = 'P20262001';
+
+  const pro = await body(await call('/api/accounts/signup', {
+    body: { role: 'partner', name: 'Ravi Plumber', mobile: '9876500011', area: 'Kukatpally', password: 'Kukatpally-7731' } }));
+  say(!!pro.token, 'a signup hands the device a session token');
+
+  state.nextCode = 'C20262001';
+  const cust = await body(await call('/api/accounts/signup', {
+    body: { role: 'customer', name: 'Asha', mobile: '9876500012', area: 'Madhapur', password: 'Kukatpally-7731' } }));
+
+  const publish = (token, payload) => call('/api/listings/publish', {
+    body: { kind: payload.kind || 'partner', area: 'Kukatpally', payload },
+    token });
+
+  eq((await publish(null, { cat: 'plumbing' })).status, 401, 'publishing without a session is refused');
+  eq((await publish('tok-NOPE', { cat: 'plumbing' })).status, 403, 'and an invented token is refused');
+  eq((await publish(cust.token, { cat: 'plumbing' })).status, 403,
+     'a customer cannot publish himself as a pro — the kind is checked against the account');
+
+  eq((await publish(pro.token, { cat: 'plumbing', ask: 50000, online: true })).status, 200,
+     'a pro publishes his own listing');
+
+  const seen = await body(await call('/api/listings', { method: 'GET' }));
+  eq(seen.listings.length, 1, 'and a device that has never met him reads it back');
+  eq(seen.listings[0].payload.cat, 'plumbing', 'with the trade intact');
+  eq(seen.listings[0].code, pro.account.code, 'under his own code');
+
+  await publish(pro.token, { cat: 'plumbing', ask: 60000, online: false });
+  const again = await body(await call('/api/listings', { method: 'GET' }));
+  eq(again.listings.length, 1, 'editing the price leaves one listing, not two');
+  eq(again.listings[0].payload.ask, 60000, 'and the edit is what the directory serves');
+
+  say(!/pass_hash|password/.test(JSON.stringify(again)), 'the directory carries no credential');
+  eq((await call('/api/listings/publish', { body: { kind: 'wizard', payload: {} }, token: pro.token })).status,
+     400, 'a listing of a kind that does not exist is refused');
+}
 
 // ── the front door: which requests are files, and which are the API ──
 // The site and the API are two Workers. Before the service binding the browser

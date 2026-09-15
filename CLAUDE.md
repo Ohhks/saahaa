@@ -95,6 +95,18 @@ Signup **fails closed**: if the rail is configured and unreachable, no account
 is made. A local code would be a name the server may hand to somebody else.
 Everything after signup still works offline — this is identity, not orders.
 
+**AN ACCOUNT IS NOT A LISTING, and that gap survived a whole round.** Making
+`profiles` global looked like the job was done: the server named the plumber
+and the owner console listed him. But every screen that LISTS a plumber reads
+the PARTNER row, which was still in the localStorage of the phone he signed up
+on — so he existed and no customer could see him. `net/directory.js` publishes
+a whitelisted copy to `listings` at signup and merges the directory into state
+at boot. Local always wins over remote (his own row has his verification and
+history); merging is skip-if-present keyed on the account code, and the remote
+id is `r_<code>` so a refresh upserts instead of growing a row per boot.
+The payload is a **whitelist**, never a row minus deletions — a mobile number,
+a UPI id and a licence number are not in it.
+
 ## Payments — the live rail is manual UPI
 
 Customer pays `saahaa@ptyes` → types the 12-digit UTR → **the pro confirms** (job
