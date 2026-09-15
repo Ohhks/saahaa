@@ -21,6 +21,7 @@
 #   bash tools/deploy.sh --worker   # just the Worker + its secrets
 #   bash tools/deploy.sh --pages    # just the site
 #   bash tools/deploy.sh --check    # verify what is live, change nothing
+#   bash tools/deploy.sh --creds    # check the credentials only, change nothing
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -37,8 +38,8 @@ die()  { red "  x $*"; exit 1; }
 # not wrong.
 MODE="${1:-all}"
 case "$MODE" in
-  --db|--worker|--pages|--check|all|"") ;;
-  *) die "unknown option: $MODE  (--db | --worker | --pages | --check)" ;;
+  --db|--worker|--pages|--check|--creds|all|"") ;;
+  *) die "unknown option: $MODE  (--db | --worker | --pages | --check | --creds)" ;;
 esac
 
 [ -f "$ENVF" ] || die "no .env.deploy — copy .env.deploy.example and fill it in"
@@ -49,6 +50,80 @@ need() { [ -n "${!1:-}" ] || die "$1 is not set in .env.deploy"; }
 
 WORKER_NAME="$(sed -n 's/^name *= *"\(.*\)"/\1/p' worker/wrangler.toml)"
 PAGES_PROJECT="${PAGES_PROJECT:-saahaa}"
+
+# ── are the credentials the ones they are labelled as? ────────
+# CHECKED BEFORE ANYTHING IS CHANGED, because the realistic mistakes here are
+# silent ones: the anon and service keys are the same shape and swapping them
+# publishes a master key, and a Cloudflare token minted with the wrong template
+# fails only at the upload, after the schema is already applied. A deploy that
+# stops with everything untouched is recoverable; a half-finished one is a
+# puzzle.
+jwt_role() {   # jwt_role <key> — the role claim, or empty if unreadable
+  printf '%s' "$1" | cut -d. -f2 | tr '_-' '/+'     | { read -r P; L=$(( ${#P} % 4 )); [ $L -ne 0 ] && P="$P$(printf '=%.0s' $(seq $((4-L)))) "; printf '%s' "$P"; }     | base64 -d 2>/dev/null | grep -oE '"role" *: *"[a-z_]+"' | grep -oE '[a-z_]+"$' | tr -d '"'
+}
+
+check_creds() {
+  step "credentials"
+  local bad=0
+
+  # A CHECK THAT PASSES ON AN EMPTY FILE IS NOT A CHECK. Every test below is
+  # guarded on the value being present, so with nothing filled in they all
+  # skipped and it printed "every credential is what it says it is" over a
+  # blank .env.deploy. Say what is missing first.
+  local missing=""
+  for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID SUPABASE_URL            SUPABASE_ANON_KEY SUPABASE_SERVICE_KEY SUPABASE_DB_URL; do
+    [ -n "${!v:-}" ] || missing="$missing $v"
+  done
+  if [ -n "$missing" ]; then
+    red "  x   not filled in yet:"
+    for v in $missing; do echo "        $v"; done
+    die "fill these in $ENVF — see the PASTE ME lines"
+  fi
+
+  if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+    local v
+    v=$(curl -s --max-time 20 https://api.cloudflare.com/client/v4/user/tokens/verify           -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")
+    if printf '%s' "$v" | grep -q '"success":true'; then
+      grn "  ok  the Cloudflare token is valid and active"
+    else
+      red "  x   Cloudflare rejected the token: $(printf '%s' "$v" | grep -oE '"message":"[^"]*"' | head -1)"
+      bad=1
+    fi
+    if [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+      local a
+      a=$(curl -s --max-time 20 "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")
+      printf '%s' "$a" | grep -q '"success":true'         && grn "  ok  the token can see account $CLOUDFLARE_ACCOUNT_ID"         || { red "  x   the token cannot see that account — check it has Memberships·Read"; bad=1; }
+    fi
+  fi
+
+  # THE ONE THAT WOULD BE CATASTROPHIC IS THE KEYS THE WRONG WAY ROUND. The
+  # anon key is baked into the browser build; the service key bypasses every
+  # RLS policy in the schema. They are both "eyJ..." and both about the same
+  # length, and the only thing that tells them apart is a claim inside.
+  if [ -n "${SUPABASE_ANON_KEY:-}" ]; then
+    case "$(jwt_role "$SUPABASE_ANON_KEY")" in
+      anon) grn "  ok  SUPABASE_ANON_KEY really carries role anon" ;;
+      service_role) red "  x   SUPABASE_ANON_KEY IS THE SERVICE KEY — it would be baked into the browser. Swap them."; bad=1 ;;
+      *) echo "  ·   could not read a role claim from SUPABASE_ANON_KEY" ;;
+    esac
+  fi
+  if [ -n "${SUPABASE_SERVICE_KEY:-}" ]; then
+    case "$(jwt_role "$SUPABASE_SERVICE_KEY")" in
+      service_role) grn "  ok  SUPABASE_SERVICE_KEY really carries role service_role" ;;
+      anon) red "  x   SUPABASE_SERVICE_KEY is the ANON key — the Worker could not clear a payment. Swap them."; bad=1 ;;
+      *) echo "  ·   could not read a role claim from SUPABASE_SERVICE_KEY" ;;
+    esac
+  fi
+
+  if [ -n "${SUPABASE_URL:-}" ] && [ -n "${SUPABASE_ANON_KEY:-}" ]; then
+    local code
+    code=$(curl -s -o /dev/null --max-time 20 -w '%{http_code}'              "$SUPABASE_URL/rest/v1/" -H "apikey: $SUPABASE_ANON_KEY")
+    [ "$code" = "200" ] && grn "  ok  $SUPABASE_URL answers with that anon key"       || { red "  x   $SUPABASE_URL/rest/v1/ returned HTTP $code"; bad=1; }
+  fi
+
+  [ "$bad" = 0 ] || die "fix the credentials above — nothing has been changed"
+  grn "  every credential is what it says it is"
+}
 
 # ── the database ──────────────────────────────────────────────
 # Applied with psql out of a throwaway container, for the same reason
@@ -167,5 +242,6 @@ case "$MODE" in
   --worker) deploy_worker ;;
   --pages)  deploy_pages ;;
   --check)  check ;;
-  all|"")   deploy_db; deploy_worker; deploy_pages; check ;;
+  --creds)  check_creds ;;
+  all|"")   check_creds; deploy_db; deploy_worker; deploy_pages; check ;;
 esac
