@@ -100,6 +100,33 @@ movements above ₹5,000 need step-up re-auth, and every attempt is written to
 the audit log. See [docs/SECURITY.md](docs/SECURITY.md) for the honest scope of
 what client-side auth can and cannot do.
 
+## Where the data actually lives
+
+Nothing is stored in Cloudflare. Cloudflare runs two Workers and holds no
+records at all.
+
+| | |
+|---|---|
+| `saahaa` | the site. Static files out of `dist/`, plus a router (`worker-site/index.js`) that hands `/api/*` to the API. Holds no secret. |
+| `saahaa-api` | the only thing that may write. Holds `SUPABASE_SERVICE_KEY`. |
+| Supabase Postgres | **every record** — accounts, orders, payments, the ledger, payouts. |
+| the browser | a working copy, so the app renders and works offline. Not the source of truth. |
+
+The two Workers are joined by a **service binding**, not a URL: `/api/*` goes
+to `saahaa-api` over Cloudflare's internal RPC, so it never leaves their
+network, never resolves DNS and never crosses an origin. That is why the site
+needs no CORS and why its `connect-src` does not have to name another host.
+
+Secrets are not bindings and do not appear in that panel — they are under
+**Settings → Variables and Secrets** on `saahaa-api`. The service-role key is
+there and only there: the browser never holds it, and neither does the site
+Worker. That separation is what makes it safe to publish the owner console as
+a static file.
+
+An account is written by `create_account()` in Postgres, which allocates the
+code under a row lock and stores a bcrypt hash — the password is never stored,
+never logged, and never sent back. See [supabase/schema.sql](supabase/schema.sql).
+
 ## What is in here
 
 - **The Modernist design.** Archivo (vendored — no CDN), a light paper ground

@@ -315,6 +315,51 @@ for (const bad of ['123', 'abcdefghijkl', '1234567890123', '']) {
   say(!hasCredential(rosb), 'and still without a single credential field');
 }
 
+
+// ── the front door: which requests are files, and which are the API ──
+// The site and the API are two Workers. Before the service binding the browser
+// called the API by its absolute address, which meant CORS for the whole
+// internet and `https://*.workers.dev` in the site's connect-src. Now /api/* is
+// handed over Cloudflare's internal RPC and everything else is a file.
+{
+  console.log('\n  the front door\n');
+  const { default: site } = await import(new URL('../worker-site/index.js', import.meta.url).href);
+
+  let went;
+  const env = {
+    API:    { fetch: r => { went = 'api';    return new Response('api ' + new URL(r.url).pathname); } },
+    ASSETS: { fetch: r => { went = 'assets'; return new Response('asset ' + new URL(r.url).pathname); } },
+  };
+  const where = async (p) => { went = null; await site.fetch(new Request('https://saahaa.test' + p), env); return went; };
+
+  eq(await where('/api/health'), 'api', '/api/health goes to the API');
+  eq(await where('/api/accounts/signup'), 'api', 'and so does a signup');
+  eq(await where('/api'), 'api', 'a bare /api goes there too — it answers with the real endpoints');
+  eq(await where('/'), 'assets', 'the home page is a file');
+  eq(await where('/admin.html'), 'assets', 'the owner console is a file');
+  eq(await where('/vendor/leaflet/leaflet.js'), 'assets', 'so is everything vendored');
+  /* THE ONE THAT WOULD HAVE BEEN A BUG. `startsWith('/api')` without the
+     slash sends /apiary — or any future /api-docs — into the money Worker. */
+  eq(await where('/apiary'), 'assets', 'a path that merely starts with the letters api is a file');
+  eq(await where('/api-docs'), 'assets', 'and so is /api-docs');
+  eq(await where('/some/deep/link'), 'assets', 'an unknown path is the app, not the API');
+
+  /* The router must carry the request through unchanged: the API reads the
+     method and the body, and a rebuilt Request would lose both. */
+  went = null;
+  const posted = await site.fetch(new Request('https://saahaa.test/api/accounts/signin', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"ident":"C20262001"}' }), {
+      API: { fetch: async r => new Response(JSON.stringify({ method: r.method, body: await r.text() })) },
+      ASSETS: { fetch: () => new Response('asset') } });
+  const seen = JSON.parse(await posted.text());
+  eq(seen.method, 'POST', 'the method survives the hop');
+  eq(seen.body, '{"ident":"C20262001"}', 'and so does the body');
+
+  say(!/SUPABASE|SERVICE_KEY|HOOK_SECRET/.test(
+        (await import('node:fs')).readFileSync(new URL('../worker-site/index.js', import.meta.url), 'utf8')),
+      'the front door holds no secret — that boundary is why the console is safe to publish');
+}
+
 // ── unknown routes ───────────────────────────────────────────
 eq((await call('/api/whatever')).status, 404, 'an unknown endpoint is a 404, not a 500');
 

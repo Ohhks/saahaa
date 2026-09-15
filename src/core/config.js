@@ -72,15 +72,36 @@ export const hasSupabase = () => { const c = supabaseConfig(); return !!(c.url &
 const BAKED_RAIL = 'https://saahaa-api.siidhartha12.workers.dev';
 const KEY_RAIL = 'SAAHAA_RAIL';
 
+/* ON THE DEPLOYED SITE THE API IS SAME-ORIGIN. wrangler.toml binds /api/* to
+   the saahaa-api Worker, so the browser asks its own origin and the request
+   never crosses one — no CORS, no third host in connect-src, and a custom
+   domain works the day it is pointed here without editing this file.
+
+   A laptop is the exception: `python tools/serve.py` serves the app and
+   nothing else, and a double-clicked dist/saahaa.html has no origin to speak
+   of. Those fall back to the absolute address. */
+function sameOriginApi() {
+  try {
+    if (!/^https?:$/.test(location.protocol)) return false;            // file://
+    return !/^(localhost|127\.|0\.0\.0\.0|\[?::1)/.test(location.hostname);
+  } catch (e) { return false; }
+}
+
+/** The prefix to put before /api/…  '' means this origin; null means no rail. */
 export function railUrl() {
   try {
     const q = new URLSearchParams(location.search).get('rail');
-    if (q) persist.write(KEY_RAIL, q === 'off' ? '' : q.replace(/\/+$/, ''));
+    if (q) persist.write(KEY_RAIL, q === 'off' ? 'off' : q.replace(/\/+$/, ''));
   } catch (e) {}
   const saved = persist.read(KEY_RAIL, null);
-  return String(saved === null ? BAKED_RAIL : saved).replace(/\/+$/, '');
+  if (saved === 'off') return null;
+  if (saved) return String(saved).replace(/\/+$/, '');
+  return sameOriginApi() ? '' : BAKED_RAIL;
 }
-export const hasRail = () => !!railUrl();
+/* NOT `!!railUrl()`. Same-origin is the empty string, which is falsy, and
+   reading it as "no rail configured" would have turned the whole identity rail
+   off on the one deployment it was built for. */
+export const hasRail = () => railUrl() !== null;
 export const setRailUrl = u => persist.write(KEY_RAIL, String(u || '').replace(/\/+$/, ''));
 
 /* Which backend the app runs against.

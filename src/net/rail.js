@@ -42,8 +42,10 @@ export class RailError extends Error {
 }
 
 async function post(path, body, { timeoutMs = 12000 } = {}) {
+  /* `base` is '' on the deployed site — /api/… on this origin, through the
+     service binding. `null` is the only value that means there is no rail. */
   const base = cfg.railUrl();
-  if (!base) throw new RailError('The server is not configured', { offline: true });
+  if (base === null) throw new RailError('The server is not configured', { offline: true });
 
   /* A PHONE ON A BAD SIGNAL DOES NOT FAIL — IT HANGS. Without this the signup
      button spins until the network gives up on its own, which on a 2G tail can

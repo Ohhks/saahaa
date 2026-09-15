@@ -18,10 +18,14 @@
 # the build command below cannot run, that build now FAILS rather than quietly
 # publishing the source tree.
 name = "saahaa"
+main = "worker-site/index.js"
 compatibility_date = "2026-01-01"
 
 [assets]
 directory = "./dist"
+# Named so worker-site/index.js can serve a file itself. Requests that match an
+# asset are still answered before that Worker runs, so they stay free.
+binding = "ASSETS"
 
 # EVERY UNKNOWN PATH IS THE APP, NOT A MISSING FILE. This is a single-page app
 # whose routes live after the #, but a customer who refreshes on a deep link
@@ -38,6 +42,19 @@ not_found_handling = "404-page"
 # The default costs one 307 from /admin.html to /admin. That is the cheaper
 # side of the trade.
 # html_handling = "none"   ← do not.
+
+# THE BINDING THE DASHBOARD WAS RIGHT TO SAY WAS MISSING. /api/* is handed to
+# saahaa-api over Cloudflare's internal RPC: it never leaves their network,
+# never resolves DNS and never crosses an origin, so the API no longer has to
+# answer CORS for the whole internet and the site's connect-src no longer has
+# to name every *.workers.dev in existence.
+#
+# The two Workers stay separate on purpose. saahaa-api holds the service-role
+# key; this one holds nothing, and that is the boundary that makes a public
+# static site safe to put the console on.
+[[services]]
+binding = "API"
+service = "saahaa-api"
 
 # Cloudflare's own build runs this before it uploads ./dist.
 [build]
