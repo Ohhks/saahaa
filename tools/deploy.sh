@@ -375,9 +375,9 @@ deploy_pages() {
   # NOT `wrangler pages deploy`. Cloudflare Pages is now part of Workers, and a
   # Pages project cannot be created under a name a Worker already holds — which
   # this account does, so that command fails outright. The site ships as a
-  # Workers static-assets deployment; wrangler.site.toml carries the two
+  # Workers static-assets deployment; wrangler.toml carries the two
   # settings that matter, and says why.
-  npx --yes wrangler deploy -c wrangler.site.toml || die "site deploy failed"
+  npx --yes wrangler deploy -c wrangler.toml || die "site deploy failed"
   grn "  ok  site deployed"
 }
 

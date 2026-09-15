@@ -6,6 +6,17 @@
 # and the 82 loose modules instead of the built bundle — and, more seriously,
 # without dist/404.html, so any deep link died on a hard refresh. This deploys
 # what tools/build.py --site actually produces.
+# IT IS CALLED wrangler.toml, AND THE NAME IS THE POINT. As wrangler.site.toml
+# it was invisible to anything that did not pass -c, and this account has a
+# Cloudflare build connected to the GitHub repo: every push produced a
+# deployment seconds later that served the REPOSITORY ROOT — the 3 KB source
+# shell, with no bundle behind it. The live site was replaced twice that way
+# while it was being tested, and the gate that caught it was accused of being
+# broken before the deployment was.
+#
+# dist/ is gitignored, so a build that checks the repo out has to make it. If
+# the build command below cannot run, that build now FAILS rather than quietly
+# publishing the source tree.
 name = "saahaa"
 compatibility_date = "2026-01-01"
 
@@ -27,3 +38,7 @@ not_found_handling = "404-page"
 # The default costs one 307 from /admin.html to /admin. That is the cheaper
 # side of the trade.
 # html_handling = "none"   ← do not.
+
+# Cloudflare's own build runs this before it uploads ./dist.
+[build]
+command = "python tools/build.py --site"
