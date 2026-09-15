@@ -1,6 +1,44 @@
 # Going live — the parts only you can do
 
 Everything in this repo is built and gated. What remains needs your logins.
+
+## The one command
+
+```bash
+cp .env.deploy.example .env.deploy     # then fill it in — it is gitignored
+bash tools/deploy.sh
+```
+
+Schema, Worker, secrets, site, then a verification pass — in that order,
+because a bundle that fails preflight must never reach a phone. It is
+idempotent: the schema applies twice on purpose, `wrangler deploy` replaces,
+and secrets overwrite. Run it again whenever something looks wrong; re-running
+is how you fix things, not how you break them.
+
+```bash
+bash tools/deploy.sh --db       # just the schema
+bash tools/deploy.sh --worker   # just the Worker + its secrets
+bash tools/deploy.sh --pages    # just the site
+bash tools/deploy.sh --check    # verify what is live, change nothing
+```
+
+Every service it touches is on a free plan and nothing in it can move you off
+one — [docs/FREE-TIER.md](FREE-TIER.md) is the accounting, including which
+limit would bite first and what is already shipped to stop it.
+
+To point the browser build at your project (the anon key, baked in):
+
+```bash
+python tools/setup-supabase.py --url https://xxxx.supabase.co --anon eyJ...
+```
+
+It refuses a service-role key rather than committing a master key to a public
+history.
+
+---
+
+## The same thing by hand
+
 Work top to bottom; each step is verifiable before the next.
 
 ## 1 · Supabase (5 min)

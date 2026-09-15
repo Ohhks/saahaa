@@ -159,6 +159,8 @@ what client-side auth can and cannot do.
 | First-time setup | [docs/SETUP.md](docs/SETUP.md) |
 | Go-live checklist | [docs/LAUNCH.md](docs/LAUNCH.md) |
 | Step-by-step to production | [docs/PRODUCTION-PROCESS.md](docs/PRODUCTION-PROCESS.md) |
+| Deploying, in one command | [docs/DEPLOY.md](docs/DEPLOY.md) |
+| What it costs to run (₹0) | [docs/FREE-TIER.md](docs/FREE-TIER.md) |
 | What runs itself | [docs/AUTOMATION.md](docs/AUTOMATION.md) |
 | When something breaks | [docs/RUNBOOK.md](docs/RUNBOOK.md) |
 | Release test report | [docs/TEST-REPORT.md](docs/TEST-REPORT.md) |

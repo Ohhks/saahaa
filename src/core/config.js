@@ -19,7 +19,8 @@
 import * as persist from './persist.js';
 
 const BAKED = {
-  // Filled in by `python tools/setup-supabase.py`, or paste yours here.
+  // Written by `python tools/setup-supabase.py`. Both values are public:
+  // the anon key authorises nothing on its own — RLS decides access.
   url: '',
   anonKey: '',
 };
