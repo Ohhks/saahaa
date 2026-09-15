@@ -32,33 +32,64 @@ if ! docker run -d --name "$NAME" -e POSTGRES_PASSWORD=saahaa -e POSTGRES_DB=saa
   exit 0
 fi
 
-ready=0
+# `pg_isready` IS NOT A READY SIGNAL FOR THIS IMAGE, AND THAT COST THREE CI
+# RUNS. The official postgres image runs initdb against a TEMPORARY server, then
+# shuts it down and starts the real one. pg_isready answers yes to that
+# temporary server, so the very next psql could land in the restart and come
+# back "the database system is starting up" or with the connection dropped —
+# which this script then reported as "supabase/schema.sql does not do what it
+# says". The schema was never the problem. It is intermittent by nature: it
+# depends on how fast the box is, which is why the same commit passed CI and
+# failed deploy an hour apart.
+#
+# A real query is the only honest test of "can I use this database", and it has
+# to succeed TWICE with a gap, because one success can still be the temporary
+# server moments before it goes away.
+ready=0; streak=0
 for i in $(seq 1 90); do
-  if docker exec "$NAME" pg_isready -U postgres -d saahaa >/dev/null 2>&1; then ready=1; break; fi
+  if docker exec "$NAME" psql -U postgres -d saahaa -tAc 'select 1' >/dev/null 2>&1; then
+    streak=$((streak + 1))
+    if [ "$streak" -ge 2 ]; then ready=1; break; fi
+  else
+    streak=0
+  fi
   sleep 1
 done
 if [ "$ready" -ne 1 ]; then
-  echo "  schema: SKIPPED — Postgres never became ready in 90s, not a schema fault"
+  echo "  schema: SKIPPED — Postgres never became usable in 90s, not a schema fault"
   exit 0
 fi
 
 # quiet the "already exists, skipping" chorus; errors still stop the run
 psql() { { echo "set client_min_messages to warning;"; cat; } | docker exec -i "$NAME" psql -U postgres -d saahaa -v ON_ERROR_STOP=1 -q "$@"; }
 
+# A GATE THAT FAILS WITHOUT SAYING WHY COSTS A WHOLE ROUND. This printed one
+# line — "x schema.sql does not apply" — and threw away the only thing that
+# could say what Postgres actually objected to. On a CI runner, whose logs are
+# not readable without signing in, that left an annotation naming the file and
+# nothing else; the failure was reproduced by guesswork instead of read. Every
+# path below now surfaces the database's own words, as a ::error:: annotation
+# so it survives on a runner where the log does not.
+say_fail() {   # say_fail <headline> <output>
+  echo "  x $1"
+  echo "$2" | grep -E "^(ERROR|FAILED|psql|DETAIL|HINT|CONTEXT|LINE)" | head -20 | sed 's/^/      /'
+  echo "::error::schema-test: $1 — $(echo "$2" | grep -E '^(ERROR|FAILED)' | head -1 | cut -c1-300)"
+}
+
 echo "  schema: applying supabase/schema.sql to a real Postgres"
-psql < supabase/test-auth-stub.sql >/dev/null || { echo "  x auth stub failed"; exit 1; }
-psql < supabase/schema.sql > /dev/null || { echo "  x schema.sql does not apply"; exit 1; }
+OUT=$(psql < supabase/test-auth-stub.sql 2>&1) || { say_fail "the auth stub failed" "$OUT"; exit 1; }
+OUT=$(psql < supabase/schema.sql 2>&1)         || { say_fail "schema.sql does not apply" "$OUT"; exit 1; }
 
 # The header says "Run once. Idempotent." That is a claim, so check it.
-psql < supabase/schema.sql > /dev/null || { echo "  x schema.sql is NOT idempotent — a second run failed"; exit 1; }
+OUT=$(psql < supabase/schema.sql 2>&1) || { say_fail "schema.sql is NOT idempotent — a second run failed" "$OUT"; exit 1; }
 echo "  ok  schema.sql applies, and applies twice"
 
 OUT=$(psql < supabase/schema.test.sql 2>&1)
 echo "$OUT" | grep -E "^(NOTICE|psql|ERROR)" | sed -e 's/^NOTICE:  /  /' -e 's/^/  /' | sed 's/^    /  /'
 if echo "$OUT" | grep -q "FAILED:"; then
-  echo "  x schema behaviour test failed"; exit 1
+  say_fail "the database does not behave the way schema.sql claims" "$OUT"; exit 1
 fi
 if echo "$OUT" | grep -qE "^(ERROR|psql:)"; then
-  echo "  x schema test errored"; exit 1
+  say_fail "the behaviour test errored before it could finish" "$OUT"; exit 1
 fi
 echo "  schema: every claim in schema.sql now holds against a real database"
