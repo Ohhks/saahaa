@@ -81,10 +81,23 @@ auto() {
   if printf '%s' "$who" | grep -qi 'not authenticated'; then
     die "Cloudflare is not signed in — run: npx wrangler login"
   fi
-  grn "  ok  Cloudflare is signed in$(printf '%s' "$who" | grep -oiE 'Account Name[^|]*' | head -1)"
+  # The email, not the first thing matching "Account Name" — that matched the
+  # header of the accounts TABLE and printed a row of box-drawing characters.
+  grn "  ok  Cloudflare is signed in as $(printf '%s' "$who" | grep -oiE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+' | head -1)"
 
   local projects ref
-  projects=$(npx --yes supabase@latest projects list --output json 2>/dev/null)     || die "Supabase is not signed in — run: npx supabase login"
+  # TWO WAYS IN, AND NEITHER IS A PASSWORD. `supabase login` stores a browser
+  # grant; SUPABASE_ACCESS_TOKEN is a personal access token that the CLI reads
+  # straight from the environment — and .env.deploy is sourced with `set -a`,
+  # so putting it there is enough. Both are revocable from the dashboard, which
+  # an account password is not.
+  projects=$(npx --yes supabase@latest projects list --output json 2>/dev/null) || {
+    red "  x   Supabase is not signed in. Either:"
+    echo "        npx supabase login                       (browser, click Allow)"
+    echo "      or put a personal access token in $ENVF:"
+    echo "        SUPABASE_ACCESS_TOKEN=sbp_...            (supabase.com/dashboard/account/tokens)"
+    die "no Supabase credential"
+  }
 
   # Pick the project by name, and refuse to guess when it is ambiguous: this
   # writes secrets and applies a schema, so choosing the wrong project is not
