@@ -62,6 +62,14 @@ buys groceries has a `C…` and a `P…`, each with its own password, wallet and
 history. What they cannot have is two accounts of the same kind. Sign-in takes
 either a mobile number or an ID; a number holding two accounts asks which one.
 
+**Accounts are the platform's, not the device's.** Signing up asks the server
+for the code and the server keeps the account, so a customer who signs up on
+her phone appears in the owner console on a different machine, and the same
+number cannot open two accounts of one kind from two devices. Sign-in works
+from any device: the password is checked against the database (bcrypt), and the
+account is adopted onto that device the first time. What does not travel yet is
+history — orders, wallet and ledger are still per device.
+
 Accounts that existed before IDs keep their internal key — every order, partner
 row and ledger leg still points where it did — and were assigned an ID by
 migration, oldest first. See `src/domain/identity.js`.

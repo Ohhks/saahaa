@@ -87,6 +87,17 @@ function onFail() {
 function onSuccess() { setGate({ fails: 0, nextAt: 0, lockUntil: 0 }); }
 
 /* ── login ─────────────────────────────────────────────────── */
+/* THE OWNER'S PASSWORD, FOR AS LONG AS THE CONSOLE IS OPEN AND NOT A MOMENT
+   LONGER. The Worker will not hand over the platform roster to a browser that
+   cannot prove who it is, and the only proof this console has is the password
+   that was just typed. Keeping it in a module variable means it dies with the
+   tab: it is never written to sessionStorage, never to localStorage, never to
+   the audit log. A refresh loses it, and the roster then asks again — which is
+   the correct trade, because the alternative is storing a password somewhere
+   it can be read. */
+let liveSecret = null;
+export const ownerSecret = () => liveSecret;
+
 export async function login(username, password, cred) {
   const g = gateStatus();
   if (g.blocked) {
@@ -107,6 +118,7 @@ export async function login(username, password, cred) {
     return { ok: false, reason: 'bad', fails: after.fails };
   }
   onSuccess();
+  liveSecret = password;          // memory only — see ownerSecret() above
   const sess = { t: randSalt(), start: Date.now(), touched: Date.now() };
   try { sessionStorage.setItem(SESS_KEY, JSON.stringify(sess)); } catch (e) {}
   audit.record(audit.ACTIONS.ADMIN_LOGIN, { via: 'in-site' }, 'admin');
@@ -128,6 +140,7 @@ export function touch() {
   if (s) { s.touched = Date.now(); try { sessionStorage.setItem(SESS_KEY, JSON.stringify(s)); } catch (e) {} }
 }
 export function logout(reason = 'manual') {
+  liveSecret = null;
   try { sessionStorage.removeItem(SESS_KEY); } catch (e) {}
   audit.record(audit.ACTIONS.ADMIN_LOGOUT, { reason }, 'admin');
 }

@@ -27,6 +27,149 @@ create table if not exists profiles (
   created_at  timestamptz not null default now()
 );
 
+-- ── accounts are the SERVER's to name ────────────────────────
+-- WHY THIS MOVED. domain/identity.js picked the next code by looking at the
+-- accounts ON THAT DEVICE: `nextCode(role, getState().users)`. With one device
+-- that is correct and cheap. With two it is neither — both phones look at an
+-- empty list and both mint C20262001, and the first one to reach a shared
+-- database wins while the second person loses the name they were shown. A
+-- sequence that must be unique across devices cannot be computed on one.
+--
+-- So the counter lives here, and `alloc_code` is the only thing allowed to
+-- move it. The INSERT ... ON CONFLICT DO UPDATE ... RETURNING takes a row lock
+-- for the duration, so two signups landing in the same millisecond are handed
+-- 2001 and 2002 rather than 2001 twice. That is the whole reason it is a
+-- function and not a SELECT max()+1.
+create table if not exists code_counters (
+  prefix    char(1) not null check (prefix in ('C','P','S')),
+  year      int     not null,
+  next_seq  int     not null default 2001,
+  primary key (prefix, year)
+);
+
+create or replace function alloc_code(p_role text) returns text as $$
+declare
+  p char(1);
+  y int := extract(year from (now() at time zone 'Asia/Kolkata'))::int;
+  s int;
+begin
+  p := case p_role when 'partner' then 'P' when 'shop' then 'S' else 'C' end;
+  insert into code_counters (prefix, year, next_seq) values (p, y, 2001)
+    on conflict (prefix, year) do update set next_seq = code_counters.next_seq + 1
+    returning next_seq into s;
+  return p || y::text || lpad(s::text, 4, '0');
+end $$ language plpgsql security definer;
+
+-- ── the credential, and who may hold an account ──────────────
+-- profiles.id pointed at auth.users, which forced every account through
+-- Supabase Auth — a sign-up flow this product does not have and does not want
+-- (there is no SMS rail, and GoTrue wants an email or a phone). The Worker
+-- holds the service key and is the only writer here, so the row can own its
+-- own id. Dropped by lookup rather than by name because the name is generated.
+do $$
+declare c text;
+begin
+  select conname into c from pg_constraint
+   where conrelid = 'profiles'::regclass and contype = 'f'
+     and pg_get_constraintdef(oid) like '%auth.users%';
+  if c is not null then execute format('alter table profiles drop constraint %I', c); end if;
+end $$;
+alter table profiles alter column id set default gen_random_uuid();
+
+-- THE PASSWORD NEVER TRAVELS BACK. The salt and the hash are stored so the
+-- Worker can re-derive and compare; nothing selects them into a response, and
+-- the browser is never handed a salt to grind on. 250,000 rounds of
+-- PBKDF2-SHA256, the same figure core/security.js uses, so an account made on
+-- one device verifies identically on the next.
+alter table profiles add column if not exists pass_hash text;
+alter table profiles add column if not exists pass_salt text;
+alter table profiles add column if not exists pass_iter int not null default 250000;
+
+-- ONE ACCOUNT PER NUMBER PER ROLE, and this is where that is decided now.
+-- auth.js checked it against the accounts on the device, which is the same
+-- mistake the code sequence made: a number free on this phone may be taken on
+-- another. Partial, because a shop row may legitimately carry no mobile.
+create unique index if not exists profiles_role_mobile
+  on profiles (role, mobile) where mobile is not null;
+
+-- ── the credential lives HERE, and is checked HERE ───────────
+-- IT WAS BRIEFLY THE WORKER'S JOB, AND THE FREE TIER SAID NO. The Worker
+-- derived PBKDF2-SHA256 at 250,000 rounds to match core/security.js. That is
+-- perhaps 100ms of pure CPU, and a Cloudflare Worker on the free plan gets
+-- **10ms**: every signup and every sign-in died as exception 1101 — a 500 with
+-- no message, on the one path a new customer has to walk. docs/FREE-TIER.md
+-- names CPU as the limit most likely to bite, and this is it biting.
+--
+-- Postgres is the right place anyway. crypt() costs the Worker nothing because
+-- the Worker is waiting on I/O rather than computing, bcrypt carries its own
+-- salt and cost factor inside the 60-character hash, and the password never
+-- exists anywhere but in flight and in this function's arguments.
+--
+-- pass_salt / pass_iter are left over from the PBKDF2 attempt and are no longer
+-- written. They stay because dropping a column is a destructive migration run
+-- against live data to tidy something that costs nothing.
+
+-- Opening an account is ONE statement, so the name and the row are allocated
+-- together. Two devices racing produce 2001 and 2002; a duplicate number is
+-- refused by the partial unique index, not by a SELECT that both can pass.
+create or replace function create_account(
+  p_role text, p_name text, p_mobile text, p_area text, p_password text
+) returns json as $$
+declare r profiles;
+begin
+  insert into profiles (code, role, name, mobile, area, pass_hash)
+  values (alloc_code(p_role), p_role, p_name,
+          nullif(p_mobile, ''), nullif(p_area, ''),
+          crypt(p_password, gen_salt('bf', 10)))
+  returning * into r;
+  -- NAMED FIELDS, NEVER `select *`. Returning the row would return pass_hash
+  -- with it, straight through PostgREST and into a browser.
+  return json_build_object('code', r.code, 'role', r.role, 'name', r.name,
+                           'mobile', r.mobile, 'area', r.area, 'createdAt', r.created_at);
+end $$ language plpgsql security definer;
+
+-- Every account the password opens — a number may hold a customer AND a pro,
+-- and checking only the first row would tell one of them their password is
+-- wrong. The comparison is crypt(given, stored): bcrypt reads its own salt and
+-- cost out of the stored hash, so there is nothing to look up first and nothing
+-- to hand out.
+create or replace function verify_account(p_ident text, p_password text) returns json as $$
+  select coalesce(json_agg(json_build_object(
+           'code', code, 'role', role, 'name', name,
+           'mobile', mobile, 'area', area, 'createdAt', created_at)), '[]'::json)
+    from profiles
+   where (code = upper(p_ident) or mobile = p_ident)
+     and pass_hash is not null
+     and pass_hash = crypt(p_password, pass_hash);
+$$ language sql security definer;
+
+-- ── the owner's own credential, for the console roster ───────
+-- The console asks the Worker for every account on the platform, and the Worker
+-- must not hand that list to whoever asks. The owner's password is the proof —
+-- the same one they already type — and it is verified the same way, here.
+-- RLS is on and there is no policy, so only the service role reaches this table
+-- at all; the hash is never selected by anything but the function below.
+create table if not exists platform_secrets (
+  key        text primary key,
+  value      text not null,
+  updated_at timestamptz not null default now()
+);
+alter table platform_secrets enable row level security;
+
+create or replace function set_owner_password(p_password text) returns void as $$
+  insert into platform_secrets (key, value)
+  values ('owner_password', crypt(p_password, gen_salt('bf', 10)))
+  on conflict (key) do update set value = excluded.value, updated_at = now();
+$$ language sql security definer;
+
+-- Absent credential = no. A missing row must never read as "anyone may look",
+-- which is what `=` against NULL would quietly do inside a looser query.
+create or replace function verify_owner(p_password text) returns boolean as $$
+  select exists (
+    select 1 from platform_secrets
+     where key = 'owner_password' and value = crypt(p_password, value));
+$$ language sql security definer;
+
 -- ── shops ────────────────────────────────────────────────────
 -- orders.shop_id was a dangling text column: the server carried retail orders
 -- but had no idea who owned the shop on them, so the RLS below could not let a

@@ -175,3 +175,125 @@ do $$ begin
   assert (select beat()) is not null, 'FAILED: beat() did not return a timestamp';
   raise notice 'ok  beat() answers, so the free project stays awake';
 end $$;
+
+-- ── 8 · the server names the account, and never twice ────────
+-- The bug this replaces: nextCode() counted the accounts on ONE DEVICE, so two
+-- phones signing up at the same moment both produced C20262001.
+do $$
+declare a text; b text; c text; y int := extract(year from (now() at time zone 'Asia/Kolkata'))::int;
+begin
+  a := alloc_code('customer');
+  b := alloc_code('customer');
+  c := alloc_code('partner');
+  assert a <> b, 'FAILED: alloc_code handed out the same customer code twice';
+  assert a = 'C' || y || '2001', format('FAILED: first customer code was %s', a);
+  assert b = 'C' || y || '2002', format('FAILED: second customer code was %s', b);
+  assert c = 'P' || y || '2001', format('FAILED: partner sequence is not its own, got %s', c);
+  assert a ~ '^[CPS][0-9]{8}$', 'FAILED: alloc_code does not match the code format profiles enforces';
+  raise notice 'ok  the server names accounts, one sequence per role, never twice';
+end $$;
+
+-- A thousand of them, because "unique" is a claim about collisions and three
+-- calls cannot see one.
+do $$
+declare seen int; last text;
+begin
+  -- Collect every code a thousand calls produce and count the DISTINCT ones.
+  -- Counting the counter would only prove the counter moved; counting the
+  -- codes proves no two callers were handed the same name.
+  create temp table alloc_probe (code text) on commit drop;
+  insert into alloc_probe select alloc_code('shop') from generate_series(1, 1000);
+  select count(distinct code) into seen from alloc_probe;
+  assert seen = 1000, format('FAILED: 1000 allocations produced only %s distinct codes', seen);
+  select max(code) into last from alloc_probe;
+  assert last = 'S' || extract(year from (now() at time zone 'Asia/Kolkata'))::int || '3000',
+    format('FAILED: the thousandth shop code was %s', last);
+  raise notice 'ok  a thousand allocations produced a thousand different codes';
+end $$;
+
+-- ── 9 · an account no longer needs a Supabase Auth user ──────
+do $$ begin
+  insert into profiles (code, role, name, mobile, pass_hash, pass_salt)
+    values ('C20269901', 'customer', 'Server Named', '9888800001', 'deadbeef', 'cafe');
+  assert (select count(*) from profiles where code = 'C20269901') = 1,
+    'FAILED: a profile could not be created without an auth.users row';
+  raise notice 'ok  the Worker owns identity — no auth.users row required';
+end $$;
+
+-- ── 10 · one number, one account of a kind, ACROSS devices ───
+do $$ begin
+  begin
+    insert into profiles (code, role, name, mobile, pass_hash, pass_salt)
+      values ('C20269902', 'customer', 'Same Number', '9888800001', 'deadbeef', 'cafe');
+    raise exception 'FAILED: the same number opened two customer accounts';
+  exception when unique_violation then
+    raise notice 'ok  one number holds one account per role, enforced by the database';
+  end;
+  -- the same number MAY hold a different kind of account
+  insert into profiles (code, role, name, mobile, pass_hash, pass_salt)
+    values ('P20269901', 'partner', 'Same Number', '9888800001', 'deadbeef', 'cafe');
+  raise notice 'ok  and the same number may still hold a pro account beside it';
+end $$;
+
+-- ── 11 · the credential is never selectable by a signed-out caller ──
+begin;
+  set local role app_user;
+  set local "test.uid" = '';
+  do $$ begin
+    assert (select count(*) from profiles) = 0, 'FAILED: profiles are readable signed out';
+    raise notice 'ok  nobody signed out can read an account, let alone its salt';
+  end $$;
+rollback;
+
+-- ── 12 · the credential is checked in the database ───────────
+-- This moved here because a Cloudflare Worker on the free plan gets 10ms of
+-- CPU and PBKDF2 at 250,000 rounds needs roughly ten times that: every signup
+-- returned 1101. bcrypt in Postgres costs the Worker nothing.
+do $$
+declare made json; opened json; acct text;   -- not `code`: it shadows the column
+begin
+  made := create_account('customer', 'Asha Verified', '9777700001', 'Kukatpally', 'Kukatpally-7731');
+  acct := made->>'code';
+  assert acct ~ '^C[0-9]{8}$', format('FAILED: create_account named the account %s', acct);
+  assert made::text not like '%pass_hash%', 'FAILED: create_account returned the credential';
+  assert made::text not like '%Kukatpally-7731%', 'FAILED: create_account echoed the password back';
+
+  -- what is actually stored is a bcrypt hash, not the password
+  assert (select p.pass_hash from profiles p where p.code = acct) <> 'Kukatpally-7731',
+    'FAILED: the password was stored as itself';
+  assert (select p.pass_hash from profiles p where p.code = acct) like '$2%',
+    'FAILED: the stored credential is not a bcrypt hash';
+
+  opened := verify_account(acct, 'Kukatpally-7731');
+  assert json_array_length(opened) = 1, 'FAILED: the right password did not open the account';
+  assert opened::text not like '%pass_hash%', 'FAILED: verify_account returned the credential';
+  raise notice 'ok  the database hashes the password and the hash never comes back out';
+
+  assert json_array_length(verify_account(acct, 'wrong-password')) = 0,
+    'FAILED: a wrong password opened the account';
+  assert json_array_length(verify_account('C20269998', 'Kukatpally-7731')) = 0,
+    'FAILED: an account that does not exist opened';
+  raise notice 'ok  a wrong password and a missing account both open nothing';
+
+  -- one number, two kinds, and the password picks which
+  perform create_account('partner', 'Asha Verified', '9777700001', 'Kukatpally', 'Plumber-8821');
+  assert json_array_length(verify_account('9777700001', 'Plumber-8821')) = 1,
+    'FAILED: signing in by number did not find the pro account';
+  assert verify_account('9777700001', 'Plumber-8821')->0->>'role' = 'partner',
+    'FAILED: the wrong one of the two accounts was opened';
+  raise notice 'ok  one number, two accounts, and the password decides which opens';
+end $$;
+
+-- ── 13 · the owner's roster credential ───────────────────────
+do $$ begin
+  assert verify_owner('anything') = false,
+    'FAILED: the roster was open before an owner password was ever set';
+  raise notice 'ok  with no owner password set, nobody is the owner';
+
+  perform set_owner_password('the-owner-password');
+  assert verify_owner('the-owner-password') = true, 'FAILED: the owner password does not verify';
+  assert verify_owner('not-it') = false, 'FAILED: a wrong owner password verified';
+  assert (select value from platform_secrets where key = 'owner_password') like '$2%',
+    'FAILED: the owner password is not stored as a bcrypt hash';
+  raise notice 'ok  the owner is checked the same way everybody else is';
+end $$;

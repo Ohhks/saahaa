@@ -7,6 +7,9 @@
  *
  * ENDPOINTS
  *   GET  /api/health          — liveness, and the Supabase keep-alive target
+ *   POST /api/accounts/signup — the server names the account and keeps it
+ *   POST /api/accounts/signin — verify a password from any device
+ *   POST /api/accounts/roster — the owner console's roster   [owner password]
  *   POST /api/claim           — she says she has paid (validated, deduped)
  *   POST /api/pro-check       — he says he saw it
  *   POST /api/clear           — an admin matched the statement  [admin only]
@@ -14,7 +17,10 @@
  *   POST /api/hooks/psp       — the future PSP callback, same verification
  *
  * SECRETS (wrangler secret put ...): SUPABASE_URL, SUPABASE_SERVICE_KEY,
- * HOOK_SECRET, ADMIN_CODES. None of these may ever appear in the repo.
+ * HOOK_SECRET, ADMIN_CODES. The owner's roster password is NOT a
+ * Worker secret: it is a bcrypt hash in the database (set_owner_password), so
+ * nothing here can compute, compare or leak it. None of these may ever appear
+ * in the repo.
  */
 
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
@@ -92,6 +98,34 @@ async function whoami(request, env) {
 const isAdmin = (env, me) =>
   !!me && (me.role === 'admin'
     || String(env.ADMIN_CODES || '').split(',').map(s => s.trim()).includes(me.code));
+
+
+/* ── validation, and nothing else ────────────────────────────
+   THE PASSWORD IS NOT HASHED HERE, AND THAT IS THE POINT. It was, briefly:
+   PBKDF2-SHA256 at 250,000 rounds to match core/security.js. A Cloudflare
+   Worker on the free plan gets **10ms of CPU**, that derivation needs roughly
+   ten times it, and every signup and sign-in died as exception 1101 — a bare
+   500 on the one path a new customer has to walk. docs/FREE-TIER.md names CPU
+   as the limit most likely to bite; this was it biting.
+
+   So the credential is created and checked by Postgres (bcrypt, via pgcrypto),
+   and this Worker only passes the password through and forgets it. Waiting on
+   the database is I/O, not CPU, so it costs nothing against the budget. */
+const MOBILE_RE = /^[6-9][0-9]{9}$/;
+const ROLES = new Set(['customer', 'partner', 'shop']);
+
+/* WHAT AN ACCOUNT LOOKS LIKE ON THE WAY OUT — named fields, never a delete
+   list, because a row gains columns over time and a delete list starts leaking
+   the day somebody adds one. The two account functions already return exactly
+   this shape; the roster builds it from a narrowed select. */
+const publicAccount = r => ({
+  code: r.code, role: r.role, name: r.name,
+  mobile: r.mobile, area: r.area, createdAt: r.created_at || r.createdAt,
+});
+
+/** Call a Postgres function. The body is its named arguments. */
+const rpc = (env, fn, args) =>
+  db(env, 'rpc/' + fn, { method: 'POST', body: JSON.stringify(args) });
 
 export default {
   async fetch(request, env, ctx) {
@@ -196,6 +230,80 @@ export default {
           cleared_by: me.code, cleared_at: new Date().toISOString() }) });
       if (!r.ok) return json({ ok: false, reason: 'the leg is posted but the row did not mark' }, 500);
       return json({ ok: true, seen, short });
+    }
+
+    // ── accounts: the server names them, and keeps them ──────
+    // WHY THE SERVER. domain/identity.js chose the next code from the accounts
+    // on THAT DEVICE, so two phones both minted C20262001 and neither could see
+    // the other's customers — which is exactly what the owner console was
+    // reporting when it showed an empty roster while people were signing up.
+    if (path === '/api/accounts/signup' && request.method === 'POST') {
+      const b = await request.json().catch(() => ({}));
+      const role = String(b.role || 'customer');
+      const name = String(b.name || '').trim();
+      const mobile = String(b.mobile || '').replace(/\s+/g, '');
+      const area = String(b.area || '').slice(0, 40);
+      const password = String(b.password || '');
+
+      if (!ROLES.has(role)) return json({ ok: false, reason: 'unknown kind of account' }, 400);
+      if (name.length < 1 || name.length > 80) return json({ ok: false, reason: 'a name is needed' }, 400);
+      if (!MOBILE_RE.test(mobile)) return json({ ok: false, reason: 'that is not an Indian mobile number' }, 400);
+      if (password.length < 8) return json({ ok: false, reason: 'a password needs at least 8 characters' }, 400);
+
+      // One statement in the database: the code is allocated under a row lock
+      // and the account is written with it, so two devices racing get 2001 and
+      // 2002 rather than one name twice.
+      const made = await rpc(env, 'create_account', {
+        p_role: role, p_name: name, p_mobile: mobile, p_area: area, p_password: password });
+      if (!made.ok) {
+        // THE DATABASE DECIDES WHETHER THE NUMBER IS FREE, not a SELECT before
+        // this one — two devices can both pass a check and both insert.
+        const text = JSON.stringify(made.body || '');
+        const dup = made.status === 409 || text.includes('23505') || text.includes('duplicate key');
+        return json({ ok: false, reason: dup
+          ? 'That number already has an account of this kind. Sign in instead.'
+          : 'could not open the account' }, dup ? 409 : 500);
+      }
+      return json({ ok: true, account: made.body });
+    }
+
+    // ── sign in, from any device ─────────────────────────────
+    if (path === '/api/accounts/signin' && request.method === 'POST') {
+      const b = await request.json().catch(() => ({}));
+      const ident = String(b.ident || '').replace(/[\s-]/g, '');
+      const password = String(b.password || '');
+      if (!ident || !password) return json({ ok: false, reason: 'sign-in needs an ID or number, and a password' }, 400);
+
+      // EVERY CANDIDATE IS CHECKED, AND THE SAME ANSWER COMES BACK EITHER WAY.
+      // One number can hold a customer account and a pro account, so a failure
+      // must not be decided on the first row; and separating "no such account"
+      // from "wrong password" would turn this into a directory of who is
+      // registered. verify_account answers with the accounts the password
+      // opens, which is none of them or some of them.
+      const got = await rpc(env, 'verify_account', { p_ident: ident, p_password: password });
+      const accounts = (got.ok && Array.isArray(got.body)) ? got.body : [];
+      if (!accounts.length) return json({ ok: false, reason: 'That ID or number and password do not match.' }, 401);
+      return json({ ok: true, accounts });
+    }
+
+    // ── the roster the owner console shows ───────────────────
+    // POST, not GET: the owner's password is in the body, and a password in a
+    // query string is a password in a proxy log and in browser history.
+    if (path === '/api/accounts/roster' && request.method === 'POST') {
+      const b = await request.json().catch(() => ({}));
+      const who = await rpc(env, 'verify_owner', { p_password: String(b.password || '') });
+      if (!who.ok || who.body !== true) {
+        return json({ ok: false, reason: 'admins only' }, 403);
+      }
+      const rows = await db(env, 'profiles?select=code,role,name,mobile,area,created_at&order=created_at.desc&limit=2000');
+      if (!rows.ok) return json({ ok: false, reason: 'could not read the roster' }, 500);
+      const list = (rows.body || []).map(publicAccount);
+      return json({ ok: true, accounts: list, counts: {
+        total: list.length,
+        customer: list.filter(a => a.role === 'customer').length,
+        partner: list.filter(a => a.role === 'partner').length,
+        shop: list.filter(a => a.role === 'shop').length,
+      } });
     }
 
     // ── webhooks in ──────────────────────────────────────────

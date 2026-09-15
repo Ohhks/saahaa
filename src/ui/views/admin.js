@@ -30,6 +30,7 @@ import { ctx, getState, dispatch } from '../../core/ctx.js';
 import * as PAY from '../../domain/payments.js';
 import { get, namespaces, count } from '../../core/registry.js';
 import * as adminauth from '../../core/adminauth.js';
+import * as rail from '../../net/rail.js';
 import * as audit from '../../core/audit.js';
 import * as flags from '../../core/flags.js';
 import * as persist from '../../core/persist.js';
@@ -840,6 +841,77 @@ function disputes(st) {
   }).join('') : empty('No open disputes.')}</div></div>`;
 }
 
+
+/* ── the platform roster ──────────────────────────────────────
+   WHAT WAS WRONG. This console listed `st.users` — the accounts in the OWNER'S
+   OWN BROWSER. On the owner's laptop that is an empty list, so people signed up
+   all day and the console reported nothing, which is exactly what it was told.
+   It was never a reporting bug; there was no shared place for an account to be.
+
+   Now there is, and the Worker is the only thing that can read it (the browser
+   holds no service key and RLS refuses an anonymous caller — supabase/schema.sql
+   proves that). The owner's password is the proof of who is asking. */
+let rosterData = null;
+let rosterErr = '';
+let rosterBusy = false;
+let rosterTried = false;
+
+export async function loadRoster() {
+  if (rosterBusy) return;
+  const secret = adminauth.ownerSecret();
+  if (!rail.isConfigured()) { rosterErr = 'No server is configured for this build.'; ctx.render(); return; }
+  if (!secret) {
+    /* A REFRESH LOSES THE PASSWORD ON PURPOSE — it is held in memory and
+       nowhere else. Say so, rather than showing an empty table that looks
+       exactly like "nobody has signed up". */
+    rosterErr = 'Sign in to the console again to load the roster — your password is kept in memory only.';
+    ctx.render(); return;
+  }
+  rosterBusy = true; rosterErr = ''; ctx.render();
+  try {
+    rosterData = await rail.roster(secret);
+  } catch (err) {
+    rosterData = null;
+    rosterErr = (err && err.message) || 'Could not read the roster.';
+  } finally {
+    rosterBusy = false; rosterTried = true; ctx.render();
+  }
+}
+
+/** The table of everybody, with the device's own list named for what it is. */
+function platformRoster(st) {
+  if (!rail.isConfigured()) return '';
+  /* One automatic attempt when the tab is first opened; after that it is the
+     owner's to ask for, so a failing network cannot spin on every repaint. */
+  if (!rosterTried && !rosterBusy && !rosterErr && adminauth.ownerSecret()) {
+    rosterTried = true;
+    Promise.resolve().then(loadRoster);
+  }
+  const c = (rosterData && rosterData.counts) || {};
+  const rows = (rosterData && rosterData.accounts) || [];
+  const localOnly = st.users.filter(u => !rows.some(a => a.code === u.code)).length;
+
+  return `
+  <div class="sec">${secHead(`Everyone on SAAHAA · ${rosterData ? c.total : '—'}`,
+      `<button class="btn btn--ghost btn--sm" data-act="admin.roster.load"${rosterBusy ? ' disabled' : ''}>
+         ${rosterBusy ? 'Loading…' : 'Refresh'}</button>`)}
+    <p class="tiny muted" style="margin-bottom:12px">
+      Every account on the platform, read from the server &mdash; not from this browser.
+      ${rosterData ? `${c.customer} customer${c.customer === 1 ? '' : 's'} &middot; ${c.partner} pro${c.partner === 1 ? '' : 's'} &middot; ${c.shop} shop${c.shop === 1 ? '' : 's'}.` : ''}
+      ${localOnly ? `<b>${localOnly}</b> account${localOnly === 1 ? '' : 's'} on this device ${localOnly === 1 ? 'is' : 'are'} not on the server &mdash; opened before the server existed, or while it was unreachable.` : ''}
+    </p>
+    ${rosterErr ? `<p class="tiny" style="color:var(--bad)">${esc(rosterErr)}</p>` : ''}
+    ${table(['Name', 'ID', 'Kind', 'Mobile', 'Area', 'Opened'], rows.map(a => `<tr>
+      <td class="nowrap"><b>${esc(a.name || '')}</b></td>
+      <td class="nowrap"><span class="num" style="letter-spacing:.08em">${esc(a.code)}</span></td>
+      <td class="nowrap">${esc(a.role === 'partner' ? 'Pro' : a.role === 'shop' ? 'Shop' : 'Customer')}</td>
+      <td class="nowrap muted">${esc(a.mobile || '')}</td>
+      <td>${esc(a.area || '')}</td>
+      <td class="nowrap muted">${a.createdAt ? esc(new Date(a.createdAt).toLocaleDateString('en-IN')) : ''}</td>
+      </tr>`).join(''),
+      rosterBusy ? 'Reading the roster…' : 'No accounts on the server yet.')}</div>`;
+}
+
 /* ── 5. PEOPLE ────────────────────────────────────────────── */
 function people(st) {
   const customers = st.users.filter(u => u.role === 'customer');
@@ -848,6 +920,8 @@ function people(st) {
          'suspend, ban, promote or demote a tier, waive a strike, adjust a wallet with a reason')}
 
   ${flowBlock(st)}
+
+  ${platformRoster(st)}
 
   <div class="sec">${secHead(`Pros · ${st.partners.length}`,
       `<span class="avatars">${st.partners.slice(0, 6).map(p => avatar(p.name)).join('')}</span>`)}

@@ -582,6 +582,7 @@ function wireActions() {
   A('pay.admin.reject', d => { PAY.adminClear(d.id, { ok: false, note: 'not in the statement' }); toast('Rejected', 'warn'); render(); });
 
   A('admin.reset', d => admin.resetPassword && admin.resetPassword(d.key));
+  A('admin.roster.load', () => admin.loadRoster && admin.loadRoster());
 
   A('account.erase', () => {
     const s = me();

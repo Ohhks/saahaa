@@ -165,6 +165,21 @@ print(next((r['api_key'] for r in rows if r.get('name')=='service_role'), ''))")
   # bundle knows its own project.
   python tools/setup-supabase.py --url "$SUPABASE_URL" --anon "$SUPABASE_ANON_KEY"     || die "could not bake the anon key into the build"
 
+  # The owner console reads the platform roster through the Worker, and the
+  # Worker asks Postgres whether the password it was given is the owner's.
+  # That hash has to be planted once. Optional on purpose: without it the
+  # roster refuses everybody, which is the safe way to be unconfigured.
+  if [ -n "${ADMIN_PASSWORD:-}" ]; then
+    if npx --yes supabase@latest db query --linked --project-ref "$ref" "select set_owner_password('$(printf %s "$ADMIN_PASSWORD" | sed "s/'/''/g")');" >/dev/null 2>&1; then
+      grn "  ok  the owner console can read the roster"
+    else
+      red "  x   could not set the owner password — the roster will refuse the console"
+    fi
+  else
+    echo "  .   no ADMIN_PASSWORD in .env.deploy — the console roster will answer"
+    echo "      \"admins only\" until you add your console password there and re-run"
+  fi
+
   deploy_worker
   deploy_pages
   check
@@ -326,6 +341,12 @@ deploy_worker() {
   put SUPABASE_SERVICE_KEY  "$SUPABASE_SERVICE_KEY"
   put HOOK_SECRET           "$HOOK_SECRET"
   put ADMIN_CODES           "${ADMIN_CODES:-}"
+
+  # THE OWNER'S ROSTER PASSWORD IS NOT A WORKER SECRET. It was, briefly, as a
+  # PBKDF2 salt+hash the Worker compared against — until the free plan's 10ms
+  # of CPU turned every comparison into a 1101. It is a bcrypt hash in the
+  # database now (set_owner_password), so nothing in the Worker can compute,
+  # compare or leak it. Seeded below, from .env.deploy, only if given.
   [ -n "${NOTIFY_URL:-}" ] && put NOTIFY_URL "$NOTIFY_URL"
 
   # -c EXPLICITLY. A stray wrangler.jsonc at the repo root — left by a

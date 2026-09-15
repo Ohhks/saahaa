@@ -56,6 +56,33 @@ export function clearSupabaseConfig() {
 }
 export const hasSupabase = () => { const c = supabaseConfig(); return !!(c.url && c.anonKey); };
 
+/* ── the rail: the Worker that owns identity ────────────────────
+   WHY THERE IS A SERVER IN AN OFFLINE-FIRST APP AT ALL. Two things cannot be
+   decided on a device and were being decided on one: the next account code
+   (domain/identity.js counted the accounts it could see, so two phones both
+   minted C20262001), and whether a mobile number is already taken. Both need a
+   single writer. The Worker is that writer; it holds the service-role key and
+   the browser holds none.
+
+   Everything else stays exactly where it was. The device is still the working
+   copy, still renders offline, still owns its own session.
+
+   Override for a fork or a local Worker: ?rail=https://…  (stored per device),
+   or ?rail=off to run the old device-only way. */
+const BAKED_RAIL = 'https://saahaa-api.siidhartha12.workers.dev';
+const KEY_RAIL = 'SAAHAA_RAIL';
+
+export function railUrl() {
+  try {
+    const q = new URLSearchParams(location.search).get('rail');
+    if (q) persist.write(KEY_RAIL, q === 'off' ? '' : q.replace(/\/+$/, ''));
+  } catch (e) {}
+  const saved = persist.read(KEY_RAIL, null);
+  return String(saved === null ? BAKED_RAIL : saved).replace(/\/+$/, '');
+}
+export const hasRail = () => !!railUrl();
+export const setRailUrl = u => persist.write(KEY_RAIL, String(u || '').replace(/\/+$/, ''));
+
 /* Which backend the app runs against.
    'auto'  — use Supabase when configured and reachable, otherwise local
    'local' — never touch the network (the demo/offline mode)

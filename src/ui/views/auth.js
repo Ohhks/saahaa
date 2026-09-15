@@ -38,6 +38,7 @@
 
 import { mount, esc, toast, sheet, delegate } from '../dom.js';
 import * as ID from '../../domain/identity.js';
+import * as rail from '../../net/rail.js';
 import { liveMarkup, AGG_COMMISSION, RETAIL_FEE_FLOOR, RIDER_DISPATCH_CUT } from '../../domain/pricing.js';
 import { FREE_FIRST_ORDERS } from '../../domain/flow.js';
 import { MIN_STAKE, MAX_STAKE, STAKE_PCT } from '../../domain/wallet.js';
@@ -688,13 +689,76 @@ export function choosePlace(d) {
 /* ── handlers ──────────────────────────────────────────────── */
 const val = id => (document.getElementById(id) || {}).value || '';
 
+
+/* A device that has never seen this account, and the account is real.
+   ------------------------------------------------------------------
+   Identity lives on the server now, so "no account on that number" is only
+   ever a statement about THIS PHONE. Ask the Worker before saying it out loud.
+
+   What comes back is the account, never its credential — so the password just
+   typed (and proved correct by the server) is what gets hashed and stored here,
+   which is what lets the same phone sign in again with no signal at all.
+
+   WHAT DOES NOT COME WITH IT: orders, wallet, ledger and history are still the
+   device's. This adopts the identity, not the past. */
+async function adoptAccounts(typed, pw) {
+  let accounts;
+  try {
+    accounts = await rail.signIn({ ident: typed, password: pw });
+  } catch (err) {
+    /* Offline is not a wrong password. Saying "wrong password" to somebody on
+       a train would be a lie, and they would change a password that was right. */
+    if (err && err.offline) toast(err.message, 'warn');
+    return [];
+  }
+  const cred = await security.hashPassword(pw);
+  const made = [];
+  for (const a of accounts) {
+    if (getState().users.some(u => u.key === a.code)) continue;
+    const user = {
+      key: a.code, code: a.code, id: nid('u'),
+      name: a.name, mobile: a.mobile, role: a.role, area: a.area || '',
+      ...cred, tier: a.role === 'customer' ? 1 : 0,
+      createdAt: Date.parse(a.createdAt || '') || Date.now(),
+    };
+    /* A pro or a shop is two rows, not one — every screen on the working side
+       reads the partner/shop row, and a user pointing at nothing renders an
+       error page the first time they open their own console. */
+    if (a.role === 'partner') {
+      const pid = nid('p');
+      user.partnerId = pid;
+      dispatch({ type: 'partner/add', payload: {
+        id: pid, userKey: a.code, name: a.name, mobile: a.mobile, cat: 'repair',
+        ask: toPaise(500), area: a.area || '', loc: null, tier: 0, online: false,
+        completed: 0, starts: 0, onTimeStarts: 0, ratings: [], lastActiveTs: Date.now(),
+        verification: { steps: {}, attempts: {} } } });
+    }
+    if (a.role === 'shop') {
+      const sid = nid('s');
+      user.shopId = sid;
+      dispatch({ type: 'shop/add', payload: {
+        id: sid, ownerKey: a.code, name: a.name, catId: 'kirana', area: a.area || '',
+        loc: null, mobile: a.mobile, photo: '', prepMins: 20, radiusKm: 3,
+        status: 'active', isOpen: true, minOrder: toPaise(149),
+        freeDeliveryAbove: toPaise(499), deliveryMode: 'both', selfDeliveryFee: toPaise(25),
+        fillRate: 100, ratingAvg: 0, ratingCount: 0, ordersCompleted: 0, badges: [],
+        upi: '', fssai: '', drugLicence: '', onboardedAt: Date.now() } });
+    }
+    dispatch({ type: 'user/add', payload: user });
+    audit.record('user.adopted', { key: a.code, role: a.role }, a.code);
+    made.push(user);
+  }
+  if (!made.length) return getState().users.filter(u => accounts.some(a => a.code === u.key));
+  return made;
+}
+
 export async function doLogin(pickedKey = null) {
   const typed = val('lgMobile').trim(), pw = val('lgPass');
   if (!typed) { toast('Enter your mobile number or your SAAHAA ID', 'danger'); return; }
 
   /* A code names ONE account; a number may now carry several — a plumber who
      also buys groceries holds a C... and a P.... Both resolve here. */
-  const r = ID.resolve(typed, getState().users);
+  let r = ID.resolve(typed, getState().users);
   if (r.kind === 'unknown') { toast('That is not a 10-digit number or a SAAHAA ID', 'danger'); return; }
 
   /* Unlimited guesses against a 4-digit-thinking population is not a login
@@ -704,6 +768,14 @@ export async function doLogin(pickedKey = null) {
   const gate = loginGate(gateKey);
   if (gate.blocked) {
     toast(`Too many attempts — try again in ${Math.ceil(gate.waitMs / 1000)}s`, 'danger'); return;
+  }
+
+  /* THIS PHONE HAS NEVER SEEN THE ACCOUNT — WHICH IS NOT THE SAME AS THERE
+     NOT BEING ONE. Before 8.12 that distinction did not exist, because there
+     was nowhere else an account could live. */
+  if (!r.matches.length && rail.isConfigured()) {
+    const adopted = await adoptAccounts(typed, pw);
+    if (adopted.length) r = { ...r, matches: adopted };
   }
 
   if (!r.matches.length) {
@@ -853,8 +925,32 @@ export async function doSignup() {
     toast(`This number already has a ${(ID.ROLE_LABEL[role] || role).toLowerCase()} account (${clash.code || 'existing'}) \u2014 sign in instead`, 'danger');
     return;
   }
-  const key = ID.nextCode(role, getState().users);
-  const code = key;
+  /* THE SERVER NAMES THE ACCOUNT. ID.nextCode() reads the accounts on THIS
+     DEVICE, which is a correct answer to the wrong question: a fresh phone
+     sees an empty list and confidently mints C20262001 — and so does the
+     next one. The clash check above has the same flaw, because a number free
+     on this phone may be taken on another; both are the Worker's to decide
+     when there is one, and a partial unique index refuses the duplicate
+     rather than a SELECT that two devices can pass at once.
+
+     FAIL CLOSED. If the rail is configured and cannot be reached we do NOT
+     fall back to a local code: that mints a name the server may hand to
+     somebody else tomorrow, and tells this person they have an account when
+     only their phone thinks so. Signing up is a one-off, online moment;
+     everything the pro does afterwards still works with no signal at all. */
+  let key, code;
+  if (rail.isConfigured()) {
+    try {
+      const acct = await rail.signUp({ role, name, mobile, area, password: pw });
+      key = acct.code; code = acct.code;
+    } catch (err) {
+      toast(err && err.message ? err.message : 'Could not create the account', 'danger');
+      return;
+    }
+  } else {
+    key = ID.nextCode(role, getState().users);
+    code = key;
+  }
 
   const cred = await security.hashPassword(pw);   // salted PBKDF2, never a bare sha256
   const id = nid('u');

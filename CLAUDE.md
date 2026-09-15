@@ -77,6 +77,24 @@ threshold to make a change pass.
 One permanent code per person: `C20262001` / `P20262001` / `S20262001`. It signs
 them in **and** is the door code. **There is no SMS rail and never will be.**
 
+**THE SERVER NAMES THE ACCOUNT, since 8.12.** `ID.nextCode()` counted the
+accounts on the device, so two phones both minted `C20262001` and the owner
+console — reading that same local list — showed no customers while people were
+signing up. Signup and sign-in now go through `net/rail.js` → the Worker →
+`create_account` / `verify_account` in Postgres. `alloc_code` moves the counter
+under a row lock, and a partial unique index on `(role, mobile)` refuses a
+duplicate number; neither can be decided on one device.
+
+**The credential is bcrypt IN POSTGRES, not PBKDF2 in the Worker.** It was
+PBKDF2 at 250,000 rounds to match `core/security.js` — and a free-plan Worker
+gets **10ms of CPU**, so every signup returned exception 1101. Anything
+password-shaped belongs in `pgcrypto`, where the Worker is waiting on I/O
+rather than burning CPU.
+
+Signup **fails closed**: if the rail is configured and unreachable, no account
+is made. A local code would be a name the server may hand to somebody else.
+Everything after signup still works offline — this is identity, not orders.
+
 ## Payments — the live rail is manual UPI
 
 Customer pays `saahaa@ptyes` → types the 12-digit UTR → **the pro confirms** (job

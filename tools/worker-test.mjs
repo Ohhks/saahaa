@@ -14,6 +14,11 @@ const ENV = {
   ADMIN_CODES: 'C20262001',
 };
 
+/* The owner's password. The Worker does not hash it — Postgres does, because
+   a Worker on the free plan gets 10ms of CPU and bcrypt does not fit in it.
+   The stub below stands in for verify_owner. */
+const OWNER_PW = 'the-owner-password';
+
 let pass = 0; const fails = [];
 const say = (c, what, d = '') => { if (c) { pass++; console.log('  ok   ' + what); }
   else { fails.push(what); console.log('      x ' + what + (d ? '  — ' + d : '')); } };
@@ -27,6 +32,9 @@ let state = {
   user: { id: 'u1' },
   profile: { code: 'C20262006', role: 'customer' },
   insertFails409: false,
+  profileInsert409: false,
+  nextCode: 'C20262001',
+  accounts: [],
 };
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url); const method = (init.method || 'GET').toUpperCase();
@@ -38,7 +46,41 @@ globalThis.fetch = async (url, init = {}) => {
     const auth = (init.headers || {}).authorization || '';
     return auth.includes('good-token') ? J(state.user) : { ok: false, status: 401, text: async () => '', json: async () => ({}) };
   }
-  if (u.includes('/rest/v1/profiles')) return J([state.profile]);
+  /* The account functions live in Postgres now — the Worker only passes the
+     password through, so the stub is where a password is "checked". */
+  if (u.includes('/rest/v1/rpc/create_account')) {
+    if (state.profileInsert409) return { ok: false, status: 409,
+      text: async () => JSON.stringify({ code: '23505' }), json: async () => ({ code: '23505' }) };
+    const a = JSON.parse(init.body);
+    const row = { code: state.nextCode, role: a.p_role, name: a.p_name,
+                  mobile: a.p_mobile, area: a.p_area, createdAt: '2026-09-16T00:00:00Z' };
+    state.accounts.push({ ...row, created_at: row.createdAt, password: a.p_password });
+    return J(row);
+  }
+  if (u.includes('/rest/v1/rpc/verify_account')) {
+    const a = JSON.parse(init.body);
+    const id = String(a.p_ident || '');
+    return J(state.accounts
+      .filter(x => (x.code === id.toUpperCase() || x.mobile === id) && x.password === a.p_password)
+      .map(({ password, created_at, ...rest }) => rest));
+  }
+  if (u.includes('/rest/v1/rpc/verify_owner')) {
+    return J(JSON.parse(init.body).p_password === OWNER_PW);
+  }
+  if (u.includes('/rest/v1/profiles')) {
+    if (method === 'POST') {
+      if (state.profileInsert409) return { ok: false, status: 409,
+        text: async () => JSON.stringify({ code: '23505' }), json: async () => ({ code: '23505' }) };
+      const row = { ...JSON.parse(init.body), created_at: '2026-09-16T00:00:00Z' };
+      state.accounts.push(row);
+      return J([row]);
+    }
+    /* whoami asks by id; signup/signin/roster ask by code, mobile or for all */
+    if (u.includes('id=eq.')) return J([state.profile]);
+    if (u.includes('code=eq.')) return J(state.accounts.filter(a => u.includes(a.code)));
+    if (u.includes('mobile=eq.')) return J(state.accounts.filter(a => u.includes(a.mobile)));
+    return J(state.accounts);
+  }
   if (u.includes('/rest/v1/orders'))   return J([state.order]);
   if (u.includes('/rest/v1/rpc/beat')) return J(new Date().toISOString());
   if (u.includes('/rest/v1/payments')) {
@@ -59,7 +101,11 @@ globalThis.fetch = async (url, init = {}) => {
   return J({});
 };
 
-const { default: worker } = await import(new URL('../worker/index.js', import.meta.url).href);
+const workerUrl = new URL('../worker/index.js', import.meta.url);
+/* Read as text as well as imported: one assertion below is about what the
+   Worker does NOT contain, and that cannot be asked of a module object. */
+const workerSource = (await import('node:fs')).readFileSync(workerUrl, 'utf8');
+const { default: worker } = await import(workerUrl.href);
 const ctx = { waitUntil() {} };
 const call = (path, { method = 'POST', body = {}, token = null, sig = null } = {}) => {
   const headers = { 'content-type': 'application/json' };
@@ -187,6 +233,86 @@ for (const bad of ['123', 'abcdefghijkl', '1234567890123', '']) {
   eq(r3.status, 200, 'a correctly signed webhook is accepted');
   const r4 = await call('/api/hooks/psp', { body: { event: 'payment.captured' }, sig: 'deadbeef' });
   eq(r4.status, 401, 'and the PSP endpoint refuses a bad signature the same way');
+}
+
+// ── accounts: the server names them, and the credential never leaves ──
+// The bug these guard: identity.js numbered accounts from the list on ONE
+// device, so two phones both minted C20262001 and the owner console — reading
+// that same local list — showed an empty roster while people signed up.
+{
+  console.log('\n  accounts\n');
+  const PW = 'Kukatpally-7731';
+  const hasCredential = o => JSON.stringify(o).match(/pass_hash|pass_salt|pass_iter/);
+
+  state.accounts = [];
+  state.nextCode = 'C20262001';
+
+  // what a signup must refuse before it reaches the database
+  eq((await call('/api/accounts/signup', { body: { role: 'wizard', name: 'X', mobile: '9876543210', password: PW } })).status,
+     400, 'a role that does not exist is refused');
+  eq((await call('/api/accounts/signup', { body: { role: 'customer', name: 'X', mobile: '12345', password: PW } })).status,
+     400, 'a number that is not an Indian mobile is refused');
+  eq((await call('/api/accounts/signup', { body: { role: 'customer', name: 'X', mobile: '9876543210', password: 'short' } })).status,
+     400, 'a password under eight characters is refused');
+  eq((await call('/api/accounts/signup', { body: { role: 'customer', name: '', mobile: '9876543210', password: PW } })).status,
+     400, 'an account with no name is refused');
+
+  const up = await call('/api/accounts/signup', {
+    body: { role: 'customer', name: 'Asha', mobile: '9876543210', area: 'Kukatpally', password: PW } });
+  const upb = await body(up);
+  eq(up.status, 200, 'a good signup is accepted');
+  eq(upb.account.code, 'C20262001', 'and the code comes from the SERVER, not the device');
+  say(!hasCredential(upb), 'the signup reply carries no hash, no salt and no iteration count');
+  say(state.accounts[0].password === PW,
+      'the Worker passes the password to Postgres rather than hashing it itself');
+  /* `deriveBits` and not /pbkdf2/i: the comment explaining why the derivation
+     was REMOVED says the word, and an assertion that fails on its own
+     explanation teaches the next person to delete the explanation. */
+  say(!/deriveBits/.test(workerSource),
+      'and derives no key itself — 250,000 rounds does not fit in 10ms of CPU');
+
+  // the database decides whether a number is free, not a SELECT before the insert
+  state.profileInsert409 = true;
+  const dup = await call('/api/accounts/signup', {
+    body: { role: 'customer', name: 'Asha Again', mobile: '9876543210', password: PW } });
+  eq(dup.status, 409, 'the same number cannot open a second account of one kind');
+  say(/[Ss]ign in instead/.test((await body(dup)).reason), 'and the person is told to sign in instead');
+  state.profileInsert409 = false;
+
+  // signing in from a device that has never seen this account
+  const inOk = await call('/api/accounts/signin', { body: { ident: 'C20262001', password: PW } });
+  const inb = await body(inOk);
+  eq(inOk.status, 200, 'a correct password signs in from any device');
+  eq(inb.accounts[0].code, 'C20262001', 'and the account comes back by its code');
+  say(!hasCredential(inb), 'the sign-in reply carries no credential either');
+
+  eq((await call('/api/accounts/signin', { body: { ident: 'C20262001', password: 'wrong-password' } })).status,
+     401, 'a wrong password does not sign in');
+  eq((await call('/api/accounts/signin', { body: { ident: 'C20269999', password: PW } })).status,
+     401, 'and an account that does not exist answers exactly the same way');
+  const unknown = await body(await call('/api/accounts/signin', { body: { ident: 'C20269999', password: PW } }));
+  const wrongpw = await body(await call('/api/accounts/signin', { body: { ident: 'C20262001', password: 'nope-nope' } }));
+  eq(unknown.reason, wrongpw.reason, 'the two are not distinguishable — this is not a directory of who is registered');
+
+  // one number, two kinds of account: both are checked, not just the first
+  state.nextCode = 'P20262001';
+  await call('/api/accounts/signup', {
+    body: { role: 'partner', name: 'Asha', mobile: '9876543210', password: 'Plumber-8821' } });
+  const byNumber = await body(await call('/api/accounts/signin', { body: { ident: '9876543210', password: 'Plumber-8821' } }));
+  eq(byNumber.accounts.length, 1, 'signing in by number finds the account the password opens');
+  eq(byNumber.accounts[0].role, 'partner', 'and it is the right one of the two on that number');
+
+  // the roster the owner console reads
+  eq((await call('/api/accounts/roster', { body: { password: 'not-the-owner' } })).status,
+     403, 'the roster refuses a wrong owner password');
+  eq((await call('/api/accounts/roster', { body: {} })).status,
+     403, 'and refuses no password at all');
+  const ros = await call('/api/accounts/roster', { body: { password: OWNER_PW } });
+  const rosb = await body(ros);
+  eq(ros.status, 200, 'the owner password opens the roster');
+  eq(rosb.counts.total, 2, 'which lists every account on the platform, not on one device');
+  eq(rosb.counts.partner, 1, 'counted by role');
+  say(!hasCredential(rosb), 'and still without a single credential field');
 }
 
 // ── unknown routes ───────────────────────────────────────────
