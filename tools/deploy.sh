@@ -55,6 +55,15 @@ set -a; . "$ENVF"; set +a
 
 need() { [ -n "${!1:-}" ] || die "$1 is not set in .env.deploy"; }
 
+# CLOUDFLARE IS AUTHORISED TWO WAYS AND ONLY ONE OF THEM IS A VARIABLE. An
+# OAuth grant from `wrangler login` lives in wrangler's own config, so demanding
+# CLOUDFLARE_API_TOKEN stopped a deploy that was already signed in.
+need_cloudflare() {
+  [ -n "${CLOUDFLARE_API_TOKEN:-}" ] && return 0
+  npx --yes wrangler whoami 2>&1 | grep -qi 'not authenticated'     && die "Cloudflare: set CLOUDFLARE_API_TOKEN in .env.deploy, or run npx wrangler login"
+  return 0
+}
+
 WORKER_NAME="$(sed -n 's/^name *= *"\(.*\)"/\1/p' worker/wrangler.toml)"
 PAGES_PROJECT="${PAGES_PROJECT:-saahaa}"
 
@@ -180,8 +189,16 @@ check_creds() {
   # guarded on the value being present, so with nothing filled in they all
   # skipped and it printed "every credential is what it says it is" over a
   # blank .env.deploy. Say what is missing first.
+  # WHAT IS REQUIRED DEPENDS ON HOW WE GOT HERE. --auto signs in through the
+  # CLIs themselves: Cloudflare is an OAuth grant, not an API token, and the
+  # database password is optional because the schema can be pasted into the SQL
+  # editor. Demanding the file's full set in that mode failed a deploy that had
+  # everything it actually needed.
+  local required="CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_KEY SUPABASE_DB_URL"
+  [ "$MODE" = "--auto" ] && required="SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_KEY"
+
   local missing=""
-  for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID SUPABASE_URL            SUPABASE_ANON_KEY SUPABASE_SERVICE_KEY SUPABASE_DB_URL; do
+  for v in $required; do
     [ -n "${!v:-}" ] || missing="$missing $v"
   done
   if [ -n "$missing" ]; then
@@ -225,10 +242,20 @@ check_creds() {
     esac
   fi
 
+  # EACH KEY IS CHECKED AGAINST AN ENDPOINT THAT ACCEPTS IT. /rest/v1/ is the
+  # PostgREST root and it answers "Only the `service_role` API key can be used
+  # for this endpoint" — so testing the anon key there reported a perfectly good
+  # key as a 401 and stopped the deploy. GoTrue's /auth/v1/settings is the anon
+  # key's endpoint; the REST root is the service key's.
   if [ -n "${SUPABASE_URL:-}" ] && [ -n "${SUPABASE_ANON_KEY:-}" ]; then
     local code
-    code=$(curl -s -o /dev/null --max-time 20 -w '%{http_code}'              "$SUPABASE_URL/rest/v1/" -H "apikey: $SUPABASE_ANON_KEY")
-    [ "$code" = "200" ] && grn "  ok  $SUPABASE_URL answers with that anon key"       || { red "  x   $SUPABASE_URL/rest/v1/ returned HTTP $code"; bad=1; }
+    code=$(curl -s -o /dev/null --max-time 20 -w '%{http_code}'              "$SUPABASE_URL/auth/v1/settings" -H "apikey: $SUPABASE_ANON_KEY")
+    [ "$code" = "200" ] && grn "  ok  the project answers to the anon key"       || { red "  x   $SUPABASE_URL/auth/v1/settings returned HTTP $code"; bad=1; }
+  fi
+  if [ -n "${SUPABASE_URL:-}" ] && [ -n "${SUPABASE_SERVICE_KEY:-}" ]; then
+    local code
+    code=$(curl -s -o /dev/null --max-time 20 -w '%{http_code}' "$SUPABASE_URL/rest/v1/"              -H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY")
+    [ "$code" = "200" ] && grn "  ok  the project answers to the service key"       || { red "  x   $SUPABASE_URL/rest/v1/ returned HTTP $code for the service key"; bad=1; }
   fi
 
   [ "$bad" = 0 ] || die "fix the credentials above — nothing has been changed"
@@ -271,8 +298,8 @@ deploy_db() {
 # ── the Worker ────────────────────────────────────────────────
 deploy_worker() {
   step "worker · $WORKER_NAME"
-  need CLOUDFLARE_API_TOKEN; need SUPABASE_URL; need SUPABASE_SERVICE_KEY
-  export CLOUDFLARE_API_TOKEN
+  need_cloudflare; need SUPABASE_URL; need SUPABASE_SERVICE_KEY
+  [ -n "${CLOUDFLARE_API_TOKEN:-}" ] && export CLOUDFLARE_API_TOKEN
   [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ] && export CLOUDFLARE_ACCOUNT_ID
 
   # A HOOK SECRET THAT IS EMPTY IS A WEBHOOK THAT ANYONE CAN FIRE. If one was
@@ -287,7 +314,13 @@ deploy_worker() {
 
   # Piped, never argv: a secret on a command line is a secret in the process
   # table and in your shell history.
-  put() { printf '%s' "$2" | (cd worker && npx --yes wrangler secret put "$1" >/dev/null 2>&1) \
+  # -c HERE TOO, AND THIS ONE WAS NOT COSMETIC. Without it the stray root
+  # wrangler.jsonc won the config lookup from inside worker/, and all four
+  # secrets — the service-role key among them — were written to the SITE
+  # Worker instead of the API one. Nothing was exposed (that Worker is
+  # assets-only and secrets are never served to a client), but saahaa-api came
+  # up with an empty environment and threw 1101 on its very first request.
+  put() { printf '%s' "$2" | (cd worker && npx --yes wrangler secret put "$1" -c wrangler.toml >/dev/null 2>&1) \
             && echo "  ok  secret $1" || die "could not set secret $1"; }
   put SUPABASE_URL          "$SUPABASE_URL"
   put SUPABASE_SERVICE_KEY  "$SUPABASE_SERVICE_KEY"
@@ -295,15 +328,19 @@ deploy_worker() {
   put ADMIN_CODES           "${ADMIN_CODES:-}"
   [ -n "${NOTIFY_URL:-}" ] && put NOTIFY_URL "$NOTIFY_URL"
 
-  (cd worker && npx --yes wrangler deploy) || die "wrangler deploy failed"
+  # -c EXPLICITLY. A stray wrangler.jsonc at the repo root — left by a
+  # hand-deploy, and carrying assets.directory "." — was picked up from inside
+  # worker/ and tried to upload the whole repository, .git pack files included,
+  # as the API Worker's static assets. Naming the config removes the guess.
+  (cd worker && npx --yes wrangler deploy -c wrangler.toml) || die "wrangler deploy failed"
   grn "  ok  worker deployed"
 }
 
 # ── the site ──────────────────────────────────────────────────
 deploy_pages() {
   step "pages · $PAGES_PROJECT"
-  need CLOUDFLARE_API_TOKEN
-  export CLOUDFLARE_API_TOKEN
+  need_cloudflare
+  [ -n "${CLOUDFLARE_API_TOKEN:-}" ] && export CLOUDFLARE_API_TOKEN
   [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ] && export CLOUDFLARE_ACCOUNT_ID
 
   # THE GATES RUN BEFORE THE UPLOAD, NOT AFTER. A bundle that fails preflight

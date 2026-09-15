@@ -22,3 +22,9 @@ Thumbs.db
 .dev.vars*
 !.dev.vars.example
 !.env.example
+
+# a hand-deploy leaves this behind, and it points assets at the repo root
+wrangler.jsonc
+
+# supabase CLI scratch
+supabase/.temp/

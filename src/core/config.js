@@ -21,8 +21,8 @@ import * as persist from './persist.js';
 const BAKED = {
   // Written by `python tools/setup-supabase.py`. Both values are public:
   // the anon key authorises nothing on its own — RLS decides access.
-  url: '',
-  anonKey: '',
+  url: 'https://pokoynttebwwswazrunw.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBva295bnR0ZWJ3d3N3YXpydW53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNjU0NDksImV4cCI6MjEwNDk0MTQ0OX0.IZaj34yrd0nTYhuU3t6sDCoeD1qwV3KYTx2K6QxeFE0',
 };
 
 const KEY_URL = 'SAAHAA_SB_URL';
