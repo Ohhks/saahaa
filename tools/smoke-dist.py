@@ -11,8 +11,16 @@ chips everywhere). Every static check passed. Only a browser could have seen it.
     python tools/smoke-dist.py <url>      checks a deployed site (post-deploy)
 
 Exit 0 = the bundle boots and paints the app. Exit 1 = it does not. Exit 2 =
-no browser found (CI runners have Chrome; a laptop without one gets a warning
-from preflight, not a pass).
+the question could not be asked: no browser, or the browser never answered.
+
+WHY A TIMEOUT IS A 2 AND NOT A 1. It was a 1, which made the deploy gate
+decorative in exactly the way deploy.yml's own header warns about — commit
+2939dc2 passed CI and failed deploy, the same script over the same bytes,
+because headless Chrome is launched thirteen times here and a loaded runner
+can lose one of those to the budget. A gate must fail for the thing it is
+about and nothing else; tools/schema-test.sh already draws this line for
+docker and this is the same line. A browser that never answered proves
+nothing. A browser that answered with a broken DOM still fails hard, below.
 """
 import io, os, re, subprocess, sys, tempfile
 
@@ -28,7 +36,15 @@ CANDIDATES = [
     '/usr/bin/chromium-browser', '/opt/google/chrome/chrome',
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
 ]
+# A CHROME THAT WAS SET BUT POINTS NOWHERE IS STILL "NO BROWSER". The env var
+# skipped the existence check every candidate below is subject to, so a stale
+# path in somebody's shell profile came out as a Python traceback and a hard
+# fail — the bundle blamed for the setting.
 CHROME = os.environ.get('CHROME') or next((c for c in CANDIDATES if os.path.exists(c)), None)
+if CHROME and not os.path.exists(CHROME):
+    print(f'smoke-dist: CHROME is set to {CHROME}, which does not exist — '
+          'cannot prove the bundle renders')
+    sys.exit(2)
 if not CHROME:
     print('smoke-dist: no Chrome/Edge found — cannot prove the bundle renders')
     sys.exit(2)
@@ -42,11 +58,30 @@ url = LIVE or 'file:///' + BUNDLE.replace('\\', '/').lstrip('/')
 cmd = [CHROME, '--headless=new', '--disable-gpu', '--no-first-run', '--no-sandbox', '--disable-extensions',
        '--allow-file-access-from-files', f'--user-data-dir={profile}',
        '--virtual-time-budget=6000', '--window-size=390,844', '--dump-dom', url]
-try:
-    dom = subprocess.run(cmd, capture_output=True, timeout=90).stdout.decode('utf-8', 'replace')
-except subprocess.TimeoutExpired:
-    print('smoke-dist: browser timed out')
-    sys.exit(1)
+# The bundle is ~1.8 MB of inlined modules and it grows with the product, so
+# the budget is generous and overridable rather than a number chosen in 2026.
+TIMEOUT = int(os.environ.get('SMOKE_TIMEOUT') or 180)
+
+
+def dump(command):
+    """Run headless Chrome once. Returns (dom, timed_out) — never raises."""
+    try:
+        return subprocess.run(command, capture_output=True, timeout=TIMEOUT
+                              ).stdout.decode('utf-8', 'replace'), False
+    except subprocess.TimeoutExpired:
+        return '', True
+    except OSError as e:
+        # The browser could not be started at all. That is the same class of
+        # answer as silence: we did not learn anything about the bundle.
+        print(f'smoke-dist: could not start the browser: {e}')
+        return '', True
+
+
+dom, timed_out = dump(cmd)
+if timed_out:
+    print(f'::warning::smoke-dist: the browser did not answer in {TIMEOUT}s — '
+          'the bundle was NOT proved to render (this is a skip, not a pass)')
+    sys.exit(2)
 
 # what the USER sees: the DOM minus scripts and styles
 visible = re.sub(r'(?is)<(script|style)\b.*?</\1\s*>', '', dom)
@@ -89,13 +124,13 @@ ROUTES = ['#/shops', '#/cart', '#/orders', '#/account', '#/earn',
           '#/legal/terms', '#/legal/refunds', '#/legal/privacy']
 ERROR_MARK = 'This screen hit an error'
 broken = []
+unproven = []
 for route in ROUTES:
     rcmd = [c for c in cmd]
     rcmd[-1] = url + ('&' if '?' in url else '?') + 'demo=1' + route
-    try:
-        rdom = subprocess.run(rcmd, capture_output=True, timeout=90).stdout.decode('utf-8', 'replace')
-    except subprocess.TimeoutExpired:
-        broken.append(route + ' — browser timed out')
+    rdom, timed_out = dump(rcmd)
+    if timed_out:
+        unproven.append(route)
         continue
     rvis = re.sub(r'(?is)<(script|style)\b.*?</\1\s*>', '', rdom)
     if ERROR_MARK in rvis:
@@ -105,6 +140,9 @@ for route in ROUTES:
     elif 'data-act=' not in rvis:
         broken.append(route + ' — nothing interactive rendered')
 
+# A ROUTE THAT ACTUALLY RENDERED WRONG OUTRANKS EVERY SILENCE. Checked first
+# and on its own, so a run that both found a broken screen and lost a browser
+# still fails for the broken screen.
 if broken:
     print('smoke-dist: FAIL — routes that do not render:')
     for b in broken:
@@ -112,5 +150,11 @@ if broken:
     print('    A view with a free variable parses, passes every test, and builds.')
     print('    It throws the first time somebody opens it.')
     sys.exit(1)
+if unproven:
+    print(f'::warning::smoke-dist: {len(unproven)} route(s) were never proved — '
+          f'the browser did not answer in {TIMEOUT}s: ' + ', '.join(unproven))
+    print(f'    {len(ROUTES) - len(unproven)} of {len(ROUTES)} routes rendered without throwing.')
+    sys.exit(2)
+
 print(f'smoke-dist: OK — {len(ROUTES)} more routes render without throwing')
 

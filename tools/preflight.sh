@@ -62,10 +62,18 @@ ok "SPA deep links will survive a hard refresh"
 
 # THE ONE A BROWSER HAS TO SEE: the built bundle boots and paints as an app, not as text.
 node --experimental-vm-modules tools/lint-parse.mjs 2>/dev/null || fail "a module does not parse as a module"
-python tools/smoke-dist.py; SM=$?
+# `python ...; SM=$?` COULD NEVER WORK UNDER `set -e`. The shell exits on the
+# failing command itself, so SM was never assigned and all three branches below
+# were unreachable: a non-zero smoke-dist killed preflight with no message at
+# all, and the documented "a laptop with no browser gets a warning, not a pass"
+# had never once happened. `|| SM=$?` puts the call in an OR-list, which is the
+# one form set -e is specified to ignore.
+SM=0
+python tools/smoke-dist.py || SM=$?
 [ $SM -eq 1 ] && fail "the built bundle does not render as an app (tools/smoke-dist.py)"
-[ $SM -eq 2 ] && echo "  warn: no browser here - CI proves the bundle renders"
+[ $SM -eq 2 ] && echo "  warn: the bundle was NOT proved to render (no browser, or it never answered)"
 [ $SM -eq 0 ] && ok "the built bundle boots and paints in a real browser"
+[ $SM -le 2 ] || fail "tools/smoke-dist.py exited $SM"
 python tools/check-version.py    || fail "version / CHANGELOG mismatch"
 python tools/lint-migrations.py  || fail "migration lint failed"
 # FIRST, BECAUSE EVERYTHING BELOW ASSUMES THE CODE PARSES. `node --check` does
