@@ -864,15 +864,39 @@ let rosterErr = '';
 let rosterBusy = false;
 let rosterTried = false;
 
+/* THE CONSOLE KEY. The roster is the only place a customer ever appears — a
+   buyer publishes nothing, and a public directory of buyers would be a privacy
+   hole nobody could take back — so the server has to be sure who is asking,
+   and the only thing it can check is a secret it already holds.
+
+   The console's own password cannot be that secret. It is verified here
+   against a PBKDF2 hash that SHIPS IN THE BUNDLE, so anyone who opens the page
+   can read the verifier; a server that trusted a browser's word about it would
+   be trusting a check the attacker also gets to perform. That is why this is a
+   separate value the server knows and the bundle does not.
+
+   Kept per device, because it is a capability and not an identity: pasting it
+   is how a machine becomes an owner console. `--owner` changes it to whatever
+   the owner prefers, including their console password. */
+const KEY_CONSOLE = 'SAAHAA_CONSOLE_KEY';
+export const consoleKey = () => persist.read(KEY_CONSOLE, '');
+export function setConsoleKey(v) {
+  persist.write(KEY_CONSOLE, String(v || '').trim());
+  rosterErr = ''; rosterData = null; rosterTried = false;
+  loadRoster();
+}
+
+/* The stored key first: it is what the server was actually seeded with. The
+   typed console password is the fallback, for an owner who set the two to the
+   same thing with `bash tools/deploy.sh --owner`. */
+const rosterSecret = () => consoleKey() || adminauth.ownerSecret();
+
 export async function loadRoster() {
   if (rosterBusy) return;
-  const secret = adminauth.ownerSecret();
+  const secret = rosterSecret();
   if (!rail.isConfigured()) { rosterErr = 'No server is configured for this build.'; ctx.render(); return; }
   if (!secret) {
-    /* A REFRESH LOSES THE PASSWORD ON PURPOSE — it is held in memory and
-       nowhere else. Say so, rather than showing an empty table that looks
-       exactly like "nobody has signed up". */
-    rosterErr = 'Sign in to the console again to load the roster — your password is kept in memory only.';
+    rosterErr = 'Paste the console key below to see everyone who has signed up.';
     ctx.render(); return;
   }
   rosterBusy = true; rosterErr = ''; ctx.render();
@@ -885,7 +909,7 @@ export async function loadRoster() {
        means the server has no owner password to check yours against, which is
        a setup step, not a refusal. Say which one. */
     rosterErr = (err && err.status === 403)
-      ? 'The server has no owner password yet, so it cannot check yours. Put your console password in .env.deploy as ADMIN_PASSWORD and run: bash tools/deploy.sh --owner'
+      ? 'That console key is not the one this server holds. Paste the right one below, or set a new one with: bash tools/deploy.sh --owner'
       : ((err && err.message) || 'Could not read the roster.');
   } finally {
     rosterBusy = false; rosterTried = true; ctx.render();
@@ -915,6 +939,13 @@ function platformRoster(st) {
       ${localOnly ? `<b>${localOnly}</b> account${localOnly === 1 ? '' : 's'} on this device ${localOnly === 1 ? 'is' : 'are'} not on the server &mdash; opened before the server existed, or while it was unreachable.` : ''}
     </p>
     ${rosterErr ? `<p class="tiny" style="color:var(--bad)">${esc(rosterErr)}</p>` : ''}
+    ${(rosterErr || !rosterData) ? `
+      <div class="row" style="gap:8px;align-items:center;margin:8px 0 14px">
+        <input id="adConsoleKey" type="password" class="in" style="max-width:320px"
+               placeholder="Console key" value="${esc(consoleKey())}"
+               autocomplete="off" aria-label="Console key">
+        <button class="btn btn--ghost btn--sm" data-act="admin.roster.key">Use this key</button>
+      </div>` : ''}
     ${table(['Name', 'ID', 'Kind', 'Mobile', 'Area', 'Opened'], rows.map(a => `<tr>
       <td class="nowrap"><b>${esc(a.name || '')}</b></td>
       <td class="nowrap"><span class="num" style="letter-spacing:.08em">${esc(a.code)}</span></td>
@@ -1132,7 +1163,17 @@ function flowBlock(st) {
     </div>
     ${table(['Who', 'Where', 'Step', 'Seen', 'Spent / earned'], rows.map(r => flowRow(r)).join(''),
       flowQuery.trim() ? `Nobody matches “${flowQuery.trim()}”.`
-        : flowRole === 'all' ? 'Nobody has signed up yet.' : 'Nobody in that role yet.')}
+        /* THE FLOW TRACKER FOLLOWS A JOURNEY, AND A JOURNEY IS ORDERS AND A
+           LEDGER — both of which are still this device's. So it saw nobody and
+           said "Nobody has signed up yet", sitting directly above a roster
+           listing three people who had. It is the same sentence that sent the
+           owner looking for a bug when the data was fine, and it must not be
+           said by a screen that cannot know it. */
+        : flowRole === 'all'
+          ? (rail.isConfigured()
+              ? 'Nobody has started a journey on this device yet. Everyone who has signed up is in the roster below — a journey appears here once they book.'
+              : 'Nobody has signed up yet.')
+          : 'Nobody in that role yet.')}
     ${rows.length >= FLOW_ROWS ? `<p class="micro muted" style="margin-top:var(--sp-4)">Showing the ${FLOW_ROWS} most recently active.</p>` : ''}
   </div>`;
 }

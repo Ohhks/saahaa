@@ -584,6 +584,7 @@ function wireActions() {
 
   A('admin.reset', d => admin.resetPassword && admin.resetPassword(d.key));
   A('admin.roster.load', () => admin.loadRoster && admin.loadRoster());
+  A('admin.roster.key', () => { const el = document.getElementById('adConsoleKey'); if (el && admin.setConsoleKey) admin.setConsoleKey(el.value); });
 
   A('account.erase', () => {
     const s = me();
