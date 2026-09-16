@@ -393,7 +393,17 @@ function dash(st) {
   <div class="sec">${secHead('The numbers')}
   <div class="capsules">
     ${capsule('Ours (fees earned)', M.fmt(t.feeEarned), `${M.fmt(t.withdrawn)} withdrawn so far`, 'gold')}
-    ${capsule('Users', st.users.length, `${st.users.filter(u => u.role === 'customer').length} customers`, 'soft')}
+    ${(() => {
+      /* THE LEDGER AND THE ORDER REGISTRY ARE THIS DEVICE'S, AND USERS ARE NOT
+         ANY MORE. This capsule read st.users and therefore said 0 on a console
+         that had just been handed three accounts by the server. When the
+         roster has been read it is the truth; when it has not, the label says
+         whose number this is rather than implying it is everybody's. */
+      const c = rosterData && rosterData.counts;
+      return c
+        ? capsule('Users', c.total, `${c.customer} customer${c.customer === 1 ? '' : 's'} · on the platform`, 'soft')
+        : capsule('Users', st.users.length, `${st.users.filter(u => u.role === 'customer').length} on this device`, 'soft');
+    })()}
     ${capsule('Partners', st.partners.length, `${st.shops.length} shops`, 'soft')}
     ${capsule('Orders', st.orders.length, `${liveOrders} live`, 'info')}
     ${capsule('Revenue', M.fmt(a.revenue), `GST ${M.fmt(a.gst)} collected`, 'gold')}
@@ -942,9 +952,9 @@ function platformRoster(st) {
     ${(rosterErr || !rosterData) ? `
       <div class="row" style="gap:8px;align-items:center;margin:8px 0 14px">
         <input id="adConsoleKey" type="password" class="in" style="max-width:320px"
-               placeholder="Console key" value="${esc(consoleKey())}"
-               autocomplete="off" aria-label="Console key">
-        <button class="btn btn--ghost btn--sm" data-act="admin.roster.key">Use this key</button>
+               placeholder="Console password or key" value="${esc(consoleKey())}"
+               autocomplete="off" aria-label="Console password or key">
+        <button class="btn btn--ghost btn--sm" data-act="admin.roster.key">Load the roster</button>
       </div>` : ''}
     ${table(['Name', 'ID', 'Kind', 'Mobile', 'Area', 'Opened'], rows.map(a => `<tr>
       <td class="nowrap"><b>${esc(a.name || '')}</b></td>
@@ -954,7 +964,15 @@ function platformRoster(st) {
       <td>${esc(a.area || '')}</td>
       <td class="nowrap muted">${a.createdAt ? esc(new Date(a.createdAt).toLocaleDateString('en-IN')) : ''}</td>
       </tr>`).join(''),
-      rosterBusy ? 'Reading the roster…' : 'No accounts on the server yet.')}</div>`;
+      /* "No accounts on the server yet." IS THE SAME LIE IN A NEW PLACE. The
+         roster has not been READ unless rosterData exists — the owner's
+         password lives in memory only, so a refresh loses it and this table
+         goes blank. Blank-because-unasked and blank-because-empty are
+         different sentences and the second one is the one that sends somebody
+         hunting for a bug that is not there. */
+      rosterBusy ? 'Reading the roster…'
+        : rosterData ? 'No accounts on the server yet.'
+        : 'Not loaded. Type your console password (or a console key) above — it is kept in memory only, so a refresh asks again.')}</div>`;
 }
 
 /* ── 5. PEOPLE ────────────────────────────────────────────── */
