@@ -70,6 +70,29 @@ export async function makeCredential(password) {
 function gate() { return persist.read(GATE_KEY, { fails: 0, nextAt: 0, lockUntil: 0 }); }
 function setGate(g) { persist.write(GATE_KEY, g); }
 
+/**
+ * A shipped credential that is NEWER than the one this device holds.
+ *
+ * WHY THIS HAD TO BE WRITTEN. `bootstrapVersion` was recorded on every
+ * credential and then read by nothing at all, so rotating ADMIN_BOOTSTRAP
+ * changed the password on a FRESH device and on no other — migration v7->v8
+ * only fills a credential in when there is none, deliberately, so it will not
+ * overwrite one. The result was a rotation that looked done, passed every
+ * gate, and left every existing console on the old password. A field that is
+ * written and never read is a promise the code does not keep.
+ *
+ * Bumping the version in src/core/config.js is an explicit act by whoever
+ * deploys, and it wins — including over a password set from Admin -> System on
+ * this device, which is the only way it can mean "the password is now this".
+ * The replacement is audited, so it is never silent.
+ */
+export function bootstrapSupersedes(stored) {
+  const boot = bootstrapCredential();
+  if (!boot) return null;
+  const have = (stored && stored.bootstrapVersion) || 0;
+  return boot.bootstrapVersion > have ? boot : null;
+}
+
 export function gateStatus() {
   const g = gate(), now = Date.now();
   if (g.lockUntil > now) return { blocked: true, reason: 'locked', waitMs: g.lockUntil - now, fails: g.fails };

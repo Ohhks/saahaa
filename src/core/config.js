@@ -126,10 +126,10 @@ export const setBackendMode = m => persist.write('SAAHAA_BACKEND', m);
    `node tools/admin-cred.mjs '<new password>'` and paste the result here. */
 export const ADMIN_BOOTSTRAP = {
   username: 'siidhartha12',
-  salt: '4da0f76dcbf7f8a102f6eb757c3d46d6',
-  hash: '895883bb11300d91f5bcf91234e0c44b7a0627a0017203b0cd6a975e982bbe14',
+  salt: 'e16a49ed6bdbae559d061b3988913078',
+  hash: '7edecb3faaf3bac2c37985098f1946b410d27f9285e6d20dab2052b0cfa0f657',
   iterations: 250000,
-  version: 1,
+  version: 2,
 };
 
 /* ── payments: the rail (core/gateway.js) ───────────────────────

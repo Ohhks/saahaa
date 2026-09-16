@@ -1291,6 +1291,18 @@ async function boot() {
   }
 
   render();
+  /* A ROTATED OWNER CREDENTIAL, BEFORE ANYONE TRIES TO SIGN IN WITH IT.
+     Rotating ADMIN_BOOTSTRAP used to reach fresh devices only; a console that
+     already had a credential kept the old password for ever, because nothing
+     ever read the version that was being stamped on it. */
+  {
+    const fresher = adminauth.bootstrapSupersedes(getState().admin);
+    if (fresher) {
+      dispatch({ type: 'admin/set', payload: fresher });
+      audit.record('admin.credential.rotated', { version: fresher.bootstrapVersion }, 'system');
+    }
+  }
+
   await showSplash({ onGuest: () => go('home') });
   render();
 
