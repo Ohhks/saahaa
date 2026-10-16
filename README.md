@@ -201,3 +201,13 @@ never logged, and never sent back. See [supabase/schema.sql](supabase/schema.sql
 | Release test report | [docs/TEST-REPORT.md](docs/TEST-REPORT.md) |
 | Security scope | [docs/SECURITY.md](docs/SECURITY.md) |
 | Deploys and rollback | [docs/DEVOPS.md](docs/DEVOPS.md) |
+
+## Contributing to SAAHAA
+
+SAAHAA is built with an uncompromising commitment to clean engineering and production integrity:
+1. **Zero External Dependencies**: We write clean, dependency-free Vanilla ES Modules (no npm packages, no framework bloat).
+2. **Mathematical Integrity**: Currency arithmetic is integer-paise only (src/core/money.js).
+3. **15-Gate CI/CD Engine**: All PRs must pass bash tools/preflight.sh (301 domain tests, 30 view renders, 17 money journeys with 186 assertions).
+
+We welcome PRs for local language translations, additional offline map optimizations, and edge-case testing.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/WORKFLOW.md](docs/WORKFLOW.md) before submitting a PR.
